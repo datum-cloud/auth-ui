@@ -11,7 +11,7 @@ import { useForm } from "react-hook-form";
 import { Alert } from "./alert";
 import { BackButton } from "./back-button";
 import { Button, ButtonVariants } from "./button";
-import { Spinner } from "./spinner";
+import { FormActions } from "./form-actions";
 import { Translated } from "./translated";
 
 type Inputs = {};
@@ -187,11 +187,20 @@ export function RegisterPasskey({
         </div>
       )}
 
-      <div className="mt-8 flex w-full flex-row items-center">
+      <div className="mt-8 flex w-full flex-col items-center gap-1.5 justify-center">
+        <FormActions
+          submitLabel={<Translated i18nKey="set.submit" namespace="passkey" />}
+          disabled={loading || !formState.isValid}
+          loading={loading}
+          onSubmit={handleSubmit(submitRegisterAndContinue)}
+          showBackButton={false}
+          submitTestId="submit-button"
+        />
         {isPrompt ? (
           <Button
+            className="w-full"
             type="button"
-            variant={ButtonVariants.Secondary}
+            variant={ButtonVariants.Ghost}
             onClick={() => {
               continueAndLogin();
             }}
@@ -201,19 +210,6 @@ export function RegisterPasskey({
         ) : (
           <BackButton />
         )}
-
-        <span className="flex-grow"></span>
-        <Button
-          type="submit"
-          className="self-end"
-          variant={ButtonVariants.Primary}
-          disabled={loading || !formState.isValid}
-          onClick={handleSubmit(submitRegisterAndContinue)}
-          data-testid="submit-button"
-        >
-          {loading && <Spinner className="h-5 w-5 mr-2" />}{" "}
-          <Translated i18nKey="set.submit" namespace="passkey" />
-        </Button>
       </div>
     </form>
   );

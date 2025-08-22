@@ -46,6 +46,20 @@ export default {
     extend: {
       colors: {
         ...colors,
+        // Custom color palette
+        navy: "var(--color-navy)",
+        cream: "var(--color-cream)",
+        "light-gray": "var(--color-light-gray)",
+        "lime-green": "var(--color-lime-green)",
+        "dark-navy-blue": "var(--color-dark-navy-blue)",
+        "light-pink": "var(--color-light-pink)",
+        mauve: "var(--color-mauve)",
+        "navy-muted": "var(--color-navy-muted)",
+        orange: "var(--color-orange)",
+        tuscany: "var(--color-tuscany)",
+        indigo: "var(--color-indigo)",
+        "pearl-gray": "var(--color-pearl-gray)",
+        "green-dark": "var(--color-green-dark)",
         state: {
           success: {
             light: {
@@ -88,6 +102,11 @@ export default {
             },
           },
         },
+      },
+      fontFamily: {
+        alliance: ["var(--font-alliance)"],
+        "canela-text": ["var(--font-canela-text)"],
+        frontliner: ["var(--font-frontliner)"],
       },
       animation: {
         shake: "shake .8s cubic-bezier(.36,.07,.19,.97) both;",

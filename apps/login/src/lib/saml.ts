@@ -1,6 +1,10 @@
 import { Cookie } from "@/lib/cookies";
 import { sendLoginname, SendLoginnameCommand } from "@/lib/server/loginname";
-import { createResponse, getLoginSettings } from "@/lib/zitadel";
+import {
+  createResponse,
+  getLoginSettings,
+  listAuthenticationMethodTypes,
+} from "@/lib/zitadel";
 import { create } from "@zitadel/client";
 import { CreateResponseRequestSchema } from "@zitadel/proto/zitadel/saml/v2/saml_service_pb";
 import { Session } from "@zitadel/proto/zitadel/session/v2/session_pb";
@@ -9,6 +13,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { v4 as uuidv4 } from "uuid";
 import { constructUrl } from "./service-url";
 import { isSessionValid } from "./session";
+import { checkMFAFactors } from "./verify-helper";
 
 type LoginWithSAMLAndSession = {
   serviceUrl: string;
@@ -116,8 +121,37 @@ export async function loginWithSAMLAndSession({
     console.log("Session is valid:", isValid);
 
     if (!isValid && selectedSession.factors?.user) {
+      // Check if user has already authenticated via IDP but needs MFA
+      if (selectedSession.factors?.intent?.verifiedAt) {
+        console.log("User has IDP authentication, checking MFA factors...");
+
+        const methods = await listAuthenticationMethodTypes({
+          serviceUrl,
+          userId: selectedSession.factors.user.id,
+        });
+
+        const loginSettings = await getLoginSettings({
+          serviceUrl,
+          organization: selectedSession.factors?.user?.organizationId,
+        });
+
+        const mfaFactorCheck = await checkMFAFactors(
+          serviceUrl,
+          selectedSession,
+          loginSettings,
+          methods.authMethodTypes,
+          selectedSession.factors?.user?.organizationId,
+          `saml_${samlRequest}`,
+        );
+
+        if (mfaFactorCheck?.redirect) {
+          console.log("Redirecting to MFA:", mfaFactorCheck.redirect);
+          const absoluteUrl = constructUrl(request, mfaFactorCheck.redirect);
+          return NextResponse.redirect(absoluteUrl.toString());
+        }
+      }
+
       // if the session is not valid anymore, we need to redirect the user to re-authenticate /
-      // TODO: handle IDP intent direcly if available
       const command: SendLoginnameCommand = {
         loginName: selectedSession.factors.user?.loginName,
         organization: selectedSession.factors?.user?.organizationId,
@@ -127,8 +161,16 @@ export async function loginWithSAMLAndSession({
       const res = await sendLoginname(command);
 
       if (res && "redirect" in res && res?.redirect) {
-        const absoluteUrl = constructUrl(request, res.redirect);
-        return NextResponse.redirect(absoluteUrl.toString());
+        // Check if the redirect URL is already a full URL
+        if (
+          res.redirect.startsWith("http://") ||
+          res.redirect.startsWith("https://")
+        ) {
+          return NextResponse.redirect(res.redirect);
+        } else {
+          const absoluteUrl = constructUrl(request, res.redirect);
+          return NextResponse.redirect(absoluteUrl.toString());
+        }
       }
     }
 

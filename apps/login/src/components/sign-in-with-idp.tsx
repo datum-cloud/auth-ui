@@ -15,7 +15,6 @@ import { SignInWithGeneric } from "./idps/sign-in-with-generic";
 import { SignInWithGithub } from "./idps/sign-in-with-github";
 import { SignInWithGitlab } from "./idps/sign-in-with-gitlab";
 import { SignInWithGoogle } from "./idps/sign-in-with-google";
-import { Translated } from "./translated";
 
 export interface SignInWithIDPProps {
   children?: ReactNode;
@@ -76,10 +75,7 @@ export function SignInWithIdp({
   };
 
   return (
-    <div className="flex flex-col w-full space-y-2 text-sm">
-      <p className="text-center ztdl-p">
-        <Translated i18nKey="orSignInWith" namespace="idp" />
-      </p>
+    <div className="flex flex-col w-full text-sm sign-in-with-idp">
       {!!identityProviders.length && identityProviders?.map(renderIDPButton)}
       {state?.error && (
         <div className="py-4">

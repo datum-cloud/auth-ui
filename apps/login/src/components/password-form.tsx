@@ -8,10 +8,8 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useForm } from "react-hook-form";
 import { Alert, AlertType } from "./alert";
-import { BackButton } from "./back-button";
-import { Button, ButtonVariants } from "./button";
+import { FormActions } from "./form-actions";
 import { TextInput } from "./input";
-import { Spinner } from "./spinner";
 import { Translated } from "./translated";
 
 type Inputs = {
@@ -119,12 +117,12 @@ export function PasswordForm({
           type="password"
           autoComplete="password"
           {...register("password", { required: "This field is required" })}
-          label="Password"
+          placeholder="Password"
           data-testid="password-text-input"
         />
         {!loginSettings?.hidePasswordReset && (
           <button
-            className="transition-all text-sm hover:text-primary-light-500 dark:hover:text-primary-dark-500"
+            className="transition-all text-sm text-navy opacity-60 hover:text-navy hover:opacity-100 dark:text-navy dark:hover:text-navy "
             onClick={() => resetPasswordAndContinue()}
             type="button"
             disabled={loading}
@@ -156,21 +154,18 @@ export function PasswordForm({
         </div>
       )}
 
-      <div className="mt-8 flex w-full flex-row items-center">
-        <BackButton data-testid="back-button" />
-        <span className="flex-grow"></span>
-        <Button
-          type="submit"
-          className="self-end"
-          variant={ButtonVariants.Primary}
-          disabled={loading || !formState.isValid}
-          onClick={handleSubmit(submitPassword)}
-          data-testid="submit-button"
-        >
-          {loading && <Spinner className="h-5 w-5 mr-2" />}{" "}
+      <FormActions
+        submitLabel={
           <Translated i18nKey="verify.submit" namespace="password" />
-        </Button>
-      </div>
+        }
+        disabled={loading || !formState.isValid}
+        loading={loading}
+        onSubmit={handleSubmit(submitPassword)}
+        showBackButton={true}
+        submitTestId="submit-button"
+        backTestId="back-button"
+        className="mt-8"
+      />
     </form>
   );
 }

@@ -93,10 +93,12 @@ export async function GET(request: NextRequest) {
 
   const sessionId = searchParams.get("sessionId");
 
-  // TODO: find a better way to handle _rsc (react server components) requests and block them to avoid conflicts when creating oidc callback
   const _rsc = searchParams.get("_rsc");
   if (_rsc) {
-    return NextResponse.json({ error: "No _rsc supported" }, { status: 500 });
+    return NextResponse.json(
+      { error: "RSC requests not supported on login endpoint" },
+      { status: 400 },
+    );
   }
 
   const sessionCookies = await getAllSessions();

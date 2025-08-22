@@ -29,5 +29,10 @@ declare namespace NodeJS {
      * Split by comma, key value pairs separated by colon
      */
     CUSTOM_REQUEST_HEADERS?: string;
+
+    /**
+     * Optional: whether to enable the Zitadel API translation
+     */
+    ENABLE_ZITADEL_API_TRANSLATION?: string | boolean;
   }
 }

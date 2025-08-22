@@ -205,10 +205,10 @@ docker compose up
 
 - **ZITADEL Admin email**: `zitadel-admin@zitadel.localhost`
 - **ZITADEL Admin password**: `Password1!`
-  
->[!NOTE]
+
+> [!NOTE]
 > When using Docker Compose, a local SMTP server can be configured for testing email functionality.
->The SMTP provider UI is available at: `http://localhost:8025`
+> The SMTP provider UI is available at: `http://localhost:8025`
 
 To configure the local SMTP provider:
 
@@ -227,6 +227,7 @@ Update `apps/login/.env.local` with:
 ZITADEL_API_URL=<http://localhost:8080 or Zitadel URL instance>
 ZITADEL_SERVICE_USER_TOKEN=<Personal Access Token from machine user with Org Owener and Iam Owener memberships>
 CUSTOM_REQUEST_HEADERS=x-zitadel-public-host:auth.staging.env.datum.net,x-zitadel-public-proto:https
+ENABLE_ZITADEL_API_TRANSLATION=false
 ```
 
 #### Starting the app
@@ -268,6 +269,7 @@ To run the production build of the Login UI locally, follow these steps:
    ZITADEL_API_URL=<your-zitadel-instance-url>
    ZITADEL_SERVICE_USER_TOKEN=<your-service-user-token>
    CUSTOM_REQUEST_HEADERS=x-zitadel-public-host:auth.staging.env.datum.net,x-zitadel-public-proto:https
+   ENABLE_ZITADEL_API_TRANSLATION=true
 
    ```
 

@@ -34,10 +34,10 @@ export function ChooseSecondFactor({
   }
 
   return (
-    <div className="grid grid-cols-1 gap-5 w-full pt-4">
+    <div className="grid grid-cols-1 gap-5 w-full space-y-5">
       {userMethods.map((method, i) => {
         return (
-          <div key={"method-" + i}>
+          <>
             {method === AuthenticationMethodType.TOTP &&
               TOTP(false, "/otp/time-based?" + params)}
             {method === AuthenticationMethodType.U2F &&
@@ -46,7 +46,7 @@ export function ChooseSecondFactor({
               EMAIL(false, "/otp/email?" + params)}
             {method === AuthenticationMethodType.OTP_SMS &&
               SMS(false, "/otp/sms?" + params)}
-          </div>
+          </>
         );
       })}
     </div>

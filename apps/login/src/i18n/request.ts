@@ -33,18 +33,21 @@ export default getRequestConfig(async () => {
   const i18nOrganization = _headers.get("x-zitadel-i18n-organization") || ""; // You may need to set this header in middleware
 
   let translations: JsonObject | {} = {};
-  try {
-    const i18nJSON = await getHostedLoginTranslation({
-      serviceUrl,
-      locale,
-      organization: i18nOrganization,
-    });
 
-    if (i18nJSON) {
-      translations = i18nJSON;
+  if (process.env.ENABLE_ZITADEL_API_TRANSLATION === "true") {
+    try {
+      const i18nJSON = await getHostedLoginTranslation({
+        serviceUrl,
+        locale,
+        organization: i18nOrganization,
+      });
+
+      if (i18nJSON) {
+        translations = i18nJSON;
+      }
+    } catch (error) {
+      console.warn("Error fetching custom translations:", error);
     }
-  } catch (error) {
-    console.warn("Error fetching custom translations:", error);
   }
 
   const customMessages = translations;

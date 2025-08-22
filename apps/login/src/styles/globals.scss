@@ -8,11 +8,28 @@
 @layer base {
   h1,
   .ztdl-h1 {
-    @apply text-2xl text-center;
+    @apply font-canela-text font-normal leading-[1.2] text-center tracking-[-0.02em];
+    font-size: 40px;
   }
 
   .ztdl-p {
-    @apply text-sm text-center text-text-light-secondary-500 dark:text-text-dark-secondary-500 text-center;
+    @apply text-navy dark:text-cream text-center;
+
+    &-secondary {
+      @apply text-navy dark:text-cream opacity-50;
+      font-size: 14px;
+    }
+
+    &.description {
+      font-size: 19px;
+    }
+  }
+
+  body {
+    @apply text-navy dark:text-cream;
+
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
   }
 }
 
@@ -61,5 +78,29 @@ html {
   }
   100% {
     background-position: -200% 0;
+  }
+}
+
+.boxed-card {
+  > h1 {
+    margin-bottom: 30px;
+  }
+
+  > p.description {
+    margin-bottom: 40px;
+  }
+
+  form {
+    @apply space-y-5;
+  }
+
+  .or-sign-in-with {
+    margin-top: 30px;
+    margin-bottom: 10px;
+  }
+
+  .terms-of-service {
+    margin-top: 40px;
+    margin-bottom: 40px;
   }
 }

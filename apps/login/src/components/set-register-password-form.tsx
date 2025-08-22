@@ -12,11 +12,9 @@ import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { FieldValues, useForm } from "react-hook-form";
 import { Alert } from "./alert";
-import { BackButton } from "./back-button";
-import { Button, ButtonVariants } from "./button";
+import { FormActions } from "./form-actions";
 import { TextInput } from "./input";
 import { PasswordComplexity } from "./password-complexity";
-import { Spinner } from "./spinner";
 import { Translated } from "./translated";
 
 type Inputs =
@@ -117,7 +115,7 @@ export function SetRegisterPasswordForm({
             {...register("password", {
               required: "You have to provide a password!",
             })}
-            label="Password"
+            placeholder="Password"
             error={errors.password?.message as string}
             data-testid="password-text-input"
           />
@@ -130,7 +128,7 @@ export function SetRegisterPasswordForm({
             {...register("confirmPassword", {
               required: "This field is required",
             })}
-            label="Confirm Password"
+            placeholder="Confirm Password"
             error={errors.confirmPassword?.message as string}
             data-testid="password-confirm-text-input"
           />
@@ -147,24 +145,23 @@ export function SetRegisterPasswordForm({
 
       {error && <Alert>{error}</Alert>}
 
-      <div className="mt-8 flex w-full flex-row items-center justify-between">
-        <BackButton data-testid="back-button" />
-        <Button
-          type="submit"
-          variant={ButtonVariants.Primary}
-          disabled={
-            loading ||
-            !policyIsValid ||
-            !formState.isValid ||
-            watchPassword !== watchConfirmPassword
-          }
-          onClick={handleSubmit(submitRegister)}
-          data-testid="submit-button"
-        >
-          {loading && <Spinner className="h-5 w-5 mr-2" />}{" "}
+      <FormActions
+        submitLabel={
           <Translated i18nKey="password.submit" namespace="register" />
-        </Button>
-      </div>
+        }
+        disabled={
+          loading ||
+          !policyIsValid ||
+          !formState.isValid ||
+          watchPassword !== watchConfirmPassword
+        }
+        loading={loading}
+        onSubmit={handleSubmit(submitRegister)}
+        showBackButton={true}
+        submitTestId="submit-button"
+        backTestId="back-button"
+        className="mt-8"
+      />
     </form>
   );
 }

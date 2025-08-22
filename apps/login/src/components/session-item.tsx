@@ -102,9 +102,9 @@ export function SessionItem({
           }
         }
       }}
-      className="group flex flex-row items-center bg-background-light-400 dark:bg-background-dark-400  border border-divider-light hover:shadow-lg dark:hover:bg-white/10 py-2 px-4 rounded-md transition-all"
+      className="group flex flex-row items-center py-2 border border-light-gray hover:border-navy rounded-lg bg-background-light-400 dark:bg-background-dark-400 transition-all px-4"
     >
-      <div className="pr-4">
+      <div className="pr-2.5">
         <Avatar
           size="small"
           loginName={session.factors?.user?.loginName as string}
@@ -113,17 +113,19 @@ export function SessionItem({
       </div>
 
       <div className="flex flex-col items-start overflow-hidden">
-        <span className="">{session.factors?.user?.displayName}</span>
-        <span className="text-xs opacity-80 text-ellipsis">
+        <span className="font-semibold text-sm">
+          {session.factors?.user?.displayName}
+        </span>
+        <span className="text-xs text-navy opacity-60 text-ellipsis font-normal">
           {session.factors?.user?.loginName}
         </span>
         {valid ? (
-          <span className="text-xs opacity-80 text-ellipsis">
+          <span className="text-xs text-navy opacity-60 text-ellipsis">
             {verifiedAt && moment(timestampDate(verifiedAt)).fromNow()}
           </span>
         ) : (
           verifiedAt && (
-            <span className="text-xs opacity-80 text-ellipsis">
+            <span className="text-xs text-navy opacity-60 text-ellipsis">
               expired{" "}
               {session.expirationDate &&
                 moment(timestampDate(session.expirationDate)).fromNow()}
