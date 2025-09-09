@@ -1,0 +1,39 @@
+name: Publish Auth UI
+
+on:
+  push:
+    paths-ignore:
+      - 'docs/**'
+      - 'README.md'
+
+  release:
+    types: ['published']
+
+jobs:
+  check-files:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v5
+
+  publish-container-image:
+    permissions:
+      id-token: write
+      contents: read
+      packages: write
+      attestations: write
+    uses: datum-cloud/actions/.github/workflows/publish-docker.yaml@v1.6.5
+    with:
+      image-name: auth-ui
+    secrets: inherit
+
+  publish-kustomize-bundles:
+    permissions:
+      id-token: write
+      contents: read
+      packages: write
+    uses: datum-cloud/actions/.github/workflows/publish-kustomize-bundle.yaml@1.6.5
+    with:
+      bundle-name: ghcr.io/datum-cloud/auth-ui-kustomize
+      bundle-path: config
+    secrets: inherit 
