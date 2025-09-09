@@ -46,6 +46,12 @@ const imageRemotePatterns = [
     port: "",
     pathname: "/**",
   },
+  {
+    protocol: "https",
+    hostname: "auth.staging.env.datum.net",
+    port: "",
+    pathname: "/**",
+  },
 ];
 
 if (process.env.ZITADEL_API_URL) {
