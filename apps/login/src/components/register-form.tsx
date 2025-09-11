@@ -1,7 +1,6 @@
 "use client";
 
 import { registerUser } from "@/lib/server/register";
-import { LegalAndSupportSettings } from "@zitadel/proto/zitadel/settings/v2/legal_settings_pb";
 import {
   LoginSettings,
   PasskeysType,
@@ -15,11 +14,8 @@ import {
   AuthenticationMethodRadio,
   methods,
 } from "./authentication-method-radio";
-import { BackButton } from "./back-button";
-import { Button, ButtonVariants } from "./button";
+import { FormActions } from "./form-actions";
 import { TextInput } from "./input";
-import { PrivacyPolicyCheckboxes } from "./privacy-policy-checkboxes";
-import { Spinner } from "./spinner";
 import { Translated } from "./translated";
 
 type Inputs =
@@ -31,7 +27,6 @@ type Inputs =
   | FieldValues;
 
 type Props = {
-  legal: LegalAndSupportSettings;
   firstname?: string;
   lastname?: string;
   email?: string;
@@ -42,7 +37,6 @@ type Props = {
 };
 
 export function RegisterForm({
-  legal,
   email,
   firstname,
   lastname,
@@ -121,17 +115,16 @@ export function RegisterForm({
 
   const { errors } = formState;
 
-  const [tosAndPolicyAccepted, setTosAndPolicyAccepted] = useState(false);
   return (
     <form className="w-full">
-      <div className="grid grid-cols-2 gap-4 mb-4">
+      <div className="grid grid-cols-2 gap-5 mb-5">
         <div className="">
           <TextInput
             type="firstname"
             autoComplete="firstname"
             required
             {...register("firstname", { required: "This field is required" })}
-            label="First name"
+            placeholder="First name"
             error={errors.firstname?.message as string}
             data-testid="firstname-text-input"
           />
@@ -142,7 +135,7 @@ export function RegisterForm({
             autoComplete="lastname"
             required
             {...register("lastname", { required: "This field is required" })}
-            label="Last name"
+            placeholder="Last name"
             error={errors.lastname?.message as string}
             data-testid="lastname-text-input"
           />
@@ -152,35 +145,27 @@ export function RegisterForm({
             type="email"
             autoComplete="email"
             required
-            {...register("email", { required: "This field is required" })}
-            label="E-mail"
+            {...register("email", {
+              required: "This field is required",
+              pattern: {
+                value: /^[^\s@]+@[^\s@]+\.[^\s@]+$/,
+                message: "Invalid email address",
+              },
+            })}
+            placeholder="E-mail"
             error={errors.email?.message as string}
             data-testid="email-text-input"
           />
         </div>
       </div>
-      {legal && (
-        <PrivacyPolicyCheckboxes
-          legal={legal}
-          onChange={setTosAndPolicyAccepted}
-        />
-      )}
       {/* show chooser if both methods are allowed */}
       {loginSettings &&
         loginSettings.allowUsernamePassword &&
         loginSettings.passkeysType == PasskeysType.ALLOWED && (
-          <>
-            <p className="mt-4 ztdl-p mb-6 block text-left">
-              <Translated i18nKey="selectMethod" namespace="register" />
-            </p>
-
-            <div className="pb-4">
-              <AuthenticationMethodRadio
-                selected={selected}
-                selectionChanged={setSelected}
-              />
-            </div>
-          </>
+          <AuthenticationMethodRadio
+            selected={selected}
+            selectionChanged={setSelected}
+          />
         )}
       {!loginSettings?.allowUsernamePassword &&
         loginSettings?.passkeysType !== PasskeysType.ALLOWED &&
@@ -201,27 +186,23 @@ export function RegisterForm({
         </div>
       )}
 
-      <div className="mt-8 flex w-full flex-row items-center justify-between">
-        <BackButton data-testid="back-button" />
-        <Button
-          type="submit"
-          variant={ButtonVariants.Primary}
-          disabled={loading || !formState.isValid || !tosAndPolicyAccepted}
-          onClick={handleSubmit((values) => {
-            const usePasswordToContinue: boolean =
-              loginSettings?.allowUsernamePassword &&
-              loginSettings?.passkeysType == PasskeysType.ALLOWED
-                ? !!!(selected === methods[0]) // choose selection if both available
-                : !!loginSettings?.allowUsernamePassword; // if password is chosen
-            // set password as default if only password is allowed
-            return submitAndContinue(values, usePasswordToContinue);
-          })}
-          data-testid="submit-button"
-        >
-          {loading && <Spinner className="h-5 w-5 mr-2" />}
-          <Translated i18nKey="submit" namespace="register" />
-        </Button>
-      </div>
+      <FormActions
+        submitLabel={<Translated i18nKey="submit" namespace="register" />}
+        disabled={loading || !formState.isValid}
+        loading={loading}
+        onSubmit={handleSubmit((values) => {
+          const usePasswordToContinue: boolean =
+            loginSettings?.allowUsernamePassword &&
+            loginSettings?.passkeysType == PasskeysType.ALLOWED
+              ? !!!(selected === methods[0]) // choose selection if both available
+              : !!loginSettings?.allowUsernamePassword; // if password is chosen
+          // set password as default if only password is allowed
+          return submitAndContinue(values, usePasswordToContinue);
+        })}
+        showBackButton={false}
+        submitTestId="submit-button"
+        backTestId="back-button"
+      />
     </form>
   );
 }

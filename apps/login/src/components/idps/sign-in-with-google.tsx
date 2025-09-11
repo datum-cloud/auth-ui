@@ -11,8 +11,13 @@ export const SignInWithGoogle = forwardRef<
   const { children, name, ...restProps } = props;
 
   return (
-    <BaseButton {...restProps} ref={ref}>
-      <div className="h-12 w-12 flex items-center justify-center">
+    <BaseButton
+      {...restProps}
+      ref={ref}
+      containerclassname="flex items-center justify-center"
+      className="!text-[19px] border-navy hover:border-green-dark rounded-lg"
+    >
+      <div className="h-8 w-8 flex items-center justify-center">
         <svg
           xmlns="http://www.w3.org/2000/svg"
           xmlSpace="preserve"
@@ -53,7 +58,7 @@ export const SignInWithGoogle = forwardRef<
       {children ? (
         children
       ) : (
-        <span className="ml-4">
+        <span className="ml-1 font-semibold">
           {name ? (
             name
           ) : (

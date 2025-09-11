@@ -21,9 +21,11 @@
   },
   "loginname": {
     "title": "Welcome back!",
-    "description": "Enter your login data.",
-    "register": "Register new user",
-    "submit": "Continue"
+    "description": "Choose your login method:",
+    "register": "Register now",
+    "submit": "Continue",
+    "notRegistered": "Not registered?",
+    "termsOfService": "By continuing, you agree to Datum's <terms>Terms of Service</terms> and <privacy>Privacy Policy</privacy>, and to receive periodic emails with updates."
   },
   "password": {
     "verify": {
@@ -94,9 +96,9 @@
       "noResults": "No second factors available to setup."
     },
     "set": {
-      "title": "Set up 2-Factor",
-      "description": "Choose one of the following second factors.",
-      "skip": "Skip"
+      "title": "Set up 2FA",
+      "description": "2-factor authentication gives you an additional layer of security for your user account, ensuring only you have access.",
+      "skip": "Skip for now"
     }
   },
   "otp": {
@@ -143,7 +145,7 @@
     },
     "set": {
       "title": "Set up 2-Factor",
-      "description": "Set up a device as a second factor.",
+      "description": "2-factor authentication gives you an additional layer of security for your user account, ensuring only you have access.",
       "submit": "Continue"
     }
   },
@@ -160,8 +162,10 @@
       "title": "Missing data",
       "description": "Provide email, first and last name to register."
     },
+    "alreadyRegistered": "Already registered?",
+    "loginNow": "Login now.",
     "title": "Register",
-    "description": "Create your ZITADEL account.",
+    "description": "Choose your registration method:",
     "noMethodAvailableWarning": "No authentication method available. Please contact your administrator.",
     "selectMethod": "Select the method you would like to authenticate",
     "agreeTo": "To register you must agree to the terms and conditions",

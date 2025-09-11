@@ -1,10 +1,10 @@
 "use client";
 
 import { createNewSessionFromIdpIntent } from "@/lib/server/idp";
+import { Loader2 } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Alert } from "./alert";
-import { Spinner } from "./spinner";
 
 type Props = {
   userId: string;
@@ -56,9 +56,11 @@ export function IdpSignin({
 
   return (
     <div className="flex items-center justify-center py-4">
-      {loading && <Spinner className="h-5 w-5" />}
+      {loading && (
+        <Loader2 className="animate-spin size-8 stroke-green-dark dark:stroke-cream" />
+      )}
       {error && (
-        <div className="py-4">
+        <div className="py-4 w-full">
           <Alert>{error}</Alert>
         </div>
       )}

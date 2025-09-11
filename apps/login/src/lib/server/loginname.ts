@@ -9,6 +9,7 @@ import { idpTypeToIdentityProviderType, idpTypeToSlug } from "../idp";
 import { PasskeysType } from "@zitadel/proto/zitadel/settings/v2/login_settings_pb";
 import { UserState } from "@zitadel/proto/zitadel/user/v2/user_pb";
 import { getServiceUrlFromHeaders } from "../service-url";
+import { checkMFAFactors } from "../verify-helper";
 import {
   getActiveIdentityProviders,
   getIDPByID,
@@ -256,6 +257,37 @@ export async function sendLoginname(command: SendLoginnameCommand) {
       serviceUrl,
       userId: session.factors?.user?.id,
     });
+
+    // Check for MFA factors if user has authenticated (e.g., via IDP)
+    if (
+      session.factors?.intent?.verifiedAt ||
+      session.factors?.password?.verifiedAt ||
+      session.factors?.webAuthN?.verifiedAt
+    ) {
+      console.log("User has authenticated, checking MFA factors...");
+      console.log("Session factors:", {
+        intent: session.factors?.intent?.verifiedAt,
+        password: session.factors?.password?.verifiedAt,
+        webAuthN: session.factors?.webAuthN?.verifiedAt,
+      });
+      console.log("Auth methods:", methods.authMethodTypes);
+
+      const mfaFactorCheck = await checkMFAFactors(
+        serviceUrl,
+        session,
+        userLoginSettings,
+        methods.authMethodTypes,
+        command.organization,
+        command.requestId,
+      );
+
+      console.log("MFA factor check result:", mfaFactorCheck);
+
+      if (mfaFactorCheck?.redirect) {
+        console.log("Redirecting to MFA:", mfaFactorCheck.redirect);
+        return mfaFactorCheck;
+      }
+    }
 
     // always resend invite if user has no auth method set
     if (!methods.authMethodTypes || !methods.authMethodTypes.length) {

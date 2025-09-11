@@ -1,6 +1,10 @@
 import { Cookie } from "@/lib/cookies";
 import { sendLoginname, SendLoginnameCommand } from "@/lib/server/loginname";
-import { createCallback, getLoginSettings } from "@/lib/zitadel";
+import {
+  createCallback,
+  getLoginSettings,
+  listAuthenticationMethodTypes,
+} from "@/lib/zitadel";
 import { create } from "@zitadel/client";
 import {
   CreateCallbackRequestSchema,
@@ -10,6 +14,7 @@ import { Session } from "@zitadel/proto/zitadel/session/v2/session_pb";
 import { NextRequest, NextResponse } from "next/server";
 import { constructUrl } from "./service-url";
 import { isSessionValid } from "./session";
+import { checkMFAFactors } from "./verify-helper";
 
 type LoginWithOIDCAndSession = {
   serviceUrl: string;
@@ -44,8 +49,37 @@ export async function loginWithOIDCAndSession({
     console.log("Session is valid:", isValid);
 
     if (!isValid && selectedSession.factors?.user) {
+      // Check if user has already authenticated via IDP but needs MFA
+      if (selectedSession.factors?.intent?.verifiedAt) {
+        console.log("User has IDP authentication, checking MFA factors...");
+
+        const methods = await listAuthenticationMethodTypes({
+          serviceUrl,
+          userId: selectedSession.factors.user.id,
+        });
+
+        const loginSettings = await getLoginSettings({
+          serviceUrl,
+          organization: selectedSession.factors?.user?.organizationId,
+        });
+
+        const mfaFactorCheck = await checkMFAFactors(
+          serviceUrl,
+          selectedSession,
+          loginSettings,
+          methods.authMethodTypes,
+          selectedSession.factors?.user?.organizationId,
+          `oidc_${authRequest}`,
+        );
+
+        if (mfaFactorCheck?.redirect) {
+          console.log("Redirecting to MFA:", mfaFactorCheck.redirect);
+          const absoluteUrl = constructUrl(request, mfaFactorCheck.redirect);
+          return NextResponse.redirect(absoluteUrl.toString());
+        }
+      }
+
       // if the session is not valid anymore, we need to redirect the user to re-authenticate /
-      // TODO: handle IDP intent direcly if available
       const command: SendLoginnameCommand = {
         loginName: selectedSession.factors.user?.loginName,
         organization: selectedSession.factors?.user?.organizationId,
@@ -55,8 +89,16 @@ export async function loginWithOIDCAndSession({
       const res = await sendLoginname(command);
 
       if (res && "redirect" in res && res?.redirect) {
-        const absoluteUrl = constructUrl(request, res.redirect);
-        return NextResponse.redirect(absoluteUrl.toString());
+        // Check if the redirect URL is already a full URL
+        if (
+          res.redirect.startsWith("http://") ||
+          res.redirect.startsWith("https://")
+        ) {
+          return NextResponse.redirect(res.redirect);
+        } else {
+          const absoluteUrl = constructUrl(request, res.redirect);
+          return NextResponse.redirect(absoluteUrl.toString());
+        }
       }
     }
 

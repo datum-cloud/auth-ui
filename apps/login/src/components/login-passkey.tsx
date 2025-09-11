@@ -14,7 +14,7 @@ import { useEffect, useRef, useState } from "react";
 import { Alert } from "./alert";
 import { BackButton } from "./back-button";
 import { Button, ButtonVariants } from "./button";
-import { Spinner } from "./spinner";
+import { FormActions } from "./form-actions";
 import { Translated } from "./translated";
 
 // either loginName or sessionId must be provided
@@ -202,11 +202,46 @@ export function LoginPasskey({
           <Alert>{error}</Alert>
         </div>
       )}
-      <div className="mt-8 flex w-full flex-row items-center">
+      <div className="mt-8 flex w-full flex-col items-center gap-1.5 justify-center">
+        <FormActions
+          submitLabel={
+            <Translated i18nKey="verify.submit" namespace="passkey" />
+          }
+          disabled={loading}
+          loading={loading}
+          onSubmit={async () => {
+            const response = await updateSessionForChallenge().finally(() => {
+              setLoading(false);
+            });
+
+            const pK =
+              response?.challenges?.webAuthN?.publicKeyCredentialRequestOptions
+                ?.publicKey;
+
+            if (!pK) {
+              setError("Could not request passkey challenge");
+              return;
+            }
+
+            setLoading(true);
+
+            return submitLoginAndContinue(pK)
+              .catch((error) => {
+                setError(error);
+                return;
+              })
+              .finally(() => {
+                setLoading(false);
+              });
+          }}
+          showBackButton={false}
+          submitTestId="submit-button"
+        />
         {altPassword ? (
           <Button
             type="button"
-            variant={ButtonVariants.Secondary}
+            variant={ButtonVariants.Ghost}
+            className="w-full"
             onClick={() => {
               const params = new URLSearchParams();
 
@@ -237,43 +272,6 @@ export function LoginPasskey({
         ) : (
           <BackButton />
         )}
-
-        <span className="flex-grow"></span>
-        <Button
-          type="submit"
-          className="self-end"
-          variant={ButtonVariants.Primary}
-          disabled={loading}
-          onClick={async () => {
-            const response = await updateSessionForChallenge().finally(() => {
-              setLoading(false);
-            });
-
-            const pK =
-              response?.challenges?.webAuthN?.publicKeyCredentialRequestOptions
-                ?.publicKey;
-
-            if (!pK) {
-              setError("Could not request passkey challenge");
-              return;
-            }
-
-            setLoading(true);
-
-            return submitLoginAndContinue(pK)
-              .catch((error) => {
-                setError(error);
-                return;
-              })
-              .finally(() => {
-                setLoading(false);
-              });
-          }}
-          data-testid="submit-button"
-        >
-          {loading && <Spinner className="h-5 w-5 mr-2" />}{" "}
-          <Translated i18nKey="verify.submit" namespace="passkey" />
-        </Button>
       </div>
     </div>
   );

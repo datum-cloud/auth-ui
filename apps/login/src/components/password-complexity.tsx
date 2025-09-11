@@ -49,7 +49,7 @@ const cross = (
   </svg>
 );
 const desc =
-  "text-14px leading-4 text-input-light-label dark:text-input-dark-label";
+  "text-sm leading-4 text-input-light-label dark:text-input-dark-label";
 
 export function PasswordComplexity({
   passwordComplexitySettings,

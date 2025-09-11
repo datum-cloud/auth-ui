@@ -25,7 +25,7 @@ export function AuthenticationMethodRadio({
       <div className="mx-auto w-full max-w-md">
         <RadioGroup value={selected} onChange={selectionChanged}>
           <RadioGroup.Label className="sr-only">Server size</RadioGroup.Label>
-          <div className="flex flex-row space-x-4">
+          <div className="flex flex-row space-x-5">
             {methods.map((method) => (
               <RadioGroup.Option
                 key={method}
@@ -39,15 +39,15 @@ export function AuthenticationMethodRadio({
                   }
                     ${
                       checked
-                        ? "bg-background-light-400 dark:bg-background-dark-400 ring-2 ring-primary-light-500 dark:ring-primary-dark-500"
-                        : "bg-background-light-400 dark:bg-background-dark-400"
+                        ? " ring-2 ring-green-dark dark:ring-cream"
+                        : " dark:bg-background-dark-400"
                     }
-                     h-full flex-1 relative border boder-divider-light dark:border-divider-dark flex cursor-pointer rounded-lg px-5 py-4 focus:outline-none hover:shadow-lg dark:hover:bg-white/10`
+                     transition-all h-full flex-1 relative border border-navy bg-transparent flex cursor-pointer rounded-lg p-4 focus:outline-none hover:shadow-lg `
                 }
               >
-                {({ active, checked }) => (
+                {({ checked }) => (
                   <>
-                    <div className="flex flex-col items-center w-full text-sm">
+                    <div className="flex flex-col items-center w-full">
                       {method === "passkey" && (
                         <svg
                           xmlns="http://www.w3.org/2000/svg"
@@ -55,7 +55,7 @@ export function AuthenticationMethodRadio({
                           viewBox="0 0 24 24"
                           strokeWidth="1.5"
                           stroke="currentColor"
-                          className="w-8 h-8 mb-3"
+                          className="w-8 h-8 mb-2"
                         >
                           <path
                             strokeLinecap="round"
@@ -66,7 +66,7 @@ export function AuthenticationMethodRadio({
                       )}
                       {method === "password" && (
                         <svg
-                          className="w-8 h-8 mb-3 fill-current"
+                          className="w-8 h-8 mb-2 fill-current"
                           xmlns="http://www.w3.org/2000/svg"
                           viewBox="0 0 24 24"
                         >
@@ -76,7 +76,7 @@ export function AuthenticationMethodRadio({
                       )}
                       <RadioGroup.Label
                         as="p"
-                        className={`font-medium  ${checked ? "" : ""}`}
+                        className={`font-medium text-[19px] ${checked ? "" : ""}`}
                       >
                         {method === AuthenticationMethod.Passkey && (
                           <Translated

@@ -58,7 +58,7 @@ export function ChooseSecondFactorToSetup({
 
   return (
     <>
-      <div className="grid grid-cols-1 gap-5 w-full pt-4">
+      <div className="grid grid-cols-1 gap-4 w-full">
         {loginSettings.secondFactors.map((factor) => {
           switch (factor) {
             case SecondFactorType.OTP:
@@ -94,7 +94,7 @@ export function ChooseSecondFactorToSetup({
       </div>
       {!force && (
         <button
-          className="transition-all text-sm hover:text-primary-light-500 dark:hover:text-primary-dark-500"
+          className="transition-all text-sm underline"
           onClick={async () => {
             const resp = await skipMFAAndContinueWithNextUrl({
               userId,

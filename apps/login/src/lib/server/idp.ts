@@ -3,6 +3,7 @@
 import {
   getLoginSettings,
   getUserByID,
+  listAuthenticationMethodTypes,
   startIdentityProviderFlow,
   startLDAPIdentityProviderFlow,
 } from "@/lib/zitadel";
@@ -10,7 +11,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getNextUrl } from "../client";
 import { getServiceUrlFromHeaders } from "../service-url";
-import { checkEmailVerification } from "../verify-helper";
+import { checkEmailVerification, checkMFAFactors } from "../verify-helper";
 import { createSessionForIdpAndUpdateCookie } from "./cookie";
 
 export type RedirectToIdpState = { error?: string | null } | undefined;
@@ -160,11 +161,31 @@ export async function createNewSessionFromIdpIntent(
     return emailVerificationCheck;
   }
 
-  // TODO: check if user has MFA methods
-  // const mfaFactorCheck = checkMFAFactors(session, loginSettings, authMethods, organization, requestId);
-  // if (mfaFactorCheck?.redirect) {
-  //   return mfaFactorCheck;
-  // }
+  // check if user has MFA methods or needs to enroll new ones
+  let authMethods;
+  try {
+    const response = await listAuthenticationMethodTypes({
+      serviceUrl,
+      userId: session.factors.user.id,
+    });
+    if (response.authMethodTypes && response.authMethodTypes.length) {
+      authMethods = response.authMethodTypes;
+    }
+  } catch (error) {
+    console.warn("Could not load authentication methods", error);
+  }
+
+  const mfaFactorCheck = await checkMFAFactors(
+    serviceUrl,
+    session,
+    loginSettings,
+    authMethods ?? [],
+    command.organization,
+    command.requestId,
+  );
+  if (mfaFactorCheck?.redirect) {
+    return mfaFactorCheck;
+  }
 
   const url = await getNextUrl(
     command.requestId && session.id

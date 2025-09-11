@@ -10,6 +10,8 @@ export enum ButtonVariants {
   Primary = "Primary",
   Secondary = "Secondary",
   Destructive = "Destructive",
+  Ghost = "Ghost",
+  Green = "Green",
 }
 
 export enum ButtonColors {
@@ -33,18 +35,18 @@ export const getButtonClasses = (
   color: ButtonColors,
 ) =>
   clsx({
-    "box-border font-normal leading-36px text-14px inline-flex items-center rounded-md focus:outline-none transition-colors transition-shadow duration-300":
+    "box-border h-[40px] font-normal text-navy text-center justify-center leading-36px text-sm inline-flex items-center rounded-md focus:outline-none transition-colors transition-shadow duration-300":
       true,
-    "shadow hover:shadow-xl active:shadow-xl disabled:border-none disabled:bg-gray-300 disabled:text-gray-600 disabled:shadow-none disabled:cursor-not-allowed disabled:dark:bg-gray-800 disabled:dark:text-gray-900":
+    "bg-tuscany text-white disabled:opacity-60 disabled:cursor-not-allowed hover:underline disabled:pointer-events-none transition-all":
       variant === ButtonVariants.Primary,
-    "bg-primary-light-500 dark:bg-primary-dark-500 hover:bg-primary-light-400 hover:dark:bg-primary-dark-400 text-primary-light-contrast-500 dark:text-primary-dark-contrast-500":
-      variant === ButtonVariants.Primary && color !== ButtonColors.Warn,
-    "bg-warn-light-500 dark:bg-warn-dark-500 hover:bg-warn-light-400 hover:dark:bg-warn-dark-400 text-white dark:text-white":
-      variant === ButtonVariants.Primary && color === ButtonColors.Warn,
+    "bg-transparent border-none shadow-none text-navy dark:text-cream underline hover:opacity-80 disabled:opacity-50 disabled:cursor-not-allowed":
+      variant === ButtonVariants.Ghost,
     "border border-button-light-border dark:border-button-dark-border text-gray-950 hover:bg-gray-500 hover:bg-opacity-20 hover:dark:bg-white hover:dark:bg-opacity-10 focus:bg-gray-500 focus:bg-opacity-20 focus:dark:bg-white focus:dark:bg-opacity-10 dark:text-white disabled:text-gray-600 disabled:hover:bg-transparent disabled:dark:hover:bg-transparent disabled:cursor-not-allowed disabled:dark:text-gray-900":
       variant === ButtonVariants.Secondary,
     "border border-button-light-border dark:border-button-dark-border text-warn-light-500 dark:text-warn-dark-500 hover:bg-warn-light-500 hover:bg-opacity-10 dark:hover:bg-warn-light-500 dark:hover:bg-opacity-10 focus:bg-warn-light-500 focus:bg-opacity-20 dark:focus:bg-warn-light-500 dark:focus:bg-opacity-20":
       color === ButtonColors.Warn && variant !== ButtonVariants.Primary,
+    "bg-green-dark text-white disabled:opacity-60 disabled:cursor-not-allowed hover:underline disabled:pointer-events-none transition-all":
+      variant === ButtonVariants.Green,
     "px-16 py-2": size === ButtonSizes.Large,
     "px-4 h-[36px]": size === ButtonSizes.Small,
   });

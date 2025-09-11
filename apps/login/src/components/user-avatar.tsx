@@ -1,5 +1,5 @@
-import { Avatar } from "@/components/avatar";
 import { ChevronDownIcon } from "@heroicons/react/24/outline";
+import { UserIcon } from "lucide-react";
 import Link from "next/link";
 
 type Props = {
@@ -34,22 +34,17 @@ export function UserAvatar({
   }
 
   return (
-    <div className="flex h-full flex-row items-center rounded-full border p-[1px] dark:border-white/20">
-      <div>
-        <Avatar
-          size="small"
-          name={displayName ?? loginName ?? ""}
-          loginName={loginName ?? ""}
-        />
+    <div className="flex h-full flex-row items-center rounded-full border bg-cream border-light-gray dark:border-dark-navy-blue dark:bg-navy gap-4 px-6 py-2">
+      <div className="flex flex-row items-center gap-2">
+        <UserIcon className="w-4 h-4" />
+        <span className="text-sm max-w-[250px] text-ellipsis overflow-hidden whitespace-pre">
+          {loginName ?? displayName}
+        </span>
       </div>
-      <span className="ml-4 pr-4 text-14px max-w-[250px] text-ellipsis overflow-hidden">
-        {loginName}
-      </span>
-      <span className="flex-grow"></span>
       {showDropdown && (
         <Link
           href={"/accounts?" + params}
-          className="ml-4 flex items-center justify-center p-1 hover:bg-black/10 dark:hover:bg-white/10 rounded-full mr-1 transition-all"
+          className="flex items-center justify-center p-1 rounded-full mr-1 transition-all"
         >
           <ChevronDownIcon className="h-4 w-4" />
         </Link>

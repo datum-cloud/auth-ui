@@ -11,6 +11,7 @@ export type SignInWithIdentityProviderProps = DetailedHTMLProps<
 > & {
   name?: string;
   e2e?: string;
+  containerclassname?: string;
 };
 
 export const BaseButton = forwardRef<
@@ -26,15 +27,27 @@ export const BaseButton = forwardRef<
       ref={ref}
       disabled={formStatus.pending}
       className={clsx(
-        "flex-1 transition-all cursor-pointer flex flex-row items-center bg-background-light-400 text-text-light-500 dark:bg-background-dark-500 dark:text-text-dark-500 border border-divider-light hover:border-black dark:border-divider-dark hover:dark:border-white focus:border-primary-light-500 focus:dark:border-primary-dark-500 outline-none rounded-md px-4 text-sm",
+        "flex-1 transition-all cursor-pointer flex flex-row items-center bg-white text-navy border border-navy hover:border-green-dark focus:border-green-dark outline-none rounded-md px-4 text-sm",
+        "dark:bg-navy dark:text-cream dark:border-cream dark:hover:border-green-dark dark:focus:border-green-dark",
+        "disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none",
+        "h-[62px] text-[19px]",
         props.className,
       )}
     >
-      <div className="flex-1 justify-between flex items-center gap-4">
-        <div className="flex-1 flex flex-row items-center">
+      <div className="flex-1 justify-between flex items-center gap-4 relative">
+        <div
+          className={clsx(
+            "flex-1 flex flex-row items-center",
+            props.containerclassname,
+          )}
+        >
           {props.children}
         </div>
-        {formStatus.pending && <Loader2Icon className="w-4 h-4 animate-spin" />}
+        {formStatus.pending && (
+          <div className="absolute right-2">
+            <Loader2Icon className="w-6 h-6 animate-spin stroke-green-dark dark:stroke-cream" />
+          </div>
+        )}
       </div>
     </button>
   );

@@ -10,10 +10,8 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { useForm } from "react-hook-form";
 import { Alert, AlertType } from "./alert";
-import { BackButton } from "./back-button";
-import { Button, ButtonVariants } from "./button";
+import { FormActions } from "./form-actions";
 import { TextInput } from "./input";
-import { Spinner } from "./spinner";
 import { Translated } from "./translated";
 
 // either loginName or sessionId must be provided
@@ -250,7 +248,7 @@ export function LoginOTP({
         <TextInput
           type="text"
           {...register("code", { required: "This field is required" })}
-          label="Code"
+          placeholder="Code"
           autoComplete="one-time-code"
           data-testid="code-text-input"
         />
@@ -262,23 +260,17 @@ export function LoginOTP({
         </div>
       )}
 
-      <div className="mt-8 flex w-full flex-row items-center">
-        <BackButton data-testid="back-button" />
-        <span className="flex-grow"></span>
-        <Button
-          type="submit"
-          className="self-end"
-          variant={ButtonVariants.Primary}
-          disabled={loading || !formState.isValid}
-          onClick={handleSubmit((e) => {
-            setCodeAndContinue(e, organization);
-          })}
-          data-testid="submit-button"
-        >
-          {loading && <Spinner className="h-5 w-5 mr-2" />}{" "}
-          <Translated i18nKey="verify.submit" namespace="otp" />
-        </Button>
-      </div>
+      <FormActions
+        submitLabel={<Translated i18nKey="verify.submit" namespace="otp" />}
+        disabled={loading || !formState.isValid}
+        loading={loading}
+        onSubmit={handleSubmit((e) => {
+          setCodeAndContinue(e, organization);
+        })}
+        showBackButton={true}
+        submitTestId="submit-button"
+        backTestId="back-button"
+      />
     </form>
   );
 }

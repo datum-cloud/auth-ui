@@ -44,14 +44,20 @@ export const SignInWithGithub = forwardRef<
   const { children, name, ...restProps } = props;
 
   return (
-    <BaseButton {...restProps} ref={ref}>
-      <div className="mx-2 my-2 flex items-center justify-center">
+    <BaseButton
+      {...restProps}
+      ref={ref}
+      containerclassname="flex items-center justify-center"
+      className="!text-[19px] border-navy hover:border-green-dark rounded-lg"
+      e2e="github"
+    >
+      <div className="flex items-center justify-center p-1.5 h-8 w-8">
         <GitHubLogo />
       </div>
       {children ? (
         children
       ) : (
-        <span className="ml-4">
+        <span className="ml-1 font-semibold">
           {name ? (
             name
           ) : (
