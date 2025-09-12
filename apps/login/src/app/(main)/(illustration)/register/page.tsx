@@ -55,19 +55,6 @@ export default async function Page(props: {
     });
   });
 
-  if (!loginSettings?.allowRegister) {
-    return (
-      <>
-        <h1>
-          <Translated i18nKey="disabled.title" namespace="register" />
-        </h1>
-        <p className="ztdl-p">
-          <Translated i18nKey="disabled.description" namespace="register" />
-        </p>
-      </>
-    );
-  }
-
   return (
     <>
       <h1>
@@ -83,7 +70,8 @@ export default async function Page(props: {
         </Alert>
       )}
 
-      {passwordComplexitySettings &&
+      {loginSettings?.allowRegister &&
+        passwordComplexitySettings &&
         organization &&
         (loginSettings.allowUsernamePassword ||
           loginSettings.passkeysType == PasskeysType.ALLOWED) && (
