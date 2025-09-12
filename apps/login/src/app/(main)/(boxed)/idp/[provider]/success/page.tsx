@@ -22,6 +22,7 @@ import { ConnectError, create } from "@zitadel/client";
 import { AutoLinkingOption } from "@zitadel/proto/zitadel/idp/v2/idp_pb";
 import { OrganizationSchema } from "@zitadel/proto/zitadel/object/v2/object_pb";
 import { Organization } from "@zitadel/proto/zitadel/org/v2/org_pb";
+import { SetHumanEmailSchema } from "@zitadel/proto/zitadel/user/v2/email_pb";
 import {
   AddHumanUserRequest,
   AddHumanUserRequestSchema,
@@ -66,6 +67,47 @@ async function resolveOrganizationForUser({
   return undefined;
 }
 
+type GithubEmailInfo = { email: string; verified: boolean } | undefined;
+
+// getGithunPrimaryEmail fetches the primary email, even if the user has hidden it
+// user:email scope is required for private emails
+async function getGithubPrimaryEmail(token: string): Promise<GithubEmailInfo> {
+  const fetchEmails = async () => {
+    return fetch("https://api.github.com/user/emails", {
+      headers: {
+        Accept: "application/vnd.github+json",
+        Authorization: `Bearer ${token}`,
+        "X-GitHub-Api-Version": "2022-11-28",
+      },
+      cache: "no-store",
+    });
+  };
+
+  try {
+    let res = await fetchEmails();
+    if (!res.ok) {
+      console.warn("GitHub email fetch failed", res.status);
+      return undefined;
+    }
+
+    const data: Array<{ email: string; primary: boolean; verified: boolean }> =
+      await res.json();
+
+    const primary =
+      data.find((e) => e.primary && e.verified) ||
+      data.find((e) => e.primary) ||
+      data[0];
+    if (primary) {
+      return { email: primary.email, verified: primary.verified };
+    }
+
+    return undefined;
+  } catch (err) {
+    console.warn("GitHub email fetch error", err);
+    return undefined;
+  }
+}
+
 export const metadata = generateRouteMetadata("idp");
 export default async function Page(props: {
   searchParams: Promise<Record<string | number | symbol, string | undefined>>;
@@ -100,6 +142,57 @@ export default async function Page(props: {
 
   const { idpInformation, userId } = intent;
   let { addHumanUser } = intent;
+
+  // ensure mandatory profile fields are populated to satisfy ZITADEL validation, as GitHub does not provide givenName
+  // and familyName
+  if (addHumanUser) {
+    const profile: any = addHumanUser.profile ?? {};
+    let { givenName, familyName } = profile;
+
+    const fallback = idpInformation?.userName ?? "user";
+
+    if (!givenName || givenName.trim().length === 0) {
+      givenName = fallback.slice(0, 200);
+    }
+
+    if (!familyName || familyName.trim().length === 0) {
+      familyName = fallback.slice(0, 200);
+    }
+
+    addHumanUser = {
+      ...addHumanUser,
+      profile: {
+        ...profile,
+        givenName,
+        familyName,
+      },
+    } as typeof addHumanUser;
+
+    // ensure email exists as well (GitHub may not return an address if user hides it)
+    if (
+      !addHumanUser.email?.email ||
+      addHumanUser.email.email.trim().length === 0
+    ) {
+      let newEmailInfo: GithubEmailInfo;
+      const githubAccessToken: string | undefined = (idpInformation as any)
+        ?.access?.value?.accessToken;
+      if (provider === "github") {
+        if (githubAccessToken) {
+          newEmailInfo = await getGithubPrimaryEmail(githubAccessToken);
+        }
+      }
+      let finalEmail = newEmailInfo?.email ?? `${fallback}@idp.local`;
+      const isVerified = newEmailInfo?.verified ?? false;
+
+      addHumanUser = {
+        ...addHumanUser,
+        email: create(SetHumanEmailSchema, {
+          email: finalEmail.slice(0, 200),
+          verification: { case: "isVerified", value: isVerified },
+        }),
+      };
+    }
+  }
 
   if (!idpInformation) {
     return loginFailed("IDP information missing");
