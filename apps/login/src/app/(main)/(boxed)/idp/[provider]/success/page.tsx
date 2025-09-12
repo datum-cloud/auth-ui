@@ -151,6 +151,20 @@ export default async function Page(props: {
 
     const fallback = idpInformation?.userName ?? "user";
 
+    // if givenName or familyName is not set, try to derive it from the displayName
+    if (!givenName || !familyName) {
+      if (addHumanUser.profile?.displayName) {
+        const source = addHumanUser.profile.displayName.trim();
+        const parts = source.split(/\s+/);
+        if (parts.length >= 2) {
+          const derivedFamily = parts.pop()!.slice(0, 200);
+          const derivedGiven = parts.join(" ").slice(0, 200);
+          givenName = derivedGiven;
+          familyName = derivedFamily;
+        }
+      }
+    }
+
     if (!givenName || givenName.trim().length === 0) {
       givenName = fallback.slice(0, 200);
     }
