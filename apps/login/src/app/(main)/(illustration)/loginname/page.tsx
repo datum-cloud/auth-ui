@@ -64,7 +64,6 @@ export default async function Page(props: {
       <p className="ztdl-p description">
         <Translated i18nKey="description" namespace="loginname" />
       </p>
-
       {loginSettings?.allowUsernamePassword && (
         <>
           <UsernameForm
@@ -83,7 +82,6 @@ export default async function Page(props: {
           )}
         </>
       )}
-
       {loginSettings?.allowExternalIdp && !!identityProviders.length && (
         <SignInWithIdp
           identityProviders={identityProviders}
@@ -91,7 +89,6 @@ export default async function Page(props: {
           organization={organization}
         ></SignInWithIdp>
       )}
-
       <p className="text-center ztdl-p-secondary terms-of-service">
         <Translated
           i18nKey="termsOfService"
@@ -99,8 +96,9 @@ export default async function Page(props: {
           useCommonTags
         />
       </p>
-
-      <RegisterBtn organization={organization} requestId={requestId} />
+      {loginSettings?.allowRegister && (
+        <RegisterBtn organization={organization} requestId={requestId} />
+      )}
     </>
   );
 }
