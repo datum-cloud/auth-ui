@@ -69,7 +69,7 @@ async function resolveOrganizationForUser({
 
 type GithubEmailInfo = { email: string; verified: boolean } | undefined;
 
-// getGithunPrimaryEmail fetches the primary email, even if the user has hidden it
+// getGithubPrimaryEmail fetches the primary email, even if the user has hidden it
 // user:email scope is required for private emails
 async function getGithubPrimaryEmail(token: string): Promise<GithubEmailInfo> {
   const fetchEmails = async () => {
