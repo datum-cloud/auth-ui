@@ -7,8 +7,9 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { SITE_CONFIG } from "@/config/site";
 import { alliance, canelaText, frontliner } from "@/lib/fonts/fonts";
 import { generateMetadata } from "@/lib/metadata";
-import { Analytics } from "@vercel/analytics/react";
 import { ReactNode, Suspense } from "react";
+import { FathomAnalytics } from "@/components/fathom/fathom";
+import MarkerIoEmbed from "@/components/markerio/markerio";
 
 export const metadata = generateMetadata({
   title: "Authentication",
@@ -38,7 +39,13 @@ export default async function RootLayout({
             </LanguageProvider>
           </Suspense>
         </ThemeProvider>
-        <Analytics />
+        {process.env.FATHOM_ID && (
+          <FathomAnalytics privateKey={process.env.FATHOM_ID} />
+        )}
+
+        {process.env.MARKER_IO_PROJECT_ID && (
+          <MarkerIoEmbed projectId={process.env.MARKER_IO_PROJECT_ID} />
+        )}
       </body>
     </html>
   );
