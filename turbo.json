@@ -14,7 +14,9 @@
     "NEXT_PUBLIC_BASE_PATH",
     "CUSTOM_REQUEST_HEADERS",
     "ENABLE_ZITADEL_API_TRANSLATION",
-    "NODE_ENV"
+    "NODE_ENV",
+    "MARKER_IO_PROJECT_ID",
+    "FATHOM_ID"
   ],
   "tasks": {
     "generate": {
