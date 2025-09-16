@@ -34,5 +34,15 @@ declare namespace NodeJS {
      * Optional: whether to enable the Zitadel API translation
      */
     ENABLE_ZITADEL_API_TRANSLATION?: string | boolean;
+
+    /**
+     * Optional: the Marker.io project id
+     */
+    MARKER_IO_PROJECT_ID?: string;
+
+    /**
+     * Optional: the Fathom analytics id
+     */
+    FATHOM_ID?: string;
   }
 }
