@@ -9,7 +9,9 @@ import { generateRouteMetadata } from "@/lib/metadata";
 import { getServiceUrlFromHeaders } from "@/lib/service-url";
 import { loadMostRecentSession } from "@/lib/session";
 import { getSession, listAuthenticationMethodTypes } from "@/lib/zitadel";
+import { AuthenticationMethodType } from "@zitadel/proto/zitadel/user/v2/user_service_pb";
 import { headers } from "next/headers";
+import { redirect } from "next/navigation";
 
 export const metadata = generateRouteMetadata("mfa");
 
@@ -26,6 +28,53 @@ export default async function Page(props: {
   const sessionFactors = sessionId
     ? await loadSessionById(serviceUrl, sessionId, organization)
     : await loadSessionByLoginname(serviceUrl, loginName, organization);
+
+  // 2FA-capable methods (exclude PASSWORD, PASSKEY, IDP, UNSPECIFIED)
+  const SECOND_FACTOR_METHODS = [
+    AuthenticationMethodType.TOTP,
+    AuthenticationMethodType.U2F,
+    AuthenticationMethodType.OTP_EMAIL,
+    AuthenticationMethodType.OTP_SMS,
+  ];
+
+  // Skip method selection if only one 2FA method is available
+  if (sessionFactors) {
+    const validMethods = (sessionFactors.authMethods ?? []).filter((m) =>
+      SECOND_FACTOR_METHODS.includes(m),
+    );
+
+    if (validMethods.length === 1) {
+      const singleMethod = validMethods[0];
+
+      const params = new URLSearchParams();
+      if (loginName) params.append("loginName", loginName);
+      if (sessionId) params.append("sessionId", sessionId);
+      if (requestId) params.append("requestId", requestId);
+      if (organization) params.append("organization", organization);
+
+      let target = "";
+      switch (singleMethod) {
+        case AuthenticationMethodType.TOTP:
+          target = "/otp/time-based?" + params.toString();
+          break;
+        case AuthenticationMethodType.U2F:
+          target = "/u2f?" + params.toString();
+          break;
+        case AuthenticationMethodType.OTP_EMAIL:
+          target = "/otp/email?" + params.toString();
+          break;
+        case AuthenticationMethodType.OTP_SMS:
+          target = "/otp/sms?" + params.toString();
+          break;
+        default:
+          break;
+      }
+
+      if (target) {
+        redirect(target);
+      }
+    }
+  }
 
   async function loadSessionByLoginname(
     serviceUrl: string,
