@@ -5,63 +5,48 @@
  * controlling which resources can be loaded and executed.
  */
 
-// Third-party services domains
-const THIRD_PARTY_DOMAINS = {
-  // Analytics
-  FATHOM_CDN: "https://*.usefathom.com",
-  FATHOM_API: "https://*.usefathom.com",
-
-  // User feedback and support
-  MARKER_CDN: "https://*.marker.io",
-  MARKER_API: "https://*.marker.io",
-
-  // General
-  VERCEL_IMAGES: "https://vercel.com",
-};
-
-// CSP directive configuration
+// Highly permissive CSP - allows most external resources while maintaining basic security
 const CSP_DIRECTIVES = {
-  // Default policy for all resources
-  "default-src": ["'self'"],
+  // Allow resources from anywhere but maintain some basic protections
+  "default-src": [
+    "'self'",
+    "'unsafe-inline'",
+    "'unsafe-eval'",
+    "data:",
+    "https:",
+    "http:",
+  ],
 
-  // JavaScript sources
+  // Allow scripts from anywhere
   "script-src": [
     "'self'",
-    "'unsafe-inline'", // Required for Next.js
-    "'unsafe-eval'", // Required for development
-    THIRD_PARTY_DOMAINS.FATHOM_CDN,
-    THIRD_PARTY_DOMAINS.MARKER_CDN,
+    "'unsafe-inline'",
+    "'unsafe-eval'",
+    "https:",
+    "http:",
+    "data:",
   ],
 
-  // Network connections (fetch, XHR, WebSocket, etc.)
-  "connect-src": [
-    "'self'",
-    THIRD_PARTY_DOMAINS.FATHOM_API,
-    THIRD_PARTY_DOMAINS.MARKER_CDN,
-    THIRD_PARTY_DOMAINS.MARKER_API,
-  ],
+  // Allow connections to anywhere
+  "connect-src": ["'self'", "https:", "http:", "ws:", "wss:"],
 
-  // Image sources
-  "img-src": [
-    "'self'",
-    THIRD_PARTY_DOMAINS.VERCEL_IMAGES,
-    THIRD_PARTY_DOMAINS.FATHOM_CDN,
-  ],
+  // Allow images from anywhere
+  "img-src": ["'self'", "https:", "http:", "data:", "blob:"],
 
-  // CSS sources
-  "style-src": [
-    "'self'",
-    "'unsafe-inline'", // Required for styled-components and inline styles
-  ],
+  // Allow styles from anywhere
+  "style-src": ["'self'", "'unsafe-inline'", "https:", "http:"],
 
-  // Font sources
-  "font-src": ["'self'"],
+  // Allow fonts from anywhere
+  "font-src": ["'self'", "https:", "http:", "data:"],
 
-  // Object sources (plugins)
+  // Still block object/embed for basic security
   "object-src": ["'none'"],
 
-  // Child frames (empty means no restrictions)
-  "child-src": [],
+  // Allow frames from anywhere
+  "frame-src": ["'self'", "https:", "http:"],
+
+  // Allow child frames from anywhere
+  "child-src": ["'self'", "https:", "http:"],
 };
 
 /**
