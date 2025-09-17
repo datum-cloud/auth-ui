@@ -1,15 +1,15 @@
 import "@/styles/globals.scss";
 
 import { DefaultTags } from "@/components/default-tags";
+import { FathomAnalytics } from "@/components/fathom/fathom";
 import { LanguageProvider } from "@/components/language-provider";
 import { Loader } from "@/components/loader";
+import MarkerIoEmbed from "@/components/markerio/markerio";
 import { ThemeProvider } from "@/components/theme-provider";
 import { SITE_CONFIG } from "@/config/site";
 import { alliance, canelaText, frontliner } from "@/lib/fonts/fonts";
 import { generateMetadata } from "@/lib/metadata";
 import { ReactNode, Suspense } from "react";
-import { FathomAnalytics } from "@/components/fathom/fathom";
-import MarkerIoEmbed from "@/components/markerio/markerio";
 
 export const metadata = generateMetadata({
   title: "Authentication",

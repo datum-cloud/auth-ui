@@ -1,6 +1,6 @@
-'use client';
+"use client";
 
-import { useEffect } from 'react';
+import { useEffect } from "react";
 
 // TypeScript declarations for Marker.io
 declare global {
@@ -33,17 +33,15 @@ interface MarkerIoEmbedProps {
   projectId: string;
 }
 
-export default function MarkerIoEmbed({ 
-  projectId,
-}: MarkerIoEmbedProps) {
+export default function MarkerIoEmbed({ projectId }: MarkerIoEmbedProps) {
   useEffect(() => {
     // Only run on client side
-    if (typeof window === 'undefined') return;
+    if (typeof window === "undefined") return;
 
     // Config
     window.markerConfig = {
       project: projectId,
-      source: 'snippet',
+      source: "snippet",
     };
 
     // Load shim
@@ -52,19 +50,19 @@ export default function MarkerIoEmbed({
       const queue: any[] = [];
       const markerStub: any = { __cs: queue };
       const methods = [
-        'show',
-        'hide',
-        'isVisible',
-        'capture',
-        'cancelCapture',
-        'unload',
-        'reload',
-        'isExtensionInstalled',
-        'setReporter',
-        'clearReporter',
-        'setCustomData',
-        'on',
-        'off',
+        "show",
+        "hide",
+        "isVisible",
+        "capture",
+        "cancelCapture",
+        "unload",
+        "reload",
+        "isExtensionInstalled",
+        "setReporter",
+        "clearReporter",
+        "setCustomData",
+        "on",
+        "off",
       ];
 
       methods.forEach((method) => {
@@ -75,15 +73,15 @@ export default function MarkerIoEmbed({
 
       window.Marker = markerStub;
 
-      const script = document.createElement('script');
+      const script = document.createElement("script");
       script.async = true;
-      script.src = 'https://edge.marker.io/latest/shim.js';
-      
+      script.src = "https://edge.marker.io/latest/shim.js";
+
       // Add error handling
       script.onerror = () => {
-        console.warn('Failed to load Marker.io script');
+        console.warn("Failed to load Marker.io script");
       };
-      
+
       document.body.appendChild(script);
     }
   }, [projectId]);
