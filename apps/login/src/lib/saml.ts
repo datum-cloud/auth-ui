@@ -174,6 +174,38 @@ export async function loginWithSAMLAndSession({
       }
     }
 
+    // Enforce MFA even when the session is valid (or regardless of validity) before finalizing
+    if (selectedSession.factors?.user) {
+      try {
+        const [methods, loginSettings] = await Promise.all([
+          listAuthenticationMethodTypes({
+            serviceUrl,
+            userId: selectedSession.factors.user.id,
+          }),
+          getLoginSettings({
+            serviceUrl,
+            organization: selectedSession.factors?.user?.organizationId,
+          }),
+        ]);
+
+        const mfaFactorCheck = await checkMFAFactors(
+          serviceUrl,
+          selectedSession,
+          loginSettings,
+          methods.authMethodTypes,
+          selectedSession.factors?.user?.organizationId,
+          `saml_${samlRequest}`,
+        );
+
+        if (mfaFactorCheck?.redirect) {
+          const absoluteUrl = constructUrl(request, mfaFactorCheck.redirect);
+          return NextResponse.redirect(absoluteUrl.toString());
+        }
+      } catch (error) {
+        console.warn("Failed to enforce MFA before finalize (SAML)", error);
+      }
+    }
+
     const cookie = sessionCookies.find(
       (cookie) => cookie.id === selectedSession?.id,
     );

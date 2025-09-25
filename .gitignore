@@ -17,3 +17,5 @@ public/dist
 /out
 /docker
 /machinekey
+
+.cursor

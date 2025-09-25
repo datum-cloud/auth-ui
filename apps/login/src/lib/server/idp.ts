@@ -180,9 +180,13 @@ export async function createNewSessionFromIdpIntent(
     session,
     loginSettings,
     authMethods ?? [],
-    command.organization,
+    session.factors.user.organizationId,
     command.requestId,
   );
+
+  console.log("mfaFactorCheck", mfaFactorCheck);
+
+  return 'test';
   if (mfaFactorCheck?.redirect) {
     return mfaFactorCheck;
   }
