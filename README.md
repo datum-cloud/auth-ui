@@ -3,7 +3,7 @@
 This repository contains all TypeScript and JavaScript packages and applications you need to create your own ZITADEL
 Login UI.
 
-<img src="./apps/login/screenshots/collage.png"alt="collage of login screens" width="1600px" />
+<img src="./apps/login/screenshots/collage.png" alt="collage of login screens" width="800px">
 
 [![npm package](https://img.shields.io/npm/v/@zitadel/proto.svg?style=for-the-badge&logo=npm&logoColor=white)](https://www.npmjs.com/package/@zitadel/proto)
 [![npm package](https://img.shields.io/npm/v/@zitadel/client.svg?style=for-the-badge&logo=npm&logoColor=white)](https://www.npmjs.com/package/@zitadel/client)
