@@ -58,10 +58,10 @@ export default async function Page(props: {
   return (
     <>
       <h1>
-        <Translated i18nKey="title" namespace="register" />
+        <Translated i18nKey="title" namespace="waitlist" />
       </h1>
       <p className="ztdl-p description">
-        <Translated i18nKey="description" namespace="register" />
+        <Translated i18nKey="description" namespace="waitlist" />
       </p>
 
       {!organization && (

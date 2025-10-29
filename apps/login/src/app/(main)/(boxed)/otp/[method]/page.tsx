@@ -98,14 +98,12 @@ export default async function Page(props: {
       )}
 
       {session && (
-        <div className="mb-10">
-          <UserAvatar
-            loginName={loginName ?? session.factors?.user?.loginName}
-            displayName={session.factors?.user?.displayName}
-            showDropdown
-            searchParams={searchParams}
-          ></UserAvatar>
-        </div>
+        <UserAvatar
+          loginName={loginName ?? session.factors?.user?.loginName}
+          displayName={session.factors?.user?.displayName}
+          showDropdown
+          searchParams={searchParams}
+        ></UserAvatar>
       )}
 
       {method && session && (
