@@ -34,7 +34,7 @@ export function UserAvatar({
   }
 
   return (
-    <div className="flex h-full flex-row items-center rounded-full border bg-cream border-light-gray dark:border-dark-navy-blue dark:bg-navy gap-4 px-6 py-2">
+    <div className="flex h-full flex-row items-center rounded-full border bg-cream border-light-gray dark:border-dark-navy-blue dark:bg-navy gap-4 px-6 py-2 mb-10">
       <div className="flex flex-row items-center gap-2">
         <UserIcon className="w-4 h-4" />
         <span className="text-sm max-w-[250px] text-ellipsis overflow-hidden whitespace-pre">

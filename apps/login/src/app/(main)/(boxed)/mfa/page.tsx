@@ -138,14 +138,12 @@ export default async function Page(props: {
       </p>
 
       {sessionFactors && (
-        <div className="mb-10">
-          <UserAvatar
-            loginName={loginName ?? sessionFactors.factors?.user?.loginName}
-            displayName={sessionFactors.factors?.user?.displayName}
-            showDropdown
-            searchParams={searchParams}
-          ></UserAvatar>
-        </div>
+        <UserAvatar
+          loginName={loginName ?? sessionFactors.factors?.user?.loginName}
+          displayName={sessionFactors.factors?.user?.displayName}
+          showDropdown
+          searchParams={searchParams}
+        ></UserAvatar>
       )}
 
       {!(loginName || sessionId) && (

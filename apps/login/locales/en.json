@@ -179,6 +179,10 @@
       "submit": "Continue"
     }
   },
+  "waitlist": {
+    "title": "Get on the waitlist",
+    "description": "Choose how you'll log in to save time when the doors open–same method, zero set up later."
+  },
   "invite": {
     "title": "Invite User",
     "description": "Provide the email address and the name of the user you want to invite.",
