@@ -75,6 +75,10 @@
       "title": "账户链接失败",
       "description": "链接账户时发生错误。"
     },
+    "registerError": {
+      "title": "注册失败",
+      "description": "尝试注册时发生错误。"
+    },
     "completeRegister": {
       "title": "完成注册",
       "description": "完成您的账户注册。"

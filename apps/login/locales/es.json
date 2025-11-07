@@ -75,6 +75,10 @@
       "title": "Error al vincular la cuenta",
       "description": "Ocurrió un error al intentar vincular tu cuenta."
     },
+    "registerError": {
+      "title": "Registro fallido",
+      "description": "Ocurrió un error al intentar registrarse."
+    },
     "completeRegister": {
       "title": "Completar registro",
       "description": "Para completar el registro, debes establecer una contraseña."

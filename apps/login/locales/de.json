@@ -75,6 +75,10 @@
       "title": "Konto-Verknüpfung fehlgeschlagen",
       "description": "Beim Verknüpfen Ihres Kontos ist ein Fehler aufgetreten."
     },
+    "registerError": {
+      "title": "Registrierung fehlgeschlagen",
+      "description": "Beim Registrieren ist ein Fehler aufgetreten."
+    },
     "completeRegister": {
       "title": "Registrierung abschließen",
       "description": "Bitte vervollständige die Registrierung, um dein Konto zu erstellen."
