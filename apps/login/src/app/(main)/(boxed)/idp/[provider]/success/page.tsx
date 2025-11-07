@@ -4,6 +4,7 @@ import { linkingFailed } from "@/components/idps/pages/linking-failed";
 import { linkingSuccess } from "@/components/idps/pages/linking-success";
 import { loginFailed } from "@/components/idps/pages/login-failed";
 import { loginSuccess } from "@/components/idps/pages/login-success";
+import { registrationFailed } from "@/components/idps/pages/registration-failed";
 import { Translated } from "@/components/translated";
 import { generateRouteMetadata } from "@/lib/metadata";
 import { getServiceUrlFromHeaders } from "@/lib/service-url";
@@ -366,6 +367,19 @@ export default async function Page(props: {
     }
 
     try {
+      // before creating a new user, ensure the email is not already used
+      const emailToCheck = addHumanUser?.email?.email;
+      if (emailToCheck) {
+        const existingByEmail = await listUsers({
+          serviceUrl,
+          email: emailToCheck,
+        });
+        if (existingByEmail.result && existingByEmail.result.length > 0) {
+          return registrationFailed(
+            "This email address is already associated with an existing account. Account linking and merge capabilities across identity providers are not yet available; support for account consolidation is planned for a future release.",
+          );
+        }
+      }
       newUser = await addHuman({
         serviceUrl,
         request: addHumanUserWithOrganization,
