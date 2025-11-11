@@ -39,9 +39,7 @@ export default async function RootLayout({
             </LanguageProvider>
           </Suspense>
         </ThemeProvider>
-        {process.env.FATHOM_ID && (
-          <FathomAnalytics clientId={process.env.FATHOM_ID} />
-        )}
+        <FathomAnalytics />
 
         {process.env.MARKER_IO_PROJECT_ID && (
           <MarkerIoEmbed projectId={process.env.MARKER_IO_PROJECT_ID} />

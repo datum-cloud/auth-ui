@@ -4,15 +4,15 @@ import { load, trackPageview } from "fathom-client";
 import { usePathname, useSearchParams } from "next/navigation";
 import { Suspense, useEffect } from "react";
 
-function TrackPageView({ clientId }: { clientId: string }) {
+function TrackPageView() {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
   useEffect(() => {
-    load(clientId, {
+    load("PXKRQKIZ", {
       auto: false,
     });
-  }, [clientId]);
+  }, []);
 
   useEffect(() => {
     if (!pathname) return;
@@ -26,10 +26,10 @@ function TrackPageView({ clientId }: { clientId: string }) {
   return null;
 }
 
-export function FathomAnalytics({ clientId }: { clientId: string }) {
+export function FathomAnalytics() {
   return (
     <Suspense fallback={null}>
-      <TrackPageView clientId={clientId} />
+      <TrackPageView />
     </Suspense>
   );
 }
