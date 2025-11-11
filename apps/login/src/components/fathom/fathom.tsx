@@ -2,23 +2,34 @@
 
 import { load, trackPageview } from "fathom-client";
 import { usePathname, useSearchParams } from "next/navigation";
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 
-export const FathomAnalytics = ({ privateKey }: { privateKey: string }) => {
+function TrackPageView({ clientId }: { clientId: string }) {
   const pathname = usePathname();
   const searchParams = useSearchParams();
 
   useEffect(() => {
-    if (privateKey) {
-      load(privateKey);
-    }
-  }, [privateKey]);
+    load(clientId, {
+      auto: false,
+    });
+  }, [clientId]);
 
   useEffect(() => {
-    if (privateKey) {
-      trackPageview();
-    }
-  }, [pathname, searchParams, privateKey]);
+    if (!pathname) return;
+
+    trackPageview({
+      url: pathname + searchParams?.toString(),
+      referrer: document.referrer,
+    });
+  }, [pathname, searchParams]);
 
   return null;
-};
+}
+
+export function FathomAnalytics({ clientId }: { clientId: string }) {
+  return (
+    <Suspense fallback={null}>
+      <TrackPageView clientId={clientId} />
+    </Suspense>
+  );
+}

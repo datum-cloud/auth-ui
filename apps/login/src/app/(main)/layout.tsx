@@ -40,7 +40,7 @@ export default async function RootLayout({
           </Suspense>
         </ThemeProvider>
         {process.env.FATHOM_ID && (
-          <FathomAnalytics privateKey={process.env.FATHOM_ID} />
+          <FathomAnalytics clientId={process.env.FATHOM_ID} />
         )}
 
         {process.env.MARKER_IO_PROJECT_ID && (
