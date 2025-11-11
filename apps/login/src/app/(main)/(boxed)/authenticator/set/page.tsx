@@ -177,7 +177,7 @@ export default async function Page(props: {
         displayName={sessionWithData.factors?.user?.displayName}
         showDropdown
         searchParams={searchParams}
-        ></UserAvatar>
+      ></UserAvatar>
 
       {loginSettings && (
         <ChooseAuthenticatorToSetup

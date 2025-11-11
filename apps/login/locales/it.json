@@ -75,6 +75,10 @@
       "title": "Collegamento account fallito",
       "description": "Si è verificato un errore durante il tentativo di collegare il tuo account."
     },
+    "registerError": {
+      "title": "Registrazione non riuscita",
+      "description": "Si è verificato un errore durante il tentativo di registrazione."
+    },
     "completeRegister": {
       "title": "Completa la registrazione",
       "description": "Completa la registrazione del tuo account."

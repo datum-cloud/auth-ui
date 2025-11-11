@@ -75,6 +75,10 @@
       "title": "Powiązanie konta nie powiodło się",
       "description": "Wystąpił błąd podczas próby powiązania konta."
     },
+    "registerError": {
+      "title": "Rejestracja nie powiodła się",
+      "description": "Wystąpił błąd podczas próby rejestracji."
+    },
     "completeRegister": {
       "title": "Ukończ rejestrację",
       "description": "Ukończ rejestrację swojego konta."
