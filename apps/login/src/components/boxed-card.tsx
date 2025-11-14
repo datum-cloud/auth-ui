@@ -11,12 +11,12 @@ export const BoxedCard = ({
   className?: string;
 }) => {
   return (
-    <div className="flex flex-col items-center justify-center gap-[60px] w-full z-10 p-[50px]">
+    <div className="flex flex-col items-center gap-[50px] w-full z-10 p-[90px]">
       <DatumLogoFull className="h-[86px]" />
       <div
         className={clsx(
           "boxed-card",
-          "rounded border border-card-border bg-card-background p-[70px] w-full max-w-[528px]",
+          "rounded border border-card-border bg-card-background p-[50px] w-full max-w-[400px]",
           "flex flex-col items-center",
           className,
         )}
@@ -24,7 +24,7 @@ export const BoxedCard = ({
         {children}
       </div>
 
-      <div className="w-full max-w-[528px]">
+      <div className="w-full max-w-[250px]">
         <p className="text-center ztdl-p-secondary terms-of-service">
           <Translated
             i18nKey="termsOfService"

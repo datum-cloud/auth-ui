@@ -88,7 +88,7 @@ export default async function Page(props: {
               loginSettings={loginSettings}
             ></RegisterForm>
             {loginSettings?.allowExternalIdp && !!identityProviders.length && (
-              <p className="text-center ztdl-p-secondary or-sign-in-with">
+              <p className="ztdl-p description text-center or-sign-in-with">
                 <Translated i18nKey="orUseIDP" namespace="register" />
               </p>
             )}

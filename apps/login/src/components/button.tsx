@@ -35,7 +35,7 @@ export const getButtonClasses = (
   color: ButtonColors,
 ) =>
   clsx({
-    "box-border h-[40px] font-normal text-button-foreground text-center justify-center leading-36px text-sm inline-flex items-center rounded-md focus:outline-none transition-colors transition-shadow duration-300":
+    "box-border font-normal text-button-foreground text-center justify-center leading-36px inline-flex items-center rounded-md focus:outline-none transition-colors transition-shadow duration-300":
       true,
     "bg-button-primary-background text-button-primary-foreground disabled:opacity-60 disabled:cursor-not-allowed hover:opacity-90 focus:opacity-80 disabled:pointer-events-none transition-all":
       variant === ButtonVariants.Primary,
@@ -48,7 +48,7 @@ export const getButtonClasses = (
     "bg-green-dark text-white disabled:opacity-60 disabled:cursor-not-allowed hover:underline disabled:pointer-events-none transition-all":
       variant === ButtonVariants.Green,
     "px-16 py-2": size === ButtonSizes.Large,
-    "px-4 h-[36px]": size === ButtonSizes.Small,
+    "px-4 py-2": size === ButtonSizes.Small,
   });
 
 // eslint-disable-next-line react/display-name
