@@ -11,7 +11,7 @@ export const BoxedCard = ({
   className?: string;
 }) => {
   return (
-    <div className="flex flex-col items-center justify-center gap-[60px] w-full z-10">
+    <div className="flex flex-col items-center justify-center gap-[60px] w-full z-10 p-[50px]">
       <DatumLogoFull className="h-[86px]" />
       <div
         className={clsx(
@@ -24,7 +24,7 @@ export const BoxedCard = ({
         {children}
       </div>
 
-      <div className="mb-[70px] w-full max-w-[528px]">
+      <div className="w-full max-w-[528px]">
         <p className="text-center ztdl-p-secondary terms-of-service">
           <Translated
             i18nKey="termsOfService"
