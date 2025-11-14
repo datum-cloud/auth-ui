@@ -29,7 +29,16 @@ export default async function RootLayout({
       <head>
         <DefaultTags />
       </head>
-      <body className="bg-cream dark:bg-dark-navy-blue font-alliance text-navy">
+        <body className="bg-body-background font-alliance text-body-foreground relative">
+
+        <div className="fixed bottom-0 left-0 z-0 max-w-[300px] md:max-w-[416px]">
+          <img src="/scene-1.png" className="size-auto w-full object-cover" alt="scene 1" />
+        </div>
+
+        <div className="fixed right-0 bottom-0 z-0 max-w-[500px] md:max-w-[800px]">
+          <img src="/scene-2.png" className="size-auto w-full object-cover" alt="scene 2" />
+        </div>
+        
         <ThemeProvider>
           <Suspense fallback={<Loader />}>
             <LanguageProvider>

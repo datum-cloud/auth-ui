@@ -35,11 +35,11 @@ export const getButtonClasses = (
   color: ButtonColors,
 ) =>
   clsx({
-    "box-border h-[40px] font-normal text-navy text-center justify-center leading-36px text-sm inline-flex items-center rounded-md focus:outline-none transition-colors transition-shadow duration-300":
+    "box-border h-[40px] font-normal text-button-foreground text-center justify-center leading-36px text-sm inline-flex items-center rounded-md focus:outline-none transition-colors transition-shadow duration-300":
       true,
-    "bg-tuscany text-white disabled:opacity-60 disabled:cursor-not-allowed hover:underline disabled:pointer-events-none transition-all":
+    "bg-button-primary-background text-button-primary-foreground disabled:opacity-60 disabled:cursor-not-allowed hover:opacity-90 focus:opacity-80 disabled:pointer-events-none transition-all":
       variant === ButtonVariants.Primary,
-    "bg-transparent border-none shadow-none text-navy dark:text-cream underline hover:opacity-80 disabled:opacity-50 disabled:cursor-not-allowed":
+    "bg-button-ghost-background border-none shadow-none text-button-ghost-foreground underline hover:opacity-80 disabled:opacity-50 disabled:cursor-not-allowed":
       variant === ButtonVariants.Ghost,
     "border border-button-light-border dark:border-button-dark-border text-gray-950 hover:bg-gray-500 hover:bg-opacity-20 hover:dark:bg-white hover:dark:bg-opacity-10 focus:bg-gray-500 focus:bg-opacity-20 focus:dark:bg-white focus:dark:bg-opacity-10 dark:text-white disabled:text-gray-600 disabled:hover:bg-transparent disabled:dark:hover:bg-transparent disabled:cursor-not-allowed disabled:dark:text-gray-900":
       variant === ButtonVariants.Secondary,

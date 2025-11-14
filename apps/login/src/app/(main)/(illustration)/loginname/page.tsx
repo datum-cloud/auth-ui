@@ -92,14 +92,6 @@ export default async function Page(props: {
         ></SignInWithIdp>
       )}
 
-      <p className="text-center ztdl-p-secondary terms-of-service">
-        <Translated
-          i18nKey="termsOfService"
-          namespace="loginname"
-          useCommonTags
-        />
-      </p>
-
       <RegisterBtn organization={organization} requestId={requestId} />
     </>
   );

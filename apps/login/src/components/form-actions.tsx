@@ -41,13 +41,13 @@ export function FormActions({
       <Button
         data-testid={submitTestId}
         type="submit"
-        className="w-full h-[62px] !text-[19px]"
-        variant={ButtonVariants.Green}
+        className="w-full h-[58px] !text-[19px]"
+        variant={ButtonVariants.Primary}
         disabled={disabled}
         onClick={onSubmit}
       >
         {loading ? (
-          <Loader2 className="h-6 w-6 animate-spin stroke-green-dark dark:stroke-cream" />
+          <Loader2 className="h-6 w-6 animate-spin stroke-loader-button-color" />
         ) : (
           submitLabel
         )}

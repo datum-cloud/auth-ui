@@ -27,9 +27,9 @@ export type TextInputProps = DetailedHTMLProps<
 
 const styles = (error: boolean, disabled: boolean) =>
   clsx({
-    "box-border flex flex-row items-center px-4 w-full h-[62px] bg-cream dark:bg-navy border border-navy dark:border-cream rounded-md transition-colors duration-300 opacity-100":
+    "box-border flex flex-row items-center px-4 w-full h-[58px] bg-input-background border border-input-border rounded-md transition-colors duration-300 opacity-100":
       true,
-    "focus:outline-none focus:ring-0 focus:border-navy focus:!shadow-[0_0_0_2px_rgba(77,99,86,0.15)] text-[19px] text-navy dark:text-cream placeholder:text-navy placeholder:dark:text-cream placeholder:opacity-60":
+    "focus:outline-none focus:ring-0 focus:border-input-focus focus:!shadow-[0_0_0_2px_rgba(77,99,86,0.15)] text-[19px] text-input-foreground placeholder:text-input-foreground placeholder:opacity-60":
       true,
     "border-warn-light-500 dark:border-warn-dark-500 hover:border-warn-light-500 hover:dark:border-warn-dark-500 focus:border-warn-light-500 focus:dark:border-warn-dark-500":
       error,
