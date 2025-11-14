@@ -38,7 +38,12 @@ types.forEach((type) => {
 export default {
   presets: [sharedConfig],
   darkMode: "class",
-  content: ["./src/**/*.{js,ts,jsx,tsx}"],
+  content: [
+    "./src/**/*.{js,ts,jsx,tsx}",
+    // Include config and vars files to trigger rebuilds when they change
+    "./tailwind.config.mjs",
+    "./src/styles/vars.scss",
+  ],
   future: {
     hoverOnlyWhenSupported: true,
   },
@@ -102,6 +107,32 @@ export default {
             },
           },
         },
+
+        // PURPOSE TOKENs
+        "body-background": "var(--body-background)",
+        "body-foreground": "var(--body-foreground)",
+        
+        "card-background": "var(--card-background)",
+        "card-border": "var(--card-border)",
+
+        "input-background": "var(--input-background)",
+        "input-foreground": "var(--input-foreground)",
+        "input-border": "var(--input-border)",
+        "input-focus": "var(--input-focus)",
+
+        "loader-color": "var(--loader-color)",
+        "loader-button-color": "var(--loader-button-color)",
+
+        "button-foreground": "var(--button-foreground)",
+        "button-primary-background": "var(--button-primary-background)",
+        "button-primary-foreground": "var(--button-primary-foreground)",
+        "button-ghost-background": "var(--button-ghost-background)",
+        "button-ghost-foreground": "var(--button-ghost-foreground)",
+
+        "button-idp-background": "var(--button-idp-background)",
+        "button-idp-foreground": "var(--button-idp-foreground)",
+        "button-idp-border": "var(--button-idp-border)",
+        "button-idp-focus": "var(--button-idp-focus)",
       },
       fontFamily: {
         alliance: ["var(--font-alliance)"],

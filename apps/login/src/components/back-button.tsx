@@ -8,7 +8,7 @@ export function BackButton() {
   const router = useRouter();
   return (
     <Button
-      className="w-full h-[62px] !text-[19px]"
+      className="w-full h-[58px] !text-[19px]"
       onClick={() => router.back()}
       type="button"
       variant={ButtonVariants.Ghost}

@@ -15,7 +15,7 @@ export const SignInWithGoogle = forwardRef<
       {...restProps}
       ref={ref}
       containerclassname="flex items-center justify-center"
-      className="!text-[19px] border-navy hover:border-green-dark rounded-lg"
+      className="!text-[19px] rounded-lg"
     >
       <div className="h-8 w-8 flex items-center justify-center">
         <svg

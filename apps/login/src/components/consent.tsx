@@ -92,7 +92,7 @@ export function ConsentScreen({
           onClick={() => {
             denyDeviceAuth();
           }}
-          variant={ButtonVariants.Secondary}
+          variant={ButtonVariants.Ghost}
           data-testid="deny-button"
         >
           {loading && <Spinner className="h-5 w-5 mr-2" />}

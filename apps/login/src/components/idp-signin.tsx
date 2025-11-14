@@ -57,7 +57,7 @@ export function IdpSignin({
   return (
     <div className="flex items-center justify-center py-4">
       {loading && (
-        <Loader2 className="animate-spin size-8 stroke-green-dark dark:stroke-cream" />
+        <Loader2 className="animate-spin size-8 stroke-loader-color" />
       )}
       {error && (
         <div className="py-4 w-full">

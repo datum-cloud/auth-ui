@@ -1,7 +1,7 @@
 "use client";
 
 import { clsx } from "clsx";
-import { Loader2Icon } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { ButtonHTMLAttributes, DetailedHTMLProps, forwardRef } from "react";
 import { useFormStatus } from "react-dom";
 
@@ -27,10 +27,9 @@ export const BaseButton = forwardRef<
       ref={ref}
       disabled={formStatus.pending}
       className={clsx(
-        "flex-1 transition-all cursor-pointer flex flex-row items-center bg-white text-navy border border-navy hover:border-green-dark focus:border-green-dark outline-none rounded-md px-4 text-sm",
-        "dark:bg-navy dark:text-cream dark:border-cream dark:hover:border-green-dark dark:focus:border-green-dark",
+        "flex-1 transition-all cursor-pointer flex flex-row items-center bg-button-idp-background text-button-idp-foreground border border-button-idp-border hover:border-button-idp-focus focus:border-button-idp-focus outline-none rounded-md px-4 text-sm",
         "disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none",
-        "h-[62px] text-[19px]",
+        "h-[58px] text-[19px]",
         props.className,
       )}
     >
@@ -45,7 +44,7 @@ export const BaseButton = forwardRef<
         </div>
         {formStatus.pending && (
           <div className="absolute right-2">
-            <Loader2Icon className="w-6 h-6 animate-spin stroke-green-dark dark:stroke-cream" />
+            <Loader2 className="w-6 h-6 animate-spin stroke-loader-color" />
           </div>
         )}
       </div>
