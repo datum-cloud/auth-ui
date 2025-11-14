@@ -41,7 +41,7 @@ export function FormActions({
       <Button
         data-testid={submitTestId}
         type="submit"
-        className="w-full h-[58px] !text-[19px]"
+        className="w-full py-2 px-4"
         variant={ButtonVariants.Primary}
         disabled={disabled}
         onClick={onSubmit}

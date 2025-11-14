@@ -76,7 +76,7 @@ export function AuthenticationMethodRadio({
                       )}
                       <RadioGroup.Label
                         as="p"
-                        className={`font-medium text-[19px] ${checked ? "" : ""}`}
+                        className={`font-medium ${checked ? "" : ""}`}
                       >
                         {method === AuthenticationMethod.Passkey && (
                           <Translated

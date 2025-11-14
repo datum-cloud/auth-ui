@@ -9,20 +9,23 @@
   h1,
   .ztdl-h1 {
     @apply font-alliance font-normal leading-[1.2] text-center tracking-[-0.02em];
-    font-size: 40px;
+    font-size: 20px;
+    line-height: 28px;
+    font-weight: 500;
   }
 
   .ztdl-p {
-    @apply text-navy dark:text-cream text-center;
-
-    &-secondary {
-      @apply text-navy dark:text-cream opacity-50;
+    @apply text-center;
+    
+    &.description {
       font-size: 14px;
     }
 
-    &.description {
-      font-size: 19px;
+    &-secondary {
+      @apply opacity-50;
+      font-size: 12px;
     }
+
   }
 
   body {
@@ -82,21 +85,18 @@ html {
 }
 
 .boxed-card {
-  > h1 {
-    margin-bottom: 30px;
-  }
-
   > p.description {
-    margin-bottom: 40px;
+    margin-top: 15px;
+    margin-bottom: 20px;
   }
 
   form {
     @apply space-y-5;
   }
 
-  .or-sign-in-with {
-    margin-top: 30px;
-    margin-bottom: 10px;
+  > p.or-sign-in-with {
+    margin-top: 20px;
+    margin-bottom: 0px;
   }
 
   .terms-of-service {

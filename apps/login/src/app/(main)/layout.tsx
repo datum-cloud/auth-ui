@@ -9,6 +9,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { SITE_CONFIG } from "@/config/site";
 import { alliance, canelaText, frontliner } from "@/lib/fonts/fonts";
 import { generateMetadata } from "@/lib/metadata";
+import Image from "next/image";
 import { ReactNode, Suspense } from "react";
 
 export const metadata = generateMetadata({
@@ -32,17 +33,17 @@ export default async function RootLayout({
         <body className="bg-body-background font-alliance text-body-foreground relative">
 
         <div className="fixed bottom-0 left-0 z-0 max-w-[300px] md:max-w-[416px]">
-          <img src="/scene-1.png" className="size-auto w-full object-cover" alt="scene 1" />
+          <Image src="/scene-1.png" className="size-auto w-full object-cover" alt="scene 1" width={416} height={416} />
         </div>
 
         <div className="fixed right-0 bottom-0 z-0 max-w-[500px] md:max-w-[800px]">
-          <img src="/scene-2.png" className="size-auto w-full object-cover" alt="scene 2" />
+          <Image src="/scene-2.png" className="size-auto w-full object-cover" alt="scene 2" width={800} height={800} />
         </div>
         
         <ThemeProvider>
           <Suspense fallback={<Loader />}>
             <LanguageProvider>
-              <div className="flex min-h-screen w-full items-center justify-center">
+              <div className="flex min-h-screen w-full justify-center">
                 {children}
               </div>
             </LanguageProvider>

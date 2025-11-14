@@ -77,7 +77,7 @@ export default async function Page(props: {
           ></UsernameForm>
 
           {loginSettings?.allowExternalIdp && !!identityProviders.length && (
-            <p className="text-center ztdl-p-secondary or-sign-in-with">
+            <p className="ztdl-p description text-center or-sign-in-with">
               <Translated i18nKey="orSignInWith" namespace="idp" />
             </p>
           )}

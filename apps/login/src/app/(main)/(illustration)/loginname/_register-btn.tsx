@@ -13,7 +13,7 @@ export const RegisterBtn = ({
   const router = useRouter();
 
   return (
-    <div className="text-center ztdl-p text-[16px] font-normal flex items-center gap-0.5 mt-6">
+    <div className="text-center ztdl-p text-sm font-normal flex items-center gap-0.5 mt-6">
       <Translated i18nKey="notRegistered" namespace="loginname" />
       <button
         className="underline"

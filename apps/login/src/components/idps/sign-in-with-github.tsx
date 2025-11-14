@@ -48,7 +48,7 @@ export const SignInWithGithub = forwardRef<
       {...restProps}
       ref={ref}
       containerclassname="flex items-center justify-center"
-      className="!text-[19px] rounded-lg"
+      className="rounded-lg"
       e2e="github"
     >
       <div className="flex items-center justify-center p-1.5 h-8 w-8">

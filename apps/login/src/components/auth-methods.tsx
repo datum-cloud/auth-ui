@@ -73,7 +73,7 @@ export const TOTP = (alreadyAdded: boolean, link: string) => {
               </clipPath>
             </defs>
           </svg>
-          <span className="text-[19px]">Authenticator app</span>
+          <span>Authenticator app</span>
         </div>
         <span className="text-[14px] text-center text-navy opacity-60">
           E.g. Google/Microsoft Authenticator, Authy
@@ -107,7 +107,7 @@ export const U2F = (alreadyAdded: boolean, link: string) => {
               d="M7.864 4.243A7.5 7.5 0 0119.5 10.5c0 2.92-.556 5.709-1.568 8.268M5.742 6.364A7.465 7.465 0 004.5 10.5a7.464 7.464 0 01-1.15 3.993m1.989 3.559A11.209 11.209 0 008.25 10.5a3.75 3.75 0 117.5 0c0 .527-.021 1.049-.064 1.565M12 10.5a14.94 14.94 0 01-3.6 9.75m6.633-4.596a18.666 18.666 0 01-2.485 5.33"
             />
           </svg>
-          <span className="text-[19px]">Device dependent</span>
+          <span>Device dependent</span>
         </div>
         <span className="text-[14px] text-center text-navy opacity-60">
           E.g. FaceID, Windows Hello, Fingerprint
@@ -180,7 +180,7 @@ export const SMS = (alreadyAdded: boolean, link: string) => {
             d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 18.75h3"
           />
         </svg>
-        <span className="text-[19px]">Code via SMS</span>
+        <span>Code via SMS</span>
       </div>
       {alreadyAdded && (
         <>
@@ -214,7 +214,7 @@ export const PASSKEYS = (alreadyAdded: boolean, link: string) => {
             d="M7.864 4.243A7.5 7.5 0 0119.5 10.5c0 2.92-.556 5.709-1.568 8.268M5.742 6.364A7.465 7.465 0 004.5 10.5a7.464 7.464 0 01-1.15 3.993m1.989 3.559A11.209 11.209 0 008.25 10.5a3.75 3.75 0 117.5 0c0 .527-.021 1.049-.064 1.565M12 10.5a14.94 14.94 0 01-3.6 9.75m6.633-4.596a18.666 18.666 0 01-2.485 5.33"
           />
         </svg>
-        <span className="text-[19px]">Passkeys</span>
+        <span>Passkeys</span>
       </div>
       {alreadyAdded && (
         <>
@@ -242,7 +242,7 @@ export const PASSWORD = (alreadyAdded: boolean, link: string) => {
           <title>form-textbox-password</title>
           <path d="M17,7H22V17H17V19A1,1 0 0,0 18,20H20V22H17.5C16.95,22 16,21.55 16,21C16,21.55 15.05,22 14.5,22H12V20H14A1,1 0 0,0 15,19V5A1,1 0 0,0 14,4H12V2H14.5C15.05,2 16,2.45 16,3C16,2.45 16.95,2 17.5,2H20V4H18A1,1 0 0,0 17,5V7M2,7H13V9H4V15H13V17H2V7M20,15V9H17V15H20M8.5,12A1.5,1.5 0 0,0 7,10.5A1.5,1.5 0 0,0 5.5,12A1.5,1.5 0 0,0 7,13.5A1.5,1.5 0 0,0 8.5,12M13,10.89C12.39,10.33 11.44,10.38 10.88,11C10.32,11.6 10.37,12.55 11,13.11C11.55,13.63 12.43,13.63 13,13.11V10.89Z" />
         </svg>
-        <span className="text-[19px]">Password</span>
+        <span>Password</span>
       </div>
       {alreadyAdded && (
         <>
