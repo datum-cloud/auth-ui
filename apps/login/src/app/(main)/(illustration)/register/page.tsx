@@ -13,7 +13,6 @@ import {
 import { Organization } from "@zitadel/proto/zitadel/org/v2/org_pb";
 import { PasskeysType } from "@zitadel/proto/zitadel/settings/v2/login_settings_pb";
 import { headers } from "next/headers";
-import { LoginBtn } from "./_login-btn";
 
 export const metadata = generateRouteMetadata("register");
 
@@ -103,7 +102,7 @@ export default async function Page(props: {
         ></SignInWithIdp>
       )}
 
-      <LoginBtn />
+      {/* <LoginBtn /> */}
     </>
   );
 }
