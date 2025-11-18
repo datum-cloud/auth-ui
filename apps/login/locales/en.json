@@ -22,7 +22,7 @@
   "loginname": {
     "title": "Welcome",
     "description": "Choose your login method:",
-    "register": "Register now",
+    "register": "Request access",
     "submit": "Continue",
     "notRegistered": "Not registered?",
     "termsOfService": "By continuing, you agree to Datum's <terms>Terms of Service</terms> and <privacy>Privacy Policy</privacy>, and to receive periodic emails with updates."
@@ -166,8 +166,9 @@
       "title": "Missing data",
       "description": "Provide email, first and last name to register."
     },
-    "alreadyRegistered": "Already registered?",
-    "loginNow": "Login now.",
+    "alreadyRegistered": "Have an invitation?",
+    "loginNow": "Log in here.",
+    "onWaitList": "Still on the waitlist? We'll email you when it's your turn!",
     "title": "Register",
     "description": "Choose your registration method:",
     "noMethodAvailableWarning": "No authentication method available. Please contact your administrator.",
