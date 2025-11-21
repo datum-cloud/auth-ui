@@ -12,7 +12,7 @@ export const BoxedCard = ({
 }) => {
   return (
     <div className="flex flex-col items-center gap-4 sm:gap-6 md:gap-8 lg:gap-[44px] w-full z-10 p-3 sm:p-4 md:p-6 lg:p-12 xl:p-[90px] min-w-0">
-      <DatumLogoFull className="h-10 sm:h-12 md:h-16 lg:h-[66.5px] w-auto" />
+      <DatumLogoFull />
       <div
         className={clsx(
           "boxed-card",
