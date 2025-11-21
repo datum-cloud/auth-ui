@@ -117,7 +117,7 @@ export function RegisterForm({
 
   return (
     <form className="w-full">
-      <div className="grid grid-cols-2 gap-5 mb-5">
+      <div className="grid grid-cols-2 gap-3 mb-3">
         <div className="">
           <TextInput
             type="firstname"
