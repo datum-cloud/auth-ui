@@ -16,7 +16,7 @@ export function RichText({ children, className }: RichTextProps) {
     // Legal links
     terms: (chunks: ReactNode) => (
       <Link
-        href="https://www.datum.net/terms-of-service"
+        href="https://www.datum.net/legal/terms/"
         target="_blank"
         rel="noopener noreferrer"
         className="underline "
@@ -26,7 +26,7 @@ export function RichText({ children, className }: RichTextProps) {
     ),
     privacy: (chunks: ReactNode) => (
       <Link
-        href="https://www.datum.net/privacy-policy"
+        href="https://www.datum.net/legal/privacy/"
         target="_blank"
         rel="noopener noreferrer"
         className="underline "
