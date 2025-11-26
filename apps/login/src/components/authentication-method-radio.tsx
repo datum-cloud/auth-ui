@@ -25,7 +25,7 @@ export function AuthenticationMethodRadio({
       <div className="mx-auto w-full max-w-md">
         <RadioGroup value={selected} onChange={selectionChanged}>
           <RadioGroup.Label className="sr-only">Server size</RadioGroup.Label>
-          <div className="flex flex-row space-x-5">
+          <div className="flex flex-row space-x-3">
             {methods.map((method) => (
               <RadioGroup.Option
                 key={method}

@@ -1,5 +1,7 @@
 "use client";
 
+import googleLogo from "@/components/assets/google.svg";
+import Image from "next/image";
 import { forwardRef } from "react";
 import { Translated } from "../translated";
 import { BaseButton, SignInWithIdentityProviderProps } from "./base-button";
@@ -18,7 +20,8 @@ export const SignInWithGoogle = forwardRef<
       className="rounded-lg"
     >
       <div className="h-8 w-8 flex items-center justify-center">
-        <svg
+        <Image src={googleLogo} alt="google" width={19} height={21} />
+        {/* <svg
           xmlns="http://www.w3.org/2000/svg"
           viewBox="-3 0 262 262"
           width="22"
@@ -41,12 +44,12 @@ export const SignInWithGoogle = forwardRef<
             d="M130.55 50.479c24.514 0 41.05 10.589 50.479 19.438l36.844-35.974C195.245 12.91 165.798 0 130.55 0 79.49 0 35.393 29.301 13.925 71.947l42.211 32.783c10.59-31.477 39.891-54.251 74.414-54.251"
             fill="#EB4335"
           />
-        </svg>
+        </svg> */}
       </div>
       {children ? (
         children
       ) : (
-        <span className="ml-1 font-semibold">
+        <span className="ml-1 font-medium">
           {name ? (
             name
           ) : (

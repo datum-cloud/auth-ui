@@ -168,7 +168,8 @@
     },
     "alreadyRegistered": "Have an invitation?",
     "loginNow": "Log in here.",
-    "onWaitList": "Still on the waitlist? We'll email you when it's your turn!",
+    "onWaitListQuestion": "Still on the waitlist? ",
+    "onWaitListInfo": "We'll email you when it's your turn!",
     "title": "Register",
     "description": "Choose your registration method:",
     "noMethodAvailableWarning": "No authentication method available. Please contact your administrator.",
@@ -186,7 +187,7 @@
   },
   "waitlist": {
     "title": "Get on the waitlist",
-    "description": "Choose how you'll log in to save time when the doors open–same method, zero set up later."
+    "description": "Choose how you’ll log in so you can access Datum as soon as the doors open - no extra setup needed."
   },
   "invite": {
     "title": "Invite User",

@@ -57,7 +57,7 @@ export const SignInWithGithub = forwardRef<
       {children ? (
         children
       ) : (
-        <span className="ml-1 font-semibold">
+        <span className="ml-1 font-medium">
           {name ? (
             name
           ) : (

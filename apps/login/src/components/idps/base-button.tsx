@@ -27,7 +27,7 @@ export const BaseButton = forwardRef<
       ref={ref}
       disabled={formStatus.pending}
       className={clsx(
-        "flex-1 transition-all cursor-pointer flex flex-row items-center bg-button-idp-background text-button-idp-foreground border border-button-idp-border hover:border-button-idp-focus focus:border-button-idp-focus outline-none rounded-md px-4 py-2 text-sm",
+        "flex-1 transition-all cursor-pointer flex flex-row items-center bg-button-idp-background text-button-idp-foreground border border-button-idp-border hover:border-button-idp-focus focus:border-button-idp-focus outline-none rounded-md px-4 py-2 text-[16px]",
         "disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none",
         props.className,
       )}

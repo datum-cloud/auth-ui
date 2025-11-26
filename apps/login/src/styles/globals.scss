@@ -86,21 +86,16 @@ html {
 
 .boxed-card {
   > p.description {
-    margin-top: 15px;
-    margin-bottom: 20px;
+    margin-top: 12px;
+    margin-bottom: 24px;
   }
 
   form {
-    @apply space-y-5;
+    @apply space-y-3;
   }
 
   > p.or-sign-in-with {
-    margin-top: 20px;
-    margin-bottom: 0px;
-  }
-
-  .terms-of-service {
-    margin-top: 40px;
-    margin-bottom: 40px;
+    margin-top: 24px;
+    margin-bottom: 12px;
   }
 }
