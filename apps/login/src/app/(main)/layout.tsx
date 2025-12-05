@@ -33,13 +33,24 @@ export default async function RootLayout({
         <DefaultTags />
       </head>
       <body className="bg-body-background font-alliance text-body-foreground relative">
-
         <div className="fixed bottom-0 left-0 z-0 max-w-[300px] md:max-w-[416px]">
-          <Image src={scene1} className="size-auto w-full object-cover" alt="scene 1" width={416} height={416} />
+          <Image
+            src={scene1}
+            className="size-auto w-full object-cover"
+            alt="scene 1"
+            width={416}
+            height={416}
+          />
         </div>
 
         <div className="fixed right-0 bottom-0 z-0 max-w-[500px] md:max-w-[800px]">
-          <Image src={scene2} className="size-auto w-full object-cover" alt="scene 2" width={800} height={800} />
+          <Image
+            src={scene2}
+            className="size-auto w-full object-cover"
+            alt="scene 2"
+            width={800}
+            height={800}
+          />
         </div>
 
         <ThemeProvider>

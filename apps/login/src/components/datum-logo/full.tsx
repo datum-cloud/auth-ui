@@ -16,8 +16,6 @@ export const DatumLogoFull = (props: React.SVGProps<SVGSVGElement>) => {
     mounted && resolvedTheme === "dark" ? "#ffffff" : "#0C1D31";
   const fillColor = mounted && resolvedTheme === "dark" ? "#E6F59E" : "#BF9595";
 
-  
-
   return (
     <svg
       width={82}
