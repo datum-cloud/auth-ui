@@ -59,7 +59,7 @@
     "signInWithGitlab": "Sign in with GitLab",
     "loginSuccess": {
       "title": "Login successful",
-      "description": "You have successfully been loggedIn!"
+      "description": "You have successfully been logged in"
     },
     "linkingSuccess": {
       "title": "Account linked",
