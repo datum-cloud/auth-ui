@@ -58,8 +58,8 @@
     "signInWithGithub": "Sign in with GitHub",
     "signInWithGitlab": "Sign in with GitLab",
     "loginSuccess": {
-      "title": "Login successful",
-      "description": "You have successfully been logged in"
+      "title": "Sign in confirmed",
+      "description": "Directing you to your account"
     },
     "linkingSuccess": {
       "title": "Account linked",
