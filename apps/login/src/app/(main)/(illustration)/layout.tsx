@@ -7,5 +7,5 @@ export default function IllustrationLayout({
 }: {
   children: ReactNode;
 }) {
-  return (<BoxedCard>{children}</BoxedCard>);
+  return <BoxedCard>{children}</BoxedCard>;
 }

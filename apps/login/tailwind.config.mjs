@@ -111,7 +111,7 @@ export default {
         // PURPOSE TOKENs
         "body-background": "var(--body-background)",
         "body-foreground": "var(--body-foreground)",
-        
+
         "card-background": "var(--card-background)",
         "card-border": "var(--card-border)",
 
