@@ -2,6 +2,10 @@ name: Build and Publish Docker Image
 
 on:
   push:
+    paths-ignore:
+      - "docs/**"
+      - "README.md"
+      - "*.md"
   release:
     types: ["published"]
 
@@ -32,16 +36,14 @@ jobs:
       with:
         images: ghcr.io/datum-cloud/auth-ui
         tags: |
-          type=schedule
-          type=ref,event=branch
-          type=ref,event=pr
-          type=ref,event=branch,suffix=-{{commit_date 'YYYYMMDD-HHmmss'}}
-          type=semver,pattern={{version}}
-          type=semver,pattern={{major}}.{{minor}}
-          type=semver,pattern={{major}}
-          type=sha
-          type=raw,value=latest,enable={{is_default_branch}}
-          type=raw,value=latest,enable=${{ github.event_name == 'release' }}
+          type=ref,event=pr,suffix=-{{commit_date 'YYYYMMDD-HHmmss'}},prefix=v0.0.0-
+          type=ref,event=pr,prefix=v0.0.0-
+          type=ref,event=branch,suffix=-{{commit_date 'YYYYMMDD-HHmmss'}},prefix=v0.0.0-
+          type=ref,event=branch,prefix=v0.0.0-
+          type=semver,pattern=v{{version}}
+          type=semver,pattern=v{{major}}.{{minor}}
+          type=semver,pattern=v{{major}}
+          type=sha,prefix=v0.0.0-
 
     - name: Build Auth UI Docker image
       run: make login_standalone_build
@@ -63,12 +65,19 @@ jobs:
         done
   
   publish-kustomize-bundles:
+    # Add explicit dependency so that the kustomize bundles only get published
+    # if the container image has been built successfully. This helps prevent
+    # situations where the deployment manifests are picked up by flux but the
+    # container is still being created.
+    needs: [build-and-push]
     permissions:
       id-token: write
       contents: read
       packages: write
-    uses: datum-cloud/actions/.github/workflows/publish-kustomize-bundle.yaml@v1.5.1
+    uses: datum-cloud/actions/.github/workflows/publish-kustomize-bundle.yaml@v1.8.1
     with:
       bundle-name: ghcr.io/datum-cloud/auth-ui-kustomize
       bundle-path: config
+      image-overlays: config/base
+      image-name: ghcr.io/datum-cloud/auth-ui
     secrets: inherit 
