@@ -22,6 +22,7 @@ export interface SignInWithIDPProps {
   requestId?: string;
   organization?: string;
   linkOnly?: boolean;
+  userId?: string;
 }
 
 export function SignInWithIdp({
@@ -29,6 +30,7 @@ export function SignInWithIdp({
   requestId,
   organization,
   linkOnly,
+  userId,
 }: Readonly<SignInWithIDPProps>) {
   const [state, action, _isPending] = useActionState(redirectToIdp, {});
 
@@ -64,6 +66,7 @@ export function SignInWithIdp({
         <input type="hidden" name="provider" value={idpTypeToSlug(type)} />
         <input type="hidden" name="requestId" value={requestId} />
         <input type="hidden" name="organization" value={organization} />
+        {userId && <input type="hidden" name="userId" value={userId} />}
         <input
           type="hidden"
           name="linkOnly"

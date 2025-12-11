@@ -32,12 +32,14 @@ export async function redirectToIdp(
   const linkOnly = formData.get("linkOnly") === "true";
   const requestId = formData.get("requestId") as string;
   const organization = formData.get("organization") as string;
+  const userId = formData.get("userId") as string;
   const idpId = formData.get("id") as string;
   const provider = formData.get("provider") as string;
 
   if (linkOnly) params.set("link", "true");
   if (requestId) params.set("requestId", requestId);
   if (organization) params.set("organization", organization);
+  if (userId) params.set("userId", userId);
 
   // redirect to LDAP page where username and password is requested
   if (provider === "ldap") {
