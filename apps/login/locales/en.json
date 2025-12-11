@@ -81,6 +81,16 @@
       "title": "Registration failed",
       "description": "An error occurred while trying to register."
     },
+    "link": {
+      "title": "Link an identity provider",
+      "description": "Select a provider to link with your account",
+      "linked": {
+        "singular": "Linked provider",
+        "plural": "Linked providers"
+      },
+      "noMoreProviders": "All available identity providers are already linked."
+
+    },
     "completeRegister": {
       "title": "Complete your data",
       "description": "You need to complete your registration by providing your email address and name."

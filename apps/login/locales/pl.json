@@ -79,6 +79,15 @@
       "title": "Rejestracja nie powiodła się",
       "description": "Wystąpił błąd podczas próby rejestracji."
     },
+    "link": {
+      "title": "Połącz dostawcę tożsamości",
+      "description": "Wybierz dostawcę, aby połączyć z kontem",
+      "linked": {
+        "singular": "Połączony dostawca",
+        "plural": "Połączeni dostawcy"
+      },
+      "noMoreProviders": "Wszyscy dostępni dostawcy tożsamości są już połączeni."
+    },
     "completeRegister": {
       "title": "Ukończ rejestrację",
       "description": "Ukończ rejestrację swojego konta."

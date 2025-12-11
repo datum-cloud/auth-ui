@@ -79,6 +79,15 @@
       "title": "Registro fallido",
       "description": "Ocurrió un error al intentar registrarse."
     },
+    "link": {
+      "title": "Vincular un proveedor de identidad",
+      "description": "Selecciona un proveedor para vincular con tu cuenta",
+      "linked": {
+        "singular": "Proveedor vinculado",
+        "plural": "Proveedores vinculados"
+      },
+      "noMoreProviders": "Todos los proveedores de identidad disponibles ya están vinculados."
+    },
     "completeRegister": {
       "title": "Completar registro",
       "description": "Para completar el registro, debes establecer una contraseña."

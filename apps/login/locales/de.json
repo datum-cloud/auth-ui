@@ -79,6 +79,15 @@
       "title": "Registrierung fehlgeschlagen",
       "description": "Beim Registrieren ist ein Fehler aufgetreten."
     },
+    "link": {
+      "title": "Identitätsanbieter verknüpfen",
+      "description": "Wähle einen Anbieter, um dein Konto zu verknüpfen",
+      "linked": {
+        "singular": "Verknüpfter Anbieter",
+        "plural": "Verknüpfte Anbieter"
+      },
+      "noMoreProviders": "Alle verfügbaren Identitätsanbieter sind bereits verknüpft."
+    },
     "completeRegister": {
       "title": "Registrierung abschließen",
       "description": "Bitte vervollständige die Registrierung, um dein Konto zu erstellen."
