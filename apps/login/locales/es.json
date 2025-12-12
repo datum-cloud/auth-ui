@@ -77,16 +77,26 @@
     },
     "registerError": {
       "title": "Registro fallido",
-      "description": "Ocurrió un error al intentar registrarse."
+      "description": "Ocurrió un error al intentar registrarse.",
+      "duplicateEmail": "Esta dirección de correo electrónico ya está asociada a una cuenta existente. Puedes vincular tu cuenta a un nuevo proveedor de identidad desde la configuración de la cuenta."
     },
     "link": {
-      "title": "Vincular un proveedor de identidad",
+      "title": "Gestionar proveedores de identidad",
       "description": "Selecciona un proveedor para vincular con tu cuenta",
       "linked": {
         "singular": "Proveedor vinculado",
         "plural": "Proveedores vinculados"
       },
-      "noMoreProviders": "Todos los proveedores de identidad disponibles ya están vinculados."
+      "noMoreProviders": "Todos los proveedores de identidad disponibles ya están vinculados.",
+      "signInRequired": "Inicio de sesión requerido",
+      "signInDescription": "Después de iniciar sesión, puedes vincular otro proveedor de identidad."
+    },
+    "unlink": {
+      "title": "¿Desvincular {provider}?",
+      "description": "¿Estás seguro de que quieres eliminar este método de inicio de sesión? Ya no podrás iniciar sesión con él.",
+      "cancel": "Cancelar",
+      "submit": "Desvincular",
+      "tooltip": "Desvincular"
     },
     "completeRegister": {
       "title": "Completar registro",

@@ -77,16 +77,26 @@
     },
     "registerError": {
       "title": "Rejestracja nie powiodła się",
-      "description": "Wystąpił błąd podczas próby rejestracji."
+      "description": "Wystąpił błąd podczas próby rejestracji.",
+      "duplicateEmail": "Ten adres email jest już powiązany z istniejącym kontem. Możesz połączyć swoje konto z nowym dostawcą tożsamości w Ustawieniach konta."
     },
     "link": {
-      "title": "Połącz dostawcę tożsamości",
+      "title": "Zarządzaj dostawcami tożsamości",
       "description": "Wybierz dostawcę, aby połączyć z kontem",
       "linked": {
         "singular": "Połączony dostawca",
         "plural": "Połączeni dostawcy"
       },
-      "noMoreProviders": "Wszyscy dostępni dostawcy tożsamości są już połączeni."
+      "noMoreProviders": "Wszyscy dostępni dostawcy tożsamości są już połączeni.",
+      "signInRequired": "Wymagane logowanie",
+      "signInDescription": "Po zalogowaniu możesz połączyć kolejnego dostawcę tożsamości."
+    },
+    "unlink": {
+      "title": "Odłączyć {provider}?",
+      "description": "Czy na pewno chcesz usunąć tę metodę logowania? Nie będziesz mógł się nią już logować.",
+      "cancel": "Anuluj",
+      "submit": "Odłącz",
+      "tooltip": "Odłącz"
     },
     "completeRegister": {
       "title": "Ukończ rejestrację",

@@ -4,9 +4,11 @@ import {
   getLoginSettings,
   getUserByID,
   listAuthenticationMethodTypes,
+  removeIDPLink,
   startIdentityProviderFlow,
   startLDAPIdentityProviderFlow,
 } from "@/lib/zitadel";
+import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getNextUrl } from "../client";
@@ -33,13 +35,18 @@ export async function redirectToIdp(
   const requestId = formData.get("requestId") as string;
   const organization = formData.get("organization") as string;
   const userId = formData.get("userId") as string;
+  const onSuccessRedirectTo = formData.get("onSuccessRedirectTo") as string;
   const idpId = formData.get("id") as string;
   const provider = formData.get("provider") as string;
+  const preventCreation = formData.get("preventCreation") === "true";
 
   if (linkOnly) params.set("link", "true");
   if (requestId) params.set("requestId", requestId);
   if (organization) params.set("organization", organization);
+  if (onSuccessRedirectTo)
+    params.set("onSuccessRedirectTo", onSuccessRedirectTo);
   if (userId) params.set("userId", userId);
+  if (preventCreation) params.set("preventCreation", "true");
 
   // redirect to LDAP page where username and password is requested
   if (provider === "ldap") {
@@ -261,4 +268,29 @@ export async function createNewSessionForLDAP(
   return {
     redirect: `/idp/ldap/success?` + params.toString(),
   };
+}
+
+export async function unlinkIdp(formData: FormData) {
+  const _headers = await headers();
+  const { serviceUrl } = getServiceUrlFromHeaders(_headers);
+
+  const userId = formData.get("userId") as string;
+  const idpId = formData.get("idpId") as string;
+  const linkedUserId = formData.get("linkedUserId") as string;
+
+  if (!userId || !idpId || !linkedUserId) {
+    return; // Or throw error, but avoid returning object if not using useActionState
+  }
+
+  try {
+    await removeIDPLink({
+      serviceUrl,
+      userId,
+      idpId,
+      linkedUserId,
+    });
+    revalidatePath("/idp/link");
+  } catch (error) {
+    console.error("Could not unlink IDP", error);
+  }
 }
