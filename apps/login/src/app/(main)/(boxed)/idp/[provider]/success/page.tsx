@@ -123,6 +123,8 @@ export default async function Page(props: {
     organization,
     link,
     userId: qpUserId,
+    onSuccessRedirectTo,
+    preventCreation,
   } = searchParams;
   const { provider } = params;
 
@@ -256,6 +258,7 @@ export default async function Page(props: {
       resolvedUserId,
       { idpIntentId: id, idpIntentToken: token },
       requestId,
+      onSuccessRedirectTo,
     );
   }
 
@@ -291,6 +294,7 @@ export default async function Page(props: {
         resolvedUserId,
         { idpIntentId: id, idpIntentToken: token },
         requestId,
+        onSuccessRedirectTo,
       );
     }
   }
@@ -354,6 +358,10 @@ export default async function Page(props: {
   let newUser;
   // automatic creation of a user is allowed and data is complete
   if (options?.isAutoCreation && addHumanUser) {
+    if (preventCreation === "true") {
+      return loginFailed("User not found and creation is disabled.");
+    }
+
     const orgToRegisterOn = await resolveOrganizationForUser({
       organization,
       addHumanUser,
@@ -387,7 +395,10 @@ export default async function Page(props: {
         });
         if (existingByEmail.result && existingByEmail.result.length > 0) {
           return registrationFailed(
-            "This email address is already associated with an existing account. Account linking and merge capabilities across identity providers are not yet available; support for account consolidation is planned for a future release.",
+            <Translated
+              i18nKey="registerError.duplicateEmail"
+              namespace="idp"
+            />,
           );
         }
       }

@@ -14,12 +14,14 @@ type Props = {
     idpIntentToken: string;
   };
   requestId?: string;
+  onSuccessRedirectTo?: string;
 };
 
 export function IdpSignin({
   userId,
   idpIntent: { idpIntentId, idpIntentToken },
   requestId,
+  onSuccessRedirectTo,
 }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -39,6 +41,26 @@ export function IdpSignin({
         if (response && "error" in response && response?.error) {
           setError(response?.error);
           return;
+        }
+
+        if (onSuccessRedirectTo) {
+          if (
+            onSuccessRedirectTo.startsWith("/") &&
+            !onSuccessRedirectTo.startsWith("//")
+          ) {
+            return router.push(onSuccessRedirectTo);
+          }
+          let target = onSuccessRedirectTo;
+          if (target.startsWith("//")) {
+            target = `https:${target}`;
+          } else if (
+            !target.startsWith("http://") &&
+            !target.startsWith("https://")
+          ) {
+            target = `https://${target}`;
+          }
+
+          return router.push(target);
         }
 
         if (response && "redirect" in response && response?.redirect) {

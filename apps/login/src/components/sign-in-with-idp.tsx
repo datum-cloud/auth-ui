@@ -23,6 +23,8 @@ export interface SignInWithIDPProps {
   organization?: string;
   linkOnly?: boolean;
   userId?: string;
+  onSuccessRedirectTo?: string;
+  preventCreation?: boolean;
 }
 
 export function SignInWithIdp({
@@ -31,6 +33,8 @@ export function SignInWithIdp({
   organization,
   linkOnly,
   userId,
+  onSuccessRedirectTo,
+  preventCreation,
 }: Readonly<SignInWithIDPProps>) {
   const [state, action, _isPending] = useActionState(redirectToIdp, {});
 
@@ -67,11 +71,21 @@ export function SignInWithIdp({
         <input type="hidden" name="requestId" value={requestId} />
         <input type="hidden" name="organization" value={organization} />
         {userId && <input type="hidden" name="userId" value={userId} />}
+        {onSuccessRedirectTo && (
+          <input
+            type="hidden"
+            name="onSuccessRedirectTo"
+            value={onSuccessRedirectTo}
+          />
+        )}
         <input
           type="hidden"
           name="linkOnly"
           value={linkOnly ? "true" : "false"}
         />
+        {preventCreation && (
+          <input type="hidden" name="preventCreation" value="true" />
+        )}
         <Component key={id} name={name} />
       </form>
     ) : null;

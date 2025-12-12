@@ -197,6 +197,25 @@ export async function listIDPLinks({
   return userService.listIDPLinks({ userId }, {});
 }
 
+export async function removeIDPLink({
+  serviceUrl,
+  userId,
+  idpId,
+  linkedUserId,
+}: {
+  serviceUrl: string;
+  userId: string;
+  idpId: string;
+  linkedUserId: string;
+}) {
+  const userService: Client<typeof UserService> = await createServiceForHost(
+    UserService,
+    serviceUrl,
+  );
+
+  return userService.removeIDPLink({ userId, idpId, linkedUserId }, {});
+}
+
 export async function addOTPEmail({
   serviceUrl,
   userId,

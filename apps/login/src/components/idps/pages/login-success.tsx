@@ -5,6 +5,7 @@ export async function loginSuccess(
   userId: string,
   idpIntent: { idpIntentId: string; idpIntentToken: string },
   requestId?: string,
+  onSuccessRedirectTo?: string,
 ) {
   return (
     <>
@@ -15,7 +16,12 @@ export async function loginSuccess(
         <Translated i18nKey="loginSuccess.description" namespace="idp" />
       </p>
 
-      <IdpSignin userId={userId} idpIntent={idpIntent} requestId={requestId} />
+      <IdpSignin
+        userId={userId}
+        idpIntent={idpIntent}
+        requestId={requestId}
+        onSuccessRedirectTo={onSuccessRedirectTo}
+      />
     </>
   );
 }
