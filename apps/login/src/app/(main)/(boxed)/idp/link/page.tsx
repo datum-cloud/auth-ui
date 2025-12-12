@@ -155,7 +155,7 @@ export default async function Page(props: {
       </h1>
 
       {linkedIdps && linkedIdps.length > 0 && (
-        <div className="mb-6">
+        <div className="mb-6 w-full">
           <h2 className="text-sm font-semibold mb-2">
             <Translated
               i18nKey={`link.linked.${linkedIdps.length === 1 ? "singular" : "plural"}`}

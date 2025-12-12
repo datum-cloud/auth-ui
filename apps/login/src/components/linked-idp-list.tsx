@@ -19,7 +19,7 @@ type Props = {
 
 export function LinkedIdpList({ linkedIdps }: Props) {
   return (
-    <ul className="space-y-2">
+    <ul className="space-y-2 w-full">
       {linkedIdps.map((l) => {
         let icon: React.ReactNode = null;
         switch (l.idpType) {
@@ -67,7 +67,7 @@ export function LinkedIdpList({ linkedIdps }: Props) {
         return (
           <li
             key={l.idpId}
-            className="flex flex-row items-center justify-between text-sm p-3 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 shadow-sm min-h-[3.5rem]"
+            className="w-full flex flex-row items-center justify-between text-sm p-3 rounded-lg border border-gray-200 dark:border-white/10 bg-white dark:bg-white/5 shadow-sm min-h-[3.5rem]"
           >
             <div className="flex flex-row items-center gap-3 min-w-0 flex-1 mr-4">
               <span className="shrink-0 flex items-center justify-center">
