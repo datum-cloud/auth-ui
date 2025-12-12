@@ -94,6 +94,7 @@ export function LinkedIdpList({ linkedIdps }: Props) {
                 idpId={l.idpId}
                 linkedUserId={l.linkedUserId}
                 providerName={l.idpName}
+                isLastIdp={linkedIdps.length === 1}
               />
             </div>
           </li>

@@ -9,6 +9,7 @@ interface UnlinkIdpButtonProps {
   idpId: string;
   linkedUserId: string;
   providerName: string;
+  isLastIdp?: boolean;
 }
 
 export function UnlinkIdpButton({
@@ -16,6 +17,7 @@ export function UnlinkIdpButton({
   idpId,
   linkedUserId,
   providerName,
+  isLastIdp,
 }: UnlinkIdpButtonProps) {
   const t = useTranslations("idp.unlink");
   const [showConfirm, setShowConfirm] = useState(false);
@@ -30,6 +32,10 @@ export function UnlinkIdpButton({
       setIsPending(false);
     }
   };
+
+  if (isLastIdp) {
+    return null;
+  }
 
   if (!showConfirm) {
     return (
