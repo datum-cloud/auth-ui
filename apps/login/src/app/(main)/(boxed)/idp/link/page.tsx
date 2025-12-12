@@ -10,15 +10,13 @@ import {
   getSession,
   listIDPLinks,
 } from "@/lib/zitadel";
-import { IdentityProviderType } from "@zitadel/proto/zitadel/settings/v2/login_settings_pb";
 import { IDPLink } from "@zitadel/proto/zitadel/user/v2/idp_pb";
 import { headers } from "next/headers";
 
 import { Alert, AlertType } from "@/components/alert";
-import googleLogo from "@/components/assets/google.svg";
-import { GitHubLogo } from "@/components/idps/sign-in-with-github";
 
-import Image from "next/image";
+import { LinkedIdp, LinkedIdpList } from "@/components/linked-idp-list";
+import Link from "next/link";
 
 export const metadata = generateRouteMetadata("idp");
 
@@ -29,6 +27,8 @@ export default async function Page(props: {
   const requestId = searchParams?.requestId;
   let organization = searchParams?.organization;
   const authProvider = searchParams?.provider;
+  const actualProvider = searchParams?.actualProvider;
+  const onSuccessRedirectTo = searchParams?.onSuccessRedirectTo;
 
   const _headers = await headers();
   const { serviceUrl } = getServiceUrlFromHeaders(_headers);
@@ -49,12 +49,8 @@ export default async function Page(props: {
 
   // resolve current user and linked IDPs
   let userId: string | undefined;
-  type Linked = {
-    idpId: string;
-    idpType: IdentityProviderType;
-    idpName: string;
-  };
-  let linkedIdps: Linked[] = [];
+  let userLoginName: string | undefined;
+  let linkedIdps: LinkedIdp[] = [];
 
   try {
     const recentCookie = await getMostRecentSessionCookie();
@@ -64,18 +60,51 @@ export default async function Page(props: {
       sessionToken: recentCookie.token,
     });
     userId = session?.factors?.user?.id;
+    userLoginName = session?.factors?.user?.loginName;
   } catch {}
 
-  // If not logged in show error
+  // If not logged in, prompt user to sign-in with the chosen provider
   if (!userId) {
+    let providersToShow = activeIdentityProviders;
+
+    if (actualProvider && activeIdentityProviders?.length) {
+      const desired = activeIdentityProviders.find(
+        (p) => idpTypeToSlug(p.type) === actualProvider.toLowerCase(),
+      );
+      if (desired) {
+        providersToShow = [desired];
+      }
+    }
+
     return (
       <>
-        <h1>
-          <Translated i18nKey="error.sessionExpired" namespace="error" />
+        <h1 className="mb-4">
+          <Translated i18nKey="link.title" namespace="idp" />
         </h1>
-        <p className="ztdl-p">
-          <Translated i18nKey="error.noActiveSession" namespace="idp" />
-        </p>
+        <h2 className="text-sm font-semibold mb-2">
+          <Translated i18nKey="link.signInRequired" namespace="idp" />
+        </h2>
+        <Alert type={AlertType.INFO}>
+          <Translated i18nKey="link.signInDescription" namespace="idp" />
+        </Alert>
+
+        {providersToShow && providersToShow.length > 0 && (
+          <SignInWithIdp
+            identityProviders={providersToShow}
+            requestId={requestId}
+            organization={organization}
+            preventCreation={true} // prevent account creation in case they login with a wrong account
+            onSuccessRedirectTo={(() => {
+              // redirect back to the link page with all the params
+              const params = new URLSearchParams();
+              Object.entries(searchParams ?? {}).forEach(([k, v]) => {
+                if (v) params.set(k.toString(), v as string);
+              });
+              const qs = params.toString();
+              return `/idp/link${qs ? `?${qs}` : ""}`;
+            })()}
+          />
+        )}
       </>
     );
   }
@@ -107,7 +136,9 @@ export default async function Page(props: {
         idpId: l.idpId,
         idpType: match?.type,
         idpName: match?.name ?? l.userName ?? l.idpId,
-      } as Linked;
+        userName: l.userName,
+        linkedUserId: l.userId,
+      } as LinkedIdp;
     });
   } catch (e) {
     console.warn("Could not load linked IDPs", e);
@@ -132,37 +163,7 @@ export default async function Page(props: {
             />
           </h2>
           <ul className="space-y-2">
-            {linkedIdps.map((l) => {
-              let icon: React.ReactNode = null;
-              switch (l.idpType) {
-                case IdentityProviderType.GOOGLE:
-                  icon = (
-                    <Image
-                      src={googleLogo}
-                      alt="google"
-                      width={20}
-                      height={20}
-                      className="rounded"
-                    />
-                  );
-                  break;
-                case IdentityProviderType.GITHUB:
-                case IdentityProviderType.GITHUB_ES:
-                  icon = (
-                    <span className="h-5 w-5 flex items-center justify-center">
-                      <GitHubLogo />
-                    </span>
-                  );
-                  break;
-              }
-
-              return (
-                <li key={l.idpId} className="flex items-center text-sm gap-2">
-                  <span className="mr-2">{icon}</span>
-                  <span>{l.idpName}</span>
-                </li>
-              );
-            })}
+            <LinkedIdpList linkedIdps={linkedIdps} />
           </ul>
         </div>
       )}
@@ -171,19 +172,29 @@ export default async function Page(props: {
         <Translated i18nKey="link.description" namespace="idp" />
       </h2>
 
-      {unlinkedIdentityProviders && unlinkedIdentityProviders.length > 0 ? (
+      {activeIdentityProviders && activeIdentityProviders.length > 0 ? (
         <SignInWithIdp
-          identityProviders={unlinkedIdentityProviders}
+          identityProviders={activeIdentityProviders}
           requestId={requestId}
           organization={organization}
           linkOnly={true}
           userId={userId}
+          onSuccessRedirectTo={"/idp/link"}
         />
       ) : (
         <Alert type={AlertType.INFO}>
           <Translated i18nKey="link.noMoreProviders" namespace="idp" />
         </Alert>
       )}
+
+      <div className="mt-6 flex flex-col items-center justify-center">
+        {userLoginName && (
+          <span className="text-sm text-gray-300">{userLoginName}</span>
+        )}
+        <Link href="/logout" className="text-sm text-gray-500 hover:underline">
+          <Translated i18nKey="title" namespace="logout" />
+        </Link>
+      </div>
     </>
   );
 }
