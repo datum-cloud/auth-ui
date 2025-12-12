@@ -6,7 +6,6 @@ import { Spinner } from "./spinner";
 
 interface UnlinkIdpButtonProps {
   unlinkAction: (formData: FormData) => Promise<void>;
-  userId: string;
   idpId: string;
   linkedUserId: string;
   providerName: string;
@@ -14,7 +13,6 @@ interface UnlinkIdpButtonProps {
 
 export function UnlinkIdpButton({
   unlinkAction,
-  userId,
   idpId,
   linkedUserId,
   providerName,
@@ -68,7 +66,6 @@ export function UnlinkIdpButton({
         <p className="text-sm text-gray-500 mb-6">{t("description")}</p>
 
         <form action={handleSubmit} className="flex justify-end gap-3">
-          <input type="hidden" name="userId" value={userId} />
           <input type="hidden" name="idpId" value={idpId} />
           <input type="hidden" name="linkedUserId" value={linkedUserId} />
 

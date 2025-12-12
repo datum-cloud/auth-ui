@@ -2,6 +2,7 @@
 
 import {
   getLoginSettings,
+  getSession,
   getUserByID,
   listAuthenticationMethodTypes,
   removeIDPLink,
@@ -12,6 +13,7 @@ import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getNextUrl } from "../client";
+import { getMostRecentSessionCookie } from "../cookies";
 import { getServiceUrlFromHeaders } from "../service-url";
 import { checkEmailVerification, checkMFAFactors } from "../verify-helper";
 import { createSessionForIdpAndUpdateCookie } from "./cookie";
@@ -274,12 +276,33 @@ export async function unlinkIdp(formData: FormData) {
   const _headers = await headers();
   const { serviceUrl } = getServiceUrlFromHeaders(_headers);
 
-  const userId = formData.get("userId") as string;
   const idpId = formData.get("idpId") as string;
   const linkedUserId = formData.get("linkedUserId") as string;
 
-  if (!userId || !idpId || !linkedUserId) {
-    return; // Or throw error, but avoid returning object if not using useActionState
+  if (!idpId || !linkedUserId) {
+    return;
+  }
+
+  // Securely get the user ID from the active session
+  let userId: string;
+  try {
+    const recentCookie = await getMostRecentSessionCookie();
+    const { session } = await getSession({
+      serviceUrl,
+      sessionId: recentCookie.id,
+      sessionToken: recentCookie.token,
+    });
+
+    if (!session || !session.factors?.user?.id) {
+      throw new Error("No active session found");
+    }
+    userId = session.factors.user.id;
+  } catch (error) {
+    console.error(
+      "Security violation: Attempt to unlink IDP without valid session",
+      error,
+    );
+    return;
   }
 
   try {

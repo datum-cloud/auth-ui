@@ -15,10 +15,9 @@ export type LinkedIdp = {
 
 type Props = {
   linkedIdps: LinkedIdp[];
-  userId: string;
 };
 
-export function LinkedIdpList({ linkedIdps, userId }: Props) {
+export function LinkedIdpList({ linkedIdps }: Props) {
   return (
     <ul className="space-y-2">
       {linkedIdps.map((l) => {
@@ -92,7 +91,6 @@ export function LinkedIdpList({ linkedIdps, userId }: Props) {
             <div className="shrink-0">
               <UnlinkIdpButton
                 unlinkAction={unlinkIdp}
-                userId={userId}
                 idpId={l.idpId}
                 linkedUserId={l.linkedUserId}
                 providerName={l.idpName}
