@@ -133,6 +133,9 @@ export default {
         "button-idp-foreground": "var(--button-idp-foreground)",
         "button-idp-border": "var(--button-idp-border)",
         "button-idp-focus": "var(--button-idp-focus)",
+
+        "alert-error-background": "var(--alert-error-background)",
+        "alert-error-foreground": "var(--alert-error-foreground)",
       },
       fontFamily: {
         alliance: ["var(--font-alliance)"],

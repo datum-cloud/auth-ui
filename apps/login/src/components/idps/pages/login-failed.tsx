@@ -11,7 +11,7 @@ export async function loginFailed(error?: string) {
         <Translated i18nKey="loginError.description" namespace="idp" />
       </p>
       {error && (
-        <div className="w-full">
+        <div className="py-4 w-full">
           {<Alert type={AlertType.ALERT}>{error}</Alert>}
         </div>
       )}
