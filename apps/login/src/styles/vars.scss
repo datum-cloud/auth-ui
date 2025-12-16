@@ -212,6 +212,9 @@
   --button-idp-foreground: #0c1d31;
   --button-idp-border: #e3e2df;
   --button-idp-focus: #0c1d31;
+
+  --alert-error-background: transparent;
+  --alert-error-foreground: #d25b5b;
 }
 
 .dark {
@@ -239,4 +242,7 @@
   --button-idp-foreground: #f6f6f5;
   --button-idp-border: #384555;
   --button-idp-focus: #e6f59f;
+
+  --alert-error-background: transparent;
+  --alert-error-foreground: #d25b5b;
 }

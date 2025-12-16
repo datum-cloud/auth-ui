@@ -73,9 +73,11 @@ export default async function Page(props: {
       <h1>
         <Translated i18nKey="loginError.title" namespace="idp" />
       </h1>
-      <Alert type={AlertType.ALERT}>
-        <Translated i18nKey="loginError.description" namespace="idp" />
-      </Alert>
+      <div className="pt-6">
+        <Alert type={AlertType.ALERT}>
+          <Translated i18nKey="loginError.description" namespace="idp" />
+        </Alert>
+      </div>
 
       {userId && authMethods.length && (
         <>
