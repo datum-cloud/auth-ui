@@ -77,7 +77,26 @@
     },
     "registerError": {
       "title": "Registrazione non riuscita",
-      "description": "Si è verificato un errore durante il tentativo di registrazione."
+      "description": "Si è verificato un errore durante il tentativo di registrazione.",
+      "duplicateEmail": "Questo indirizzo email è già associato a un account esistente. Puoi collegare il tuo account a un nuovo provider di identità dalle Impostazioni account."
+    },
+    "link": {
+      "title": "Gestisci provider di identità",
+      "description": "Seleziona un provider da collegare al tuo account",
+      "linked": {
+        "singular": "Provider collegato",
+        "plural": "Provider collegati"
+      },
+      "noMoreProviders": "Tutti i provider di identità disponibili sono già collegati.",
+      "signInRequired": "Accesso richiesto",
+      "signInDescription": "Dopo l'accesso, puoi collegare un altro provider di identità."
+    },
+    "unlink": {
+      "title": "Scollegare {provider}?",
+      "description": "Sei sicuro di voler rimuovere questo metodo di accesso? Non potrai più accedere con esso.",
+      "cancel": "Annulla",
+      "submit": "Scollega",
+      "tooltip": "Scollega"
     },
     "completeRegister": {
       "title": "Completa la registrazione",

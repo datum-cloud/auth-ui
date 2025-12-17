@@ -4,7 +4,7 @@ import { forwardRef } from "react";
 import { Translated } from "../translated";
 import { BaseButton, SignInWithIdentityProviderProps } from "./base-button";
 
-function GitHubLogo() {
+export function GitHubLogo() {
   return (
     <>
       <svg

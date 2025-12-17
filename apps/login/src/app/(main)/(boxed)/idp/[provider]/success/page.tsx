@@ -116,7 +116,16 @@ export default async function Page(props: {
 }) {
   const params = await props.params;
   const searchParams = await props.searchParams;
-  let { id, token, requestId, organization, link } = searchParams;
+  let {
+    id,
+    token,
+    requestId,
+    organization,
+    link,
+    userId: qpUserId,
+    onSuccessRedirectTo,
+    preventCreation,
+  } = searchParams;
   const { provider } = params;
 
   const _headers = await headers();
@@ -141,7 +150,8 @@ export default async function Page(props: {
     token,
   });
 
-  const { idpInformation, userId } = intent;
+  const { idpInformation, userId: intentUserId } = intent;
+  const resolvedUserId = intentUserId || qpUserId;
   let { addHumanUser } = intent;
 
   // ensure mandatory profile fields are populated to satisfy ZITADEL validation, as GitHub does not provide givenName
@@ -225,14 +235,14 @@ export default async function Page(props: {
   }
 
   // sign in user. If user should be linked continue
-  if (userId && !link) {
+  if (resolvedUserId && !link) {
     // if auto update is enabled, we will update the user with the new information
     if (options?.isAutoUpdate && addHumanUser) {
       try {
         await updateHuman({
           serviceUrl,
           request: create(UpdateHumanUserRequestSchema, {
-            userId: userId,
+            userId: resolvedUserId,
             profile: addHumanUser.profile,
             email: addHumanUser.email,
             phone: addHumanUser.phone,
@@ -245,13 +255,17 @@ export default async function Page(props: {
     }
 
     return loginSuccess(
-      userId,
+      resolvedUserId,
       { idpIntentId: id, idpIntentToken: token },
       requestId,
+      onSuccessRedirectTo,
     );
   }
 
   if (link) {
+    if (!resolvedUserId) {
+      return linkingFailed("User context missing");
+    }
     if (!options?.isLinkingAllowed) {
       // linking was probably disallowed since the invitation was created
       return linkingFailed("Linking is no longer allowed");
@@ -266,7 +280,7 @@ export default async function Page(props: {
           userId: idpInformation.userId,
           userName: idpInformation.userName,
         },
-        userId,
+        userId: resolvedUserId,
       });
     } catch (error) {
       console.error(error);
@@ -277,9 +291,10 @@ export default async function Page(props: {
       return linkingFailed();
     } else {
       return linkingSuccess(
-        userId,
+        resolvedUserId,
         { idpIntentId: id, idpIntentToken: token },
         requestId,
+        onSuccessRedirectTo,
       );
     }
   }
@@ -343,6 +358,10 @@ export default async function Page(props: {
   let newUser;
   // automatic creation of a user is allowed and data is complete
   if (options?.isAutoCreation && addHumanUser) {
+    if (preventCreation === "true") {
+      return loginFailed("User not found and creation is disabled.");
+    }
+
     const orgToRegisterOn = await resolveOrganizationForUser({
       organization,
       addHumanUser,
@@ -376,7 +395,10 @@ export default async function Page(props: {
         });
         if (existingByEmail.result && existingByEmail.result.length > 0) {
           return registrationFailed(
-            "This email address is already associated with an existing account. Account linking and merge capabilities across identity providers are not yet available; support for account consolidation is planned for a future release.",
+            <Translated
+              i18nKey="registerError.duplicateEmail"
+              namespace="idp"
+            />,
           );
         }
       }

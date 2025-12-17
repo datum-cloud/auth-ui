@@ -2,14 +2,18 @@
 
 import {
   getLoginSettings,
+  getSession,
   getUserByID,
   listAuthenticationMethodTypes,
+  removeIDPLink,
   startIdentityProviderFlow,
   startLDAPIdentityProviderFlow,
 } from "@/lib/zitadel";
+import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getNextUrl } from "../client";
+import { getMostRecentSessionCookie } from "../cookies";
 import { getServiceUrlFromHeaders } from "../service-url";
 import { checkEmailVerification, checkMFAFactors } from "../verify-helper";
 import { createSessionForIdpAndUpdateCookie } from "./cookie";
@@ -32,12 +36,19 @@ export async function redirectToIdp(
   const linkOnly = formData.get("linkOnly") === "true";
   const requestId = formData.get("requestId") as string;
   const organization = formData.get("organization") as string;
+  const userId = formData.get("userId") as string;
+  const onSuccessRedirectTo = formData.get("onSuccessRedirectTo") as string;
   const idpId = formData.get("id") as string;
   const provider = formData.get("provider") as string;
+  const preventCreation = formData.get("preventCreation") === "true";
 
   if (linkOnly) params.set("link", "true");
   if (requestId) params.set("requestId", requestId);
   if (organization) params.set("organization", organization);
+  if (onSuccessRedirectTo)
+    params.set("onSuccessRedirectTo", onSuccessRedirectTo);
+  if (userId) params.set("userId", userId);
+  if (preventCreation) params.set("preventCreation", "true");
 
   // redirect to LDAP page where username and password is requested
   if (provider === "ldap") {
@@ -259,4 +270,50 @@ export async function createNewSessionForLDAP(
   return {
     redirect: `/idp/ldap/success?` + params.toString(),
   };
+}
+
+export async function unlinkIdp(formData: FormData) {
+  const _headers = await headers();
+  const { serviceUrl } = getServiceUrlFromHeaders(_headers);
+
+  const idpId = formData.get("idpId") as string;
+  const linkedUserId = formData.get("linkedUserId") as string;
+
+  if (!idpId || !linkedUserId) {
+    return;
+  }
+
+  // Securely get the user ID from the active session
+  let userId: string;
+  try {
+    const recentCookie = await getMostRecentSessionCookie();
+    const { session } = await getSession({
+      serviceUrl,
+      sessionId: recentCookie.id,
+      sessionToken: recentCookie.token,
+    });
+
+    if (!session || !session.factors?.user?.id) {
+      throw new Error("No active session found");
+    }
+    userId = session.factors.user.id;
+  } catch (error) {
+    console.error(
+      "Security violation: Attempt to unlink IDP without valid session",
+      error,
+    );
+    return;
+  }
+
+  try {
+    await removeIDPLink({
+      serviceUrl,
+      userId,
+      idpId,
+      linkedUserId,
+    });
+    revalidatePath("/idp/link");
+  } catch (error) {
+    console.error("Could not unlink IDP", error);
+  }
 }

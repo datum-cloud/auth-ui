@@ -77,7 +77,26 @@
     },
     "registerError": {
       "title": "Registrierung fehlgeschlagen",
-      "description": "Beim Registrieren ist ein Fehler aufgetreten."
+      "description": "Beim Registrieren ist ein Fehler aufgetreten.",
+      "duplicateEmail": "Diese E-Mail-Adresse ist bereits mit einem bestehenden Konto verknüpft. Sie können Ihr Konto über die Kontoeinstellungen mit einem neuen Identitätsanbieter verknüpfen."
+    },
+    "link": {
+      "title": "Identitätsanbieter verwalten",
+      "description": "Wähle einen Anbieter, um dein Konto zu verknüpfen",
+      "linked": {
+        "singular": "Verknüpfter Anbieter",
+        "plural": "Verknüpfte Anbieter"
+      },
+      "noMoreProviders": "Alle verfügbaren Identitätsanbieter sind bereits verknüpft.",
+      "signInRequired": "Anmeldung erforderlich",
+      "signInDescription": "Nach der Anmeldung können Sie einen weiteren Identitätsanbieter verknüpfen."
+    },
+    "unlink": {
+      "title": "{provider} entfernen?",
+      "description": "Sind Sie sicher, dass Sie diese Anmeldemethode entfernen möchten? Sie können sich damit nicht mehr anmelden.",
+      "cancel": "Abbrechen",
+      "submit": "Entfernen",
+      "tooltip": "Entfernen"
     },
     "completeRegister": {
       "title": "Registrierung abschließen",

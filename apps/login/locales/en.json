@@ -79,7 +79,26 @@
     },
     "registerError": {
       "title": "Registration failed",
-      "description": "An error occurred while trying to register."
+      "description": "An error occurred while trying to register.",
+      "duplicateEmail": "This email address is already associated with an existing account. You can link your account to a new identity provider from Account Settings."
+    },
+    "link": {
+      "title": "Manage identity providers",
+      "description": "Select a provider to link with your account",
+      "linked": {
+        "singular": "Linked provider",
+        "plural": "Linked providers"
+      },
+      "noMoreProviders": "All available identity providers are already linked.",
+      "signInRequired": "Sign in required",
+      "signInDescription": "After signing in, you can choose to link to another identity provider."
+    },
+    "unlink": {
+      "title": "Unlink {provider}?",
+      "description": "Are you sure you want to remove this login method? You won't be able to sign in with it anymore.",
+      "cancel": "Cancel",
+      "submit": "Unlink",
+      "tooltip": "Unlink"
     },
     "completeRegister": {
       "title": "Complete your data",
