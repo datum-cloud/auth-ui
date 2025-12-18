@@ -284,11 +284,11 @@ export default async function Page(props: {
       });
     } catch (error) {
       console.error(error);
-      return linkingFailed();
+      return linkingFailed((error as Error).message);
     }
 
     if (!idpLink) {
-      return linkingFailed();
+      return linkingFailed("Could not link identity provider");
     } else {
       return linkingSuccess(
         resolvedUserId,

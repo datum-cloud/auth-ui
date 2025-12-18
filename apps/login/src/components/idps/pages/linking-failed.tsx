@@ -11,7 +11,7 @@ export async function linkingFailed(error?: string) {
         <Translated i18nKey="linkingError.description" namespace="idp" />
       </p>
       {error && (
-        <div className="w-full">
+        <div className="mt-4 w-full">
           {<Alert type={AlertType.ALERT}>{error}</Alert>}
         </div>
       )}
