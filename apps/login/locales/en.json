@@ -75,7 +75,9 @@
     },
     "linkingError": {
       "title": "Account linking failed",
-      "description": "An error occurred while trying to link your account."
+      "description": "An error occurred while trying to link your account.",
+      "alreadyExists": "This external account is already linked to another user.",
+      "linkFailed": "We could not link information from the identity provider to your account. Please try again."
     },
     "registerError": {
       "title": "Registration failed",
