@@ -73,7 +73,9 @@
     },
     "linkingError": {
       "title": "账户链接失败",
-      "description": "链接账户时发生错误。"
+      "description": "链接账户时发生错误。",
+      "alreadyExists": "此外部帐户已链接到其他用户。",
+      "linkFailed": "我们无法将身份提供商的信息链接到您的帐户。请重试。"
     },
     "registerError": {
       "title": "注册失败",

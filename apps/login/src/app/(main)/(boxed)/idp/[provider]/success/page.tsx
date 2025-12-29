@@ -284,11 +284,19 @@ export default async function Page(props: {
       });
     } catch (error) {
       console.error(error);
-      return linkingFailed();
+      const errorMessage = (error as Error).message;
+      if (errorMessage?.includes("already_exists")) {
+        return linkingFailed(
+          <Translated i18nKey="linkingError.alreadyExists" namespace="idp" />,
+        );
+      }
+      return linkingFailed(errorMessage);
     }
 
     if (!idpLink) {
-      return linkingFailed();
+      return linkingFailed(
+        <Translated i18nKey="linkingError.linkFailed" namespace="idp" />,
+      );
     } else {
       return linkingSuccess(
         resolvedUserId,

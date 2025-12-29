@@ -73,7 +73,9 @@
     },
     "linkingError": {
       "title": "Konto-Verknüpfung fehlgeschlagen",
-      "description": "Beim Verknüpfen Ihres Kontos ist ein Fehler aufgetreten."
+      "description": "Beim Verknüpfen Ihres Kontos ist ein Fehler aufgetreten.",
+      "alreadyExists": "Dieses externe Konto ist bereits mit einem anderen Benutzer verknüpft.",
+      "linkFailed": "Wir konnten die Informationen des Identitätsanbieters nicht mit Ihrem Konto verknüpfen. Bitte versuchen Sie es erneut."
     },
     "registerError": {
       "title": "Registrierung fehlgeschlagen",
