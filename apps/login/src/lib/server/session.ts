@@ -100,9 +100,12 @@ export async function continueWithSession({
             loginSettings?.defaultRedirectUri,
           )
         : null;
-  if (url) {
-    return { redirect: url };
+
+  if (!url) {
+    console.error("Could not get next url", { requestId, session });
   }
+
+  return url ? { redirect: url } : null;
 }
 
 export type UpdateSessionCommand = {
