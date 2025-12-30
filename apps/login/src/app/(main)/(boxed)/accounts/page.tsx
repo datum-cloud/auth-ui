@@ -11,11 +11,12 @@ import {
 import { UserPlusIcon } from "@heroicons/react/24/outline";
 import { Organization } from "@zitadel/proto/zitadel/org/v2/org_pb";
 import clsx from "clsx";
+import { Metadata } from "next";
 import { getLocale } from "next-intl/server";
 import { headers } from "next/headers";
 import Link from "next/link";
 
-export const metadata = generateRouteMetadata("accounts");
+export const metadata: Metadata = generateRouteMetadata("accounts");
 
 async function loadSessions({ serviceUrl }: { serviceUrl: string }) {
   const ids: (string | undefined)[] = await getAllSessionCookieIds();
