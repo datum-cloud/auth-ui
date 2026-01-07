@@ -73,7 +73,9 @@
     },
     "linkingError": {
       "title": "Collegamento account fallito",
-      "description": "Si è verificato un errore durante il tentativo di collegare il tuo account."
+      "description": "Si è verificato un errore durante il tentativo di collegare il tuo account.",
+      "alreadyExists": "Questo account esterno è già collegato a un altro utente.",
+      "linkFailed": "Non siamo riusciti a collegare le informazioni dal provider di identità al tuo account. Riprova."
     },
     "registerError": {
       "title": "Registrazione non riuscita",

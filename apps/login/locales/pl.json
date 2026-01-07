@@ -73,7 +73,9 @@
     },
     "linkingError": {
       "title": "Powiązanie konta nie powiodło się",
-      "description": "Wystąpił błąd podczas próby powiązania konta."
+      "description": "Wystąpił błąd podczas próby powiązania konta.",
+      "alreadyExists": "To konto zewnętrzne jest już powiązane z innym użytkownikiem.",
+      "linkFailed": "Nie udało nam się połączyć informacji od dostawcy tożsamości z Twoim kontem. Spróbuj ponownie."
     },
     "registerError": {
       "title": "Rejestracja nie powiodła się",

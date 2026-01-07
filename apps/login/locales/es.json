@@ -73,7 +73,9 @@
     },
     "linkingError": {
       "title": "Error al vincular la cuenta",
-      "description": "Ocurrió un error al intentar vincular tu cuenta."
+      "description": "Ocurrió un error al intentar vincular tu cuenta.",
+      "alreadyExists": "Esta cuenta externa ya está vinculada a otro usuario.",
+      "linkFailed": "No pudimos vincular la información del proveedor de identidad a su cuenta. Por favor, inténtelo de nuevo."
     },
     "registerError": {
       "title": "Registro fallido",
