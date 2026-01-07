@@ -29,9 +29,8 @@ import { headers } from "next/headers";
 import { NextRequest, NextResponse } from "next/server";
 import { DEFAULT_CSP } from "../../../constants/csp";
 
-export const dynamic = "force-dynamic";
-export const revalidate = false;
-export const fetchCache = "default-no-store";
+// NOTE: Route segment configs (dynamic, revalidate, fetchCache) removed for Next.js 15.6+ compatibility
+// With dynamicIO enabled, route handlers are dynamic by default
 
 const gotoAccounts = ({
   request,
