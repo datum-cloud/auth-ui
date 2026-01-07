@@ -11,8 +11,8 @@ RUN pnpm exec turbo run build:login:standalone
 
 FROM scratch AS login-standalone-out
 COPY --from=login-standalone-builder /build/docker/apps/login/.next/standalone /
-COPY --from=login-standalone-builder /build/docker/apps/login/.next/static /apps/login/.next/static
-COPY --from=login-standalone-builder /build/docker/apps/login/public /apps/login/public
+COPY --from=login-standalone-builder /build/docker/apps/login/.next/static /docker/apps/login/.next/static
+COPY --from=login-standalone-builder /build/docker/apps/login/public /docker/apps/login/public
 
 FROM node:20-alpine AS login-standalone
 WORKDIR /runtime
@@ -23,8 +23,8 @@ RUN mkdir -p /.env-file && touch /.env-file/.env && chown -R nextjs:nodejs /.env
 COPY ./scripts/entrypoint.sh ./
 COPY ./scripts/healthcheck.js ./
 COPY --chown=nextjs:nodejs --from=login-standalone-builder /build/docker/apps/login/.next/standalone ./
-COPY --chown=nextjs:nodejs --from=login-standalone-builder /build/docker/apps/login/.next/static ./apps/login/.next/static
-COPY --chown=nextjs:nodejs --from=login-standalone-builder /build/docker/apps/login/public ./apps/login/public
+COPY --chown=nextjs:nodejs --from=login-standalone-builder /build/docker/apps/login/.next/static ./docker/apps/login/.next/static
+COPY --chown=nextjs:nodejs --from=login-standalone-builder /build/docker/apps/login/public ./docker/apps/login/public
 USER nextjs
 ENV HOSTNAME="0.0.0.0"
 ENV PORT=3000
