@@ -6,6 +6,7 @@ import { loginFailed } from "@/components/idps/pages/login-failed";
 import { loginSuccess } from "@/components/idps/pages/login-success";
 import { registrationFailed } from "@/components/idps/pages/registration-failed";
 import { Translated } from "@/components/translated";
+import { getMostRecentSessionCookie } from "@/lib/cookies";
 import { generateRouteMetadata } from "@/lib/metadata";
 import { getServiceUrlFromHeaders } from "@/lib/service-url";
 import {
@@ -15,6 +16,7 @@ import {
   getIDPByID,
   getLoginSettings,
   getOrgsByDomain,
+  getSession,
   listUsers,
   retrieveIDPIntent,
   updateHuman,
@@ -266,6 +268,29 @@ export default async function Page(props: {
     if (!resolvedUserId) {
       return linkingFailed("User context missing");
     }
+
+    try {
+      const recentCookie = await getMostRecentSessionCookie();
+      const { session } = await getSession({
+        serviceUrl,
+        sessionId: recentCookie.id,
+        sessionToken: recentCookie.token,
+      });
+
+      if (session?.factors?.user?.id !== resolvedUserId) {
+        console.error(
+          "Security Violation: Attempt to link IDP to different user",
+          {
+            sessionUserId: session?.factors?.user?.id,
+            targetUserId: resolvedUserId,
+          },
+        );
+        return linkingFailed("Access Denied");
+      }
+    } catch {
+      return linkingFailed("Error getting user session");
+    }
+
     if (!options?.isLinkingAllowed) {
       // linking was probably disallowed since the invitation was created
       return linkingFailed("Linking is no longer allowed");
