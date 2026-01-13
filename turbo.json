@@ -1,7 +1,9 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "ui": "tui",
-  "globalDependencies": ["**/.env.*local"],
+  "globalDependencies": [
+    "**/.env.*local"
+  ],
   "globalEnv": [
     "DEBUG",
     "VERCEL_URL",
@@ -16,7 +18,8 @@
     "ENABLE_ZITADEL_API_TRANSLATION",
     "NODE_ENV",
     "MARKER_IO_PROJECT_ID",
-    "FATHOM_ID"
+    "FATHOM_ID",
+    "ALLOW_IDP_UNLINK"
   ],
   "tasks": {
     "generate": {
@@ -32,11 +35,15 @@
     "test:unit:standalone": {},
     "test:integration": {},
     "test:integration:setup": {
-      "with": ["dev"]
+      "with": [
+        "dev"
+      ]
     },
     "test:acceptance:setup": {},
     "test:acceptance:setup:dev": {
-      "with": ["dev"]
+      "with": [
+        "dev"
+      ]
     },
     "test:watch": {
       "persistent": true

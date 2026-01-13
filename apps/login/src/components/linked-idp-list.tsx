@@ -15,9 +15,10 @@ export type LinkedIdp = {
 
 type Props = {
   linkedIdps: LinkedIdp[];
+  allowUnlink?: boolean;
 };
 
-export function LinkedIdpList({ linkedIdps }: Props) {
+export function LinkedIdpList({ linkedIdps, allowUnlink = false }: Props) {
   return (
     <ul className="space-y-2 w-full">
       {linkedIdps.map((l) => {
@@ -88,15 +89,17 @@ export function LinkedIdpList({ linkedIdps }: Props) {
               </div>
             </div>
 
-            <div className="shrink-0">
-              <UnlinkIdpButton
-                unlinkAction={unlinkIdp}
-                idpId={l.idpId}
-                linkedUserId={l.linkedUserId}
-                providerName={l.idpName}
-                isLastIdp={linkedIdps.length === 1}
-              />
-            </div>
+            {allowUnlink && (
+              <div className="shrink-0">
+                <UnlinkIdpButton
+                  unlinkAction={unlinkIdp}
+                  idpId={l.idpId}
+                  linkedUserId={l.linkedUserId}
+                  providerName={l.idpName}
+                  isLastIdp={linkedIdps.length === 1}
+                />
+              </div>
+            )}
           </li>
         );
       })}

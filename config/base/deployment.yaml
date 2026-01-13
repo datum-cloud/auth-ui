@@ -38,6 +38,8 @@ spec:
           env:
             - name: ZITADEL_API_URL
               value: https://auth.datum.net
+            - name: ALLOW_IDP_UNLINK
+              value: "false"
           envFrom:
             # Add secret for ZITADEL_SERVICE_USER_TOKEN
             - secretRef:

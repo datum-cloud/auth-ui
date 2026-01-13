@@ -163,7 +163,10 @@ export default async function Page(props: {
             />
           </h2>
           <ul className="space-y-2">
-            <LinkedIdpList linkedIdps={linkedIdps} />
+            <LinkedIdpList
+              linkedIdps={linkedIdps}
+              allowUnlink={process.env.ALLOW_IDP_UNLINK === "true"}
+            />
           </ul>
         </div>
       )}

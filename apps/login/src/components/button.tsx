@@ -35,8 +35,7 @@ export const getButtonClasses = (
   color: ButtonColors,
 ) =>
   clsx({
-    "box-border font-normal text-button-foreground text-center justify-center leading-36px inline-flex items-center rounded-md focus:outline-none transition-colors transition-shadow duration-300":
-      true,
+    "box-border font-normal text-button-foreground text-center justify-center leading-36px inline-flex items-center rounded-md focus:outline-none transition-colors transition-shadow duration-300": true,
     "bg-button-primary-background text-button-primary-foreground disabled:opacity-60 disabled:cursor-not-allowed hover:opacity-90 focus:opacity-80 disabled:pointer-events-none transition-all":
       variant === ButtonVariants.Primary,
     "bg-button-ghost-background border-none shadow-none text-button-ghost-foreground underline hover:opacity-80 disabled:opacity-50 disabled:cursor-not-allowed":
