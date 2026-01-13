@@ -273,6 +273,11 @@ export async function createNewSessionForLDAP(
 }
 
 export async function unlinkIdp(formData: FormData) {
+  if (process.env.ALLOW_IDP_UNLINK !== "true") {
+    console.warn("Attempt to unlink IDP while feature is disabled");
+    return;
+  }
+
   const _headers = await headers();
   const { serviceUrl } = getServiceUrlFromHeaders(_headers);
 
