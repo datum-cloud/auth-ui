@@ -78,7 +78,6 @@ You can already use the current state, and extend it with your needs.
 - [x] Domain Discovery
 - [x] Branding
 - OIDC Standard
-
   - [x] Authorization Code Flow with PKCE
   - [x] AuthRequest `hintUserId`
   - [x] AuthRequest `loginHint`
