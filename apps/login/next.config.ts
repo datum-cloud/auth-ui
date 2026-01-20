@@ -100,9 +100,6 @@ export default withSentryConfig(withNextIntl(nextConfig), {
   project: "auth-ui",
   sentryUrl: process.env.NEXT_PUBLIC_SENTRY_URL,
 
-  // Only print logs for uploading source maps in CI
-  silent: !process.env.CI,
-
   // For all available options, see:
   // https://docs.sentry.io/platforms/javascript/guides/nextjs/manual-setup/
 
@@ -114,7 +111,6 @@ export default withSentryConfig(withNextIntl(nextConfig), {
   // Note: Check that the configured route will not match with your Next.js middleware, otherwise reporting of client-
   // side errors will fail.
   tunnelRoute: "/monitoring",
-
 
   authToken: process.env.SENTRY_AUTH_TOKEN,
 });
