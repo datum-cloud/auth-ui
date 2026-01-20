@@ -100,10 +100,6 @@ export default withSentryConfig(withNextIntl(nextConfig), {
   project: "auth-ui",
   sentryUrl: process.env.NEXT_PUBLIC_SENTRY_URL,
 
-  reactComponentAnnotation: {
-    enabled: true,
-  },
-
   // Only print logs for uploading source maps in CI
   silent: !process.env.CI,
 
@@ -121,5 +117,4 @@ export default withSentryConfig(withNextIntl(nextConfig), {
 
 
   authToken: process.env.SENTRY_AUTH_TOKEN,
-  
 });

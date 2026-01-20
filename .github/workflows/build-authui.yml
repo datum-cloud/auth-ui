@@ -11,6 +11,7 @@ on:
 
 jobs:
   build-and-push:
+    environment: ${{ github.event_name == 'release' && 'production' || 'staging' }}
     permissions:
       contents: read
       packages: write
@@ -20,50 +21,52 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v4
+      - name: Checkout repository
+        uses: actions/checkout@v4
 
-    - name: Log in to GitHub Container Registry
-      uses: docker/login-action@v3.4.0
-      with:
-        registry: ghcr.io
-        username: ${{ github.actor }}
-        password: ${{ secrets.GITHUB_TOKEN }}
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3.4.0
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
-    - name: Extract metadata
-      id: meta
-      uses: docker/metadata-action@v5
-      with:
-        images: ghcr.io/datum-cloud/auth-ui
-        tags: |
-          type=ref,event=pr,suffix=-{{commit_date 'YYYYMMDD-HHmmss'}},prefix=v0.0.0-
-          type=ref,event=pr,prefix=v0.0.0-
-          type=ref,event=branch,suffix=-{{commit_date 'YYYYMMDD-HHmmss'}},prefix=v0.0.0-
-          type=ref,event=branch,prefix=v0.0.0-
-          type=semver,pattern=v{{version}}
-          type=semver,pattern=v{{major}}.{{minor}}
-          type=semver,pattern=v{{major}}
-          type=sha,prefix=v0.0.0-
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/datum-cloud/auth-ui
+          tags: |
+            type=ref,event=pr,suffix=-{{commit_date 'YYYYMMDD-HHmmss'}},prefix=v0.0.0-
+            type=ref,event=pr,prefix=v0.0.0-
+            type=ref,event=branch,suffix=-{{commit_date 'YYYYMMDD-HHmmss'}},prefix=v0.0.0-
+            type=ref,event=branch,prefix=v0.0.0-
+            type=semver,pattern=v{{version}}
+            type=semver,pattern=v{{major}}.{{minor}}
+            type=semver,pattern=v{{major}}
+            type=sha,prefix=v0.0.0-
 
-    - name: Build Auth UI Docker image
-      run: make login_standalone_build
+      - name: Build Auth UI Docker image
+        env:
+          SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+        run: make login_standalone_build
 
-    - name: Tag and push image to GHCR
-      env:
-        TAGS: ${{ steps.meta.outputs.tags }}
-        LABELS: ${{ steps.meta.outputs.labels }}
-        IMAGE_VERSION: ${{ steps.meta.outputs.version }}
-      run: |
-        IMAGE="zitadel-login:${IMAGE_VERSION}"
-        echo "Pushing $IMAGE with tags: $TAGS"
-        # Convert tags (newline or comma separated) into space-separated list
-        for TAG in $(echo "$TAGS" | tr '\n' ' '); do
-          echo "Tagging $IMAGE as $TAG"
-          docker tag "$IMAGE" "$TAG"
-          echo "Pushing $TAG"
-          docker push "$TAG"
-        done
-  
+      - name: Tag and push image to GHCR
+        env:
+          TAGS: ${{ steps.meta.outputs.tags }}
+          LABELS: ${{ steps.meta.outputs.labels }}
+          IMAGE_VERSION: ${{ steps.meta.outputs.version }}
+        run: |
+          IMAGE="zitadel-login:${IMAGE_VERSION}"
+          echo "Pushing $IMAGE with tags: $TAGS"
+          # Convert tags (newline or comma separated) into space-separated list
+          for TAG in $(echo "$TAGS" | tr '\n' ' '); do
+            echo "Tagging $IMAGE as $TAG"
+            docker tag "$IMAGE" "$TAG"
+            echo "Pushing $TAG"
+            docker push "$TAG"
+          done
+
   publish-kustomize-bundles:
     # Add explicit dependency so that the kustomize bundles only get published
     # if the container image has been built successfully. This helps prevent
@@ -80,4 +83,4 @@ jobs:
       bundle-path: config
       image-overlays: config/base
       image-name: ghcr.io/datum-cloud/auth-ui
-    secrets: inherit 
+    secrets: inherit

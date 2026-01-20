@@ -14,6 +14,7 @@ export GID := $(id -g)
 export LOGIN_TEST_ACCEPTANCE_BUILD_CONTEXT := $(LOGIN_DIR)apps/login-test-acceptance
 
 export DOCKER_METADATA_OUTPUT_VERSION ?= local
+export SENTRY_AUTH_TOKEN ?=
 export LOGIN_TAG ?= zitadel-login:${DOCKER_METADATA_OUTPUT_VERSION}
 export LOGIN_TEST_UNIT_TAG := login-test-unit:${DOCKER_METADATA_OUTPUT_VERSION}
 export LOGIN_TEST_INTEGRATION_TAG := login-test-integration:${DOCKER_METADATA_OUTPUT_VERSION}
