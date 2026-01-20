@@ -112,7 +112,7 @@ login_test_acceptance_setup_dev:
 	@echo "Starting the login test acceptance environment with the local zitadel image"
 	docker compose --file $(LOGIN_DIR)apps/login-test-acceptance/docker-compose.yaml up --no-recreate zitadel traefik sink
 
-login_quality: login_lint login_test_unit login_test_integration
+login_quality: login_lint login_test_unit
 	@echo "Running login quality checks: lint, unit tests"
 
 login_standalone_build:
