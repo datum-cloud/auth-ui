@@ -21,7 +21,8 @@
     "NEXT_PUBLIC_SENTRY_DSN",
     "NEXT_PUBLIC_SENTRY_URL",
     "NEXT_OUTPUT_MODE",
-    "CI"
+    "CI",
+    "SENTRY_AUTH_TOKEN"
   ],
   "tasks": {
     "generate": {
