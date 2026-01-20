@@ -4,13 +4,12 @@ on:
   workflow_dispatch:
     inputs:
       ignore-run-cache:
-        description: 'Whether to ignore the run cache'
+        description: "Whether to ignore the run cache"
         required: false
-        default: true
+        default: "true"
       ref-tag:
-        description: 'overwrite the DOCKER_METADATA_OUTPUT_VERSION environment variable used by the make file'
+        description: "overwrite the DOCKER_METADATA_OUTPUT_VERSION environment variable used by the make file"
         required: false
-        default: ''
 jobs:
   quality:
     name: Ensure Quality
