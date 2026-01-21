@@ -28,6 +28,7 @@ export type SendLoginnameCommand = {
   requestId?: string;
   organization?: string;
   suffix?: string;
+  userId?: string; // Optional: when provided, used to get user email if loginName search fails
 };
 
 const ORG_SUFFIX_REGEX = /(?<=@)(.+)/;
@@ -56,6 +57,7 @@ export async function sendLoginname(command: SendLoginnameCommand) {
     organizationId: command.organization,
     loginSettings: loginSettingsByContext,
     suffix: command.suffix,
+    userId: command.userId, // Pass userId for email lookup if loginName search fails
   };
 
   const searchResult = await searchUsers(searchUsersRequest);
