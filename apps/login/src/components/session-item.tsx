@@ -88,6 +88,7 @@ export function SessionItem({
           loginName: session.factors?.user?.loginName,
           organization: session.factors.user.organizationId,
           requestId: requestId,
+          userId: session.factors?.user?.id, // Pass userId to handle IDP users
         }).catch(() => {
           setError("An internal error occurred");
           return;

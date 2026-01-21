@@ -771,6 +771,7 @@ export type SearchUsersCommand = {
   loginSettings: LoginSettings;
   organizationId?: string;
   suffix?: string;
+  userId?: string; // Optional: when provided, get user email if loginName search fails
 };
 
 const PhoneQuery = (searchValue: string) =>
@@ -816,6 +817,7 @@ export async function searchUsers({
   loginSettings,
   organizationId,
   suffix,
+  userId,
 }: SearchUsersCommand) {
   const queries: SearchQuery[] = [];
 
@@ -861,27 +863,57 @@ export async function searchUsers({
     return loginNameResult;
   }
 
+  // If loginName search returned 0 results and we have a userId,
+  // try to get the user's email and search by that instead
+  // This handles IDP users where loginName might be the IDP username (e.g., GitHub username)
+  let effectiveSearchValue = searchValue;
+
+  if (userId && loginNameResult.result.length === 0) {
+    try {
+      const userResponse = await userService.getUserByID({ userId });
+
+      const email =
+        userResponse?.user?.type?.case === "human"
+          ? userResponse.user.type.value?.email?.email
+          : undefined;
+      if (email) {
+        effectiveSearchValue = email;
+      }
+    } catch (error) {
+      console.error("Failed to get user by ID for email lookup:", error);
+      // Continue with original searchValue
+    }
+  }
+
+  console.log("searching by email", effectiveSearchValue);
+
   const emailAndPhoneQueries: SearchQuery[] = [];
   if (
     loginSettings.disableLoginWithEmail &&
     loginSettings.disableLoginWithPhone
   ) {
-    return { error: "User not found in the system" };
-  } else if (loginSettings.disableLoginWithEmail && searchValue.length <= 20) {
-    const phoneQuery = PhoneQuery(searchValue);
+    // For IDP-only setups, we still need to search by email since the session's loginName
+    // may be the user's email address from the identity provider
+    const emailQuery = EmailQuery(effectiveSearchValue);
+    emailAndPhoneQueries.push(emailQuery);
+  } else if (
+    loginSettings.disableLoginWithEmail &&
+    effectiveSearchValue.length <= 20
+  ) {
+    const phoneQuery = PhoneQuery(effectiveSearchValue);
     emailAndPhoneQueries.push(phoneQuery);
   } else if (loginSettings.disableLoginWithPhone) {
-    const emailQuery = EmailQuery(searchValue);
+    const emailQuery = EmailQuery(effectiveSearchValue);
     emailAndPhoneQueries.push(emailQuery);
   } else {
     const orQuery: SearchQuery[] = [];
 
-    const emailQuery = EmailQuery(searchValue);
+    const emailQuery = EmailQuery(effectiveSearchValue);
     orQuery.push(emailQuery);
 
     let phoneQuery;
-    if (searchValue.length <= 20) {
-      phoneQuery = PhoneQuery(searchValue);
+    if (effectiveSearchValue.length <= 20) {
+      phoneQuery = PhoneQuery(effectiveSearchValue);
       orQuery.push(phoneQuery);
     }
 
