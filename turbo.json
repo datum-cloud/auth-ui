@@ -1,9 +1,7 @@
 {
   "$schema": "https://turbo.build/schema.json",
   "ui": "tui",
-  "globalDependencies": [
-    "**/.env.*local"
-  ],
+  "globalDependencies": ["**/.env.*local"],
   "globalEnv": [
     "DEBUG",
     "VERCEL_URL",
@@ -19,7 +17,12 @@
     "NODE_ENV",
     "MARKER_IO_PROJECT_ID",
     "FATHOM_ID",
-    "ALLOW_IDP_UNLINK"
+    "ALLOW_IDP_UNLINK",
+    "NEXT_PUBLIC_SENTRY_DSN",
+    "NEXT_PUBLIC_SENTRY_URL",
+    "NEXT_OUTPUT_MODE",
+    "CI",
+    "SENTRY_AUTH_TOKEN"
   ],
   "tasks": {
     "generate": {
@@ -35,15 +38,11 @@
     "test:unit:standalone": {},
     "test:integration": {},
     "test:integration:setup": {
-      "with": [
-        "dev"
-      ]
+      "with": ["dev"]
     },
     "test:acceptance:setup": {},
     "test:acceptance:setup:dev": {
-      "with": [
-        "dev"
-      ]
+      "with": ["dev"]
     },
     "test:watch": {
       "persistent": true

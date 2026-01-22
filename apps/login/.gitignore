@@ -1,3 +1,6 @@
 custom-config.js
 .env*.local
 standalone
+
+# Sentry Config File
+.env.sentry-build-plugin

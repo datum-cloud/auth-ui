@@ -3,11 +3,13 @@
 import { Boundary } from "@/components/boundary";
 import { Button } from "@/components/button";
 import { Translated } from "@/components/translated";
+import { captureException } from "@sentry/nextjs";
 import { useEffect } from "react";
 
 export default function Error({ error, reset }: any) {
   useEffect(() => {
     console.log("logging error:", error);
+    captureException(error);
   }, [error]);
 
   return (

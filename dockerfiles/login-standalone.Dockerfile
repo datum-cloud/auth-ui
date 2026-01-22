@@ -7,7 +7,9 @@ RUN cp -r ../out/json/* .
 RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
     pnpm install --frozen-lockfile
 RUN cp -r ../out/full/* .
-RUN pnpm exec turbo run build:login:standalone
+RUN --mount=type=secret,id=sentry_auth_token,required=false \
+    if [ -s /run/secrets/sentry_auth_token ]; then export SENTRY_AUTH_TOKEN="$(cat /run/secrets/sentry_auth_token)"; fi; \
+    pnpm exec turbo run build:login:standalone
 
 FROM scratch AS login-standalone-out
 COPY --from=login-standalone-builder /build/docker/apps/login/.next/standalone /

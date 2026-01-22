@@ -1,3 +1,5 @@
+import { withSentryConfig } from "@sentry/nextjs";
+import type { NextConfig } from "next";
 import createNextIntlPlugin from "next-intl/plugin";
 import { DEFAULT_CSP } from "./constants/csp.js";
 
@@ -49,40 +51,35 @@ const secureHeaders = (() => {
 
 const imageRemotePatterns = [
   {
-    protocol: "http",
+    protocol: "http" as const,
     hostname: "localhost",
     port: "8080",
     pathname: "/**",
   },
   {
-    protocol: "https",
+    protocol: "https" as const,
     hostname: "*.zitadel.*",
     port: "",
     pathname: "/**",
   },
-];
+] satisfies NonNullable<NextConfig["images"]>["remotePatterns"];
 
 if (process.env.ZITADEL_API_URL) {
   imageRemotePatterns.push({
-    protocol: "https",
+    protocol: "https" as const,
     hostname: process.env.ZITADEL_API_URL?.replace("https://", "") || "",
     port: "",
     pathname: "/**",
   });
 }
 
-const nextConfig = {
+const nextConfig: NextConfig = {
   basePath: process.env.NEXT_PUBLIC_BASE_PATH,
-  output: process.env.NEXT_OUTPUT_MODE || undefined,
+  output: process.env.NEXT_OUTPUT_MODE as "standalone" | "export" | undefined,
   reactStrictMode: true, // Recommended for the `pages` directory, default in `app`.
-  experimental: {
-    dynamicIO: true,
-  },
+  cacheComponents: true,
   images: {
     remotePatterns: imageRemotePatterns,
-  },
-  eslint: {
-    ignoreDuringBuilds: true,
   },
   async headers() {
     return [
@@ -94,4 +91,26 @@ const nextConfig = {
   },
 };
 
-export default withNextIntl(nextConfig);
+export default withSentryConfig(withNextIntl(nextConfig), {
+  // For all available options, see:
+  // https://www.npmjs.com/package/@sentry/webpack-plugin#options
+
+  org: "sentry",
+
+  project: "auth-ui",
+  sentryUrl: process.env.NEXT_PUBLIC_SENTRY_URL,
+
+  // For all available options, see:
+  // https://docs.sentry.io/platforms/javascript/guides/nextjs/manual-setup/
+
+  // Upload a larger set of source maps for prettier stack traces (increases build time)
+  widenClientFileUpload: true,
+
+  // Route browser requests to Sentry through a Next.js rewrite to circumvent ad-blockers.
+  // This can increase your server load as well as your hosting bill.
+  // Note: Check that the configured route will not match with your Next.js middleware, otherwise reporting of client-
+  // side errors will fail.
+  tunnelRoute: "/monitoring",
+
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+});

@@ -17,7 +17,7 @@
     "isolatedModules": true,
     "jsx": "preserve",
     "incremental": true,
-    "preserveSymlinks": true,
+    "preserveSymlinks": false,
     "declaration": false,
     "declarationMap": false,
     "baseUrl": ".",

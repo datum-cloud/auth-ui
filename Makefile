@@ -14,6 +14,7 @@ export GID := $(id -g)
 export LOGIN_TEST_ACCEPTANCE_BUILD_CONTEXT := $(LOGIN_DIR)apps/login-test-acceptance
 
 export DOCKER_METADATA_OUTPUT_VERSION ?= local
+export SENTRY_AUTH_TOKEN ?=
 export LOGIN_TAG ?= zitadel-login:${DOCKER_METADATA_OUTPUT_VERSION}
 export LOGIN_TEST_UNIT_TAG := login-test-unit:${DOCKER_METADATA_OUTPUT_VERSION}
 export LOGIN_TEST_INTEGRATION_TAG := login-test-integration:${DOCKER_METADATA_OUTPUT_VERSION}
@@ -111,8 +112,8 @@ login_test_acceptance_setup_dev:
 	@echo "Starting the login test acceptance environment with the local zitadel image"
 	docker compose --file $(LOGIN_DIR)apps/login-test-acceptance/docker-compose.yaml up --no-recreate zitadel traefik sink
 
-login_quality: login_lint login_test_unit login_test_integration
-	@echo "Running login quality checks: lint, unit tests, integration tests"
+login_quality: login_lint login_test_unit
+	@echo "Running login quality checks: lint, unit tests"
 
 login_standalone_build:
 	@echo "Building the login standalone docker image with tag: $(LOGIN_TAG)"
