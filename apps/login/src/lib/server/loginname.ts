@@ -1,5 +1,6 @@
 "use server";
 
+import * as Sentry from "@sentry/nextjs";
 import { create } from "@zitadel/client";
 import { ChecksSchema } from "@zitadel/proto/zitadel/session/v2/session_service_pb";
 import { AuthenticationMethodType } from "@zitadel/proto/zitadel/user/v2/user_service_pb";
@@ -219,6 +220,22 @@ export async function sendLoginname(command: SendLoginnameCommand) {
       userLoginSettings?.disableLoginWithPhone
     ) {
       if (user.preferredLoginName !== concatLoginname) {
+        Sentry.captureMessage("User not found: IDP-only validation failed", {
+          level: "error",
+          tags: {
+            validation_type: "idp_only",
+            user_id: user.userId,
+          },
+          extra: {
+            preferredLoginName: user.preferredLoginName,
+            concatLoginname,
+            commandLoginName: command.loginName,
+            email: humanUser?.email?.email,
+            organizationId: command.organization,
+            disableLoginWithEmail: userLoginSettings?.disableLoginWithEmail,
+            disableLoginWithPhone: userLoginSettings?.disableLoginWithPhone,
+          },
+        });
         return { error: "User not found in the system!" };
       }
     } else if (userLoginSettings?.disableLoginWithEmail) {
@@ -226,6 +243,25 @@ export async function sendLoginname(command: SendLoginnameCommand) {
         user.preferredLoginName !== concatLoginname ||
         humanUser?.phone?.phone !== command.loginName
       ) {
+        Sentry.captureMessage(
+          "User not found: email-disabled validation failed",
+          {
+            level: "error",
+            tags: {
+              validation_type: "email_disabled",
+              user_id: user.userId,
+            },
+            extra: {
+              preferredLoginName: user.preferredLoginName,
+              concatLoginname,
+              commandLoginName: command.loginName,
+              phone: humanUser?.phone?.phone,
+              organizationId: command.organization,
+              disableLoginWithEmail: userLoginSettings?.disableLoginWithEmail,
+              disableLoginWithPhone: userLoginSettings?.disableLoginWithPhone,
+            },
+          },
+        );
         return { error: "User not found in the system!" };
       }
     } else if (userLoginSettings?.disableLoginWithPhone) {
@@ -233,6 +269,25 @@ export async function sendLoginname(command: SendLoginnameCommand) {
         user.preferredLoginName !== concatLoginname ||
         humanUser?.email?.email !== command.loginName
       ) {
+        Sentry.captureMessage(
+          "User not found: phone-disabled validation failed",
+          {
+            level: "error",
+            tags: {
+              validation_type: "phone_disabled",
+              user_id: user.userId,
+            },
+            extra: {
+              preferredLoginName: user.preferredLoginName,
+              concatLoginname,
+              commandLoginName: command.loginName,
+              email: humanUser?.email?.email,
+              organizationId: command.organization,
+              disableLoginWithEmail: userLoginSettings?.disableLoginWithEmail,
+              disableLoginWithPhone: userLoginSettings?.disableLoginWithPhone,
+            },
+          },
+        );
         return { error: "User not found in the system!" };
       }
     }
