@@ -1,3 +1,4 @@
+import * as Sentry from "@sentry/nextjs";
 import { Client, create, Duration } from "@zitadel/client";
 import { createServerTransport as libCreateServerTransport } from "@zitadel/client/node";
 import { makeReqCtx } from "@zitadel/client/v2";
@@ -856,6 +857,18 @@ export async function searchUsers({
   }
 
   if (loginNameResult.result.length > 1) {
+    Sentry.captureMessage("Multiple users found: loginName search", {
+      level: "error",
+      tags: {
+        search_type: "multiple_users_loginname",
+      },
+      extra: {
+        searchValue,
+        organizationId,
+        suffix,
+        resultCount: loginNameResult.result.length,
+      },
+    });
     return { error: "Multiple users found" };
   }
 
@@ -951,12 +964,44 @@ export async function searchUsers({
   }
 
   if (emailOrPhoneResult.result.length > 1) {
+    Sentry.captureMessage("Multiple users found: email/phone search", {
+      level: "error",
+      tags: {
+        search_type: "multiple_users_email_phone",
+      },
+      extra: {
+        searchValue,
+        organizationId,
+        suffix,
+        userId,
+        resultCount: emailOrPhoneResult.result.length,
+        disableLoginWithEmail: loginSettings?.disableLoginWithEmail,
+        disableLoginWithPhone: loginSettings?.disableLoginWithPhone,
+      },
+    });
     return { error: "Multiple users found." };
   }
 
   if (emailOrPhoneResult.result.length == 1) {
     return emailOrPhoneResult;
   }
+
+  Sentry.captureMessage("User not found: searchUsers exhausted all queries", {
+    level: "error",
+    tags: {
+      search_type: "user_search_failed",
+    },
+    extra: {
+      searchValue,
+      organizationId,
+      suffix,
+      userId,
+      disableLoginWithEmail: loginSettings?.disableLoginWithEmail,
+      disableLoginWithPhone: loginSettings?.disableLoginWithPhone,
+      loginNameResultCount: 0,
+      emailOrPhoneResultCount: emailOrPhoneResult.result.length,
+    },
+  });
 
   return { error: "User not found in the system" };
 }
