@@ -21,12 +21,7 @@ export const BaseButton = forwardRef<
   SignInWithIdentityProviderProps
 >(function BaseButton(props, ref) {
   const formStatus = useFormStatus();
-  const {
-    isLastUsed,
-    containerclassname,
-    e2e,
-    ...buttonProps
-  } = props;
+  const { isLastUsed, containerclassname, e2e, ...buttonProps } = props;
 
   return (
     <button

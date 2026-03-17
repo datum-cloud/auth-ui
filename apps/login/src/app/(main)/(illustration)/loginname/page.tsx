@@ -1,7 +1,7 @@
 import { SignInWithIdp } from "@/components/sign-in-with-idp";
 import { Translated } from "@/components/translated";
-import { getLastUsedIdpId } from "@/lib/cookies";
 import { UsernameForm } from "@/components/username-form";
+import { getLastUsedIdpId } from "@/lib/cookies";
 import { generateRouteMetadata } from "@/lib/metadata";
 import { getServiceUrlFromHeaders } from "@/lib/service-url";
 import {
