@@ -25,6 +25,7 @@ export interface SignInWithIDPProps {
   userId?: string;
   onSuccessRedirectTo?: string;
   preventCreation?: boolean;
+  lastUsedIdpId?: string | null;
 }
 
 export function SignInWithIdp({
@@ -35,6 +36,7 @@ export function SignInWithIdp({
   userId,
   onSuccessRedirectTo,
   preventCreation,
+  lastUsedIdpId,
 }: Readonly<SignInWithIDPProps>) {
   const [state, action, _isPending] = useActionState(redirectToIdp, {});
 
@@ -86,7 +88,7 @@ export function SignInWithIdp({
         {preventCreation && (
           <input type="hidden" name="preventCreation" value="true" />
         )}
-        <Component key={id} name={name} />
+        <Component key={id} name={name} isLastUsed={id === lastUsedIdpId} />
       </form>
     ) : null;
   };

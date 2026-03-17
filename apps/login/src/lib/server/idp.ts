@@ -13,7 +13,7 @@ import { revalidatePath } from "next/cache";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { getNextUrl } from "../client";
-import { getMostRecentSessionCookie } from "../cookies";
+import { getMostRecentSessionCookie, setLastUsedIdpId } from "../cookies";
 import { getServiceUrlFromHeaders } from "../service-url";
 import { checkEmailVerification, checkMFAFactors } from "../verify-helper";
 import { createSessionForIdpAndUpdateCookie } from "./cookie";
@@ -52,6 +52,7 @@ export async function redirectToIdp(
 
   // redirect to LDAP page where username and password is requested
   if (provider === "ldap") {
+    await setLastUsedIdpId(idpId);
     params.set("idpId", idpId);
     redirect(`/idp/ldap?` + params.toString());
   }
@@ -69,6 +70,7 @@ export async function redirectToIdp(
   }
 
   if (response && "redirect" in response && response?.redirect) {
+    await setLastUsedIdpId(idpId);
     redirect(response.redirect);
   }
 

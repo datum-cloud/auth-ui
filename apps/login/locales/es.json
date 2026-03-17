@@ -55,6 +55,7 @@
     "signInWithAzureAD": "Iniciar sesión con AzureAD",
     "signInWithGithub": "Iniciar sesión con GitHub",
     "signInWithGitlab": "Iniciar sesión con GitLab",
+    "lastUsed": "Usado recientemente",
     "loginSuccess": {
       "title": "Inicio de sesión exitoso",
       "description": "¡Has iniciado sesión con éxito!"

@@ -57,6 +57,7 @@
     "signInWithAzureAD": "Sign in with AzureAD",
     "signInWithGithub": "Sign in with GitHub",
     "signInWithGitlab": "Sign in with GitLab",
+    "lastUsed": "Last used",
     "loginSuccess": {
       "title": "Sign in confirmed",
       "description": "Directing you to your account"

@@ -1,6 +1,6 @@
 import { SignInWithIdp } from "@/components/sign-in-with-idp";
 import { Translated } from "@/components/translated";
-import { getMostRecentSessionCookie } from "@/lib/cookies";
+import { getLastUsedIdpId, getMostRecentSessionCookie } from "@/lib/cookies";
 import { idpTypeToSlug } from "@/lib/idp";
 import { generateRouteMetadata } from "@/lib/metadata";
 import { redirectToIdp } from "@/lib/server/idp";
@@ -63,6 +63,8 @@ export default async function Page(props: {
     userLoginName = session?.factors?.user?.loginName;
   } catch {}
 
+  const lastUsedIdpId = await getLastUsedIdpId();
+
   // If not logged in, prompt user to sign-in with the chosen provider
   if (!userId) {
     let providersToShow = activeIdentityProviders;
@@ -94,6 +96,7 @@ export default async function Page(props: {
             requestId={requestId}
             organization={organization}
             preventCreation={true} // prevent account creation in case they login with a wrong account
+            lastUsedIdpId={lastUsedIdpId}
             onSuccessRedirectTo={(() => {
               // redirect back to the link page with all the params
               const params = new URLSearchParams();
@@ -183,6 +186,7 @@ export default async function Page(props: {
           linkOnly={true}
           userId={userId}
           onSuccessRedirectTo={"/idp/link"}
+          lastUsedIdpId={lastUsedIdpId}
         />
       ) : (
         <Alert type={AlertType.INFO}>

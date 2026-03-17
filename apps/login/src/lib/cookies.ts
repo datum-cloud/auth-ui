@@ -301,6 +301,28 @@ export async function getAllSessions<T>(
  * @param organization optional organization to filter cookies
  * @returns most recent session
  */
+const LAST_USED_IDP_COOKIE_NAME = "last-used-idp-id";
+
+export async function setLastUsedIdpId(idpId: string): Promise<void> {
+  const cookiesList = await cookies();
+
+  await cookiesList.set({
+    name: LAST_USED_IDP_COOKIE_NAME,
+    value: idpId,
+    httpOnly: true,
+    path: "/",
+    sameSite: "lax",
+    secure: process.env.NODE_ENV === "production",
+    maxAge: 60 * 60 * 24 * 365, // 1 year
+  });
+}
+
+export async function getLastUsedIdpId(): Promise<string | null> {
+  const cookiesList = await cookies();
+  const cookie = cookiesList.get(LAST_USED_IDP_COOKIE_NAME);
+  return cookie?.value ?? null;
+}
+
 export async function getMostRecentCookieWithLoginname<T>({
   loginName,
   organization,

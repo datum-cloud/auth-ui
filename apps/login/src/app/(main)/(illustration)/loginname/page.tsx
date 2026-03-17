@@ -1,5 +1,6 @@
 import { SignInWithIdp } from "@/components/sign-in-with-idp";
 import { Translated } from "@/components/translated";
+import { getLastUsedIdpId } from "@/lib/cookies";
 import { UsernameForm } from "@/components/username-form";
 import { generateRouteMetadata } from "@/lib/metadata";
 import { getServiceUrlFromHeaders } from "@/lib/service-url";
@@ -56,6 +57,8 @@ export default async function Page(props: {
     return resp.identityProviders;
   });
 
+  const lastUsedIdpId = await getLastUsedIdpId();
+
   return (
     <>
       <h1>
@@ -89,6 +92,7 @@ export default async function Page(props: {
           identityProviders={identityProviders}
           requestId={requestId}
           organization={organization}
+          lastUsedIdpId={lastUsedIdpId}
         ></SignInWithIdp>
       )}
 

@@ -4,6 +4,7 @@ import { clsx } from "clsx";
 import { Loader2 } from "lucide-react";
 import { ButtonHTMLAttributes, DetailedHTMLProps, forwardRef } from "react";
 import { useFormStatus } from "react-dom";
+import { Translated } from "../translated";
 
 export type SignInWithIdentityProviderProps = DetailedHTMLProps<
   ButtonHTMLAttributes<HTMLButtonElement>,
@@ -12,6 +13,7 @@ export type SignInWithIdentityProviderProps = DetailedHTMLProps<
   name?: string;
   e2e?: string;
   containerclassname?: string;
+  isLastUsed?: boolean;
 };
 
 export const BaseButton = forwardRef<
@@ -19,10 +21,17 @@ export const BaseButton = forwardRef<
   SignInWithIdentityProviderProps
 >(function BaseButton(props, ref) {
   const formStatus = useFormStatus();
+  const {
+    isLastUsed,
+    containerclassname,
+    e2e,
+    ...buttonProps
+  } = props;
 
   return (
     <button
-      {...props}
+      {...buttonProps}
+      data-testid={e2e}
       type="submit"
       ref={ref}
       disabled={formStatus.pending}
@@ -35,11 +44,16 @@ export const BaseButton = forwardRef<
       <div className="flex-1 justify-between flex items-center gap-4 relative">
         <div
           className={clsx(
-            "flex-1 flex flex-row items-center",
-            props.containerclassname,
+            "flex-1 flex flex-row items-center relative",
+            containerclassname,
           )}
         >
           {props.children}
+          {isLastUsed && (
+            <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full text-button-primary-foreground shrink-0 absolute -right-10 -top-4 bg-button-primary-background">
+              <Translated i18nKey="lastUsed" namespace="idp" />
+            </span>
+          )}
         </div>
         {formStatus.pending && (
           <div className="absolute right-2">
