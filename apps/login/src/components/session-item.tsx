@@ -134,7 +134,7 @@ export function SessionItem({
         <span className="font-semibold text-sm">
           {session.factors?.user?.displayName}
         </span>
-        <span className="text-xs text-navy opacity-60 text-ellipsis font-normal">
+        <span className="text-xs text-navy dark:text-cream opacity-60 text-ellipsis font-normal">
           {session.factors?.user?.loginName}
         </span>
         {error ? (
@@ -142,12 +142,12 @@ export function SessionItem({
             {error}
           </span>
         ) : valid ? (
-          <span className="text-xs text-navy opacity-60 text-ellipsis">
+          <span className="text-xs text-navy opacity-60 text-ellipsis dark:text-cream">
             {verifiedAt && moment(timestampDate(verifiedAt)).fromNow()}
           </span>
         ) : (
           verifiedAt && (
-            <span className="text-xs text-navy opacity-60 text-ellipsis">
+            <span className="text-xs text-navy opacity-60 text-ellipsis dark:text-cream">
               expired{" "}
               {session.expirationDate &&
                 moment(timestampDate(session.expirationDate)).fromNow()}

@@ -55,6 +55,7 @@
     "signInWithAzureAD": "Mit AzureAD anmelden",
     "signInWithGithub": "Mit GitHub anmelden",
     "signInWithGitlab": "Mit GitLab anmelden",
+    "lastUsed": "Zuletzt verwendet",
     "loginSuccess": {
       "title": "Anmeldung erfolgreich",
       "description": "Sie haben sich erfolgreich angemeldet!"

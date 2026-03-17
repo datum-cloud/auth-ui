@@ -5,7 +5,7 @@ import { ChooseAuthenticatorToSetup } from "@/components/choose-authenticator-to
 import { SignInWithIdp } from "@/components/sign-in-with-idp";
 import { Translated } from "@/components/translated";
 import { UserAvatar } from "@/components/user-avatar";
-import { getSessionCookieById } from "@/lib/cookies";
+import { getLastUsedIdpId, getSessionCookieById } from "@/lib/cookies";
 import { generateRouteMetadata } from "@/lib/metadata";
 import { getServiceUrlFromHeaders } from "@/lib/service-url";
 import { loadMostRecentSession } from "@/lib/session";
@@ -146,6 +146,8 @@ export default async function Page(props: {
     return resp.identityProviders;
   });
 
+  const lastUsedIdpId = await getLastUsedIdpId();
+
   const params = new URLSearchParams({
     initial: "true", // defines that a code is not required and is therefore not shown in the UI
   });
@@ -200,6 +202,7 @@ export default async function Page(props: {
             requestId={requestId}
             organization={sessionWithData.factors?.user?.organizationId}
             linkOnly={true} // tell the callback function to just link the IDP and not login, to get an error when user is already available
+            lastUsedIdpId={lastUsedIdpId}
           ></SignInWithIdp>
         </>
       )}

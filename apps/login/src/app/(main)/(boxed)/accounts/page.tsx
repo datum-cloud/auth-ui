@@ -86,7 +86,7 @@ export default async function Page(props: {
         <Link href={`/loginname?` + params}>
           <div
             className={clsx(
-              "transition-all gap-3 cursor-pointer flex flex-row items-center border outline-none px-6 text-sm py-2 border-transparent hover:border-navy rounded-lg min-h-[40px]",
+              "transition-all gap-3 cursor-pointer flex flex-row items-center border outline-none px-6 text-sm py-2 border-transparent hover:border-navy dark:hover:border-cream rounded-lg min-h-[40px]",
               sessions.length > 0 ? "" : "justify-center",
             )}
           >
