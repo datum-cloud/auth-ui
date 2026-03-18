@@ -261,6 +261,7 @@ export default async function Page(props: {
       { idpIntentId: id, idpIntentToken: token },
       requestId,
       onSuccessRedirectTo,
+      idpInformation.idpId,
     );
   }
 
@@ -328,6 +329,7 @@ export default async function Page(props: {
         { idpIntentId: id, idpIntentToken: token },
         requestId,
         onSuccessRedirectTo,
+        idpInformation.idpId,
       );
     }
   }
@@ -383,6 +385,8 @@ export default async function Page(props: {
           foundUser.userId,
           { idpIntentId: id, idpIntentToken: token },
           requestId,
+          undefined,
+          idpInformation.idpId,
         );
       }
     }
@@ -487,6 +491,7 @@ export default async function Page(props: {
           userId={newUser.userId}
           idpIntent={{ idpIntentId: id, idpIntentToken: token }}
           requestId={requestId}
+          idpId={idpInformation.idpId}
         />
       </>
     );
