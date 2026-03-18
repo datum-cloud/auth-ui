@@ -22,7 +22,7 @@
   "loginname": {
     "title": "¡Bienvenido de nuevo!",
     "description": "Introduce tus datos de acceso.",
-    "register": "Registrar nuevo usuario",
+    "register": "Crear cuenta",
     "submit": "Continuar"
   },
   "password": {
@@ -186,6 +186,8 @@
       "title": "Datos faltantes",
       "description": "No se proporcionaron datos suficientes para el registro."
     },
+    "alreadyRegistered": "¿Ya tienes una cuenta?",
+    "loginNow": "Inicia sesión aquí.",
     "title": "Registrarse",
     "description": "Crea tu cuenta ZITADEL.",
     "noMethodAvailableWarning": "No hay métodos de autenticación disponibles. Por favor, contacta a tu administrador.",
@@ -200,6 +202,11 @@
       "description": "Establece la contraseña para tu cuenta",
       "submit": "Continuar"
     }
+  },
+  "waitlist": {
+    "title": "¡Bienvenido!",
+    "subtitle": "Empecemos",
+    "description": "Crea tu cuenta gratuita con solo unos pocos detalles"
   },
   "invite": {
     "title": "Invitar usuario",

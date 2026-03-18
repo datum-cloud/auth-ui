@@ -6,6 +6,7 @@ export async function loginSuccess(
   idpIntent: { idpIntentId: string; idpIntentToken: string },
   requestId?: string,
   onSuccessRedirectTo?: string,
+  idpId?: string,
 ) {
   return (
     <>
@@ -21,6 +22,7 @@ export async function loginSuccess(
         idpIntent={idpIntent}
         requestId={requestId}
         onSuccessRedirectTo={onSuccessRedirectTo}
+        idpId={idpId}
       />
     </>
   );

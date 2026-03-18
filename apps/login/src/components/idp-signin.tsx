@@ -8,13 +8,13 @@ import { Alert } from "./alert";
 
 type Props = {
   userId: string;
-  // organization: string;
   idpIntent: {
     idpIntentId: string;
     idpIntentToken: string;
   };
   requestId?: string;
   onSuccessRedirectTo?: string;
+  idpId?: string;
 };
 
 export function IdpSignin({
@@ -22,6 +22,7 @@ export function IdpSignin({
   idpIntent: { idpIntentId, idpIntentToken },
   requestId,
   onSuccessRedirectTo,
+  idpId,
 }: Props) {
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
@@ -37,6 +38,7 @@ export function IdpSignin({
           idpIntentToken,
         },
         requestId,
+        idpId,
       })
         .then((response) => {
           if (response && "error" in response && response?.error) {

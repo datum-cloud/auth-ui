@@ -52,7 +52,6 @@ export async function redirectToIdp(
 
   // redirect to LDAP page where username and password is requested
   if (provider === "ldap") {
-    await setLastUsedIdpId(idpId);
     params.set("idpId", idpId);
     redirect(`/idp/ldap?` + params.toString());
   }
@@ -70,7 +69,6 @@ export async function redirectToIdp(
   }
 
   if (response && "redirect" in response && response?.redirect) {
-    await setLastUsedIdpId(idpId);
     redirect(response.redirect);
   }
 
@@ -114,6 +112,7 @@ type CreateNewSessionCommand = {
   password?: string;
   organization?: string;
   requestId?: string;
+  idpId?: string;
 };
 
 export async function createNewSessionFromIdpIntent(
@@ -171,6 +170,9 @@ export async function createNewSessionFromIdpIntent(
   );
 
   if (emailVerificationCheck?.redirect) {
+    if (command.idpId) {
+      await setLastUsedIdpId(command.idpId);
+    }
     return emailVerificationCheck;
   }
 
@@ -197,6 +199,9 @@ export async function createNewSessionFromIdpIntent(
     command.requestId,
   );
   if (mfaFactorCheck?.redirect) {
+    if (command.idpId) {
+      await setLastUsedIdpId(command.idpId);
+    }
     return mfaFactorCheck;
   }
 
@@ -215,6 +220,9 @@ export async function createNewSessionFromIdpIntent(
   );
 
   if (url) {
+    if (command.idpId) {
+      await setLastUsedIdpId(command.idpId);
+    }
     return { redirect: url };
   }
 }

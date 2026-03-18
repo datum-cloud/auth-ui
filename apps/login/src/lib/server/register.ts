@@ -1,5 +1,6 @@
 "use server";
 
+import { setLastUsedIdpId } from "@/lib/cookies";
 import {
   createSessionAndUpdateCookie,
   createSessionForIdpAndUpdateCookie,
@@ -229,5 +230,8 @@ export async function registerUserAndLinkToIDP(
     loginSettings?.defaultRedirectUri,
   );
 
+  if (url) {
+    await setLastUsedIdpId(command.idpId);
+  }
   return { redirect: url };
 }

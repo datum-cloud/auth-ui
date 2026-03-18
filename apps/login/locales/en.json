@@ -22,7 +22,7 @@
   "loginname": {
     "title": "Welcome",
     "description": "Choose your login method:",
-    "register": "Request access",
+    "register": "Create account",
     "submit": "Continue",
     "notRegistered": "Not registered?",
     "termsOfService": "By continuing, you agree to Datum's <terms>Terms of Service</terms> and <privacy>Privacy Policy</privacy>, and to receive periodic emails with updates."
@@ -188,7 +188,7 @@
       "title": "Missing data",
       "description": "Provide email, first and last name to register."
     },
-    "alreadyRegistered": "Have an invitation?",
+    "alreadyRegistered": "Already have an account?",
     "loginNow": "Log in here.",
     "onWaitListQuestion": "Still on the waitlist? ",
     "onWaitListInfo": "We'll email you when it's your turn!",
@@ -208,8 +208,9 @@
     }
   },
   "waitlist": {
-    "title": "Get on the waitlist",
-    "description": "Choose how you’ll log in so you can access Datum as soon as the doors open - no extra setup needed."
+    "title": "Welcome!",
+    "subtitle": "Let's get you started",
+    "description": "Create your free account with just a few details"
   },
   "invite": {
     "title": "Invite User",

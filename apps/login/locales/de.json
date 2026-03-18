@@ -22,7 +22,7 @@
   "loginname": {
     "title": "Willkommen zurück!",
     "description": "Geben Sie Ihre Anmeldedaten ein.",
-    "register": "Neuen Benutzer registrieren",
+    "register": "Konto erstellen",
     "submit": "Weiter"
   },
   "password": {
@@ -186,6 +186,8 @@
       "title": "Registrierung fehlgeschlagen",
       "description": "Einige Daten fehlen. Bitte überprüfen Sie Ihre Eingaben."
     },
+    "alreadyRegistered": "Bereits ein Konto?",
+    "loginNow": "Hier anmelden.",
     "title": "Registrieren",
     "description": "Erstellen Sie Ihr ZITADEL-Konto.",
     "noMethodAvailableWarning": "Keine Authentifizierungsmethode verfügbar. Bitte wenden Sie sich an den Administrator.",
@@ -200,6 +202,11 @@
       "description": "Legen Sie das Passwort für Ihr Konto fest",
       "submit": "Weiter"
     }
+  },
+  "waitlist": {
+    "title": "Willkommen!",
+    "subtitle": "Lass uns loslegen",
+    "description": "Erstellen Sie Ihr kostenloses Konto mit nur wenigen Angaben"
   },
   "invite": {
     "title": "Benutzer einladen",

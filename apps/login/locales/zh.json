@@ -22,7 +22,7 @@
   "loginname": {
     "title": "欢迎回来！",
     "description": "请输入您的登录信息。",
-    "register": "注册新用户",
+    "register": "创建账户",
     "submit": "继续"
   },
   "password": {
@@ -186,6 +186,8 @@
       "title": "缺少数据",
       "description": "请提供所有必需的数据。"
     },
+    "alreadyRegistered": "已有账户？",
+    "loginNow": "在此登录。",
     "title": "注册",
     "description": "创建您的 ZITADEL 账户。",
     "noMethodAvailableWarning": "没有可用的认证方法。请联系您的系统管理员。",
@@ -200,6 +202,11 @@
       "description": "为您的账户设置密码",
       "submit": "继续"
     }
+  },
+  "waitlist": {
+    "title": "欢迎！",
+    "subtitle": "让我们开始吧",
+    "description": "只需几个细节即可创建您的免费账户"
   },
   "invite": {
     "title": "邀请用户",
