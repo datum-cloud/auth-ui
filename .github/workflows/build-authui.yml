@@ -49,6 +49,7 @@ jobs:
       - name: Build Auth UI Docker image
         env:
           SENTRY_AUTH_TOKEN: ${{ secrets.SENTRY_AUTH_TOKEN }}
+          NEXT_SERVER_ACTIONS_ENCRYPTION_KEY: ${{ secrets.NEXT_SERVER_ACTIONS_ENCRYPTION_KEY }}
         run: make login_standalone_build
 
       - name: Tag and push image to GHCR

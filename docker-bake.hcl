@@ -148,7 +148,10 @@ target "login-standalone" {
   contexts = {
     login-client = "target:login-client"
   }
-  secret = ["id=sentry_auth_token,env=SENTRY_AUTH_TOKEN"]
+  secret = [
+    "id=sentry_auth_token,env=SENTRY_AUTH_TOKEN",
+    "id=next_server_actions_encryption_key,env=NEXT_SERVER_ACTIONS_ENCRYPTION_KEY",
+  ]
 }
 
 target "login-standalone-out" {

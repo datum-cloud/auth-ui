@@ -260,6 +260,8 @@ To run the production build of the Login UI locally, follow these steps:
 
    This command will build the Docker image for the production-ready Login UI.
 
+   For multi-replica or rolling deployments, set `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` to prevent "Failed to find Server Action" errors. Generate a key with: `openssl rand -base64 32`
+
 2. **Prepare your environment file:**
 
    Create or update your environment file (e.g., `.env.production`) with the necessary environment variables. At a minimum, you will need:
@@ -283,6 +285,23 @@ To run the production build of the Login UI locally, follow these steps:
 4. **Access the UI:**
 
    Open your browser and navigate to [localhost:3000/ui/v2/login/register](localhost:3000/ui/v2/login/register) to view the production registration component running locally as example.
+
+### Docker / Kubernetes deployment
+
+When deploying with multiple replicas or rolling updates, configure `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` at **build time** to prevent "Failed to find Server Action" errors. Next.js encrypts Server Action IDs; without a fixed key, different pods may use different keys and fail to decrypt form submissions.
+
+**GitHub Actions:** Add a repository secret `NEXT_SERVER_ACTIONS_ENCRYPTION_KEY` (Settings → Secrets → Actions). Generate a value with:
+
+```sh
+openssl rand -base64 32
+```
+
+**Local Docker builds:** Export the variable before running `make login_standalone_build`:
+
+```sh
+export NEXT_SERVER_ACTIONS_ENCRYPTION_KEY=$(openssl rand -base64 32)
+make login_standalone_build
+```
 
 ### Run Login UI Acceptance tests
 

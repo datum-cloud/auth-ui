@@ -8,7 +8,9 @@ RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
     pnpm install --frozen-lockfile
 RUN cp -r ../out/full/* .
 RUN --mount=type=secret,id=sentry_auth_token,required=false \
+    --mount=type=secret,id=next_server_actions_encryption_key,required=false \
     if [ -s /run/secrets/sentry_auth_token ]; then export SENTRY_AUTH_TOKEN="$(cat /run/secrets/sentry_auth_token)"; fi; \
+    if [ -s /run/secrets/next_server_actions_encryption_key ]; then export NEXT_SERVER_ACTIONS_ENCRYPTION_KEY="$(cat /run/secrets/next_server_actions_encryption_key)"; fi; \
     pnpm exec turbo run build:login:standalone
 
 FROM scratch AS login-standalone-out
