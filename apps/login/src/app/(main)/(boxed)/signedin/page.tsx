@@ -41,32 +41,40 @@ export default async function Page(props: { searchParams: Promise<any> }) {
   const { serviceUrl } = getServiceUrlFromHeaders(_headers);
 
   const { loginName, requestId, organization, sessionId } = searchParams;
+  let deviceAuthorizationError: string | undefined;
 
   // complete device authorization flow if device requestId is present
   if (requestId && requestId.startsWith("device_")) {
-    const cookie = sessionId
-      ? await getSessionCookieById({ sessionId, organization })
-      : await getMostRecentCookieWithLoginname({
-          loginName: loginName,
-          organization: organization,
-        });
+    try {
+      const cookie = sessionId
+        ? await getSessionCookieById({ sessionId, organization })
+        : await getMostRecentCookieWithLoginname({
+            loginName: loginName,
+            organization: organization,
+          });
 
-    await completeDeviceAuthorization(requestId.replace("device_", ""), {
-      sessionId: cookie.id,
-      sessionToken: cookie.token,
-    }).catch((err) => {
-      return (
-        <>
-          <h1>
-            <Translated i18nKey="error.title" namespace="signedin" />
-          </h1>
-          <p className="ztdl-p mb-6 block">
-            <Translated i18nKey="error.description" namespace="signedin" />
-          </p>
-          <Alert>{err.message}</Alert>
-        </>
-      );
-    });
+      await completeDeviceAuthorization(requestId.replace("device_", ""), {
+        sessionId: cookie.id,
+        sessionToken: cookie.token,
+      });
+    } catch (err) {
+      deviceAuthorizationError =
+        err instanceof Error ? err.message : "Could not complete device authorization";
+    }
+  }
+
+  if (deviceAuthorizationError) {
+    return (
+      <>
+        <h1>
+          <Translated i18nKey="error.title" namespace="signedin" />
+        </h1>
+        <p className="ztdl-p mb-6 block">
+          <Translated i18nKey="error.description" namespace="signedin" />
+        </p>
+        <Alert>{deviceAuthorizationError}</Alert>
+      </>
+    );
   }
 
   const sessionFactors = sessionId
