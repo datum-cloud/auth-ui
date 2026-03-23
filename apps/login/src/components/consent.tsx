@@ -96,7 +96,7 @@ export function ConsentScreen({
           data-testid="deny-button"
         >
           {loading && <Spinner className="h-5 w-5 mr-2" />}
-          <Translated i18nKey="device.request.deny" namespace="device" />
+          <Translated i18nKey="request.deny" namespace="device" />
         </Button>
         <span className="flex-grow"></span>
 
@@ -107,7 +107,7 @@ export function ConsentScreen({
             className="self-end"
             variant={ButtonVariants.Primary}
           >
-            <Translated i18nKey="device.request.submit" namespace="device" />
+            <Translated i18nKey="request.submit" namespace="device" />
           </Button>
         </Link>
       </div>
