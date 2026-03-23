@@ -61,12 +61,16 @@ export async function proxy(request: NextRequest) {
     request.nextUrl.pathname.startsWith(prefix),
   );
 
+  const hasServiceAccountAuth =
+    !!process.env.ZITADEL_SERVICE_USER_TOKEN ||
+    !!(
+      process.env.AUDIENCE &&
+      process.env.SYSTEM_USER_ID &&
+      process.env.SYSTEM_USER_PRIVATE_KEY
+    );
+
   // escape proxy if the environment is setup for multitenancy
-  if (
-    !isMatched ||
-    !process.env.ZITADEL_API_URL ||
-    !process.env.ZITADEL_SERVICE_USER_TOKEN
-  ) {
+  if (!isMatched || !process.env.ZITADEL_API_URL || !hasServiceAccountAuth) {
     // For all other routes, just add the header and continue
     return NextResponse.next({
       request: { headers: requestHeaders },

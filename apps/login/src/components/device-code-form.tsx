@@ -18,8 +18,8 @@ type Inputs = {
 export function DeviceCodeForm({ userCode }: { userCode?: string }) {
   const router = useRouter();
 
-  const { register, handleSubmit, formState } = useForm<Inputs>({
-    mode: "onBlur",
+  const { register, handleSubmit, watch } = useForm<Inputs>({
+    mode: "onChange",
     defaultValues: {
       userCode: userCode || "",
     },
@@ -28,6 +28,7 @@ export function DeviceCodeForm({ userCode }: { userCode?: string }) {
   const [error, setError] = useState<string>("");
 
   const [loading, setLoading] = useState<boolean>(false);
+  const currentUserCode = watch("userCode");
 
   async function submitCodeAndContinue(value: Inputs): Promise<boolean | void> {
     setLoading(true);
@@ -81,7 +82,7 @@ export function DeviceCodeForm({ userCode }: { userCode?: string }) {
             type="submit"
             className="self-end"
             variant={ButtonVariants.Primary}
-            disabled={loading || !formState.isValid}
+            disabled={loading || !currentUserCode?.trim()}
             onClick={handleSubmit(submitCodeAndContinue)}
             data-testid="submit-button"
           >
