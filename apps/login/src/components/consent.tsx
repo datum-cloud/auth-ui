@@ -81,6 +81,10 @@ export function ConsentScreen({
         />
       </p>
 
+      <p className="ztdl-p text-xs text-left font-medium">
+        <Translated i18nKey="request.signInNotice" namespace="device" />
+      </p>
+
       {error && (
         <div className="py-4">
           <Alert>{error}</Alert>

@@ -1,3 +1,4 @@
+import { Alert, AlertType } from "@/components/alert";
 import { SignInWithIdp } from "@/components/sign-in-with-idp";
 import { Translated } from "@/components/translated";
 import { UsernameForm } from "@/components/username-form";
@@ -59,6 +60,8 @@ export default async function Page(props: {
 
   const lastUsedIdpId = await getLastUsedIdpId();
 
+  const isDeviceAuth = requestId?.startsWith("device_");
+
   return (
     <>
       <h1>
@@ -67,6 +70,12 @@ export default async function Page(props: {
       <p className="ztdl-p description">
         <Translated i18nKey="description" namespace="loginname" />
       </p>
+
+      {isDeviceAuth && (
+        <Alert type={AlertType.INFO}>
+          <Translated i18nKey="deviceAuthNotice" namespace="loginname" />
+        </Alert>
+      )}
 
       {loginSettings?.allowUsernamePassword && (
         <>
