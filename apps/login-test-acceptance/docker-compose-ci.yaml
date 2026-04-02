@@ -1,5 +1,4 @@
 services:
-
   zitadel:
     environment:
       ZITADEL_EXTERNALDOMAIN: traefik

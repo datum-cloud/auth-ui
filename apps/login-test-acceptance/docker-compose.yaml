@@ -1,5 +1,4 @@
 services:
-
   zitadel:
     user: "${UID:-1000}:${GID:-1000}"
     image: "${ZITADEL_TAG:-ghcr.io/zitadel/zitadel:latest}"
@@ -9,7 +8,7 @@ services:
       - "traefik.enable=true"
       - "traefik.http.routers.zitadel.rule=!PathPrefix(`/ui/v2/login`)"
       #      - "traefik.http.middlewares.zitadel.headers.customrequestheaders.Host=localhost"
-#      - "traefik.http.routers.zitadel.middlewares=zitadel@docker"
+      #      - "traefik.http.routers.zitadel.middlewares=zitadel@docker"
       - "traefik.http.services.zitadel-service.loadbalancer.server.scheme=h2c"
     ports:
       - "8080:8080"
@@ -54,7 +53,7 @@ services:
       - "traefik.http.routers.login.rule=PathPrefix(`/ui/v2/login`)"
       - "traefik.http.services.login-service.loadbalancer.server.url=http://host.docker.internal:3000"
     command:
-#      - "--log.level=DEBUG"
+      #      - "--log.level=DEBUG"
       - "--ping"
       - "--api.insecure=true"
       - "--providers.docker=true"
@@ -113,16 +112,16 @@ services:
       args:
         - LOGIN_TEST_ACCEPTANCE_GOLANG_TAG=${LOGIN_TEST_ACCEPTANCE_GOLANG_TAG:-golang:1.24-alpine}
     environment:
-      PORT: '3333'
+      PORT: "3333"
     command:
       - -port
-      - '3333'
+      - "3333"
       - -email
-      - '/email'
+      - "/email"
       - -sms
-      - '/sms'
+      - "/sms"
       - -notification
-      - '/notification'
+      - "/notification"
     ports:
       - "3333:3333"
     depends_on:
@@ -139,14 +138,14 @@ services:
       args:
         - LOGIN_TEST_ACCEPTANCE_GOLANG_TAG=${LOGIN_TEST_ACCEPTANCE_GOLANG_TAG:-golang:1.24-alpine}
     environment:
-      API_URL: 'http://traefik'
-      API_DOMAIN: 'traefik'
-      PAT_FILE: '/pat/zitadel-admin-sa.pat'
-      LOGIN_URL: 'https://traefik/ui/v2/login'
-      ISSUER: 'https://traefik'
-      HOST: 'traefik'
-      PORT: '8000'
-      SCOPES: 'openid profile email'
+      API_URL: "http://traefik"
+      API_DOMAIN: "traefik"
+      PAT_FILE: "/pat/zitadel-admin-sa.pat"
+      LOGIN_URL: "https://traefik/ui/v2/login"
+      ISSUER: "https://traefik"
+      HOST: "traefik"
+      PORT: "8000"
+      SCOPES: "openid profile email"
     ports:
       - "8000:8000"
     volumes:
@@ -167,11 +166,11 @@ services:
       args:
         - LOGIN_TEST_ACCEPTANCE_GOLANG_TAG=${LOGIN_TEST_ACCEPTANCE_GOLANG_TAG:-golang:1.24-alpine}
     environment:
-      API_URL: 'http://traefik'
-      API_DOMAIN: 'traefik'
-      PAT_FILE: '/pat/zitadel-admin-sa.pat'
-      SCHEMA: 'https'
-      HOST: 'traefik'
+      API_URL: "http://traefik"
+      API_DOMAIN: "traefik"
+      PAT_FILE: "/pat/zitadel-admin-sa.pat"
+      SCHEMA: "https"
+      HOST: "traefik"
       PORT: "8004"
     ports:
       - 8004:8004
@@ -193,13 +192,13 @@ services:
       args:
         - LOGIN_TEST_ACCEPTANCE_GOLANG_TAG=${LOGIN_TEST_ACCEPTANCE_GOLANG_TAG:-golang:1.24-alpine}
     environment:
-      API_URL: 'http://traefik'
-      API_DOMAIN: 'traefik'
-      PAT_FILE: '/pat/zitadel-admin-sa.pat'
-      LOGIN_URL: 'https://traefik/ui/v2/login'
-      IDP_URL: 'http://zitadel:8080/saml/v2/metadata'
-      HOST: 'https://traefik'
-      PORT: '8001'
+      API_URL: "http://traefik"
+      API_DOMAIN: "traefik"
+      PAT_FILE: "/pat/zitadel-admin-sa.pat"
+      LOGIN_URL: "https://traefik/ui/v2/login"
+      IDP_URL: "http://zitadel:8080/saml/v2/metadata"
+      HOST: "https://traefik"
+      PORT: "8001"
     ports:
       - 8001:8001
     volumes:
@@ -220,11 +219,11 @@ services:
       args:
         - LOGIN_TEST_ACCEPTANCE_GOLANG_TAG=${LOGIN_TEST_ACCEPTANCE_GOLANG_TAG:-golang:1.24-alpine}
     environment:
-      API_URL: 'http://traefik:8080'
-      API_DOMAIN: 'traefik'
-      PAT_FILE: '/pat/zitadel-admin-sa.pat'
-      SCHEMA: 'https'
-      HOST: 'traefik'
+      API_URL: "http://traefik:8080"
+      API_DOMAIN: "traefik"
+      PAT_FILE: "/pat/zitadel-admin-sa.pat"
+      SCHEMA: "https"
+      HOST: "traefik"
       PORT: "8003"
     ports:
       - 8003:8003
