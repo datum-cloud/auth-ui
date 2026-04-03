@@ -16,5 +16,5 @@ spec:
       backendRefs:
         - name: auth-ui
           kind: Service
-          group: ''
+          group: ""
           port: 3000

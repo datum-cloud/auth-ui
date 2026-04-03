@@ -1,6 +1,5 @@
 import { Alert, AlertType } from "@/components/alert";
 import { Button, ButtonVariants } from "@/components/button";
-
 import { Translated } from "@/components/translated";
 import { UserAvatar } from "@/components/user-avatar";
 import {
@@ -59,7 +58,9 @@ export default async function Page(props: { searchParams: Promise<any> }) {
       });
     } catch (err) {
       deviceAuthorizationError =
-        err instanceof Error ? err.message : "Could not complete device authorization";
+        err instanceof Error
+          ? err.message
+          : "Could not complete device authorization";
     }
   }
 
