@@ -42,6 +42,25 @@ export async function proxy(request: NextRequest) {
   // Add the original URL as a header to all requests
   const requestHeaders = new Headers(request.headers);
 
+  // Strip malformed Next-Router-State-Tree headers to prevent Next.js from
+  // throwing "The router state header was sent but could not be parsed."
+  // This happens when stale clients (pre-deployment) send incomplete router state.
+  const routerStateHeader = requestHeaders.get("Next-Router-State-Tree");
+  if (routerStateHeader) {
+    let isValid = false;
+    try {
+      const parsed = JSON.parse(decodeURIComponent(routerStateHeader));
+      isValid = Array.isArray(parsed) && parsed.length >= 2;
+    } catch {
+      isValid = false;
+    }
+    if (!isValid) {
+      requestHeaders.delete("Next-Router-State-Tree");
+      requestHeaders.delete("Rsc");
+      requestHeaders.delete("Next-Router-Prefetch");
+    }
+  }
+
   // Extract "organization" search param from the URL and set it as a header if available
   const organization = request.nextUrl.searchParams.get("organization");
   if (organization) {
