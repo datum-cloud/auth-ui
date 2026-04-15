@@ -66,7 +66,9 @@ export function SessionItem({
       if (valid && session?.factors?.user) {
         try {
           const resp = await continueWithSession({
-            ...session,
+            sessionId: session.id,
+            loginName: session.factors?.user?.loginName,
+            organizationId: session.factors?.user?.organizationId,
             requestId: requestId,
           });
 

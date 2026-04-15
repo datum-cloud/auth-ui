@@ -146,11 +146,27 @@ export default async function Page(props: {
     return loginFailed("IDP context missing");
   }
 
-  const intent = await retrieveIDPIntent({
-    serviceUrl,
-    id,
-    token,
-  });
+  let intent;
+  try {
+    intent = await retrieveIDPIntent({
+      serviceUrl,
+      id,
+      token,
+    });
+  } catch (error) {
+    if (
+      error &&
+      typeof error === "object" &&
+      "code" in error &&
+      error.code === 9 /* FAILED_PRECONDITION */
+    ) {
+      // Intent was already consumed by the createNewSessionFromIdpIntent
+      // server action. This re-render is expected — the client is already
+      // processing the redirect, so return a benign loading state.
+      return loginFailed("Session is being created, please wait…");
+    }
+    throw error;
+  }
 
   const { idpInformation, userId: intentUserId } = intent;
   const resolvedUserId = intentUserId || qpUserId;

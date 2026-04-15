@@ -10,7 +10,6 @@ import {
 } from "@/lib/zitadel";
 import { Duration } from "@zitadel/client";
 import { RequestChallenges } from "@zitadel/proto/zitadel/session/v2/challenge_pb";
-import { Session } from "@zitadel/proto/zitadel/session/v2/session_pb";
 import { Checks } from "@zitadel/proto/zitadel/session/v2/session_service_pb";
 import { headers } from "next/headers";
 import { getNextUrl } from "../client";
@@ -71,38 +70,50 @@ export async function skipMFAAndContinueWithNextUrl({
 
 export async function continueWithSession({
   requestId,
-  ...session
-}: Session & { requestId?: string }) {
+  sessionId,
+  loginName,
+  organizationId,
+}: {
+  requestId?: string;
+  sessionId: string;
+  loginName?: string;
+  organizationId?: string;
+}) {
   const _headers = await headers();
   const { serviceUrl } = getServiceUrlFromHeaders(_headers);
 
   const loginSettings = await getLoginSettings({
     serviceUrl,
-    organization: session.factors?.user?.organizationId,
+    organization: organizationId,
   });
 
   const url =
-    requestId && session.id && session.factors?.user
+    requestId && sessionId
       ? await getNextUrl(
           {
-            sessionId: session.id,
-            requestId: requestId,
-            organization: session.factors.user.organizationId,
+            sessionId,
+            requestId,
+            organization: organizationId,
           },
           loginSettings?.defaultRedirectUri,
         )
-      : session.factors?.user
+      : loginName
         ? await getNextUrl(
             {
-              loginName: session.factors.user.loginName,
-              organization: session.factors.user.organizationId,
+              loginName,
+              organization: organizationId,
             },
             loginSettings?.defaultRedirectUri,
           )
         : null;
 
   if (!url) {
-    console.error("Could not get next url", { requestId, session });
+    console.error("Could not get next url", {
+      requestId,
+      sessionId,
+      loginName,
+      organizationId,
+    });
   }
 
   return url ? { redirect: url } : null;
