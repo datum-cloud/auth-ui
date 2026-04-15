@@ -2,6 +2,7 @@ import { SessionsList } from "@/components/sessions-list";
 import { Translated } from "@/components/translated";
 import { getAllSessionCookieIds } from "@/lib/cookies";
 import { generateRouteMetadata } from "@/lib/metadata";
+import { toPlainObject } from "@/lib/serialize";
 import { getServiceUrlFromHeaders } from "@/lib/service-url";
 import {
   getBrandingSettings,
@@ -55,7 +56,7 @@ export default async function Page(props: {
     }
   }
 
-  let sessions = await loadSessions({ serviceUrl });
+  let sessions = toPlainObject(await loadSessions({ serviceUrl }));
 
   const branding = await getBrandingSettings({
     serviceUrl,

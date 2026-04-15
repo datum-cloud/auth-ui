@@ -12,6 +12,13 @@ Sentry.init({
   replaysSessionSampleRate: 0.1,
   replaysOnErrorSampleRate: 1.0,
 
+  ignoreErrors: [
+    // Malformed RSC requests from bots/crawlers sending invalid Next-Router-State-Tree headers
+    "The router state header was sent but could not be parsed",
+    // Node.js TransformStream race condition during RSC streaming (node:internal/webstreams bug)
+    "transformAlgorithm is not a function",
+  ],
+
   // Enable sending user PII (Personally Identifiable Information)
   // https://docs.sentry.io/platforms/javascript/guides/nextjs/configuration/options/#sendDefaultPii
   sendDefaultPii: true,

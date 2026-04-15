@@ -2,6 +2,7 @@ import { SessionsClearList } from "@/components/sessions-clear-list";
 import { Translated } from "@/components/translated";
 import { getAllSessionCookieIds } from "@/lib/cookies";
 import { generateRouteMetadata } from "@/lib/metadata";
+import { toPlainObject } from "@/lib/serialize";
 import { getServiceUrlFromHeaders } from "@/lib/service-url";
 import { getDefaultOrg, listSessions } from "@/lib/zitadel";
 import { Organization } from "@zitadel/proto/zitadel/org/v2/org_pb";
@@ -47,7 +48,7 @@ export default async function Page(props: {
     }
   }
 
-  let sessions = await loadSessions({ serviceUrl });
+  let sessions = toPlainObject(await loadSessions({ serviceUrl }));
 
   const params = new URLSearchParams();
 
