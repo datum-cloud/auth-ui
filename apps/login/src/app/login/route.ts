@@ -134,10 +134,26 @@ export async function GET(request: NextRequest) {
 
   // continue with OIDC
   if (requestId && requestId.startsWith("oidc_")) {
-    const { authRequest } = await getAuthRequest({
-      serviceUrl,
-      authRequestId: requestId.replace("oidc_", ""),
-    });
+    let authRequest;
+    try {
+      ({ authRequest } = await getAuthRequest({
+        serviceUrl,
+        authRequestId: requestId.replace("oidc_", ""),
+      }));
+    } catch (error) {
+      console.error("Failed to get auth request:", error);
+      return NextResponse.json(
+        { error: "Auth request not found or expired" },
+        { status: 400 },
+      );
+    }
+
+    if (!authRequest) {
+      return NextResponse.json(
+        { error: "Auth request not found" },
+        { status: 400 },
+      );
+    }
 
     let organization = "";
     let suffix = "";
