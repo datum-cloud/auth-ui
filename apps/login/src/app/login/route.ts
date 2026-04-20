@@ -32,6 +32,44 @@ import { DEFAULT_CSP } from "../../../constants/csp";
 // NOTE: Route segment configs (dynamic, revalidate, fetchCache) removed for Next.js 15.6+ compatibility
 // With dynamicIO enabled, route handlers are dynamic by default
 
+const gotoError = ({
+  request,
+  title,
+  error,
+}: {
+  request: NextRequest;
+  title: string;
+  error: string;
+}): NextResponse<unknown> => {
+  const errorUrl = constructUrl(request, "/error");
+  errorUrl.searchParams.set("title", title);
+  errorUrl.searchParams.set("error", error);
+  return NextResponse.redirect(errorUrl);
+};
+
+const getAuthRequestErrorMessage = (error: unknown): string => {
+  const code =
+    error != null &&
+    typeof error === "object" &&
+    "code" in error &&
+    typeof (error as { code: unknown }).code === "number"
+      ? (error as { code: number }).code
+      : undefined;
+
+  switch (code) {
+    case 5: // NOT_FOUND
+      return "Your login session has expired. Please return to the application and try signing in again.";
+    case 7: // PERMISSION_DENIED
+      return "You don't have permission to access this login request. Please contact your administrator.";
+    case 14: // UNAVAILABLE
+      return "The authentication service is temporarily unavailable. Please try again in a few moments.";
+    case 4: // DEADLINE_EXCEEDED
+      return "The authentication service took too long to respond. Please try again.";
+    default:
+      return "Your login request could not be found or has expired. Please return to the application and try signing in again.";
+  }
+};
+
 const gotoAccounts = ({
   request,
   requestId,
@@ -134,10 +172,29 @@ export async function GET(request: NextRequest) {
 
   // continue with OIDC
   if (requestId && requestId.startsWith("oidc_")) {
-    const { authRequest } = await getAuthRequest({
-      serviceUrl,
-      authRequestId: requestId.replace("oidc_", ""),
-    });
+    let authRequest;
+    try {
+      ({ authRequest } = await getAuthRequest({
+        serviceUrl,
+        authRequestId: requestId.replace("oidc_", ""),
+      }));
+    } catch (error) {
+      console.error("Failed to get auth request:", error);
+      return gotoError({
+        request,
+        title: "Login request expired",
+        error: getAuthRequestErrorMessage(error),
+      });
+    }
+
+    if (!authRequest) {
+      return gotoError({
+        request,
+        title: "Login request not found",
+        error:
+          "Your login request could not be found. Please return to the application and try signing in again.",
+      });
+    }
 
     let organization = "";
     let suffix = "";
@@ -232,10 +289,12 @@ export async function GET(request: NextRequest) {
           });
 
           if (!url) {
-            return NextResponse.json(
-              { error: "Could not start IDP flow" },
-              { status: 500 },
-            );
+            return gotoError({
+              request,
+              title: "Sign-in unavailable",
+              error:
+                "We couldn't connect to your identity provider. Please try again or contact your administrator.",
+            });
           }
 
           if (url.startsWith("/")) {
@@ -471,10 +530,12 @@ export async function GET(request: NextRequest) {
     });
 
     if (!samlRequest) {
-      return NextResponse.json(
-        { error: "No samlRequest found" },
-        { status: 400 },
-      );
+      return gotoError({
+        request,
+        title: "Login request not found",
+        error:
+          "Your SAML login request could not be found or has expired. Please return to the application and try signing in again.",
+      });
     }
 
     let selectedSession = await findValidSession({
@@ -558,9 +619,11 @@ export async function GET(request: NextRequest) {
   }
   // Device Authorization does not need to start here as it is handled on the /device endpoint
   else {
-    return NextResponse.json(
-      { error: "No authRequest nor samlRequest provided" },
-      { status: 500 },
-    );
+    return gotoError({
+      request,
+      title: "No login request",
+      error:
+        "No authentication request was provided. Please start the sign-in process from your application.",
+    });
   }
 }
