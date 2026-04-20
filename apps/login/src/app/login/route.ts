@@ -16,7 +16,7 @@ import {
   listSessions,
   startIdentityProviderFlow,
 } from "@/lib/zitadel";
-import { ConnectError, create } from "@zitadel/client";
+import { create } from "@zitadel/client";
 import { Prompt } from "@zitadel/proto/zitadel/oidc/v2/authorization_pb";
 import {
   CreateCallbackRequestSchema,
@@ -48,19 +48,26 @@ const gotoError = ({
 };
 
 const getAuthRequestErrorMessage = (error: unknown): string => {
-  if (error instanceof ConnectError) {
-    switch (error.code) {
-      case 5: // NOT_FOUND
-        return "Your login session has expired. Please return to the application and try signing in again.";
-      case 7: // PERMISSION_DENIED
-        return "You don't have permission to access this login request. Please contact your administrator.";
-      case 14: // UNAVAILABLE
-        return "The authentication service is temporarily unavailable. Please try again in a few moments.";
-      case 4: // DEADLINE_EXCEEDED
-        return "The authentication service took too long to respond. Please try again.";
-    }
+  const code =
+    error != null &&
+    typeof error === "object" &&
+    "code" in error &&
+    typeof (error as { code: unknown }).code === "number"
+      ? (error as { code: number }).code
+      : undefined;
+
+  switch (code) {
+    case 5: // NOT_FOUND
+      return "Your login session has expired. Please return to the application and try signing in again.";
+    case 7: // PERMISSION_DENIED
+      return "You don't have permission to access this login request. Please contact your administrator.";
+    case 14: // UNAVAILABLE
+      return "The authentication service is temporarily unavailable. Please try again in a few moments.";
+    case 4: // DEADLINE_EXCEEDED
+      return "The authentication service took too long to respond. Please try again.";
+    default:
+      return "Your login request could not be found or has expired. Please return to the application and try signing in again.";
   }
-  return "Your login request could not be found or has expired. Please return to the application and try signing in again.";
 };
 
 const gotoAccounts = ({
