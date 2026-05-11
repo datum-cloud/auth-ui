@@ -311,21 +311,48 @@ export async function getPasswordComplexitySettings({
   return useCache ? cacheWrapper(callback) : callback;
 }
 
+/**
+ * Builds the Zitadel session-metadata payload from a plain string map.
+ * Zitadel stores metadata values as bytes; we encode each value with
+ * TextEncoder so the consumer (auth-provider-zitadel) can string-decode
+ * it back without ambiguity. Returns undefined when the input is empty
+ * so we don't push an empty map onto the gRPC request.
+ */
+function encodeSessionMetadata(
+  metadata?: Record<string, string>,
+): Record<string, Uint8Array> | undefined {
+  if (!metadata) return undefined;
+  const entries = Object.entries(metadata).filter(([, v]) => !!v);
+  if (entries.length === 0) return undefined;
+  const encoder = new TextEncoder();
+  return Object.fromEntries(entries.map(([k, v]) => [k, encoder.encode(v)]));
+}
+
 export async function createSessionFromChecks({
   serviceUrl,
   checks,
   lifetime,
+  metadata,
 }: {
   serviceUrl: string;
   checks: Checks;
   lifetime?: Duration;
+  metadata?: Record<string, string>;
 }) {
   const sessionService: Client<typeof SessionService> =
     await createServiceForHost(SessionService, serviceUrl);
 
   const userAgent = await getUserAgent();
 
-  return sessionService.createSession({ checks, lifetime, userAgent }, {});
+  return sessionService.createSession(
+    {
+      checks,
+      lifetime,
+      userAgent,
+      metadata: encodeSessionMetadata(metadata),
+    },
+    {},
+  );
 }
 
 export async function createSessionForUserIdAndIdpIntent({
@@ -333,6 +360,7 @@ export async function createSessionForUserIdAndIdpIntent({
   userId,
   idpIntent,
   lifetime,
+  metadata,
 }: {
   serviceUrl: string;
   userId: string;
@@ -341,6 +369,7 @@ export async function createSessionForUserIdAndIdpIntent({
     idpIntentToken?: string | undefined;
   };
   lifetime?: Duration;
+  metadata?: Record<string, string>;
 }) {
   const sessionService: Client<typeof SessionService> =
     await createServiceForHost(SessionService, serviceUrl);
@@ -359,6 +388,7 @@ export async function createSessionForUserIdAndIdpIntent({
     },
     lifetime,
     userAgent,
+    metadata: encodeSessionMetadata(metadata),
   });
 }
 

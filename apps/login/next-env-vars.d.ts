@@ -44,5 +44,12 @@ declare namespace NodeJS {
      * Optional: the Fathom analytics id
      */
     FATHOM_ID?: string;
+
+    /**
+     * Optional: the MaxMind minFraud account id used to load the
+     * device-tracking JavaScript snippet at signup. When unset, the
+     * tracker component is not rendered and no token is collected.
+     */
+    NEXT_PUBLIC_MAXMIND_ACCOUNT_ID?: string;
   }
 }
