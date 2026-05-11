@@ -14,6 +14,7 @@ import { FieldValues, useForm } from "react-hook-form";
 import { Alert } from "./alert";
 import { FormActions } from "./form-actions";
 import { TextInput } from "./input";
+import { readMaxMindTrackingToken } from "./maxmind/maxmind-tracker";
 import { PasswordComplexity } from "./password-complexity";
 import { Translated } from "./translated";
 
@@ -64,6 +65,7 @@ export function SetRegisterPasswordForm({
       organization: organization,
       requestId: requestId,
       password: values.password,
+      deviceTrackingToken: readMaxMindTrackingToken(),
     })
       .catch(() => {
         setError("Could not register user");

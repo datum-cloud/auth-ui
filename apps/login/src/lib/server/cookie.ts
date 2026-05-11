@@ -51,6 +51,14 @@ export async function createSessionAndUpdateCookie(command: {
   checks: Checks;
   requestId: string | undefined;
   lifetime?: Duration;
+  /**
+   * Arbitrary key/value pairs to attach to the Zitadel session as
+   * metadata. Today this is how the MaxMind device-tracking token
+   * captured at signup reaches the fraud service: it rides on the
+   * session and is surfaced as an annotation on the milo Session by
+   * the auth-provider-zitadel apiserver.
+   */
+  metadata?: Record<string, string>;
 }): Promise<Session> {
   const _headers = await headers();
   const { serviceUrl } = getServiceUrlFromHeaders(_headers);
@@ -59,6 +67,7 @@ export async function createSessionAndUpdateCookie(command: {
     serviceUrl,
     checks: command.checks,
     lifetime: command.lifetime,
+    metadata: command.metadata,
   });
 
   if (createdSession) {
@@ -114,6 +123,7 @@ export async function createSessionForIdpAndUpdateCookie({
   idpIntent,
   requestId,
   lifetime,
+  metadata,
 }: {
   userId: string;
   idpIntent: {
@@ -122,6 +132,8 @@ export async function createSessionForIdpAndUpdateCookie({
   };
   requestId: string | undefined;
   lifetime?: Duration;
+  /** See createSessionAndUpdateCookie. */
+  metadata?: Record<string, string>;
 }): Promise<Session> {
   const _headers = await headers();
   const { serviceUrl } = getServiceUrlFromHeaders(_headers);
@@ -131,6 +143,7 @@ export async function createSessionForIdpAndUpdateCookie({
     userId,
     idpIntent,
     lifetime,
+    metadata,
   }).catch((error: ErrorDetail | CredentialsCheckError) => {
     console.error("Could not set session", error);
     if ("failedAttempts" in error && error.failedAttempts) {

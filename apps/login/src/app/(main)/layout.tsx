@@ -7,6 +7,7 @@ import { FathomAnalytics } from "@/components/fathom/fathom";
 import { LanguageProvider } from "@/components/language-provider";
 import { Loader } from "@/components/loader";
 import MarkerIoEmbed from "@/components/markerio/markerio";
+import { MaxMindTracker } from "@/components/maxmind/maxmind-tracker";
 import { ThemeProvider } from "@/components/theme-provider";
 import { SITE_CONFIG } from "@/config/site";
 import { alliance, canelaText, frontliner } from "@/lib/fonts/fonts";
@@ -63,6 +64,12 @@ export default async function RootLayout({
           </Suspense>
         </ThemeProvider>
         <FathomAnalytics />
+
+        {process.env.NEXT_PUBLIC_MAXMIND_ACCOUNT_ID && (
+          <MaxMindTracker
+            accountId={process.env.NEXT_PUBLIC_MAXMIND_ACCOUNT_ID}
+          />
+        )}
 
         {process.env.MARKER_IO_PROJECT_ID && (
           <MarkerIoEmbed projectId={process.env.MARKER_IO_PROJECT_ID} />

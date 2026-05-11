@@ -22,6 +22,16 @@ import { getNextUrl } from "../client";
 import { getServiceUrlFromHeaders } from "../service-url";
 import { checkEmailVerification } from "../verify-helper";
 
+/**
+ * Zitadel session-metadata key carrying the MaxMind minFraud device-tracking
+ * token captured by the browser at signup. auth-provider-zitadel's session
+ * apiserver mirrors this entry onto the milo Session annotation
+ * iam.miloapis.com/maxmind-tracking-token, which the fraud service then
+ * forwards to MaxMind as device.tracking_token. Keep this constant in sync
+ * with the metadataAnnotationKeys allowlist in the Go side.
+ */
+const MAXMIND_TRACKING_TOKEN_METADATA_KEY = "maxmind/tracking-token";
+
 type RegisterUserCommand = {
   email: string;
   firstName: string;
@@ -29,7 +39,18 @@ type RegisterUserCommand = {
   password?: string;
   organization: string;
   requestId?: string;
+  /**
+   * MaxMind device-tracking token from the browser, when available. Attached
+   * to the Zitadel session created during signup; silently dropped if empty.
+   */
+  deviceTrackingToken?: string;
 };
+
+function sessionMetadataFor(
+  token?: string,
+): Record<string, string> | undefined {
+  return token ? { [MAXMIND_TRACKING_TOKEN_METADATA_KEY]: token } : undefined;
+}
 
 export type RegisterUserResponse = {
   userId: string;
@@ -82,6 +103,7 @@ export async function registerUser(command: RegisterUserCommand) {
     lifetime: command.password
       ? loginSettings?.passwordCheckLifetime
       : undefined,
+    metadata: sessionMetadataFor(command.deviceTrackingToken),
   });
 
   if (!session || !session.factors?.user) {
@@ -156,6 +178,8 @@ type RegisterUserAndLinkToIDPommand = {
   idpUserId: string;
   idpId: string;
   idpUserName: string;
+  /** See RegisterUserCommand.deviceTrackingToken. */
+  deviceTrackingToken?: string;
 };
 
 export type registerUserAndLinkToIDPResponse = {
@@ -210,6 +234,7 @@ export async function registerUserAndLinkToIDP(
     userId: addResponse.userId, // the user we just created
     idpIntent: command.idpIntent,
     lifetime: loginSettings?.externalLoginCheckLifetime,
+    metadata: sessionMetadataFor(command.deviceTrackingToken),
   });
 
   if (!session || !session.factors?.user) {

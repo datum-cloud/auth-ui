@@ -16,6 +16,7 @@ import {
 } from "./authentication-method-radio";
 import { FormActions } from "./form-actions";
 import { TextInput } from "./input";
+import { readMaxMindTrackingToken } from "./maxmind/maxmind-tracker";
 import { Translated } from "./translated";
 
 type Inputs =
@@ -68,6 +69,7 @@ export function RegisterForm({
       lastName: values.lastname,
       organization: organization,
       requestId: requestId,
+      deviceTrackingToken: readMaxMindTrackingToken(),
     })
       .catch(() => {
         setError("Could not register user");

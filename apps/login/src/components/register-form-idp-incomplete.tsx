@@ -8,6 +8,7 @@ import { Alert } from "./alert";
 import { BackButton } from "./back-button";
 import { Button, ButtonVariants } from "./button";
 import { TextInput } from "./input";
+import { readMaxMindTrackingToken } from "./maxmind/maxmind-tracker";
 import { Spinner } from "./spinner";
 import { Translated } from "./translated";
 
@@ -71,6 +72,7 @@ export function RegisterFormIDPIncomplete({
       organization: organization,
       requestId: requestId,
       idpIntent: idpIntent,
+      deviceTrackingToken: readMaxMindTrackingToken(),
     })
       .catch(() => {
         setError("Could not register user");
