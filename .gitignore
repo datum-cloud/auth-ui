@@ -6,7 +6,6 @@ node_modules
 dist
 dist-ssr
 *.local
-.env
 server/dist
 public/dist
 .vscode
@@ -19,3 +18,4 @@ public/dist
 /machinekey
 
 .cursor
+config.bat
