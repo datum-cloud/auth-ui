@@ -47,6 +47,11 @@ const schema = z
       .optional()
       .transform((v) => (v !== undefined ? parseFloat(v) : 0.1))
       .pipe(z.number().min(0).max(1)),
+    // Fathom analytics site id. OPTIONAL — unset means analytics is a true no-op
+    // everywhere. Exposure to the client is additionally prod-gated in the root
+    // loader (see resolveFathomSiteId in app/modules/analytics/fathom.tsx): dev and
+    // preview never contact Fathom even when this is set.
+    FATHOM_ID: z.string().optional(),
   })
   .superRefine((v, ctx) => {
     // Zitadel creds are only required when the Zitadel adapter is actually selected.

@@ -3,8 +3,10 @@
 import allianceFontRegularUrl from './styles/fonts/AllianceNo1-Regular.woff2?url';
 import './styles/root.css';
 import { AuthCard } from '@/components/auth-card/auth-card';
+import { FathomAnalytics, resolveFathomSiteId } from '@/modules/analytics/fathom';
 import { loadMessages } from '@/modules/i18n/lingui';
 import { detectLocale } from '@/modules/i18n/lingui.server';
+import { env } from '@/utils/env/env.server';
 import { authErrorMessage } from '@/utils/errors/auth-error';
 import { ConformAdapter } from '@datum-cloud/datum-ui/form/adapters/conform';
 import { ThemeProvider, ThemeScript } from '@datum-cloud/datum-ui/theme';
@@ -49,7 +51,12 @@ export async function loader({
   // Thread the per-request CSP nonce into the route data so Layout can pass it to
   // <Scripts nonce> / <ScrollRestoration nonce> / renderToPipeableStream.
   // In dev mode the nonce is undefined (Hono uses 'unsafe-inline' instead of NONCE).
-  return { locale, messages, cspNonce: context?.cspNonce };
+  return {
+    locale,
+    messages,
+    cspNonce: context?.cspNonce,
+    fathomSiteId: resolveFathomSiteId(env.NODE_ENV, env.FATHOM_ID),
+  };
 }
 
 export function Layout({ children }: { children: React.ReactNode }) {
@@ -76,7 +83,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
-  const { locale, messages } = useLoaderData<typeof loader>();
+  const { locale, messages, fathomSiteId } = useLoaderData<typeof loader>();
 
   // Hydration marker: lets e2e tests wait until React has attached its handlers
   // before interacting with forms. With the conform adapter the forms submit
@@ -109,6 +116,7 @@ export default function App() {
       <QueryClientProvider client={queryClient}>
         <I18nProvider i18n={i18nInstance}>
           <ConformAdapter>
+            <FathomAnalytics siteId={fathomSiteId} />
             <Outlet />
           </ConformAdapter>
         </I18nProvider>

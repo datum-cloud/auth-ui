@@ -263,3 +263,21 @@ describe('env schema — DEFAULT_APP_URL (optional post-login fallback destinati
     }
   });
 });
+
+describe('env schema — FATHOM_ID (optional analytics site id)', () => {
+  it('passes through FATHOM_ID when set', () => {
+    const result = _envSchema.safeParse({ ...BASE, FATHOM_ID: 'ABCDEFGH' });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.FATHOM_ID).toBe('ABCDEFGH');
+    }
+  });
+
+  it('leaves FATHOM_ID undefined when not set', () => {
+    const result = _envSchema.safeParse(BASE);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.FATHOM_ID).toBeUndefined();
+    }
+  });
+});

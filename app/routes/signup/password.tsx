@@ -1,6 +1,7 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
 import { SubmitButton } from '@/components/auth-form/auth-form';
 import { BackLink } from '@/components/back-link/back-link';
+import { TrackOnMount } from '@/modules/analytics/fathom';
 import { readSessions, serializeSessions } from '@/modules/auth/session/cookie';
 import { genericCheckYourEmail } from '@/resources/schemas/check-your-email.schema';
 import { registerWithPassword } from '@/resources/signup';
@@ -94,6 +95,7 @@ export default function SignupPassword() {
   if (actionData && 'sent' in actionData) {
     return (
       <AuthCard title={<Trans>Check your email</Trans>}>
+        <TrackOnMount event="signup_submitted" />
         <p className="text-foreground text-center text-sm">
           <Trans>We've sent a verification link to {actionData.email}</Trans>
         </p>

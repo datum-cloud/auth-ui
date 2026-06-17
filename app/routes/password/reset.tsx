@@ -1,6 +1,7 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
 import { SubmitButton } from '@/components/auth-form/auth-form';
 import { BackLink } from '@/components/back-link/back-link';
+import { TrackOnMount } from '@/modules/analytics/fathom';
 import { requestPasswordReset } from '@/resources/password';
 import { resetRequestSchema, resetRequestClientSchema } from '@/resources/password/password.schema';
 import { genericCheckYourEmail } from '@/resources/schemas/check-your-email.schema';
@@ -77,6 +78,7 @@ export default function PasswordReset() {
   if (actionData && 'sent' in actionData) {
     return (
       <AuthCard title={<Trans>Check your email</Trans>}>
+        <TrackOnMount event="password_reset_requested" />
         <p className="text-foreground text-center text-sm">
           <Trans>We've sent a password reset link to {actionData.email}</Trans>
         </p>

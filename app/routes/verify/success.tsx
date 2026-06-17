@@ -1,4 +1,5 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
+import { TrackOnMount } from '@/modules/analytics/fathom';
 import { Trans } from '@lingui/react/macro';
 import {
   data,
@@ -21,6 +22,7 @@ export default function VerifySuccess() {
   const { loginName } = useLoaderData<typeof loader>();
   return (
     <AuthCard title={<Trans>Your email is verified</Trans>}>
+      <TrackOnMount event="email_verified" />
       <div className="flex flex-col gap-4 text-center">
         {loginName ? <p className="text-foreground text-sm">{loginName}</p> : null}
         <Link to="/login" className="text-sm underline">
