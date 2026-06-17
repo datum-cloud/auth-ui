@@ -19,9 +19,9 @@
 //
 // node env: happy-dom enforces Fetch spec rules that forbid setting the Cookie header,
 // which breaks the CSRF round-trip used here.
-import { action } from '@/routes/login/index';
 import { FakeAuthProvider } from '@/modules/auth/providers/fake/fake-provider';
 import { getAuthProvider } from '@/modules/auth/select.server';
+import { action } from '@/routes/login/index';
 import { getCsrfToken } from '@/server/csrf';
 import { describe, it, expect, vi } from 'vitest';
 

@@ -1,9 +1,14 @@
-import { resolveSamlBinding } from '@/resources/sso/saml-binding';
+import {
+  readSessions,
+  mostRecent,
+  removeSession,
+  serializeSessions,
+} from '@/modules/auth/session/cookie';
 import { ProviderError, type SamlResponse } from '@/modules/auth/types';
-import type { AuthErrorCode } from '@/utils/errors/auth-error';
+import { resolveSamlBinding } from '@/resources/sso/saml-binding';
 import { providerForRequest } from '@/server/auth-context.server';
 import { logAuthEvent } from '@/server/observability';
-import { readSessions, mostRecent, removeSession, serializeSessions } from '@/modules/auth/session/cookie';
+import type { AuthErrorCode } from '@/utils/errors/auth-error';
 import type { Context } from 'hono';
 
 function escapeAttr(v: string): string {

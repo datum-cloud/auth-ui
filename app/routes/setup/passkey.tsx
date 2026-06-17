@@ -1,10 +1,10 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
 import { WebAuthnButton } from '@/components/webauthn-button/webauthn-button';
+import { readSessions } from '@/modules/auth/session/cookie';
 import { credentialSchema, setupSkipSchema } from '@/resources/mfa/mfa.schema';
 import { requestPasskeyAttestation, verifyPasskeyEnrollment } from '@/resources/webauthn';
 import { providerForRequest } from '@/server/auth-context.server';
 import { getCsrfToken, assertCsrf } from '@/server/csrf';
-import { readSessions } from '@/modules/auth/session/cookie';
 import { Trans, useLingui } from '@lingui/react/macro';
 import { useRef } from 'react';
 import {

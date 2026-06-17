@@ -1,5 +1,7 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
 import { SubmitButton } from '@/components/auth-form/auth-form';
+import { BackLink } from '@/components/back-link/back-link';
+import { IdentityBadge } from '@/components/identity-badge/identity-badge';
 import { readSessions } from '@/modules/auth/session/cookie';
 import { resolveMfaPicker, chooseMfaMethod, type SecondFactorMethod } from '@/resources/mfa';
 import { type LoginLayoutData } from '@/routes/login/layout';
@@ -89,6 +91,12 @@ export default function MfaPicker() {
     <AuthCard
       title={<Trans>Two-factor verification</Trans>}
       description={<Trans>Choose how you want to verify your identity.</Trans>}>
+      <div className="mb-4 flex flex-col items-center gap-2">
+        <div className="self-start">
+          <BackLink />
+        </div>
+        <IdentityBadge loginName={loginName} requestId={requestId} organization={organization} />
+      </div>
       <div className="flex flex-col gap-3">
         {secondFactors.map((method) => (
           <RRForm key={method} method="POST">

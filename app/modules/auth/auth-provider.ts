@@ -76,6 +76,12 @@ export interface AuthProvider {
 
   // users
   findUser(identifier: string, orgId?: string): Promise<User | null>;
+  /**
+   * Domain discovery (settings-gated, default-off). Given an email domain, resolve the
+   * organization it belongs to, or null when no org claims it. Used by resolveIdentifier
+   * only when settings.allowDomainDiscovery is true.
+   */
+  findOrgByDomain(domain: string): Promise<{ orgId: string } | null>;
   getUser(id: string): Promise<User | null>;
   listAuthMethods(userId: string): Promise<AuthMethod[]>;
   register(input: RegisterInput): Promise<User>; // P2

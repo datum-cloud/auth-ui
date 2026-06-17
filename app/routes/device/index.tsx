@@ -1,7 +1,7 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
 import { SubmitButton } from '@/components/auth-form/auth-form';
-import { codeSchema } from '@/resources/device/device.schema';
 import { lookupDeviceCode, lookupOutcomeToResponse } from '@/resources/device';
+import { codeSchema } from '@/resources/device/device.schema';
 import { providerForRequest } from '@/server/auth-context.server';
 import { getCsrfToken, assertCsrf } from '@/server/csrf';
 import { Form } from '@datum-cloud/datum-ui/form';

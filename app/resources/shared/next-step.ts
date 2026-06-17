@@ -1,6 +1,6 @@
 import { primaryFresh } from './lifetimes';
-import { nextMfaStep } from '@/resources/mfa/mfa-routing';
 import type { AuthMethod, Factors, LoginSettings } from '@/modules/auth/types';
+import { nextMfaStep } from '@/resources/mfa/mfa-routing';
 
 // nowMs is injected (never Date.now() inside flows/) so the lifetime-expiry
 // branch stays deterministic.

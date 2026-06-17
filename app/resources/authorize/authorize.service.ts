@@ -11,11 +11,7 @@
 //
 // The seed flow `authorize-decision.ts` (decideAuthorize / deriveOrganizationFromScopes)
 // is re-exported through the barrel; the service builds the orchestration around it.
-import { decideAuthorize } from '@/resources/authorize/authorize-decision';
 import type { AuthProvider } from '@/modules/auth/auth-provider';
-import { ProviderError } from '@/modules/auth/types';
-import { type AuthErrorCode, providerErrorCode } from '@/utils/errors/auth-error';
-import { logAuthEvent } from '@/server/observability';
 import {
   readSessions,
   mostRecent,
@@ -24,6 +20,10 @@ import {
   serializeSessions,
   type SessionEntry,
 } from '@/modules/auth/session/cookie';
+import { ProviderError } from '@/modules/auth/types';
+import { decideAuthorize } from '@/resources/authorize/authorize-decision';
+import { logAuthEvent } from '@/server/observability';
+import { type AuthErrorCode, providerErrorCode } from '@/utils/errors/auth-error';
 import { redirect } from 'react-router';
 
 // requestId prefixes the loader understands. `oidc_` (Phase 1) and `saml_` (Phase 6 Task 8)

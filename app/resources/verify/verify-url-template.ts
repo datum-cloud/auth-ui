@@ -1,3 +1,9 @@
+// PUBLIC_ORIGIN (the trusted origin passed as `origin`) is scheme+host ONLY, and the app is
+// served under the /id/ basename. APP_BASENAME (single source of truth in resources/shared)
+// MUST be in the email link or it resolves to the Zitadel API (which shares the origin) instead
+// of our route.
+import { APP_BASENAME } from '@/resources/shared/app-basename';
+
 export interface VerifyUrlTemplateInput {
   /**
    * Trusted app origin — scheme + host (e.g. `https://auth.datum.net` or
@@ -41,5 +47,5 @@ export function verifyUrlTemplate(input: VerifyUrlTemplateInput): string {
   const placeholders = `code={{.Code}}&userId={{.UserID}}&organization={{.OrgID}}`;
   const invite = input.invite ? `&invite=true` : '';
   const extra = input.requestId ? `&requestId=${encodeURIComponent(input.requestId)}` : '';
-  return `${input.origin}${path}?${placeholders}${invite}${extra}`;
+  return `${input.origin}${APP_BASENAME}${path}?${placeholders}${invite}${extra}`;
 }

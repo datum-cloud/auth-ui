@@ -181,11 +181,15 @@ export default function Verify() {
           </SubmitButton>
         </Form.Root>
 
-        {/* Resend control — plain form so it posts independently of client-side validation.
+        {/* Resend control — RRForm (React Router <Form>) so the POST reaches the verify
+            INDEX action (auto ?index) AND preserves the current URL query: the resend action
+            returns data() (not a redirect), so RR re-runs the loader against the POST URL, and
+            the loader reads userId/requestId/etc. from the query — RRForm keeps them. A native
+            <form> would 405 on the action-less layout and drop the query.
             The action checks intent=resend before using the code value, but verifyCodeSchema
-            requires code.min(1). We use a sentinel value so the schema parse succeeds;
-            the resend branch in the action ignores the code entirely. */}
-        <form method="post">
+            requires code.min(1); the code='resend' sentinel makes the parse succeed and the
+            resend branch ignores the code entirely. */}
+        <RRForm method="post">
           <input type="hidden" name="csrf" value={csrfToken} />
           <input type="hidden" name="userId" value={userId} />
           <input type="hidden" name="code" value="resend" />
@@ -202,7 +206,7 @@ export default function Verify() {
             loading={navigation.state === 'submitting'}>
             <Trans>Resend code</Trans>
           </Button>
-        </form>
+        </RRForm>
       </div>
     </AuthCard>
   );

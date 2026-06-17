@@ -11,10 +11,10 @@
 //     outcome (redirect, never a 500) and emits a failure audit event via the DI seam.
 //   • CODE-MAJ-02 — IdP start: organization must be threaded into idpReturnUrls so the
 //     org-scoped login policy survives the IdP round-trip.
-import { runSsoAction, outcomeToResponse } from '@/resources/sso';
 import { FakeAuthProvider } from '@/modules/auth/providers/fake/fake-provider';
 import { getAuthProvider } from '@/modules/auth/select.server';
 import { ProviderError } from '@/modules/auth/types';
+import { runSsoAction, outcomeToResponse } from '@/resources/sso';
 import { describe, it, expect, vi } from 'vitest';
 
 vi.mock('@/utils/env/env.server', async (importOriginal) => {
@@ -30,7 +30,10 @@ const SPOOFED_ORIGIN = 'http://evil.example';
 const BASE = 'http://localhost/id/sso';
 
 /** Build the FormData + Request the service consumes (CSRF is route-level, omitted here). */
-function ssoRequest(origin: string, fields: Record<string, string>): { request: Request; form: FormData } {
+function ssoRequest(
+  origin: string,
+  fields: Record<string, string>
+): { request: Request; form: FormData } {
   const form = new FormData();
   for (const [k, v] of Object.entries(fields)) form.set(k, v);
   const request = new Request(`${origin}/id/sso`, { method: 'POST' });

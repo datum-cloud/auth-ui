@@ -1,5 +1,6 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
 import { SubmitButton } from '@/components/auth-form/auth-form';
+import { BackLink } from '@/components/back-link/back-link';
 import { requestPasswordReset } from '@/resources/password';
 import { resetRequestSchema, resetRequestClientSchema } from '@/resources/password/password.schema';
 import { genericCheckYourEmail } from '@/resources/schemas/check-your-email.schema';
@@ -90,6 +91,9 @@ export default function PasswordReset() {
 
   return (
     <AuthCard title={<Trans>Reset your password</Trans>}>
+      <div className="mb-4">
+        <BackLink />
+      </div>
       <Form.Root
         schema={resetRequestClientSchema}
         formComponent={RRForm}

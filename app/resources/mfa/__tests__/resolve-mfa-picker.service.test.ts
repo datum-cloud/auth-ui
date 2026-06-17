@@ -12,10 +12,10 @@
 // Both cases drive the fake provider's OWN seeded data (no getLoginSettings mock):
 //  - organization='totp-only-org' → settingsByOrg seeds secondFactors=['totp'] (Bug C seed).
 //  - no organization → default fake settings leave secondFactors undefined (back-compat).
-import { resolveMfaPicker } from '@/resources/mfa';
 import { FakeAuthProvider } from '@/modules/auth/providers/fake/fake-provider';
 import { getAuthProvider } from '@/modules/auth/select.server';
 import type { SessionEntry } from '@/modules/auth/session/cookie';
+import { resolveMfaPicker } from '@/resources/mfa';
 import { describe, it, expect } from 'vitest';
 
 function fakeProvider(): FakeAuthProvider {
@@ -42,10 +42,14 @@ describe('resolveMfaPicker — policy-aware second-factor filtering (Bug C / C4)
     // u7 (mfa2-user) is enrolled in [password, totp, otp_email]. The seeded 'totp-only-org'
     // policy allows only [totp] → after intersection only TOTP remains → service redirects
     // straight to its use-screen (no chooser).
-    const res = await resolveMfaPicker(fakeProvider(), sessions('mfa2-user@acme.test', 'totp-only-org'), {
-      loginName: 'mfa2-user@acme.test',
-      organization: 'totp-only-org',
-    });
+    const res = await resolveMfaPicker(
+      fakeProvider(),
+      sessions('mfa2-user@acme.test', 'totp-only-org'),
+      {
+        loginName: 'mfa2-user@acme.test',
+        organization: 'totp-only-org',
+      }
+    );
 
     expect(res.kind).toBe('redirect');
     if (res.kind === 'redirect') {

@@ -10,12 +10,12 @@
 //   • A ProviderError from retrieveIdpIntent redirects to /sso/:provider/error and logs
 //     idp.signin failure.
 //   • The ceremony user is resolved via getSession (NOT getUser(sessionId)) — CODE-MIN-05.
-import { processIdpCallback, outcomeToResponse } from '@/resources/sso';
 import type { FakeAuthProvider } from '@/modules/auth/providers/fake/fake-provider';
 import { getAuthProvider } from '@/modules/auth/select.server';
+import { sessionsCookie } from '@/modules/auth/session/cookie';
 import { ProviderError } from '@/modules/auth/types';
 import type { IdpIntentResult } from '@/modules/auth/types';
-import { sessionsCookie } from '@/modules/auth/session/cookie';
+import { processIdpCallback, outcomeToResponse } from '@/resources/sso';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 
 const BASE = 'http://localhost/id/sso';

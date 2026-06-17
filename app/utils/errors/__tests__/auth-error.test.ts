@@ -1,4 +1,9 @@
-import { AUTH_ERRORS, authErrorMessage, providerErrorCode, type AuthErrorCode } from '../auth-error';
+import {
+  AUTH_ERRORS,
+  authErrorMessage,
+  providerErrorCode,
+  type AuthErrorCode,
+} from '../auth-error';
 import { describe, it, expect } from 'vitest';
 
 const GENERIC = {

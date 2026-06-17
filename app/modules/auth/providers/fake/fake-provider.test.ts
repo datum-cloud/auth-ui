@@ -120,3 +120,43 @@ describe('FakeAuthProvider — Phase 1 surface', () => {
     expect(await p.getSession(s.id, s.token)).toBeNull();
   });
 });
+
+describe('FakeAuthProvider — getLoginSettings UX flags', () => {
+  it('defaults hidePasswordReset and ignoreUnknownUsernames to false', async () => {
+    const s = await new FakeAuthProvider().getLoginSettings();
+    expect(s.hidePasswordReset).toBe(false);
+    expect(s.ignoreUnknownUsernames).toBe(false);
+  });
+  it('honors per-org overrides for the UX flags', async () => {
+    const p = new FakeAuthProvider({
+      settingsByOrg: { 'org-1': { hidePasswordReset: true, ignoreUnknownUsernames: true } },
+    });
+    const s = await p.getLoginSettings('org-1');
+    expect(s.hidePasswordReset).toBe(true);
+    expect(s.ignoreUnknownUsernames).toBe(true);
+  });
+});
+
+describe('FakeAuthProvider — getLoginSettings allowDomainDiscovery', () => {
+  it('defaults to false and honors per-org override', async () => {
+    expect((await new FakeAuthProvider().getLoginSettings()).allowDomainDiscovery).toBe(false);
+    const p = new FakeAuthProvider({ settingsByOrg: { o: { allowDomainDiscovery: true } } });
+    expect((await p.getLoginSettings('o')).allowDomainDiscovery).toBe(true);
+  });
+});
+
+describe('FakeAuthProvider — getLoginSettings email/phone flags', () => {
+  it('defaults disableLoginWithEmail and disableLoginWithPhone to false', async () => {
+    const s = await new FakeAuthProvider().getLoginSettings();
+    expect(s.disableLoginWithEmail).toBe(false);
+    expect(s.disableLoginWithPhone).toBe(false);
+  });
+  it('honors per-org overrides', async () => {
+    const p = new FakeAuthProvider({
+      settingsByOrg: { 'org-1': { disableLoginWithEmail: true, disableLoginWithPhone: true } },
+    });
+    const s = await p.getLoginSettings('org-1');
+    expect(s.disableLoginWithEmail).toBe(true);
+    expect(s.disableLoginWithPhone).toBe(true);
+  });
+});

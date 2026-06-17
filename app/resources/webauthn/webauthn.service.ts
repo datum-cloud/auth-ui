@@ -16,13 +16,9 @@
 // folder during Pass 1; the barrel (index.ts) re-exports them and the verify
 // factory so callers/tests reach the whole domain through one specifier.
 import type { AuthProvider } from '@/modules/auth/auth-provider';
+import { byLoginName, addSession, type SessionEntry } from '@/modules/auth/session/cookie';
 import type { Session } from '@/modules/auth/types';
 import { ProviderError } from '@/modules/auth/types';
-import {
-  byLoginName,
-  addSession,
-  type SessionEntry,
-} from '@/modules/auth/session/cookie';
 import { nextStepWithParams } from '@/resources/shared/next-step-params';
 import { logAuthEvent, hashActor } from '@/server/observability';
 
@@ -376,11 +372,13 @@ export async function requestU2FAttestation(
   let u2fId: string | null = null;
   let publicKeyCredentialCreationOptions: unknown = null;
   try {
-    const { u2fId: id, publicKeyCredentialCreationOptions: options } =
-      (await provider.registerU2F(userId, domain)) as {
-        u2fId: string;
-        publicKeyCredentialCreationOptions: unknown;
-      };
+    const { u2fId: id, publicKeyCredentialCreationOptions: options } = (await provider.registerU2F(
+      userId,
+      domain
+    )) as {
+      u2fId: string;
+      publicKeyCredentialCreationOptions: unknown;
+    };
     u2fId = id;
     publicKeyCredentialCreationOptions = options;
   } catch {
@@ -395,9 +393,7 @@ export async function requestU2FAttestation(
 
 export type EnrollError = 'INVALID_INPUT' | 'SESSION_EXPIRED' | 'INVALID_CREDENTIALS';
 
-export type EnrollResult =
-  | { ok: true; target: string }
-  | { ok: false; error: EnrollError };
+export type EnrollResult = { ok: true; target: string } | { ok: false; error: EnrollError };
 
 export interface PasskeyEnrollInput {
   /** Raw JSON string of the attestation credential, as posted by the form. */

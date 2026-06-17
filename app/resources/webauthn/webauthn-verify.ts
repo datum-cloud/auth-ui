@@ -17,12 +17,12 @@
  *   type and use  `useLoaderData() as WebAuthnVerifyLoaderData`  in the route
  *   components (with a comment explaining why we cannot use `typeof loader`).
  */
+import { requestWebAuthnChallenge, verifyWebAuthnAssertion } from './webauthn.service';
+import { readSessions, serializeSessions } from '@/modules/auth/session/cookie';
 import { providerForRequest } from '@/server/auth-context.server';
 import { getCsrfToken, assertCsrf } from '@/server/csrf';
-import { readSessions, serializeSessions } from '@/modules/auth/session/cookie';
 import { data, redirect, type ActionFunctionArgs, type LoaderFunctionArgs } from 'react-router';
 import { z } from 'zod';
-import { requestWebAuthnChallenge, verifyWebAuthnAssertion } from './webauthn.service';
 
 // ── Shared credential Zod schema ────────────────────────────────────────────
 

@@ -64,6 +64,20 @@ export interface LoginSettings {
   allowExternalIdp: boolean;
   passkeysType: 'not_allowed' | 'allowed';
   forceMfa: boolean;
+  /** Login policy: hide the "Forgot password?" entry point. Proto `hidePasswordReset`. Optional (undefined ⇒ show). */
+  hidePasswordReset?: boolean;
+  /**
+   * Login policy: when an entered identifier matches no known user, proceed to the
+   * password step anyway (anti-enumeration) instead of surfacing USER_NOT_FOUND.
+   * Proto `ignoreUnknownUsernames`. Optional, default-off (undefined/false ⇒ today's behavior).
+   */
+  ignoreUnknownUsernames?: boolean;
+  /** Domain policy: email cannot be used as a login identifier. Proto `disableLoginWithEmail`. Optional, default-off. */
+  disableLoginWithEmail?: boolean;
+  /** Domain policy: phone cannot be used as a login identifier. Proto `disableLoginWithPhone`. Optional, default-off. */
+  disableLoginWithPhone?: boolean;
+  /** Login policy: email domain → org/IdP routing. Proto allowDomainDiscovery. Optional, default-off. */
+  allowDomainDiscovery?: boolean;
   passwordCheckLifetimeMs?: number;
   secondFactorCheckLifetimeMs?: number;
   multiFactorCheckLifetimeMs?: number;

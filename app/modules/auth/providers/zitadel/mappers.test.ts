@@ -1,5 +1,5 @@
-import { ProviderError } from '@/modules/auth/types';
 import { normalizeError, toAuthRequest, toSession, toLoginSettings } from './mappers';
+import { ProviderError } from '@/modules/auth/types';
 import { describe, it, expect } from 'vitest';
 
 // minimal ConnectError shape: { code: number, message: string, findDetails?: () => unknown[] }
@@ -186,5 +186,38 @@ describe('toLoginSettings secondFactors / multiFactors (Bug C policy mapping)', 
 
   it('maps an empty proto array to an empty neutral array (caller treats empty as no-restriction)', () => {
     expect(toLoginSettings({ secondFactors: [] }).secondFactors).toEqual([]);
+  });
+});
+
+describe('toLoginSettings UX flags (hidePasswordReset / ignoreUnknownUsernames)', () => {
+  it('maps both flags true from proto', () => {
+    const s = toLoginSettings({ hidePasswordReset: true, ignoreUnknownUsernames: true });
+    expect(s.hidePasswordReset).toBe(true);
+    expect(s.ignoreUnknownUsernames).toBe(true);
+  });
+  it('defaults both flags to false when proto omits them', () => {
+    const s = toLoginSettings({});
+    expect(s.hidePasswordReset).toBe(false);
+    expect(s.ignoreUnknownUsernames).toBe(false);
+  });
+});
+
+describe('toLoginSettings allowDomainDiscovery', () => {
+  it('maps true from proto, defaults to false when omitted', () => {
+    expect(toLoginSettings({ allowDomainDiscovery: true }).allowDomainDiscovery).toBe(true);
+    expect(toLoginSettings({}).allowDomainDiscovery).toBe(false);
+  });
+});
+
+describe('toLoginSettings disableLoginWithEmail / disableLoginWithPhone', () => {
+  it('maps both flags true from proto', () => {
+    const s = toLoginSettings({ disableLoginWithEmail: true, disableLoginWithPhone: true });
+    expect(s.disableLoginWithEmail).toBe(true);
+    expect(s.disableLoginWithPhone).toBe(true);
+  });
+  it('defaults both to false when proto omits them', () => {
+    const s = toLoginSettings({});
+    expect(s.disableLoginWithEmail).toBe(false);
+    expect(s.disableLoginWithPhone).toBe(false);
   });
 });

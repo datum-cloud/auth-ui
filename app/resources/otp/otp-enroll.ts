@@ -21,14 +21,14 @@
  *
  *   Behaviour is identical to `useLoaderData<typeof loader>()` in a direct route.
  */
-import { nextStepWithParams } from '@/resources/shared/next-step-params';
-import { setupSkipSchema } from '@/resources/mfa/mfa.schema';
 import { type AuthProvider } from '@/modules/auth/auth-provider';
+import { readSessions, byLoginName } from '@/modules/auth/session/cookie';
 import { ProviderError } from '@/modules/auth/types';
+import { setupSkipSchema } from '@/resources/mfa/mfa.schema';
+import { nextStepWithParams } from '@/resources/shared/next-step-params';
 import { providerForRequest } from '@/server/auth-context.server';
 import { getCsrfToken, assertCsrf } from '@/server/csrf';
 import { logAuthEvent } from '@/server/observability';
-import { readSessions, byLoginName } from '@/modules/auth/session/cookie';
 import { data, redirect, type ActionFunctionArgs, type LoaderFunctionArgs } from 'react-router';
 import { z } from 'zod';
 

@@ -1,5 +1,5 @@
-import type { Decision } from '@/resources/login/login-decision';
 import type { AuthRequest } from '@/modules/auth/types';
+import type { Decision } from '@/resources/login/login-decision';
 
 const ORG_SCOPE = /urn:zitadel:iam:org:id:([0-9]+)/;
 

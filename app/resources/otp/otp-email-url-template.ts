@@ -1,3 +1,5 @@
+import { APP_BASENAME } from '@/resources/shared/app-basename';
+
 export interface OtpEmailUrlTemplateInput {
   /**
    * Trusted app origin — scheme + host (e.g. `https://auth.datum.net` or
@@ -6,7 +8,7 @@ export interface OtpEmailUrlTemplateInput {
    * header — see verify-url-template.ts for the Host-header email-link-injection rationale.
    *
    * NOTE: trustedAppOrigin returns ORIGIN-ONLY (no path), and the app is served under the
-   * `/id/` basename, so this helper appends the explicit `/id/login/verify/email` path.
+   * APP_BASENAME (`/id/`) basename, so this helper prepends it before `/login/verify/email`.
    */
   origin: string;
   /**
@@ -50,5 +52,5 @@ export function otpEmailUrlTemplate(input: OtpEmailUrlTemplateInput): string {
   const organization = input.organization
     ? `&organization=${encodeURIComponent(input.organization)}`
     : '';
-  return `${input.origin}/id/login/verify/email?${placeholders}${loginName}${requestId}${organization}`;
+  return `${input.origin}${APP_BASENAME}/login/verify/email?${placeholders}${loginName}${requestId}${organization}`;
 }

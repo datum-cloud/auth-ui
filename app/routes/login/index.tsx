@@ -1,16 +1,18 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
 import { SubmitButton } from '@/components/auth-form/auth-form';
+import { FormError } from '@/components/form-error/form-error';
 // ADAPTATION (plan-drift fix): readSessions + serializeSessions live in @/modules/auth/session/cookie.
 // The locked plan block incorrectly listed them as coming from @/modules/auth/session/session
 // (that module only has pure helpers, no cookie I/O).
 import { readSessions, serializeSessions } from '@/modules/auth/session/cookie';
 import { shouldBridgeToAuthorize, startIdpIntent, resolveIdentifier } from '@/resources/login';
+import { resolveLoginView, resolveIdentifierField } from '@/resources/login/login-view';
 import {
   loginIdentifierSchema,
   loginIdpSchema,
-  loginIdentifierClientSchema,
+  isPhoneLike,
+  makeLoginIdentifierClientSchema,
 } from '@/resources/login/login.schema';
-import { shouldShowIdpButtons } from '@/resources/sso/idp-buttons';
 import { type LoginLayoutData } from '@/routes/login/layout';
 import { trustedAppOrigin } from '@/server/app-origin.server';
 import { providerForRequest } from '@/server/auth-context.server';
@@ -27,6 +29,7 @@ import {
 } from 'react-router';
 import {
   Form as RRForm,
+  Link,
   useLoaderData,
   useActionData,
   useNavigation,
@@ -94,9 +97,18 @@ export async function action({ request }: ActionFunctionArgs) {
   if (!parsed.success) return data({ error: 'INVALID_INPUT' }, { status: 400 });
   const { loginName, requestId, organization } = parsed.data;
 
+  // Strict phone rejection (server-side) when the org disables phone login.
+  const settings = await provider.getLoginSettings(organization);
+  if (resolveIdentifierField(settings).rejectPhone && isPhoneLike(loginName)) {
+    return data({ error: 'PHONE_LOGIN_DISABLED' }, { status: 400 });
+  }
+
   const list = await readSessions(request);
   const result = await resolveIdentifier(provider, list, { loginName, requestId, organization });
-  if (!result.ok) return data({ error: result.error }, { status: 404 });
+  if (!result.ok) {
+    const status = result.error === 'EMAIL_LOGIN_DISABLED' ? 400 : 404;
+    return data({ error: result.error }, { status });
+  }
 
   return redirect(`${result.target}?${result.params}`, {
     headers: { 'set-cookie': await serializeSessions(result.sessions) },
@@ -104,22 +116,43 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function Login() {
-  const { csrfToken, idps } = useLoaderData<typeof loader>();
+  const { csrfToken, idps, settings, branding } = useLoaderData<typeof loader>();
   const { loginName, requestId, organization } = useRouteLoaderData('login') as LoginLayoutData;
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
   const { t } = useLingui();
 
+  const view = resolveLoginView(settings, idps);
+
+  const field = resolveIdentifierField(settings);
+  const identifierLabel = field.allowEmail
+    ? field.allowPhone
+      ? t`Email, phone, or username`
+      : t`Email or username`
+    : field.allowPhone
+      ? t`Phone or username`
+      : t`Username`;
+  const identifierPlaceholder = field.allowEmail
+    ? 'email@example.com'
+    : field.allowPhone
+      ? '+1 555 000 0000'
+      : 'username';
+  const identifierClientSchema = makeLoginIdentifierClientSchema({
+    rejectPhone: field.rejectPhone,
+  });
+
   const serverError =
     actionData && 'error' in actionData
       ? actionData.error === 'USER_NOT_FOUND'
         ? t`We could not find an account for that identifier.`
-        : actionData.error === 'IDP_UNAVAILABLE'
-          ? t`This sign-in provider is currently unavailable. Please try again later.`
-          : t`Please check your input and try again.`
+        : actionData.error === 'PHONE_LOGIN_DISABLED'
+          ? t`Phone sign-in isn't available — use your email or username.`
+          : actionData.error === 'EMAIL_LOGIN_DISABLED'
+            ? t`Email sign-in isn't available — use your username.`
+            : actionData.error === 'IDP_UNAVAILABLE'
+              ? t`This sign-in provider is currently unavailable. Please try again later.`
+              : t`Please check your input and try again.`
       : undefined;
-
-  const showIdpButtons = shouldShowIdpButtons({ externalIdp: idps.length > 0 }, idps);
 
   const submittingIdpId =
     navigation.state !== 'idle' && navigation.formData?.get('intent') === 'idp'
@@ -128,76 +161,121 @@ export default function Login() {
   const identifierSubmitting =
     navigation.state === 'submitting' && navigation.formData?.get('intent') !== 'idp';
 
+  const extra = new URLSearchParams();
+  if (requestId) extra.set('requestId', requestId);
+  if (organization) extra.set('organization', organization);
+  const signupHref = extra.toString() ? `/signup?${extra.toString()}` : '/signup';
+
+  // Passkey-first prompt (P2): link to the existing /login/passkey webauthn flow,
+  // carrying any known loginName + the ceremony context. /login/passkey redirects
+  // back gracefully when there is no resolvable session, so this is safe cold too.
+  const passkeyParams = new URLSearchParams();
+  if (loginName) passkeyParams.set('loginName', loginName);
+  if (requestId) passkeyParams.set('requestId', requestId);
+  if (organization) passkeyParams.set('organization', organization);
+  const passkeyHref = passkeyParams.toString()
+    ? `/login/passkey?${passkeyParams.toString()}`
+    : '/login/passkey';
+
   return (
-    <AuthCard title={<Trans>Sign in</Trans>}>
-      <Form.Root
-        schema={loginIdentifierClientSchema}
-        formComponent={RRForm}
-        method="POST"
-        defaultValues={{ loginName: loginName ?? '' }}
-        isSubmitting={navigation.state === 'submitting'}
-        className="flex flex-col gap-4">
-        <input type="hidden" name="csrf" value={csrfToken} />
-        {requestId ? <input type="hidden" name="requestId" value={requestId} /> : null}
-        {organization ? <input type="hidden" name="organization" value={organization} /> : null}
-        <Form.Field name="loginName" label={t`Email or username`} required>
-          <Form.Input
-            type="text"
-            autoFocus
-            autoComplete="username"
-            placeholder="email@example.com"
-          />
-        </Form.Field>
-        {serverError ? (
-          <p role="alert" className="text-sm text-red-700">
-            {serverError}
-          </p>
-        ) : null}
-        <SubmitButton loading={identifierSubmitting}>
-          <Trans>Continue</Trans>
-        </SubmitButton>
-      </Form.Root>
+    <AuthCard title={<Trans>Sign in</Trans>} branding={branding}>
+      {view.showPasswordForm ? (
+        <Form.Root
+          schema={identifierClientSchema}
+          formComponent={RRForm}
+          method="POST"
+          defaultValues={{ loginName: loginName ?? '' }}
+          isSubmitting={navigation.state === 'submitting'}
+          className="flex flex-col gap-4">
+          <input type="hidden" name="csrf" value={csrfToken} />
+          {requestId ? <input type="hidden" name="requestId" value={requestId} /> : null}
+          {organization ? <input type="hidden" name="organization" value={organization} /> : null}
+          <Form.Field name="loginName" label={identifierLabel} required>
+            <Form.Input
+              type="text"
+              autoFocus
+              autoComplete="username"
+              placeholder={identifierPlaceholder}
+            />
+          </Form.Field>
+          <FormError>{serverError}</FormError>
+          <SubmitButton loading={identifierSubmitting}>
+            <Trans>Continue</Trans>
+          </SubmitButton>
+        </Form.Root>
+      ) : null}
 
-      {showIdpButtons ? (
-        <>
-          <div className="relative my-4 flex items-center" aria-hidden="true">
-            <div className="flex-grow border-t border-gray-200" />
-            <span className="mx-3 shrink-0 text-sm text-gray-600">
-              <Trans>or</Trans>
-            </span>
-            <div className="flex-grow border-t border-gray-200" />
-          </div>
+      {view.showPasswordForm && view.showIdpButtons ? (
+        <div className="relative my-4 flex items-center" aria-hidden="true">
+          <div className="flex-grow border-t border-gray-200" />
+          <span className="mx-3 shrink-0 text-sm text-gray-600">
+            <Trans>or</Trans>
+          </span>
+          <div className="flex-grow border-t border-gray-200" />
+        </div>
+      ) : null}
 
-          <div className="flex flex-col gap-3">
-            {idps.map((idp) => (
-              <RRForm key={idp.id} method="post">
-                <input type="hidden" name="csrf" value={csrfToken} />
-                <input type="hidden" name="intent" value="idp" />
-                <input type="hidden" name="idpId" value={idp.id} />
-                {requestId ? <input type="hidden" name="requestId" value={requestId} /> : null}
-                {organization ? (
-                  <input type="hidden" name="organization" value={organization} />
+      {view.showIdpButtons ? (
+        <div className="flex flex-col gap-3">
+          {idps.map((idp) => (
+            <RRForm key={idp.id} method="post">
+              <input type="hidden" name="csrf" value={csrfToken} />
+              <input type="hidden" name="intent" value="idp" />
+              <input type="hidden" name="idpId" value={idp.id} />
+              {requestId ? <input type="hidden" name="requestId" value={requestId} /> : null}
+              {organization ? (
+                <input type="hidden" name="organization" value={organization} />
+              ) : null}
+              <Button
+                type="secondary"
+                theme="outline"
+                block
+                htmlType="submit"
+                loading={submittingIdpId === idp.id}>
+                {idp.logoUrl ? (
+                  <img
+                    src={idp.logoUrl}
+                    alt=""
+                    aria-hidden="true"
+                    className="mr-2 h-5 w-5 object-contain"
+                  />
                 ) : null}
-                <Button
-                  type="secondary"
-                  theme="outline"
-                  block
-                  htmlType="submit"
-                  loading={submittingIdpId === idp.id}>
-                  {idp.logoUrl ? (
-                    <img
-                      src={idp.logoUrl}
-                      alt=""
-                      aria-hidden="true"
-                      className="mr-2 h-5 w-5 object-contain"
-                    />
-                  ) : null}
-                  <Trans>Continue with {idp.name}</Trans>
-                </Button>
-              </RRForm>
-            ))}
-          </div>
-        </>
+                <Trans>Continue with {idp.name}</Trans>
+              </Button>
+            </RRForm>
+          ))}
+        </div>
+      ) : null}
+
+      {view.showPasskeyPrompt ? (
+        <Link
+          to={passkeyHref}
+          className="mt-3 flex w-full items-center justify-center rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
+          <Trans>Sign in with a passkey</Trans>
+        </Link>
+      ) : null}
+
+      {!view.showPasswordForm && view.showIdpButtons ? (
+        // IdP buttons rendered above but the password form is gated off — still surface
+        // any server error (e.g. IDP_UNAVAILABLE) for the screen-reader.
+        <FormError>{serverError}</FormError>
+      ) : null}
+
+      {view.signInUnavailable ? (
+        <p className="text-foreground text-center text-sm">
+          <Trans>
+            Sign-in is currently unavailable for this account. Please contact your administrator.
+          </Trans>
+        </p>
+      ) : null}
+
+      {view.showRegisterLink ? (
+        <p className="mt-4 text-center text-sm text-gray-600">
+          <Trans>Don't have an account?</Trans>{' '}
+          <Link to={signupHref} className="underline">
+            <Trans>Create account</Trans>
+          </Link>
+        </p>
       ) : null}
     </AuthCard>
   );

@@ -8,10 +8,10 @@
 // Task 8 — CODE-MIN-28: a findUser failure during the best-effort audit-userId lookup must be
 // surfaced (a failure audit line), must NOT abort routing (the success routing event still
 // fires), and must NOT leak the raw loginName (CCD-9 — only the hashed actor).
-import { chooseMfaMethod } from '@/resources/mfa';
 import { FakeAuthProvider } from '@/modules/auth/providers/fake/fake-provider';
 import { getAuthProvider } from '@/modules/auth/select.server';
 import type { SessionEntry } from '@/modules/auth/session/cookie';
+import { chooseMfaMethod } from '@/resources/mfa';
 import { logAuthEvent } from '@/server/observability';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 
@@ -52,10 +52,15 @@ async function runChoose(
   organization?: string,
   method = 'totp'
 ) {
-  return chooseMfaMethod(provider, sessions(loginName, organization), { loginName, method }, {
-    loginName,
-    organization,
-  });
+  return chooseMfaMethod(
+    provider,
+    sessions(loginName, organization),
+    { loginName, method },
+    {
+      loginName,
+      organization,
+    }
+  );
 }
 
 describe('chooseMfaMethod — findUser failure audit (CODE-MIN-28)', () => {

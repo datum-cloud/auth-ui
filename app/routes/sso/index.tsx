@@ -18,6 +18,7 @@ import {
   type LoaderFunctionArgs,
 } from 'react-router';
 import type { MetaFunction } from 'react-router';
+import { Form as RRForm } from 'react-router';
 
 export const meta: MetaFunction = () => [{ title: 'Linked accounts' }];
 
@@ -88,7 +89,8 @@ export default function SsoPage() {
                   className="flex items-center justify-between gap-3">
                   <span className="text-foreground text-sm">{link.idpUserName || link.idpId}</span>
                   {allowUnlink ? (
-                    <form method="post">
+                    // RRForm auto-adds ?index → POST reaches the sso index action.
+                    <RRForm method="post">
                       <input type="hidden" name="csrf" value={csrfToken} />
                       <input type="hidden" name="intent" value="unlink" />
                       <input type="hidden" name="idpId" value={link.idpId} />
@@ -96,7 +98,7 @@ export default function SsoPage() {
                       <Button type="secondary" theme="outline" htmlType="submit" size="small">
                         <Trans>Unlink</Trans>
                       </Button>
-                    </form>
+                    </RRForm>
                   ) : null}
                 </li>
               ))}
@@ -113,7 +115,8 @@ export default function SsoPage() {
             <ul className="flex flex-col gap-2">
               {unlinked.map((idp: IdProvider) => (
                 <li key={idp.id}>
-                  <form method="post">
+                  {/* RRForm: auto-adds ?index → posts to the sso index action. */}
+                  <RRForm method="post">
                     <input type="hidden" name="csrf" value={csrfToken} />
                     <input type="hidden" name="intent" value="start" />
                     <input type="hidden" name="provider" value={slugify(idp.name)} />
@@ -121,15 +124,16 @@ export default function SsoPage() {
                     <Button type="primary" theme="solid" htmlType="submit" block>
                       {idp.name}
                     </Button>
-                  </form>
+                  </RRForm>
                 </li>
               ))}
             </ul>
           </section>
         ) : null}
 
-        {/* Sign-out link */}
-        <form method="post" action="/id/logout">
+        {/* Sign-out link → logout INDEX action; ?index disambiguates from the
+            action-less logout/layout (native <form> won't add it like RR <Form> does). */}
+        <form method="post" action="/id/logout?index">
           <input type="hidden" name="csrf" value={csrfToken} />
           <Button type="secondary" theme="outline" htmlType="submit" block>
             <Trans>Sign out</Trans>

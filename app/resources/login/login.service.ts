@@ -17,6 +17,7 @@ import { idpTypeToSlug } from '@/modules/auth/idp-slug';
 import { addSession, byLoginName, type SessionEntry } from '@/modules/auth/session/cookie';
 import { ProviderError } from '@/modules/auth/types';
 import { decideAfterIdentifier } from '@/resources/login/login-decision';
+import { isEmailLike } from '@/resources/login/login.schema';
 import { nextStepWithParams } from '@/resources/shared/next-step-params';
 import { idpReturnUrls } from '@/resources/sso/idp-return-urls';
 import { logAuthEvent, hashActor } from '@/server/observability';
@@ -87,7 +88,7 @@ export interface ResolveIdentifierInput {
   organization?: string;
 }
 
-export type ResolveIdentifierError = 'USER_NOT_FOUND';
+export type ResolveIdentifierError = 'USER_NOT_FOUND' | 'EMAIL_LOGIN_DISABLED';
 
 /**
  * A "identifier accepted, persist the ceremony session and redirect to the next
@@ -105,6 +106,13 @@ export type ResolveIdentifierResult =
   | ResolveIdentifierRedirect
   | { ok: false; error: ResolveIdentifierError };
 
+/** Lowercased domain of an email-style identifier, or null when it is not an email. */
+function emailDomain(loginName: string): string | null {
+  const at = loginName.lastIndexOf('@');
+  if (at <= 0 || at === loginName.length - 1) return null;
+  return loginName.slice(at + 1).toLowerCase();
+}
+
 /**
  * Identifier step: resolve the user, create the ceremony session, decide the next
  * factor screen, and shape the ceremony-session entry + threaded query params.
@@ -120,19 +128,86 @@ export async function resolveIdentifier(
   list: SessionEntry[],
   { loginName, requestId, organization }: ResolveIdentifierInput
 ): Promise<ResolveIdentifierResult> {
-  const user = await provider.findUser(loginName, organization);
+  // allowDomainDiscovery (settings-gated, DEFAULT-OFF): when the caller pinned no org and the
+  // BASE/instance policy enables discovery, map an email domain → org and thread it through the
+  // rest of the ceremony. The base settings (getLoginSettings(undefined)) govern WHETHER discovery
+  // runs — the org isn't known yet — and the discovered org's settings re-drive the gating below.
+  // Off / explicit-org / non-email / no-hit ⇒ org stays === the caller's organization, i.e.
+  // byte-identical to today.
+  let org = organization;
+  if (!org) {
+    const baseSettings = await provider.getLoginSettings(undefined);
+    if (baseSettings.allowDomainDiscovery === true) {
+      const domain = emailDomain(loginName);
+      const found = domain ? await provider.findOrgByDomain(domain) : null;
+      if (found) {
+        org = found.orgId;
+        // Single auto-redirect IdP: the discovered org disallows password but exposes exactly
+        // one external IdP → route straight to that IdP intent (skip the identifier/password screen).
+        const orgSettings = await provider.getLoginSettings(org);
+        const idps = await provider.getActiveIdPs(org);
+        if (!orgSettings.allowPassword && orgSettings.allowExternalIdp && idps.length === 1) {
+          logAuthEvent('identifier', 'success', { actor: hashActor(loginName) });
+          const idpParams = new URLSearchParams({
+            loginName,
+            idpId: idps[0].id,
+            organization: org,
+          });
+          if (requestId) idpParams.set('requestId', requestId);
+          return { ok: true, target: '/sso', params: idpParams, sessions: list };
+        }
+      }
+    }
+  }
+
+  const user = await provider.findUser(loginName, org);
   if (!user) {
-    logAuthEvent('identifier', 'failure', { actor: hashActor(loginName), reason: 'not_found' });
-    return { ok: false, error: 'USER_NOT_FOUND' };
+    // ignoreUnknownUsernames (settings-gated, DEFAULT-OFF): with the flag off this is
+    // byte-identical to before (USER_NOT_FOUND). With it on, proceed to the password
+    // step bound to the typed loginName but with NO user attached — the credential check
+    // then fails generically, identical to a wrong password for a real account.
+    const settings = await provider.getLoginSettings(org);
+    if (settings.ignoreUnknownUsernames !== true) {
+      // disableLoginWithEmail (settings-gated, DEFAULT-OFF): an email is never a valid loginname
+      // under this policy, so the lookup already failed. Refine the generic not-found into a
+      // distinct EMAIL_LOGIN_DISABLED so the route can guide the user to their username.
+      // isEmailLike is copy-only (never blocks) — see login.schema.ts. Gated behind the
+      // ignoreUnknownUsernames check above so the anti-enumeration path reveals nothing.
+      if (settings.disableLoginWithEmail === true && isEmailLike(loginName)) {
+        logAuthEvent('identifier', 'failure', {
+          actor: hashActor(loginName),
+          reason: 'email_login_disabled',
+        });
+        return { ok: false, error: 'EMAIL_LOGIN_DISABLED' };
+      }
+      logAuthEvent('identifier', 'failure', { actor: hashActor(loginName), reason: 'not_found' });
+      return { ok: false, error: 'USER_NOT_FOUND' };
+    }
+    logAuthEvent('identifier', 'success', { actor: hashActor(loginName) });
+    const ghostSession = await provider.createSession({}, { requestId, orgId: org });
+    const ghostSessions = addSession(list, {
+      id: ghostSession.id,
+      token: ghostSession.token,
+      loginName,
+      organization: org,
+      creationTs: ghostSession.changedAt,
+      expirationTs: ghostSession.expiresAt,
+      changeTs: ghostSession.changedAt,
+      requestId,
+    });
+    const ghostParams = new URLSearchParams({ loginName });
+    if (requestId) ghostParams.set('requestId', requestId);
+    if (org) ghostParams.set('organization', org);
+    return { ok: true, target: '/login/password', params: ghostParams, sessions: ghostSessions };
   }
   logAuthEvent('identifier', 'success', { actor: hashActor(loginName) });
 
   const session = await provider.createSession(
     {},
-    { requestId, orgId: organization, metadata: { userId: user.id } }
+    { requestId, orgId: org, metadata: { userId: user.id } }
   );
   const methods = await provider.listAuthMethods(user.id);
-  const settings = await provider.getLoginSettings(organization);
+  const settings = await provider.getLoginSettings(org);
   const decision = decideAfterIdentifier({ methods, settings });
 
   // Persist the ceremony session into the (to-be-serialized) cookie list.
@@ -140,7 +215,7 @@ export async function resolveIdentifier(
     id: session.id,
     token: session.token,
     loginName: user.loginName,
-    organization,
+    organization: org,
     creationTs: session.changedAt,
     expirationTs: session.expiresAt,
     changeTs: session.changedAt,
@@ -149,7 +224,7 @@ export async function resolveIdentifier(
 
   const params = new URLSearchParams({ loginName: user.loginName });
   if (requestId) params.set('requestId', requestId);
-  if (organization) params.set('organization', organization);
+  if (org) params.set('organization', org);
   Object.entries(decision.params ?? {}).forEach(([k, v]) => params.set(k, v));
 
   return { ok: true, target: decision.target, params, sessions };

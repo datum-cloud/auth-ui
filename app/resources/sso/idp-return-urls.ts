@@ -11,7 +11,11 @@
 // The original OIDC/SAML `requestId` MUST ride on the success URL too: the IdP broker appends
 // `&id=…&token=…` and redirects there, and the SSO callback uses `requestId` to forward back
 // to `/authorize` (and finish the protocol). Without it the callback dead-ends at /signed-in.
-export const APP_BASENAME = '/id';
+// APP_BASENAME is defined once in resources/shared; re-exported here for back-compat
+// (the sso barrel and this module's URL builder both consume it).
+import { APP_BASENAME } from '@/resources/shared/app-basename';
+
+export { APP_BASENAME };
 
 export interface IdpReturnOpts {
   /** Original OIDC/SAML request to resume after the IdP round-trip (e.g. `oidc_…`). */

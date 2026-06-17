@@ -47,7 +47,7 @@ describe('requestPasswordReset — email-link origin (anti Host-header injection
     const [userId, urlTemplate] = spy.mock.calls[0];
     expect(userId).toBe('u1');
     // Origin-trusted: uses PUBLIC_ORIGIN, never the spoofed Host.
-    expect(urlTemplate.startsWith('https://auth.datum.net/password/new?')).toBe(true);
+    expect(urlTemplate.startsWith('https://auth.datum.net/id/password/new?')).toBe(true);
     expect(urlTemplate).not.toContain(SPOOFED_HOST);
     // Raw braces preserved (NOT percent-encoded) — Zitadel does not decode %7B%7B.
     expect(urlTemplate).toContain('code={{.Code}}');
@@ -65,7 +65,7 @@ describe('requestPasswordReset — email-link origin (anti Host-header injection
     });
 
     const [, urlTemplate] = spy.mock.calls[0];
-    expect(urlTemplate.startsWith('https://auth.datum.net/password/new?')).toBe(true);
+    expect(urlTemplate.startsWith('https://auth.datum.net/id/password/new?')).toBe(true);
     expect(urlTemplate).toContain('&requestId=oidc_42');
   });
 

@@ -38,7 +38,10 @@ export default function Logout() {
         <p className="text-foreground">
           <Trans>Are you sure you want to sign out?</Trans>
         </p>
-        <form method="post">
+        {/* ?index targets routes/logout/index (which owns the action). Without it RR
+            routes this native POST to the action-less logout/layout → 405. RR <Form>
+            adds ?index automatically; a native <form> must carry it explicitly. */}
+        <form method="post" action="?index">
           <input type="hidden" name="csrf" value={csrfToken} />
           <Button type="primary" theme="solid" htmlType="submit" block>
             <Trans>Sign out</Trans>

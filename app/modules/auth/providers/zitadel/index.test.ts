@@ -1,7 +1,7 @@
 // app/providers/zitadel/index.test.ts
-import { ProviderError } from '@/modules/auth/types';
 import { ZitadelAuthProvider } from './index';
 import * as transport from './transport';
+import { ProviderError } from '@/modules/auth/types';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 
 const provider = () => new ZitadelAuthProvider({ serviceUrl: 'https://z.test', serviceToken: 't' });

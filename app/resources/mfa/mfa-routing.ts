@@ -1,5 +1,5 @@
-import { passwordlessPasskeyFresh, secondFactorFresh } from '@/resources/shared/lifetimes';
 import type { AuthMethod, Factors, LoginSettings } from '@/modules/auth/types';
+import { passwordlessPasskeyFresh, secondFactorFresh } from '@/resources/shared/lifetimes';
 
 export interface MfaRoutingInput {
   factors: Factors;

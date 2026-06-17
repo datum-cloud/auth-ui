@@ -13,12 +13,12 @@
 // service returns the RAW options, so the original `publicKey === null` assertion
 // becomes `publicKeyCredentialCreationOptions === null` here (the route's null
 // passes straight through the unwrap).
-import { requestPasskeyAttestation } from '@/resources/webauthn/webauthn.service';
 import { FakeAuthProvider } from '@/modules/auth/providers/fake/fake-provider';
 import { getAuthProvider } from '@/modules/auth/select.server';
-import { ProviderError } from '@/modules/auth/types';
-import { hashActor, logAuthEvent } from '@/server/observability';
 import type { SessionEntry } from '@/modules/auth/session/cookie';
+import { ProviderError } from '@/modules/auth/types';
+import { requestPasskeyAttestation } from '@/resources/webauthn/webauthn.service';
+import { hashActor, logAuthEvent } from '@/server/observability';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 
 // Mock observability so tests can intercept logAuthEvent calls.

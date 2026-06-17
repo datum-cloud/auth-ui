@@ -6,8 +6,8 @@
 // the extracted service `submitLdapCredentials` is driven directly here (CSRF is asserted
 // by the route). We translate the typed outcome via outcomeToResponse — identical to what
 // the route returns — so every status/redirect/data assertion is preserved verbatim.
-import { submitLdapCredentials, outcomeToResponse } from '@/resources/sso';
 import { getAuthProvider } from '@/modules/auth/select.server';
+import { submitLdapCredentials, outcomeToResponse } from '@/resources/sso';
 import { describe, it, expect } from 'vitest';
 
 const fake = getAuthProvider({ AUTH_PROVIDER: 'fake' });

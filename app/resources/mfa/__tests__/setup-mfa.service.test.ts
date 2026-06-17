@@ -8,11 +8,11 @@
 // capabilities AND the org login policy (secondFactors for u2f/totpOtp/emailOtp/smsOtp;
 // multiFactors/passkey for the passkey row). When the policy sets are undefined (fake/older
 // settings) it falls back to capabilities-only (back-compat).
-import { offerableSetupRoutes, resolveMfaSetup } from '@/resources/mfa';
 import { FakeAuthProvider } from '@/modules/auth/providers/fake/fake-provider';
 import { getAuthProvider } from '@/modules/auth/select.server';
 import type { SessionEntry } from '@/modules/auth/session/cookie';
 import type { LoginSettings, ProviderCapabilities } from '@/modules/auth/types';
+import { offerableSetupRoutes, resolveMfaSetup } from '@/resources/mfa';
 import { describe, it, expect } from 'vitest';
 
 const ALL_CAPS: ProviderCapabilities = {

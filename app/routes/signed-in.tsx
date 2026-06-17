@@ -35,10 +35,13 @@ export default function SignedIn() {
         {/* ADAPTATION (contrast fix): text-foreground instead of text-muted-foreground
             (Phase 0 finding: muted-foreground fails WCAG AA at 3.47:1). */}
         {loginName ? <p className="text-foreground">{loginName}</p> : null}
-        {/* Sign-out form: plain <form> with explicit /id/logout action so the browser
-            posts to the literal path (RR basename-prefixing only applies to RR <Form>).
-            The logout journey selects form[action="/id/logout"] — keep the selector intact. */}
-        <form method="post" action="/id/logout">
+        {/* Sign-out form posts to the logout INDEX route. Its action lives on
+            routes/logout/index, which shares /id/logout with the action-less layout, so
+            React Router needs ?index to target the index action — a native <form> won't
+            append it the way RR <Form> does; without it the POST 405s on the layout.
+            Explicit literal path because RR basename-prefixing only applies to RR <Form>.
+            A logout journey should select form[action^="/id/logout"] — keep that prefix. */}
+        <form method="post" action="/id/logout?index">
           <input type="hidden" name="csrf" value={csrfToken} />
           <Button type="primary" theme="solid" htmlType="submit" block>
             <Trans>Sign out</Trans>

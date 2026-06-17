@@ -1,5 +1,5 @@
-import { ProviderError } from '@/modules/auth/types';
 import { normalizeError } from './mappers';
+import { ProviderError } from '@/modules/auth/types';
 import { describe, it, expect } from 'vitest';
 
 // minimal ConnectError shape

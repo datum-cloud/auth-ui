@@ -1,4 +1,3 @@
-import type { SessionChecks } from '@/modules/auth/auth-provider';
 import {
   durationToMs,
   mapAuthMethod,
@@ -10,6 +9,7 @@ import {
   toSessionChallenges,
   toUser,
 } from './mappers';
+import type { SessionChecks } from '@/modules/auth/auth-provider';
 import { describe, it, expect } from 'vitest';
 
 // ── durationToMs ─────────────────────────────────────────────────────────────

@@ -1,15 +1,19 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
 import { SubmitButton } from '@/components/auth-form/auth-form';
+import { BackLink } from '@/components/back-link/back-link';
+import { FormError } from '@/components/form-error/form-error';
+import { IdentityBadge } from '@/components/identity-badge/identity-badge';
 // ADAPTATION (plan-drift fix): readSessions/serializeSessions live in @/modules/auth/session/cookie
 // (which re-exports them from session.ts) — the canonical one-stop import for route-layer session I/O.
 import { readSessions, serializeSessions } from '@/modules/auth/session/cookie';
 import { verifyLoginPassword } from '@/resources/login';
+import { attemptsRemaining } from '@/resources/login/login-view';
 import { loginPasswordSchema, loginPasswordClientSchema } from '@/resources/login/login.schema';
 import { type LoginLayoutData } from '@/routes/login/layout';
 import { providerForRequest } from '@/server/auth-context.server';
 import { getCsrfToken, assertCsrf } from '@/server/csrf';
 import { Form } from '@datum-cloud/datum-ui/form';
-import { Trans, useLingui } from '@lingui/react/macro';
+import { Trans, Plural, useLingui } from '@lingui/react/macro';
 import {
   data,
   redirect,
@@ -26,16 +30,15 @@ import { Form as RRForm, Link } from 'react-router';
 export const meta: MetaFunction = () => [{ title: 'Enter your password' }];
 
 export async function loader({ request }: LoaderFunctionArgs) {
+  const url = new URL(request.url);
+  const organization = url.searchParams.get('organization') ?? undefined;
+  const provider = providerForRequest(request);
+  const settings = await provider.getLoginSettings(organization);
   const [csrfToken, setCookie] = await getCsrfToken(request);
   // DEVIATION 3 (getCsrfToken null-guard): only set 'set-cookie' when non-null (same as login.tsx).
   const headers: Record<string, string> = {};
   if (setCookie !== null) headers['set-cookie'] = setCookie;
-  return data(
-    {
-      csrfToken,
-    },
-    { headers }
-  );
+  return data({ csrfToken, hidePasswordReset: settings.hidePasswordReset === true }, { headers });
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -74,7 +77,7 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function Password() {
-  const { csrfToken } = useLoaderData<typeof loader>();
+  const { csrfToken, hidePasswordReset } = useLoaderData<typeof loader>();
   const { loginName, requestId, organization } = useRouteLoaderData('login') as LoginLayoutData;
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
@@ -94,8 +97,24 @@ export default function Password() {
           : { kind: 'INVALID_INPUT' as const }
       : undefined;
 
+  const attempts =
+    serverError?.kind === 'INVALID_CREDENTIALS'
+      ? attemptsRemaining(serverError.failedAttempts, serverError.maxAttempts)
+      : null;
+
+  const extra = new URLSearchParams();
+  if (requestId) extra.set('requestId', requestId);
+  if (organization) extra.set('organization', organization);
+  const resetHref = extra.toString() ? `/password/reset?${extra.toString()}` : '/password/reset';
+
   return (
     <AuthCard title={<Trans>Enter your password</Trans>}>
+      <div className="mb-4 flex flex-col items-center gap-2">
+        <div className="self-start">
+          <BackLink />
+        </div>
+        <IdentityBadge loginName={loginName} requestId={requestId} organization={organization} />
+      </div>
       <Form.Root
         schema={loginPasswordClientSchema}
         formComponent={RRForm}
@@ -110,31 +129,53 @@ export default function Password() {
         <Form.Field name="password" label={t`Enter your password`} required>
           <Form.Input type="password" autoComplete="current-password" autoFocus />
         </Form.Field>
+
         {serverError?.kind === 'INVALID_CREDENTIALS' && (
-          <p role="alert" className="text-sm text-red-700">
+          <FormError>
             {serverError.message}
-            {serverError.failedAttempts != null && serverError.maxAttempts != null
-              ? ` (${serverError.failedAttempts}/${serverError.maxAttempts})`
-              : null}
-          </p>
+            {attempts?.kind === 'locked' ? (
+              <>
+                {' '}
+                <Trans>Your account is temporarily locked after too many attempts.</Trans>
+              </>
+            ) : attempts?.kind === 'remaining' ? (
+              <>
+                {' '}
+                <Plural
+                  value={attempts.count}
+                  one="# attempt remaining."
+                  other="# attempts remaining."
+                />
+              </>
+            ) : null}
+          </FormError>
         )}
         {serverError?.kind === 'SESSION_EXPIRED' && (
-          <p role="alert" className="text-sm text-red-700">
+          <FormError>
             <Trans>Your session has expired.</Trans>{' '}
             <Link to="/login" className="underline">
               <Trans>Sign in again</Trans>
             </Link>
-          </p>
+          </FormError>
         )}
         {serverError?.kind === 'INVALID_INPUT' && (
-          <p role="alert" className="text-sm text-red-700">
+          <FormError>
             <Trans>Please check your input and try again.</Trans>
-          </p>
+          </FormError>
         )}
+
         <SubmitButton>
           <Trans>Sign in</Trans>
         </SubmitButton>
       </Form.Root>
+
+      {!hidePasswordReset ? (
+        <p className="mt-4 text-center text-sm">
+          <Link to={resetHref} className="text-gray-600 underline">
+            <Trans>Forgot password?</Trans>
+          </Link>
+        </p>
+      ) : null}
     </AuthCard>
   );
 }

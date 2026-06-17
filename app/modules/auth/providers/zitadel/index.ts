@@ -1,20 +1,3 @@
-import type { AuthProvider, RegisterInput, SessionChecks, SessionOpts } from '@/modules/auth/auth-provider';
-import type {
-  AuthMethod,
-  AuthRequest,
-  BrandingTheme,
-  DeviceAuthRequest,
-  IdProvider,
-  IdpIntentResult,
-  IdpLink,
-  LdapIntent,
-  LoginSettings,
-  ProviderCapabilities,
-  SamlResponse,
-  Session,
-  User,
-} from '@/modules/auth/types';
-import { ProviderError } from '@/modules/auth/types';
 import {
   normalizeError,
   toAuthMethods,
@@ -40,6 +23,28 @@ import {
 import { TIMEOUTS } from './timeouts';
 // value import — never `import type`; instanceof checks require the runtime class
 import { createServiceClient, type TransportEnv } from './transport';
+import type {
+  AuthProvider,
+  RegisterInput,
+  SessionChecks,
+  SessionOpts,
+} from '@/modules/auth/auth-provider';
+import type {
+  AuthMethod,
+  AuthRequest,
+  BrandingTheme,
+  DeviceAuthRequest,
+  IdProvider,
+  IdpIntentResult,
+  IdpLink,
+  LdapIntent,
+  LoginSettings,
+  ProviderCapabilities,
+  SamlResponse,
+  Session,
+  User,
+} from '@/modules/auth/types';
+import { ProviderError } from '@/modules/auth/types';
 import type { DescService } from '@bufbuild/protobuf';
 import type { JsonObject } from '@bufbuild/protobuf';
 import { create } from '@zitadel/client';
@@ -52,6 +57,11 @@ import {
   OIDCService,
   SessionSchema as OidcSessionSchema,
 } from '@zitadel/proto/zitadel/oidc/v2/oidc_service_pb';
+import {
+  OrganizationService,
+  ListOrganizationsRequestSchema,
+} from '@zitadel/proto/zitadel/org/v2/org_service_pb';
+import { SearchQuerySchema as OrgSearchQuerySchema } from '@zitadel/proto/zitadel/org/v2/query_pb';
 import {
   CreateResponseRequestSchema,
   SAMLService,
@@ -213,6 +223,34 @@ export class ZitadelAuthProvider implements AuthProvider {
       const r = resp.result ?? [];
       if (r.length !== 1) return null;
       return toUser(r[0]);
+    });
+  }
+  async findOrgByDomain(domain: string): Promise<{ orgId: string } | null> {
+    // Domain discovery (settings-gated, default-off). Resolve the org that claims an
+    // email domain via OrganizationService.ListOrganizations with a domain-query filter.
+    // Proto: zitadel.org.v2.OrganizationService.ListOrganizations
+    //   request  ListOrganizationsRequest { queries: SearchQuery[] }
+    //   filter   SearchQuery.query = { case: 'domainQuery', value: OrganizationDomainQuery }
+    //   query    OrganizationDomainQuery { domain: string; method: TextQueryMethod }
+    //   response ListOrganizationsResponse { result: Organization[] }  (Organization.id: string)
+    // Unique-match only: 0 or >1 results resolve to null (no ambiguous routing).
+    const orgs = this.svc(OrganizationService);
+    return this.call(async () => {
+      const req = create(ListOrganizationsRequestSchema, {
+        queries: [
+          create(OrgSearchQuerySchema, {
+            query: {
+              case: 'domainQuery',
+              value: { domain, method: TextQueryMethod.EQUALS },
+            },
+          }),
+        ],
+      });
+      const resp = await orgs.listOrganizations(req);
+      const result = resp.result ?? [];
+      if (result.length !== 1) return null;
+      const orgId = result[0].id;
+      return orgId ? { orgId } : null;
     });
   }
   async getUser(id: string): Promise<User | null> {

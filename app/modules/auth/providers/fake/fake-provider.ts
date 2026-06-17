@@ -1,4 +1,9 @@
-import type { AuthProvider, RegisterInput, SessionChecks, SessionOpts } from '@/modules/auth/auth-provider';
+import type {
+  AuthProvider,
+  RegisterInput,
+  SessionChecks,
+  SessionOpts,
+} from '@/modules/auth/auth-provider';
 import type {
   AuthMethod,
   AuthRequest,
@@ -60,6 +65,8 @@ interface Seed {
   idps?: IdProvider[]; // P4: active IdPs seeded for tests
   idpIntents?: Record<string, IdpIntentResult>; // P4: pre-seeded intent results keyed by intentId
   settingsByOrg?: Record<string, Partial<LoginSettings>>; // P5: per-org setting overrides (e.g. forceMfa)
+  orgDomains?: Record<string, string>; // P2 domain discovery: email domain → orgId
+
   deviceAuths?: DeviceAuthSeed[]; // P6: device authorization requests keyed by userCode
   samlRequests?: SamlRequestSeed[]; // P6: SAML auth requests
   ldapUsers?: LdapUserSeed[]; // P6: LDAP credential fixtures
@@ -91,6 +98,7 @@ export class FakeAuthProvider implements AuthProvider {
   private idpIntents: Record<string, IdpIntentResult>; // P4
   private idpLinks = new Map<string, IdpLink[]>(); // P4: userId → links
   private settingsByOrg: Record<string, Partial<LoginSettings>>; // P5: per-org overrides
+  private orgDomains: Record<string, string>; // P2 domain discovery: email domain → orgId
   private enrolled = new Map<string, Set<AuthMethod>>(); // P5: dynamically enrolled methods (merged with seeded authMethods)
   private mfaSkippedAt = new Map<string, string>(); // P5: userId → ISO timestamp of last skip (BLK-06)
   private deviceAuthSeeds: DeviceAuthSeed[]; // P6
@@ -102,6 +110,10 @@ export class FakeAuthProvider implements AuthProvider {
   private callbackResults = new Map<string, FakeOutcomeScript>();
   private instanceAdminSessionId: string | null = null;
   private loginDefaultRedirectUri: string | undefined = undefined;
+  // P2 domain discovery: BASE allowDomainDiscovery toggle. The base/instance settings
+  // (getLoginSettings(undefined)) govern whether resolveIdentifier runs discovery, so the
+  // ON test flips THIS, not a settingsByOrg key (which is never consulted for an empty orgId).
+  private allowDomainDiscovery = false;
   private seq = 0;
 
   constructor(seed: Seed = {}) {
@@ -118,6 +130,7 @@ export class FakeAuthProvider implements AuthProvider {
     this.idps = seed.idps ?? []; // P4
     this.idpIntents = seed.idpIntents ?? {}; // P4
     this.settingsByOrg = seed.settingsByOrg ?? {}; // P5
+    this.orgDomains = seed.orgDomains ?? {}; // P2 domain discovery
     this.deviceAuthSeeds = seed.deviceAuths ?? []; // P6
     this.samlRequestSeeds = seed.samlRequests ?? []; // P6
     this.ldapUserSeeds = seed.ldapUsers ?? []; // P6
@@ -140,6 +153,11 @@ export class FakeAuthProvider implements AuthProvider {
       // Specs that need the prompt visit /setup/mfa directly (setup-passkey-mfa.cy.ts).
       mfaInitSkipLifetimeMs: 0,
       defaultRedirectUri: this.loginDefaultRedirectUri,
+      hidePasswordReset: false,
+      ignoreUnknownUsernames: false,
+      disableLoginWithEmail: false,
+      disableLoginWithPhone: false,
+      allowDomainDiscovery: this.allowDomainDiscovery,
     };
     // Merge per-org overrides when present (P5: allows forceMfa=true per org in e2e seeds).
     const override = orgId ? (this.settingsByOrg[orgId] ?? {}) : {};
@@ -169,6 +187,11 @@ export class FakeAuthProvider implements AuthProvider {
     if (!u) return null;
     const skippedAt = this.mfaSkippedAt.get(u.id) ?? null;
     return skippedAt !== null ? { ...u, mfaInitSkippedAt: skippedAt } : u;
+  }
+
+  async findOrgByDomain(domain: string): Promise<{ orgId: string } | null> {
+    const orgId = this.orgDomains[domain];
+    return orgId ? { orgId } : null;
   }
 
   async getUser(id: string): Promise<User | null> {
@@ -567,6 +590,12 @@ export class FakeAuthProvider implements AuthProvider {
   }
   setLoginDefaultRedirectUri(uri: string | undefined): void {
     this.loginDefaultRedirectUri = uri;
+  }
+  // P2 domain discovery: flip the BASE allowDomainDiscovery flag (getLoginSettings(undefined)).
+  // Mirrors setLoginDefaultRedirectUri — a deterministic seam for the resolveIdentifier ON test,
+  // since the instance/base policy (not a per-org override) governs whether discovery runs.
+  setAllowDomainDiscovery(on: boolean): void {
+    this.allowDomainDiscovery = on;
   }
   // Script getSession's outcome for a session id (null ⇒ confirmed dead; throw ⇒ ProviderError).
   setSessionResult(id: string, result: FakeOutcomeScript): void {

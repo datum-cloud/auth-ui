@@ -113,7 +113,7 @@ describe('dispatchEmailCode — session-ownership gate on ?send=true (CODE-MAJ-0
     expect(spy).toHaveBeenCalledTimes(1);
     const [userId, urlTemplate] = spy.mock.calls[0];
     expect(userId).toBe('self-1');
-    expect(urlTemplate.startsWith('https://auth.datum.net/verify?')).toBe(true);
+    expect(urlTemplate.startsWith('https://auth.datum.net/id/verify?')).toBe(true);
     expect(urlTemplate).toContain('code={{.Code}}');
     expect(urlTemplate).not.toContain('%7B');
     expect(urlTemplate).toContain('&requestId=oidc_42');
@@ -218,7 +218,7 @@ describe('resendEmailCode — action intent=resend', () => {
     expect(result).toEqual({ ok: true, notice: 'CODE_SENT' });
     expect(spy).toHaveBeenCalledTimes(1);
     const [, urlTemplate] = spy.mock.calls[0];
-    expect(urlTemplate.startsWith('https://auth.datum.net/verify?')).toBe(true);
+    expect(urlTemplate.startsWith('https://auth.datum.net/id/verify?')).toBe(true);
     expect(urlTemplate).toContain('code={{.Code}}');
     expect(urlTemplate).not.toContain('%7B');
   });

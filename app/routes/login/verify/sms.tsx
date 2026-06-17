@@ -1,5 +1,7 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
 import { SubmitButton } from '@/components/auth-form/auth-form';
+import { BackLink } from '@/components/back-link/back-link';
+import { IdentityBadge } from '@/components/identity-badge/identity-badge';
 import {
   readSessions,
   byLoginName,
@@ -97,6 +99,12 @@ export default function VerifySms() {
 
   return (
     <AuthCard title={<Trans>Enter your SMS code</Trans>}>
+      <div className="mb-4 flex flex-col items-center gap-2">
+        <div className="self-start">
+          <BackLink />
+        </div>
+        <IdentityBadge loginName={loginName} requestId={requestId} organization={organization} />
+      </div>
       <div className="flex flex-col gap-4">
         <p className="text-foreground text-center text-sm">
           <Trans>Enter the one-time code sent to your phone.</Trans>

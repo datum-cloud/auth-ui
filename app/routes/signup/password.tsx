@@ -1,5 +1,6 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
 import { SubmitButton } from '@/components/auth-form/auth-form';
+import { BackLink } from '@/components/back-link/back-link';
 import { readSessions, serializeSessions } from '@/modules/auth/session/cookie';
 import { genericCheckYourEmail } from '@/resources/schemas/check-your-email.schema';
 import { registerWithPassword } from '@/resources/signup';
@@ -102,6 +103,9 @@ export default function SignupPassword() {
 
   return (
     <AuthCard title={<Trans>Set a password</Trans>}>
+      <div className="mb-4">
+        <BackLink />
+      </div>
       <Form.Root
         schema={signupPasswordSchema}
         formComponent={RRForm}

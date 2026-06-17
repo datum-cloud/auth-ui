@@ -25,6 +25,44 @@ export const loginIdpSchema = z.object({
 // (the server action's schema is the real gate).
 export const loginIdentifierClientSchema = z.object({ loginName: z.string().min(1) });
 
+/**
+ * Phone-shaped identifier detector. Requires NO `@` (so it never matches an email or a
+ * domain-suffixed username like `alice@acme.test`) AND a phone shape: optional leading `+`,
+ * then ≥6 digits with the usual separators. Used by the client schema + the /login action
+ * to strict-reject phone input when the org disables phone login.
+ */
+export function isPhoneLike(value: string): boolean {
+  const v = value.trim();
+  if (v.includes('@')) return false;
+  return /^\+?[0-9][0-9\s().-]{5,}$/.test(v);
+}
+
+/**
+ * Email-shaped identifier detector: local@domain.tld. NOTE: this also matches Zitadel
+ * domain-suffixed usernames (alice@acme.zitadel.cloud) — that overlap is intentional and
+ * safe because this is used ONLY to choose error copy after a failed lookup, never to block
+ * input (see resolveIdentifier).
+ */
+export function isEmailLike(value: string): boolean {
+  return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim());
+}
+
+const PHONE_DISABLED_MESSAGE = "Phone sign-in isn't available — use your email or username.";
+
+/**
+ * Client-side identifier validator. Advisory only (the server action re-checks). When
+ * `rejectPhone`, a phone-format loginName fails with the phone message; email stays lenient.
+ */
+export function makeLoginIdentifierClientSchema({ rejectPhone }: { rejectPhone: boolean }) {
+  const loginName = rejectPhone
+    ? z
+        .string()
+        .min(1)
+        .refine((v) => !isPhoneLike(v), { message: PHONE_DISABLED_MESSAGE })
+    : z.string().min(1);
+  return z.object({ loginName });
+}
+
 // Password submission parsed by the /login/password action.
 export const loginPasswordSchema = z.object({
   password: z.string().min(1).max(512),
