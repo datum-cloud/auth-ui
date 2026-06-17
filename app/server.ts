@@ -13,7 +13,7 @@ import { requestContext, type RequestContextEnv } from '@/server/middleware/requ
 import { appSecureHeaders } from '@/server/middleware/secure-headers';
 import { registry, httpMetrics } from '@/server/observability';
 import { samlPostHandler } from '@/server/routes/saml-post';
-import { env } from '@/utils/env.server';
+import { env } from '@/utils/env/env.server';
 import { serveStatic } from 'hono/bun';
 import { compress } from 'hono/compress';
 import { createHonoServer } from 'react-router-hono-server/bun';

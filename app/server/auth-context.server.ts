@@ -1,6 +1,6 @@
-import { getAuthProvider } from '@/providers/select.server';
-import { resolveServiceUrl } from '@/providers/zitadel/transport';
-import { env } from '@/utils/env.server';
+import { getAuthProvider } from '@/modules/auth/select.server';
+import { resolveServiceUrl } from '@/modules/auth/providers/zitadel/transport';
+import { env } from '@/utils/env/env.server';
 
 // Routes import THIS, not providers/zitadel/*. It returns the neutral AuthProvider.
 // EL-TRANSPORT-1: x-zitadel-forward-host is stripped at the Hono edge (server.ts) so

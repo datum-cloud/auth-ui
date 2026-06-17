@@ -26,7 +26,7 @@
  * entry.server.tsx instead — that achieves the same effect of initialising the SDK
  * before any application code runs in the module graph.
  */
-import { env } from '@/utils/env.server';
+import { env } from '@/utils/env/env.server';
 import * as Sentry from '@sentry/react-router';
 
 export const isSentryEnabled: boolean = Boolean(env.SENTRY_DSN);

@@ -1,4 +1,4 @@
-import { env } from '@/utils/env.server';
+import { env } from '@/utils/env/env.server';
 import { createCookie } from 'react-router';
 import { CSRF, CSRFError } from 'remix-utils/csrf/server';
 

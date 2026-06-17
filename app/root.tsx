@@ -2,10 +2,10 @@
 // Vite content-hashes the file into /id/assets/AllianceNo1-Regular-[hash].woff2.
 import allianceFontRegularUrl from './styles/fonts/AllianceNo1-Regular.woff2?url';
 import './styles/root.css';
-import { AuthCard } from '@/components/auth-card';
+import { AuthCard } from '@/components/auth-card/auth-card';
 import { loadMessages } from '@/modules/i18n/lingui';
 import { detectLocale } from '@/modules/i18n/lingui.server';
-import { authErrorMessage } from '@/routes/_shared/auth-error';
+import { authErrorMessage } from '@/utils/errors/auth-error';
 import { ConformAdapter } from '@datum-cloud/datum-ui/form/adapters/conform';
 import { ThemeProvider, ThemeScript } from '@datum-cloud/datum-ui/theme';
 import { setupI18n } from '@lingui/core';

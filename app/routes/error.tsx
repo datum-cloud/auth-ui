@@ -1,5 +1,5 @@
-import { AuthCard } from '@/components/auth-card';
-import { authErrorMessage } from '@/routes/_shared/auth-error';
+import { AuthCard } from '@/components/auth-card/auth-card';
+import { authErrorMessage } from '@/utils/errors/auth-error';
 import { useSearchParams } from 'react-router';
 
 // MERGE DECISION (Phase 0 review authoritative):
