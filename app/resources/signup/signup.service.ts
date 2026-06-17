@@ -185,7 +185,8 @@ export async function registerPasskeyFirst(
   list: SessionEntry[],
   input: PasskeyFirstRegisterInput
 ): Promise<PasskeyFirstRegisterResult> {
-  const { email, firstName, lastName, organization, requestId, origin, deviceTrackingToken } = input;
+  const { email, firstName, lastName, organization, requestId, origin, deviceTrackingToken } =
+    input;
   const sessionMetadata = deviceTrackingToken
     ? { [MAXMIND_TRACKING_TOKEN_METADATA_KEY]: deviceTrackingToken }
     : undefined;
@@ -300,8 +301,16 @@ export async function registerWithPassword(
   list: SessionEntry[],
   input: RegisterWithPasswordInput
 ): Promise<RegisterWithPasswordResult> {
-  const { email, firstName, lastName, password, organization, requestId, origin, deviceTrackingToken } =
-    input;
+  const {
+    email,
+    firstName,
+    lastName,
+    password,
+    organization,
+    requestId,
+    origin,
+    deviceTrackingToken,
+  } = input;
   const sessionMetadata = deviceTrackingToken
     ? { [MAXMIND_TRACKING_TOKEN_METADATA_KEY]: deviceTrackingToken }
     : undefined;

@@ -1,8 +1,8 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
 import { SubmitButton } from '@/components/auth-form/auth-form';
 import { TrackOnMount } from '@/modules/analytics/fathom';
-import { MaxMindTracker, readMaxMindTrackingToken } from '@/modules/fraud/maxmind-tracker';
 import { readSessions, serializeSessions } from '@/modules/auth/session/cookie';
+import { MaxMindTracker, readMaxMindTrackingToken } from '@/modules/fraud/maxmind-tracker';
 import { genericCheckYourEmail } from '@/resources/schemas/check-your-email.schema';
 import { registerAndLinkIdp, passwordFirstHandoff, registerPasskeyFirst } from '@/resources/signup';
 import { registerSchema, registerClientSchema } from '@/resources/signup/signup.schema';

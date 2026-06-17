@@ -40,8 +40,8 @@ spec:
       # future hardening task that benchmarks the emptyDir overhead.
       securityContext:
         runAsNonRoot: true
-        runAsUser: 1000
-        runAsGroup: 1000
+        runAsUser: 1001
+        runAsGroup: 1001
         seccompProfile:
           type: RuntimeDefault
       # Spread pods across nodes to survive single-node failure.

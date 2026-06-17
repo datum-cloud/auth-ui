@@ -1,4 +1,8 @@
-import { MaxMindTracker, MAXMIND_TOKEN_STORAGE_KEY, readMaxMindTrackingToken } from '@/modules/fraud/maxmind-tracker';
+import {
+  MaxMindTracker,
+  MAXMIND_TOKEN_STORAGE_KEY,
+  readMaxMindTrackingToken,
+} from '@/modules/fraud/maxmind-tracker';
 import { render, cleanup } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 

@@ -417,9 +417,7 @@ export class ZitadelAuthProvider implements AuthProvider {
       // there is no metadata so we never send an empty map.
       const encoder = new TextEncoder();
       const metadata = opts?.metadata
-        ? Object.fromEntries(
-            Object.entries(opts.metadata).map(([k, v]) => [k, encoder.encode(v)])
-          )
+        ? Object.fromEntries(Object.entries(opts.metadata).map(([k, v]) => [k, encoder.encode(v)]))
         : undefined;
       const created = await sessions.createSession(
         {

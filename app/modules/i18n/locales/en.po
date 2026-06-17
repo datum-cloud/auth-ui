@@ -61,7 +61,7 @@ msgstr "Add your phone number as a second factor. We will send a one-time code v
 msgid "An error occurred. Please try again."
 msgstr "An error occurred. Please try again."
 
-#: app/routes/logout/index.tsx:39
+#: app/routes/logout/index.tsx:50
 msgid "Are you sure you want to sign out?"
 msgstr "Are you sure you want to sign out?"
 
@@ -103,9 +103,9 @@ msgstr "Change password"
 msgid "Change your password"
 msgstr "Change your password"
 
-#: app/routes/password/reset.tsx:79
-#: app/routes/signup/index.tsx:158
-#: app/routes/signup/password.tsx:96
+#: app/routes/password/reset.tsx:80
+#: app/routes/signup/index.tsx:187
+#: app/routes/signup/password.tsx:135
 msgid "Check your email"
 msgstr "Check your email"
 
@@ -130,7 +130,7 @@ msgid "Confirm new password"
 msgstr "Confirm new password"
 
 #: app/routes/password/change.tsx:83
-#: app/routes/signup/password.tsx:125
+#: app/routes/signup/password.tsx:173
 msgid "Confirm password"
 msgstr "Confirm password"
 
@@ -140,11 +140,11 @@ msgstr "Connected accounts"
 
 #: app/routes/device/index.tsx:84
 #: app/routes/login/index.tsx:203
-#: app/routes/signup/index.tsx:206
+#: app/routes/signup/index.tsx:239
 msgid "Continue"
 msgstr "Continue"
 
-#: app/routes/verify/success.tsx:27
+#: app/routes/verify/success.tsx:29
 msgid "Continue to sign in"
 msgstr "Continue to sign in"
 
@@ -166,11 +166,11 @@ msgid "Couldn't sign in"
 msgstr "Couldn't sign in"
 
 #: app/routes/login/index.tsx:276
-#: app/routes/signup/password.tsx:134
+#: app/routes/signup/password.tsx:182
 msgid "Create account"
 msgstr "Create account"
 
-#: app/routes/signup/index.tsx:167
+#: app/routes/signup/index.tsx:199
 msgid "Create your account"
 msgstr "Create your account"
 
@@ -186,7 +186,7 @@ msgstr "Device code"
 msgid "Don't have an account?"
 msgstr "Don't have an account?"
 
-#: app/routes/signup/index.tsx:191
+#: app/routes/signup/index.tsx:224
 msgid "Email"
 msgstr "Email"
 
@@ -199,7 +199,7 @@ msgid "Email one-time code"
 msgstr "Email one-time code"
 
 #: app/routes/login/index.tsx:131
-#: app/routes/password/reset.tsx:107
+#: app/routes/password/reset.tsx:109
 msgid "Email or username"
 msgstr "Email or username"
 
@@ -261,7 +261,7 @@ msgstr "Enter your password"
 msgid "Enter your SMS code"
 msgstr "Enter your SMS code"
 
-#: app/routes/signup/index.tsx:194
+#: app/routes/signup/index.tsx:227
 msgid "First name"
 msgstr "First name"
 
@@ -277,7 +277,7 @@ msgstr "Invalid code. Please try again."
 msgid "Invalid username or password."
 msgstr "Invalid username or password."
 
-#: app/routes/signup/index.tsx:197
+#: app/routes/signup/index.tsx:230
 msgid "Last name"
 msgstr "Last name"
 
@@ -334,14 +334,14 @@ msgstr "Or import this URI in your authenticator app"
 msgid "Passkey"
 msgstr "Passkey"
 
-#: app/routes/signup/password.tsx:122
+#: app/routes/signup/password.tsx:170
 #: app/routes/sso/ldap.tsx:77
 msgid "Password"
 msgstr "Password"
 
 #: app/routes/password/change.tsx:113
 #: app/routes/password/new.tsx:62
-#: app/routes/signup/password.tsx:91
+#: app/routes/signup/password.tsx:130
 msgid "Passwords must match and be at least 8 characters."
 msgstr "Passwords must match and be at least 8 characters."
 
@@ -359,11 +359,11 @@ msgstr "Phone sign-in isn't available — use your email or username."
 #: app/routes/login/verify/email.tsx:111
 #: app/routes/login/verify/sms.tsx:97
 #: app/routes/setup/authenticator.tsx:90
-#: app/routes/signup/index.tsx:153
+#: app/routes/signup/index.tsx:182
 msgid "Please check your input and try again."
 msgstr "Please check your input and try again."
 
-#: app/routes/password/reset.tsx:89
+#: app/routes/password/reset.tsx:91
 msgid "Please enter your email or username."
 msgstr "Please enter your email or username."
 
@@ -400,7 +400,7 @@ msgstr "Requested permissions"
 msgid "Resend code"
 msgstr "Resend code"
 
-#: app/routes/password/reset.tsx:93
+#: app/routes/password/reset.tsx:95
 msgid "Reset your password"
 msgstr "Reset your password"
 
@@ -417,7 +417,7 @@ msgstr "Security key"
 msgid "Select an account to continue or add a new one."
 msgstr "Select an account to continue or add a new one."
 
-#: app/routes/password/reset.tsx:121
+#: app/routes/password/reset.tsx:123
 msgid "Send reset link"
 msgstr "Send reset link"
 
@@ -425,7 +425,7 @@ msgstr "Send reset link"
 msgid "Session active"
 msgstr "Session active"
 
-#: app/routes/signup/password.tsx:105
+#: app/routes/signup/password.tsx:147
 msgid "Set a password"
 msgstr "Set a password"
 
@@ -474,7 +474,7 @@ msgstr "sign in again"
 #: app/routes/login/verify/authenticator.tsx:133
 #: app/routes/login/verify/email.tsx:150
 #: app/routes/login/verify/sms.tsx:136
-#: app/routes/logout/success.tsx:12
+#: app/routes/logout/success.tsx:14
 msgid "Sign in again"
 msgstr "Sign in again"
 
@@ -494,9 +494,9 @@ msgstr "Sign in with a passkey"
 msgid "Sign in with LDAP"
 msgstr "Sign in with LDAP"
 
-#: app/routes/logout/index.tsx:36
 #: app/routes/logout/index.tsx:47
-#: app/routes/signed-in.tsx:47
+#: app/routes/logout/index.tsx:58
+#: app/routes/signed-in.tsx:49
 #: app/routes/sso/index.tsx:139
 msgid "Sign out"
 msgstr "Sign out"
@@ -664,17 +664,17 @@ msgid "We couldn't start passkey setup. Please try again."
 msgstr "We couldn't start passkey setup. Please try again."
 
 #. placeholder {0}: actionData.email
-#: app/routes/password/reset.tsx:81
+#: app/routes/password/reset.tsx:83
 msgid "We've sent a password reset link to {0}"
 msgstr "We've sent a password reset link to {0}"
 
 #. placeholder {0}: actionData.email
-#: app/routes/signup/index.tsx:160
-#: app/routes/signup/password.tsx:98
+#: app/routes/signup/index.tsx:190
+#: app/routes/signup/password.tsx:138
 msgid "We've sent a verification link to {0}"
 msgstr "We've sent a verification link to {0}"
 
-#: app/routes/signed-in.tsx:33
+#: app/routes/signed-in.tsx:34
 msgid "You are signed in"
 msgstr "You are signed in"
 
@@ -686,7 +686,7 @@ msgstr "You may return to your device."
 msgid "You must be signed in to link an external account."
 msgstr "You must be signed in to link an external account."
 
-#: app/routes/logout/success.tsx:9
+#: app/routes/logout/success.tsx:10
 msgid "You've been signed out"
 msgstr "You've been signed out"
 
@@ -702,7 +702,7 @@ msgstr "Your browser does not support passkeys. Please use a supported browser."
 msgid "Your email is already verified. You can sign in."
 msgstr "Your email is already verified. You can sign in."
 
-#: app/routes/verify/success.tsx:23
+#: app/routes/verify/success.tsx:24
 msgid "Your email is verified"
 msgstr "Your email is verified"
 

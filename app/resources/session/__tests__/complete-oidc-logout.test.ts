@@ -60,13 +60,17 @@ describe('completeOidcLogout', () => {
     expect(outcome.location).toBe('/logout/success');
   });
 
-  it('redirects to a same-origin post_logout_redirect when present', async () => {
+  it('rejects a relative post_logout_redirect and falls back to /logout/success', async () => {
     const provider = fakeProvider();
     const request = await reqWithSessions(
       [{ id: 's1', token: 't1', loginName: 'a@x.test' }],
       '?logout_token=x&post_logout_redirect=/logout/done'
     );
+    // Relative redirects are rejected by validatePostLogoutRedirect (open-redirect
+    // guard) — only allowlisted absolute origins are honored. The allowlisted happy
+    // path is covered in post-logout-redirect.test.ts; here we assert the integration
+    // fallback to /logout/success.
     const outcome = await completeOidcLogout(provider, request);
-    expect(outcome.location).toBe('/logout/done');
+    expect(outcome.location).toBe('/logout/success');
   });
 });

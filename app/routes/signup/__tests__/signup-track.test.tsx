@@ -31,7 +31,15 @@ vi.mock('@lingui/react/macro', () => ({
 // Mock it to a plain <form> passthrough so the component renders under happy-dom.
 vi.mock('@datum-cloud/datum-ui/form', () => ({
   Form: {
-    Root: ({ children, formComponent: FC, ...props }: { children: ReactNode; formComponent: React.ElementType; [key: string]: unknown }) => {
+    Root: ({
+      children,
+      formComponent: FC,
+      ...props
+    }: {
+      children: ReactNode;
+      formComponent: React.ElementType;
+      [key: string]: unknown;
+    }) => {
       const El = FC ?? 'form';
       return <El {...props}>{children}</El>;
     },
