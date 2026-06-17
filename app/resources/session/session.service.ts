@@ -30,6 +30,7 @@ import type { Session, AuthMethod, LoginSettings } from '@/modules/auth/types';
 import { postLoginDestinationWithSource } from '@/resources/login/post-login-destination';
 import { nextStepWithParams } from '@/resources/shared/next-step-params';
 import { logAuthEvent, hashActor } from '@/server/observability';
+import { env } from '@/utils/env/env.server';
 import { data, redirect } from 'react-router';
 import { z } from 'zod';
 
@@ -411,14 +412,45 @@ export interface LogoutOutcome {
   setCookie: string;
 }
 
+/** Parse the comma-separated POST_LOGOUT_ALLOWLIST env into a list of origins. */
+function parsePostLogoutAllowlist(raw: string | undefined): string[] {
+  return (raw ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean);
+}
+
 /**
- * validatePostLogoutRedirect — fail-closed placeholder.
+ * Validate the post-logout destination for the OIDC logout handshake (hop 3→4).
  *
- * post_logout_redirect_uri allowlist lands when OIDC end-session wiring does; fail-closed
- * until then — never echo a caller-supplied URL.
+ * Accepts either query param Zitadel may use: `post_logout_redirect` (the value it
+ * appends when bouncing end_session → /id/logout) or `post_logout_redirect_uri`.
+ *
+ * Fail-closed open-redirect guard:
+ *   • absolute URL → allowed ONLY if its origin is in POST_LOGOUT_ALLOWLIST
+ *   • relative paths (e.g. Zitadel's default "/logout/done") → rejected; caller falls
+ *     back to /logout/success (the actual signed-out page in this login UI)
+ *   • anything else / missing → null (caller falls back to /logout/success)
+ *
+ * `allowlist` is injectable so unit tests exercise both branches without mutating env.
  */
-function validatePostLogoutRedirect(_request: Request): string | null {
-  return null;
+export function validatePostLogoutRedirect(
+  request: Request,
+  allowlist: string[] = parsePostLogoutAllowlist(env.POST_LOGOUT_ALLOWLIST)
+): string | null {
+  const params = new URL(request.url).searchParams;
+  const target = params.get('post_logout_redirect') ?? params.get('post_logout_redirect_uri');
+  if (!target) return null;
+
+  // Only honor an allowlisted ABSOLUTE RP URL. Relative paths — notably Zitadel's default
+  // `/logout/done`, which is NOT a route in this login UI (its signed-out page is
+  // /logout/success) — are rejected so the caller falls back to /logout/success.
+  try {
+    const origin = new URL(target).origin; // throws for relative paths → rejected
+    return allowlist.includes(origin) ? target : null;
+  } catch {
+    return null;
+  }
 }
 
 /**
@@ -474,6 +506,45 @@ export async function performLogout(
 /** Turn a LogoutOutcome into the Response the /logout route returns. */
 export function logoutOutcomeToResponse(outcome: LogoutOutcome) {
   return redirect(outcome.location, { headers: { 'set-cookie': outcome.setCookie } });
+}
+
+/**
+ * Complete a Zitadel-initiated OIDC logout (the end_session → /id/logout?logout_token handshake).
+ *
+ * Global SSO logout: deletes EVERY v2 session in the cookie (not just the active one) so no
+ * residual session can be silently reused by /authorize, then clears the whole `sessions` cookie.
+ * deleteSession is best-effort per entry: an already-terminated (NOT_FOUND) or unreachable session
+ * must not strand the user — the cookie is cleared and the redirect issued regardless.
+ *
+ * Destination: an allowlist-validated `post_logout_redirect` (the value Zitadel forwarded from the
+ * RP), else the local /logout/success page. The validation is the open-redirect guard.
+ */
+export async function completeOidcLogout(
+  provider: AuthProvider,
+  request: Request
+): Promise<LogoutOutcome> {
+  const sessions = await readSessions(request);
+
+  await Promise.all(
+    sessions.map(async (entry) => {
+      try {
+        await provider.deleteSession(entry.id, entry.token);
+        logAuthEvent('logout', 'success', {
+          actor: hashActor(entry.loginName),
+          sessionId: entry.id,
+        });
+      } catch (err) {
+        logAuthEvent('logout', 'failure', {
+          sessionId: entry.id,
+          reason: err instanceof Error ? err.message : String(err),
+        });
+        // best-effort: continue clearing + redirecting
+      }
+    })
+  );
+
+  const target = validatePostLogoutRedirect(request) ?? '/logout/success';
+  return { location: target, setCookie: await serializeSessions([]) };
 }
 
 export type { SessionEntry };

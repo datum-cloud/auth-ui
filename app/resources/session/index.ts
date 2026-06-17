@@ -12,6 +12,7 @@ export {
   accountActionOutcomeToResponse,
   performLogout,
   logoutOutcomeToResponse,
+  completeOidcLogout,
   switchSchema,
   removeSchema,
   DEFAULT_LOGIN_SETTINGS,

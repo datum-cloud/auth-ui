@@ -32,6 +32,10 @@ const schema = z
     // Fallback destination after a standalone login (e.g. when no ?redirect param
     // is present). Optional — unset in dev/test; the route supplies its own default.
     DEFAULT_APP_URL: z.url().optional(),
+    // Comma-separated list of allowed absolute origins for the OIDC RP-initiated logout
+    // post_logout_redirect parameter (e.g. http://localhost:3001,https://portal.example.com).
+    // Optional — unset means only same-origin relative paths are permitted (fail-closed).
+    POST_LOGOUT_ALLOWLIST: z.string().optional(),
     // P7 observability: Sentry error monitoring + tracing.
     // Both vars are OPTIONAL — unset means Sentry is disabled at boot (true no-op).
     // SENTRY_DSN must be a valid https DSN when set; an invalid value fails fast at startup.

@@ -1,5 +1,5 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
-import { performLogout, logoutOutcomeToResponse } from '@/resources/session';
+import { performLogout, logoutOutcomeToResponse, completeOidcLogout } from '@/resources/session';
 import { providerForRequest } from '@/server/auth-context.server';
 import { assertCsrf, getCsrfToken } from '@/server/csrf';
 import { Button } from '@datum-cloud/datum-ui/button';
@@ -15,6 +15,17 @@ import type { MetaFunction } from 'react-router';
 export const meta: MetaFunction = () => [{ title: 'Sign out' }];
 
 export async function loader({ request }: LoaderFunctionArgs) {
+  const url = new URL(request.url);
+
+  // Zitadel-initiated logout: end_session bounced here with a logout_token. Complete the
+  // handshake (terminate all v2 sessions, clear the cookie) and redirect to the validated
+  // destination. The no-token path below is the user-initiated standalone confirm page.
+  if (url.searchParams.has('logout_token')) {
+    const provider = providerForRequest(request);
+    const outcome = await completeOidcLogout(provider, request);
+    return logoutOutcomeToResponse(outcome);
+  }
+
   const [csrfToken, setCookie] = await getCsrfToken(request);
   const headers: Record<string, string> = {};
   if (setCookie !== null) headers['set-cookie'] = setCookie;
