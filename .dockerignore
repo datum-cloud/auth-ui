@@ -1,0 +1,9 @@
+node_modules
+build
+.react-router
+.git
+docs
+cypress
+coverage
+.env
+.claude

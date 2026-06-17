@@ -1,0 +1,666 @@
+msgid ""
+msgstr ""
+"Language: en\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Project-Id-Version: \n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: \n"
+"PO-Revision-Date: \n"
+"Last-Translator: \n"
+"Language-Team: \n"
+"Content-Transfer-Encoding: \n"
+"Plural-Forms: \n"
+
+#: app/routes/device.authorize.tsx:155
+msgid "<0>{appName}</0> is requesting access."
+msgstr "<0>{appName}</0> is requesting access."
+
+#: app/routes/verify.tsx:207
+msgid "A new code has been sent to your email."
+msgstr "A new code has been sent to your email."
+
+#: app/routes/accounts.tsx:302
+msgid "Account not found."
+msgstr "Account not found."
+
+#: app/routes/device.tsx:93
+msgid "Activate your device"
+msgstr "Activate your device"
+
+#: app/routes/accounts.tsx:321
+msgid "Add an account"
+msgstr "Add an account"
+
+#: app/routes/setup.mfa.tsx:159
+msgid "Add an extra layer of security to your account by setting up a second factor."
+msgstr "Add an extra layer of security to your account by setting up a second factor."
+
+#: app/routes/accounts.tsx:383
+msgid "Add another account"
+msgstr "Add another account"
+
+#: app/routes/setup.email.tsx:33
+msgid "Add your email address as a second factor. We will send a one-time code each time you sign in."
+msgstr "Add your email address as a second factor. We will send a one-time code each time you sign in."
+
+#: app/routes/setup.sms.tsx:33
+msgid "Add your phone number as a second factor. We will send a one-time code via SMS each time you sign in."
+msgstr "Add your phone number as a second factor. We will send a one-time code via SMS each time you sign in."
+
+#: app/routes/sso.ldap.tsx:160
+msgid "An error occurred. Please try again."
+msgstr "An error occurred. Please try again."
+
+#: app/routes/logout.tsx:79
+msgid "Are you sure you want to sign out?"
+msgstr "Are you sure you want to sign out?"
+
+#: app/routes/login.mfa.tsx:26
+#: app/routes/setup.mfa.tsx:35
+msgid "Authenticator app"
+msgstr "Authenticator app"
+
+#: app/routes/login.verify.authenticator.tsx:148
+#: app/routes/setup.authenticator.tsx:199
+msgid "Authenticator code"
+msgstr "Authenticator code"
+
+#: app/routes/device.authorize.tsx:134
+msgid "Authorization complete"
+msgstr "Authorization complete"
+
+#: app/routes/device.authorize.tsx:173
+msgid "Authorize"
+msgstr "Authorize"
+
+#: app/routes/device.authorize.tsx:147
+msgid "Authorize device"
+msgstr "Authorize device"
+
+#: app/routes/sso.tsx:202
+msgid "Available accounts to link"
+msgstr "Available accounts to link"
+
+#: app/routes/sso.$provider.error.tsx:24
+msgid "Back to sign in"
+msgstr "Back to sign in"
+
+#: app/routes/password.change.tsx:149
+msgid "Change password"
+msgstr "Change password"
+
+#: app/routes/password.change.tsx:98
+msgid "Change your password"
+msgstr "Change your password"
+
+#: app/routes/password.reset.tsx:97
+#: app/routes/signup.password.tsx:161
+#: app/routes/signup.tsx:234
+msgid "Check your email"
+msgstr "Check your email"
+
+#: app/routes/password.new.tsx:102
+msgid "Choose a new password"
+msgstr "Choose a new password"
+
+#: app/routes/accounts.tsx:293
+msgid "Choose an account"
+msgstr "Choose an account"
+
+#: app/routes/login.mfa.tsx:121
+msgid "Choose how you want to verify your identity."
+msgstr "Choose how you want to verify your identity."
+
+#: app/routes/device.tsx:110
+msgid "Code not found. Check your device and try again."
+msgstr "Code not found. Check your device and try again."
+
+#: app/routes/password.new.tsx:119
+msgid "Confirm new password"
+msgstr "Confirm new password"
+
+#: app/routes/password.change.tsx:114
+#: app/routes/signup.password.tsx:188
+msgid "Confirm password"
+msgstr "Confirm password"
+
+#: app/routes/sso.tsx:172
+msgid "Connected accounts"
+msgstr "Connected accounts"
+
+#: app/routes/device.tsx:119
+#: app/routes/login.tsx:198
+#: app/routes/signup.tsx:283
+msgid "Continue"
+msgstr "Continue"
+
+#: app/routes/verify.success.tsx:27
+msgid "Continue to sign in"
+msgstr "Continue to sign in"
+
+#. placeholder {0}: idp.name
+#: app/routes/login.tsx:231
+msgid "Continue with {0}"
+msgstr "Continue with {0}"
+
+#: app/routes/password.change.tsx:125
+msgid "Could not change your password. Please try again."
+msgstr "Could not change your password. Please try again."
+
+#: app/routes/login.password.tsx:151
+msgid "Could not verify password"
+msgstr "Could not verify password"
+
+#: app/routes/sso.$provider.error.tsx:21
+msgid "Couldn't sign in"
+msgstr "Couldn't sign in"
+
+#: app/routes/signup.password.tsx:197
+msgid "Create account"
+msgstr "Create account"
+
+#: app/routes/signup.tsx:243
+msgid "Create your account"
+msgstr "Create your account"
+
+#: app/routes/device.authorize.tsx:183
+msgid "Deny"
+msgstr "Deny"
+
+#: app/routes/device.tsx:105
+msgid "Device code"
+msgstr "Device code"
+
+#: app/routes/signup.tsx:268
+msgid "Email"
+msgstr "Email"
+
+#: app/routes/login.verify.email.tsx:161
+msgid "Email code"
+msgstr "Email code"
+
+#: app/routes/login.mfa.tsx:27
+msgid "Email one-time code"
+msgstr "Email one-time code"
+
+#: app/routes/login.tsx:184
+#: app/routes/password.reset.tsx:123
+msgid "Email or username"
+msgstr "Email or username"
+
+#: app/routes/setup.mfa.tsx:36
+msgid "Email OTP"
+msgstr "Email OTP"
+
+#: app/routes/setup.email.tsx:58
+msgid "Enable email one-time code"
+msgstr "Enable email one-time code"
+
+#: app/routes/setup.sms.tsx:58
+msgid "Enable SMS one-time code"
+msgstr "Enable SMS one-time code"
+
+#: app/routes/setup.email.tsx:54
+#: app/routes/setup.sms.tsx:54
+msgid "Enrollment failed. Please try again."
+msgstr "Enrollment failed. Please try again."
+
+#: app/routes/device.tsx:94
+msgid "Enter the code shown on your device to authorize it."
+msgstr "Enter the code shown on your device to authorize it."
+
+#: app/routes/login.verify.email.tsx:146
+msgid "Enter the one-time code sent to your email address."
+msgstr "Enter the one-time code sent to your email address."
+
+#: app/routes/login.verify.sms.tsx:146
+msgid "Enter the one-time code sent to your phone."
+msgstr "Enter the one-time code sent to your phone."
+
+#: app/routes/verify.tsx:176
+msgid "Enter the verification code sent to your email address."
+msgstr "Enter the verification code sent to your email address."
+
+#: app/routes/login.verify.authenticator.tsx:130
+msgid "Enter your authenticator code"
+msgstr "Enter your authenticator code"
+
+#: app/routes/login.verify.email.tsx:143
+msgid "Enter your email code"
+msgstr "Enter your email code"
+
+#: app/routes/login.password.tsx:161
+#: app/routes/login.password.tsx:174
+msgid "Enter your password"
+msgstr "Enter your password"
+
+#: app/routes/login.verify.sms.tsx:143
+msgid "Enter your SMS code"
+msgstr "Enter your SMS code"
+
+#: app/routes/signup.tsx:271
+msgid "First name"
+msgstr "First name"
+
+#: app/routes/device.tsx:115
+msgid "Invalid code. Please try again."
+msgstr "Invalid code. Please try again."
+
+#: app/routes/sso.ldap.tsx:147
+msgid "Invalid username or password."
+msgstr "Invalid username or password."
+
+#: app/routes/signup.tsx:274
+msgid "Last name"
+msgstr "Last name"
+
+#: app/routes/sso.link.tsx:81
+msgid "Link your account"
+msgstr "Link your account"
+
+#: app/routes/sso.tsx:164
+msgid "Linked accounts"
+msgstr "Linked accounts"
+
+#: app/routes/setup.authenticator.tsx:166
+msgid "Manual setup key"
+msgstr "Manual setup key"
+
+#: app/routes/accounts.tsx:347
+msgid "Needs re-authentication"
+msgstr "Needs re-authentication"
+
+#: app/routes/password.change.tsx:111
+#: app/routes/password.new.tsx:116
+msgid "New password"
+msgstr "New password"
+
+#: app/routes/sso.ldap.tsx:152
+msgid "No account is linked to these LDAP credentials. Please contact your administrator."
+msgstr "No account is linked to these LDAP credentials. Please contact your administrator."
+
+#: app/routes/sso.$provider.error.tsx:12
+msgid "No account was found and sign-up is not available."
+msgstr "No account was found and sign-up is not available."
+
+#: app/routes/accounts.tsx:312
+msgid "No signed-in accounts."
+msgstr "No signed-in accounts."
+
+#: app/routes/login.verify.authenticator.tsx:133
+msgid "Open your authenticator app and enter the 6-digit code."
+msgstr "Open your authenticator app and enter the 6-digit code."
+
+#: app/routes/login.tsx:207
+msgid "or"
+msgstr "or"
+
+#: app/routes/setup.authenticator.tsx:175
+msgid "Or import this URI in your authenticator app"
+msgstr "Or import this URI in your authenticator app"
+
+#: app/routes/setup.mfa.tsx:33
+msgid "Passkey"
+msgstr "Passkey"
+
+#: app/routes/signup.password.tsx:185
+#: app/routes/sso.ldap.tsx:141
+msgid "Password"
+msgstr "Password"
+
+#: app/routes/password.change.tsx:144
+#: app/routes/password.new.tsx:92
+#: app/routes/signup.password.tsx:156
+msgid "Passwords must match and be at least 8 characters."
+msgstr "Passwords must match and be at least 8 characters."
+
+#: app/routes/login.password.tsx:195
+#: app/routes/login.tsx:166
+#: app/routes/login.verify.authenticator.tsx:126
+#: app/routes/login.verify.email.tsx:139
+#: app/routes/login.verify.sms.tsx:139
+#: app/routes/setup.authenticator.tsx:145
+#: app/routes/signup.tsx:229
+msgid "Please check your input and try again."
+msgstr "Please check your input and try again."
+
+#: app/routes/password.reset.tsx:107
+msgid "Please enter your email or username."
+msgstr "Please enter your email or username."
+
+#: app/routes/verify.tsx:169
+msgid "Please enter your verification code."
+msgstr "Please enter your verification code."
+
+#: app/routes/setup.passkey.tsx:182
+#: app/routes/setup.security-key.tsx:182
+msgid "Please try again."
+msgstr "Please try again."
+
+#: app/routes/setup.security-key.tsx:189
+msgid "Register a hardware security key (e.g. YubiKey) as a second factor for your account."
+msgstr "Register a hardware security key (e.g. YubiKey) as a second factor for your account."
+
+#: app/routes/setup.passkey.tsx:189
+msgid "Register a passkey using your device's biometric sensor or PIN to sign in securely without a password."
+msgstr "Register a passkey using your device's biometric sensor or PIN to sign in securely without a password."
+
+#: app/routes/setup.passkey.tsx:218
+msgid "Register passkey"
+msgstr "Register passkey"
+
+#: app/routes/accounts.tsx:372
+msgid "Remove"
+msgstr "Remove"
+
+#: app/routes/device.authorize.tsx:161
+msgid "Requested permissions"
+msgstr "Requested permissions"
+
+#: app/routes/verify.tsx:242
+msgid "Resend code"
+msgstr "Resend code"
+
+#: app/routes/password.reset.tsx:111
+msgid "Reset your password"
+msgstr "Reset your password"
+
+#: app/routes/setup.authenticator.tsx:152
+msgid "Scan the QR code below with your authenticator app, then enter the 6-digit code to confirm enrollment."
+msgstr "Scan the QR code below with your authenticator app, then enter the 6-digit code to confirm enrollment."
+
+#: app/routes/login.mfa.tsx:29
+#: app/routes/setup.mfa.tsx:34
+msgid "Security key"
+msgstr "Security key"
+
+#: app/routes/accounts.tsx:294
+msgid "Select an account to continue or add a new one."
+msgstr "Select an account to continue or add a new one."
+
+#: app/routes/password.reset.tsx:137
+msgid "Send reset link"
+msgstr "Send reset link"
+
+#: app/routes/accounts.tsx:345
+msgid "Session active"
+msgstr "Session active"
+
+#: app/routes/signup.password.tsx:170
+msgid "Set a password"
+msgstr "Set a password"
+
+#: app/routes/password.new.tsx:136
+msgid "Set password"
+msgstr "Set password"
+
+#: app/routes/setup.authenticator.tsx:150
+msgid "Set up authenticator app"
+msgstr "Set up authenticator app"
+
+#: app/routes/setup.email.tsx:31
+msgid "Set up email one-time code"
+msgstr "Set up email one-time code"
+
+#: app/routes/setup.mfa.tsx:157
+msgid "Set up multi-factor authentication"
+msgstr "Set up multi-factor authentication"
+
+#: app/routes/setup.passkey.tsx:187
+msgid "Set up passkey"
+msgstr "Set up passkey"
+
+#: app/routes/setup.security-key.tsx:187
+#: app/routes/setup.security-key.tsx:217
+msgid "Set up security key"
+msgstr "Set up security key"
+
+#: app/routes/setup.sms.tsx:31
+msgid "Set up SMS one-time code"
+msgstr "Set up SMS one-time code"
+
+#: app/routes/login.password.tsx:199
+#: app/routes/login.tsx:172
+#: app/routes/sso.ldap.tsx:165
+msgid "Sign in"
+msgstr "Sign in"
+
+#: app/routes/password.change.tsx:137
+msgid "sign in again"
+msgstr "sign in again"
+
+#: app/routes/login.passkey.tsx:69
+#: app/routes/login.password.tsx:189
+#: app/routes/login.security-key.tsx:69
+#: app/routes/login.verify.authenticator.tsx:160
+#: app/routes/login.verify.email.tsx:173
+#: app/routes/login.verify.sms.tsx:173
+#: app/routes/logout.success.tsx:12
+msgid "Sign in again"
+msgstr "Sign in again"
+
+#: app/routes/sso.link.tsx:108
+msgid "Sign in to continue"
+msgstr "Sign in to continue"
+
+#: app/routes/sso.link.tsx:90
+msgid "Sign in with"
+msgstr "Sign in with"
+
+#: app/routes/sso.ldap.tsx:124
+msgid "Sign in with LDAP"
+msgstr "Sign in with LDAP"
+
+#: app/routes/logout.tsx:76
+#: app/routes/logout.tsx:84
+#: app/routes/signed-in.tsx:52
+#: app/routes/sso.tsx:226
+msgid "Sign out"
+msgstr "Sign out"
+
+#: app/routes/setup.mfa.tsx:189
+msgid "Skip for now"
+msgstr "Skip for now"
+
+#: app/routes/login.verify.sms.tsx:161
+msgid "SMS code"
+msgstr "SMS code"
+
+#: app/routes/login.mfa.tsx:28
+msgid "SMS one-time code"
+msgstr "SMS one-time code"
+
+#: app/routes/setup.mfa.tsx:37
+msgid "SMS OTP"
+msgstr "SMS OTP"
+
+#: app/routes/sso.$provider.error.tsx:19
+msgid "Something went wrong with {provider}."
+msgstr "Something went wrong with {provider}."
+
+#: app/routes/device.authorize.tsx:150
+msgid "Something went wrong. Please return to your device and try again."
+msgstr "Something went wrong. Please return to your device and try again."
+
+#: app/routes/accounts.tsx:304
+msgid "Something went wrong. Please try again."
+msgstr "Something went wrong. Please try again."
+
+#: app/routes/accounts.tsx:359
+msgid "Switch"
+msgstr "Switch"
+
+#: app/routes/sso.$provider.error.tsx:11
+msgid "That identity belongs to a different account."
+msgstr "That identity belongs to a different account."
+
+#: app/routes/verify.tsx:168
+msgid "The code is invalid or has expired. Please request a new one."
+msgstr "The code is invalid or has expired. Please request a new one."
+
+#: app/routes/login.verify.authenticator.tsx:123
+#: app/routes/login.verify.email.tsx:136
+#: app/routes/login.verify.sms.tsx:136
+#: app/routes/setup.authenticator.tsx:142
+msgid "The code is invalid or has expired. Please try again."
+msgstr "The code is invalid or has expired. Please try again."
+
+#: app/routes/setup.passkey.tsx:179
+msgid "The passkey enrollment failed. Please try again."
+msgstr "The passkey enrollment failed. Please try again."
+
+#: app/components/webauthn-button.tsx:138
+#: app/routes/login.passkey.tsx:62
+msgid "The passkey verification failed. Please try again."
+msgstr "The passkey verification failed. Please try again."
+
+#: app/routes/password.new.tsx:94
+msgid "The password does not meet the complexity requirements. Please choose a stronger password."
+msgstr "The password does not meet the complexity requirements. Please choose a stronger password."
+
+#: app/routes/setup.security-key.tsx:179
+msgid "The security key enrollment failed. Please try again."
+msgstr "The security key enrollment failed. Please try again."
+
+#: app/routes/login.security-key.tsx:62
+msgid "The security key verification failed. Please try again."
+msgstr "The security key verification failed. Please try again."
+
+#: app/routes/sso.$provider.error.tsx:10
+msgid "The sign-in link was incomplete or expired."
+msgstr "The sign-in link was incomplete or expired."
+
+#: app/routes/password.change.tsx:130
+msgid "This account must be activated from its invitation email first."
+msgstr "This account must be activated from its invitation email first."
+
+#: app/routes/password.new.tsx:129
+msgid "This reset link is invalid or has expired. <0>Please request a new one.</0>"
+msgstr "This reset link is invalid or has expired. <0>Please request a new one.</0>"
+
+#: app/routes/login.tsx:165
+msgid "This sign-in provider is currently unavailable. Please try again later."
+msgstr "This sign-in provider is currently unavailable. Please try again later."
+
+#: app/routes/login.mfa.tsx:120
+msgid "Two-factor verification"
+msgstr "Two-factor verification"
+
+#: app/routes/sso.tsx:188
+msgid "Unlink"
+msgstr "Unlink"
+
+#: app/routes/login.passkey.tsx:48
+msgid "Use your passkey to verify your identity."
+msgstr "Use your passkey to verify your identity."
+
+#: app/routes/login.security-key.tsx:48
+msgid "Use your security key to verify your identity."
+msgstr "Use your security key to verify your identity."
+
+#: app/routes/sso.ldap.tsx:137
+msgid "Username"
+msgstr "Username"
+
+#: app/routes/verify.tsx:195
+msgid "Verification code"
+msgstr "Verification code"
+
+#: app/routes/login.verify.authenticator.tsx:165
+#: app/routes/login.verify.email.tsx:178
+#: app/routes/login.verify.sms.tsx:178
+#: app/routes/verify.tsx:218
+msgid "Verify"
+msgstr "Verify"
+
+#: app/routes/setup.authenticator.tsx:208
+msgid "Verify and enable"
+msgstr "Verify and enable"
+
+#: app/components/webauthn-button.tsx:152
+#: app/routes/login.passkey.tsx:45
+msgid "Verify with passkey"
+msgstr "Verify with passkey"
+
+#: app/routes/login.security-key.tsx:45
+#: app/routes/login.security-key.tsx:76
+msgid "Verify with security key"
+msgstr "Verify with security key"
+
+#: app/routes/verify.tsx:173
+msgid "Verify your email"
+msgstr "Verify your email"
+
+#: app/routes/device.tsx:106
+msgid "WDJB-MJHT"
+msgstr "WDJB-MJHT"
+
+#: app/routes/login.tsx:163
+msgid "We could not find an account for that identifier."
+msgstr "We could not find an account for that identifier."
+
+#. placeholder {0}: actionData.email
+#: app/routes/password.reset.tsx:99
+msgid "We've sent a password reset link to {0}"
+msgstr "We've sent a password reset link to {0}"
+
+#. placeholder {0}: actionData.email
+#: app/routes/signup.password.tsx:163
+#: app/routes/signup.tsx:236
+msgid "We've sent a verification link to {0}"
+msgstr "We've sent a verification link to {0}"
+
+#: app/routes/signed-in.tsx:41
+msgid "You are signed in"
+msgstr "You are signed in"
+
+#: app/routes/device.authorize.tsx:137
+msgid "You may return to your device."
+msgstr "You may return to your device."
+
+#: app/routes/sso.link.tsx:84
+msgid "You must be signed in to link an external account."
+msgstr "You must be signed in to link an external account."
+
+#: app/routes/logout.success.tsx:9
+msgid "You've been signed out"
+msgstr "You've been signed out"
+
+#: app/components/webauthn-button.tsx:134
+msgid "Your browser does not support passkeys. Please use a supported browser."
+msgstr "Your browser does not support passkeys. Please use a supported browser."
+
+#: app/routes/verify.tsx:214
+msgid "Your email is already verified. You can sign in."
+msgstr "Your email is already verified. You can sign in."
+
+#: app/routes/verify.success.tsx:23
+msgid "Your email is verified"
+msgstr "Your email is verified"
+
+#: app/routes/password.change.tsx:120
+msgid "Your password does not meet the required complexity."
+msgstr "Your password does not meet the required complexity."
+
+#: app/routes/accounts.tsx:300
+#: app/routes/login.passkey.tsx:67
+#: app/routes/login.password.tsx:187
+#: app/routes/login.security-key.tsx:67
+#: app/routes/login.verify.authenticator.tsx:158
+#: app/routes/login.verify.email.tsx:171
+#: app/routes/login.verify.sms.tsx:171
+msgid "Your session has expired."
+msgstr "Your session has expired."
+
+#: app/routes/password.change.tsx:135
+msgid "Your session has expired. Please"
+msgstr "Your session has expired. Please"
+
+#: app/routes/setup.authenticator.tsx:144
+#: app/routes/setup.email.tsx:49
+#: app/routes/setup.passkey.tsx:181
+#: app/routes/setup.security-key.tsx:181
+#: app/routes/setup.sms.tsx:49
+msgid "Your session has expired. Please sign in again."
+msgstr "Your session has expired. Please sign in again."

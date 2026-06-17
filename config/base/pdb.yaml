@@ -1,0 +1,12 @@
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: auth-ui
+spec:
+  # Guarantee at least 1 replica is available during voluntary disruptions
+  # (node drain, cluster upgrades).  With replicas: 2 this means one pod may
+  # be evicted at a time — consistent with maxUnavailable: 0 in the Deployment
+  # strategy (rolling deploys never evict; PDB guards voluntary node ops).
+  minAvailable: 1
+  selector:
+    matchLabels: { app.kubernetes.io/name: auth-ui }

@@ -1,0 +1,213 @@
+/**
+ * Shared OTP enrollment route handlers (loader + action).
+ *
+ * Both setup.email.tsx and setup.sms.tsx perform the same enrollment ceremony;
+ * they differ only in:
+ *   - enroll: the provider method to call (addOtpEmail / addOtpSms)
+ *   - factor: the audit label ('otp_email' / 'otp_sms')
+ *   - verifyPath: the post-enrollment verify redirect ('/login/verify/email' | '/login/verify/sms')
+ *
+ * createOtpEnrollHandlers() returns a typed { loader, action } pair
+ * parameterised by those values. Each route file re-exports them and keeps its
+ * own component JSX (user-facing copy differs between email and SMS).
+ *
+ * Loader data type:
+ *   React Router 7 cannot infer `typeof loader` through a factory return —
+ *   the type variable on `data()` is not reified at the call site when the
+ *   function is returned from a higher-order function. Route components must
+ *   therefore cast:
+ *
+ *     const d = useLoaderData() as OtpEnrollLoaderData;
+ *
+ *   Behaviour is identical to `useLoaderData<typeof loader>()` in a direct route.
+ */
+import { nextStepWithParams } from './next-step-params';
+import { setupSkipSchema } from '@/flows/mfa-schemas';
+import { type AuthProvider } from '@/providers/auth-provider';
+import { ProviderError } from '@/providers/types';
+import { providerForRequest } from '@/server/auth-context.server';
+import { getCsrfToken, assertCsrf } from '@/server/csrf';
+import { logAuthEvent } from '@/server/observability';
+import { readSessions, byLoginName } from '@/session/cookie';
+import { data, redirect, type ActionFunctionArgs, type LoaderFunctionArgs } from 'react-router';
+import { z } from 'zod';
+
+// ── Action input schema ──────────────────────────────────────────────────────
+
+const otpEnrollActionSchema = z.object({
+  loginName: z.string().min(1),
+  requestId: z.string().optional(),
+  organization: z.string().optional(),
+  checkAfter: setupSkipSchema.shape.checkAfter,
+});
+
+// ── Loader data shape ────────────────────────────────────────────────────────
+
+/**
+ * Exported concrete type for the loader data.
+ *
+ * React Router 7 cannot infer `typeof loader` through a factory return —
+ * the type variable on `data()` is not reified at the call site when the
+ * function is returned from a higher-order function. Route components must
+ * therefore cast:
+ *
+ *   const d = useLoaderData() as OtpEnrollLoaderData;
+ *
+ * Behaviour is identical to `useLoaderData<typeof loader>()` in a direct route.
+ */
+export interface OtpEnrollLoaderData {
+  csrfToken: string;
+  loginName: string;
+  requestId: string | undefined;
+  organization: string | undefined;
+  force: 'true' | 'false' | undefined;
+  checkAfter: 'true' | 'false' | undefined;
+}
+
+// ── Action data shape ────────────────────────────────────────────────────────
+
+/**
+ * Exported concrete type for the action data.
+ *
+ * React Router 7 cannot infer `typeof action` through a factory return —
+ * `useActionData<typeof action>()` resolves to `never` when `action` is a
+ * re-exported value rather than a locally declared function. Route components
+ * must therefore cast:
+ *
+ *   const actionData = useActionData() as OtpEnrollActionData | undefined;
+ */
+export type OtpEnrollActionData =
+  | { error: 'INVALID_INPUT' }
+  | { error: 'SESSION_EXPIRED' }
+  | { error: 'ENROLL_FAILED' };
+
+// ── Factory config ───────────────────────────────────────────────────────────
+
+export interface OtpEnrollConfig {
+  /** Provider method to call to register the OTP factor for the user. */
+  enroll: (provider: AuthProvider, userId: string) => Promise<void>;
+  /** Audit label for log events. */
+  factor: 'otp_email' | 'otp_sms';
+  /** Redirect target when checkAfter=true, e.g. '/login/verify/email'. */
+  verifyPath: string;
+}
+
+// ── Factory ──────────────────────────────────────────────────────────────────
+
+// Return type is intentionally inferred — DataWithResponseInit is not exported
+// from react-router's public API so we let TypeScript infer the full union.
+// The exported OtpEnrollLoaderData and OtpEnrollActionData types are what route
+// components use; they don't depend on this signature.
+export function createOtpEnrollHandlers(cfg: OtpEnrollConfig) {
+  async function loader({ request }: LoaderFunctionArgs) {
+    const url = new URL(request.url);
+    const loginName = url.searchParams.get('loginName') ?? '';
+    const requestId = url.searchParams.get('requestId') ?? undefined;
+    const organization = url.searchParams.get('organization') ?? undefined;
+    // CODE-MIN-12: never throw a 500 on tampered query params. Both fields are optional —
+    // an invalid value degrades to undefined (no skip-force, no auto-checkAfter).
+    const skip = setupSkipSchema.safeParse(Object.fromEntries(url.searchParams));
+    const { force, checkAfter } = skip.success ? skip.data : {};
+
+    // Guard: require an active session for this loginName.
+    const sessions = await readSessions(request);
+    const entry = byLoginName(sessions, loginName, organization);
+    if (!entry) return redirect('/login');
+
+    const [csrfToken, setCookie] = await getCsrfToken(request);
+    const headers: Record<string, string> = {};
+    if (setCookie !== null) headers['set-cookie'] = setCookie;
+
+    return data<OtpEnrollLoaderData>(
+      { csrfToken, loginName, requestId, organization, force, checkAfter },
+      { headers }
+    );
+  }
+
+  async function action({ request }: ActionFunctionArgs) {
+    const provider = providerForRequest(request);
+    const form = await request.formData();
+    await assertCsrf(request, form);
+
+    const parsed = otpEnrollActionSchema.safeParse(Object.fromEntries(form));
+    if (!parsed.success) return data({ error: 'INVALID_INPUT' as const }, { status: 400 });
+
+    const { loginName, requestId, organization, checkAfter } = parsed.data;
+
+    // Guard: active session required.
+    const sessions = await readSessions(request);
+    const entry = byLoginName(sessions, loginName, organization);
+    if (!entry) {
+      logAuthEvent('mfa_enroll', 'failure', {
+        loginName,
+        factor: cfg.factor,
+        reason: 'session_expired',
+      });
+      return data({ error: 'SESSION_EXPIRED' as const }, { status: 400 });
+    }
+
+    // Resolve userId — SessionEntry carries no userId field.
+    const user = await provider.findUser(loginName, organization);
+    if (!user) {
+      logAuthEvent('mfa_enroll', 'failure', {
+        loginName,
+        factor: cfg.factor,
+        reason: 'session_expired',
+      });
+      return data({ error: 'SESSION_EXPIRED' as const }, { status: 400 });
+    }
+
+    const userId = user.id;
+
+    try {
+      await cfg.enroll(provider, userId);
+    } catch (err) {
+      logAuthEvent('mfa_enroll', 'failure', { userId, factor: cfg.factor });
+      if (err instanceof ProviderError) {
+        return data({ error: 'ENROLL_FAILED' as const }, { status: 500 });
+      }
+      throw err;
+    }
+
+    logAuthEvent('mfa_enroll', 'success', { userId, factor: cfg.factor });
+
+    // checkAfter=true: immediately route into the matching verify screen.
+    if (checkAfter === 'true') {
+      const params = new URLSearchParams({ loginName });
+      if (requestId) params.set('requestId', requestId);
+      if (organization) params.set('organization', organization);
+      return redirect(`${cfg.verifyPath}?${params.toString()}`);
+    }
+
+    // Normal post-enrollment routing.
+    const session = await provider.getSession(entry.id, entry.token);
+    if (!session) {
+      logAuthEvent('mfa_enroll', 'failure', {
+        loginName,
+        factor: cfg.factor,
+        reason: 'session_expired',
+      });
+      return data({ error: 'SESSION_EXPIRED' as const }, { status: 400 });
+    }
+
+    const [methods, settings] = await Promise.all([
+      provider.listAuthMethods(userId),
+      provider.getLoginSettings(organization),
+    ]);
+
+    const target = nextStepWithParams({
+      factors: session.factors,
+      settings,
+      enrolledMethods: methods,
+      loginName: session.user?.loginName ?? loginName,
+      userVerified: session.factors.passkey?.userVerified ?? false,
+      mfaInitSkippedAt: session.user?.mfaInitSkippedAt,
+      requestId,
+      organization,
+    });
+
+    return redirect(target);
+  }
+
+  return { loader, action };
+}

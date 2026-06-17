@@ -1,0 +1,45 @@
+import { type RouteConfig, index, route } from '@react-router/dev/routes';
+
+export default [
+  index('routes/_index.tsx'),
+  route('authorize', 'routes/authorize.tsx'),
+  route('login', 'routes/login.tsx'),
+  route('login/password', 'routes/login.password.tsx'),
+  route('signup', 'routes/signup.tsx'),
+  route('signup/password', 'routes/signup.password.tsx'),
+  route('password/reset', 'routes/password.reset.tsx'),
+  route('password/new', 'routes/password.new.tsx'),
+  route('password/change', 'routes/password.change.tsx'),
+  route('verify', 'routes/verify.tsx'),
+  route('verify/success', 'routes/verify.success.tsx'),
+  route('signed-in', 'routes/signed-in.tsx'),
+  route('sso', 'routes/sso.tsx'),
+  route('sso/link', 'routes/sso.link.tsx'),
+  route('logout', 'routes/logout.tsx'),
+  route('logout/success', 'routes/logout.success.tsx'),
+  route('error', 'routes/error.tsx'),
+  route('sso/:provider/callback', 'routes/sso.$provider.callback.tsx'),
+  route('sso/:provider/error', 'routes/sso.$provider.error.tsx'),
+  route('login/mfa', 'routes/login.mfa.tsx'),
+  route('login/passkey', 'routes/login.passkey.tsx'),
+  route('login/security-key', 'routes/login.security-key.tsx'),
+  route('login/verify/authenticator', 'routes/login.verify.authenticator.tsx'),
+  route('login/verify/email', 'routes/login.verify.email.tsx'),
+  route('login/verify/sms', 'routes/login.verify.sms.tsx'),
+  route('setup/passkey', 'routes/setup.passkey.tsx'),
+  route('setup/security-key', 'routes/setup.security-key.tsx'),
+  route('setup/authenticator', 'routes/setup.authenticator.tsx'),
+  route('setup/email', 'routes/setup.email.tsx'),
+  route('setup/sms', 'routes/setup.sms.tsx'),
+  route('setup/mfa', 'routes/setup.mfa.tsx'),
+  route('accounts', 'routes/accounts.tsx'),
+  // P6 Task 6: device authorization grant — user-code entry screen.
+  route('device', 'routes/device.tsx'),
+  // P6 Task 7: device/authorize — consent (authorize / deny).
+  route('device/authorize', 'routes/device.authorize.tsx'),
+  // P6 Task 9: LDAP credential-entry route.
+  route('sso/ldap', 'routes/sso.ldap.tsx'),
+  // Catch-all uses a separate module — RR7 derives route IDs from file paths,
+  // so two entries pointing at the same file produce a duplicate-ID error.
+  route('*', 'routes/catchall.tsx'),
+] satisfies RouteConfig;

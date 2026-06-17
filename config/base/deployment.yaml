@@ -1,0 +1,107 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: auth-ui
+  labels: { app.kubernetes.io/name: auth-ui }
+spec:
+  # CODE-MAJ-13 — RATE-LIMIT SCALING CONSTRAINT: the in-process rate limiter holds state in a
+  # per-replica Map; at replicas > 1 the effective limit is (configured limit × replica count)
+  # and requests may scatter across pods. Until the Redis-backed store is wired
+  # (tracked: REDIS-RATELIMIT follow-up), do NOT scale this Deployment horizontally without
+  # also deploying the shared Redis rate-limit store. Current value is 2 with sticky sessions
+  # assumed; set replicas: 1 if sticky sessions are not available in your cluster.
+  replicas: 2
+  revisionHistoryLimit: 5
+  progressDeadlineSeconds: 600
+  # Zero-downtime rolling: never take a pod down before its replacement is Ready.
+  # Mirror of cloud-portal's proven strategy.
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 0
+      maxSurge: 1
+  selector: { matchLabels: { app.kubernetes.io/name: auth-ui } }
+  template:
+    metadata: { labels: { app.kubernetes.io/name: auth-ui } }
+    spec:
+      # Allow 60 s for Bun to drain in-flight requests after SIGTERM.
+      # react-router-hono-server/bun owns the SIGTERM handler (wired only when
+      # onGracefulShutdown is supplied — see app/server.ts); the preStop sleep
+      # provides a k8s-level drain window so kube-proxy has time to deregister
+      # the endpoint before the pod receives SIGTERM.  The 60 s grace period is
+      # consumed first by preStop (10 s), leaving a 50 s post-SIGTERM drain
+      # window — far above the worst-case request duration (~5 s; smoke p99 28 ms),
+      # with headroom for OOM or stuck-shutdown detection.
+      terminationGracePeriodSeconds: 60
+      # Non-root security posture — mirrors the cloud-portal convention.
+      # readOnlyRootFilesystem is omitted intentionally: Bun writes to /tmp
+      # at startup (e.g. transpiler cache); a read-only root would require a
+      # separate emptyDir mount that cloud-portal doesn't model — defer to a
+      # future hardening task that benchmarks the emptyDir overhead.
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        runAsGroup: 1000
+        seccompProfile:
+          type: RuntimeDefault
+      # Spread pods across nodes to survive single-node failure.
+      # cloud-portal doesn't model topologySpreadConstraints yet, so we add a
+      # single hostname-level constraint (best-effort DoNotSchedule equivalent
+      # for 2 replicas).
+      topologySpreadConstraints:
+        - maxSkew: 1
+          topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: ScheduleAnyway
+          labelSelector:
+            matchLabels: { app.kubernetes.io/name: auth-ui }
+      containers:
+        - name: auth-ui
+          # Immutable, pinned tag (git SHA / semver) set by the publish job — never `:latest`,
+          # so a deploy is deterministic and Phase 7 has a concrete legacy tag to roll back to.
+          image: ghcr.io/datum-cloud/auth-ui:0.0.1 # placeholder; overwritten per release by the publish job / Flux image automation
+          ports: [{ name: http, containerPort: 3000 }]
+          env:
+            - { name: ZITADEL_API_URL, value: https://auth.datum.net }
+            # PUBLIC_ORIGIN: trusted public origin (scheme + host) of THIS auth-ui
+            # deployment. The verification-email link is built from this, NOT the
+            # request Host header (client-controllable; would otherwise let an attacker
+            # phish a victim's real verification code to an attacker host). Boot fails
+            # closed if unset in production.
+            # CUTOVER: replace the placeholder below with the real public origin
+            # (e.g. https://auth.datum.net) before going live.
+            - { name: PUBLIC_ORIGIN, value: https://REPLACE_ME.example } # placeholder — ops MUST set the real public origin at cutover
+          envFrom:
+            - secretRef: { name: auth-ui }
+          # Resource requests/limits — mirror cloud-portal's limit tier.
+          # Requests are intentionally left unset (TODO: profile actual idle
+          # usage once the app runs under production load in Phase 8 staging).
+          # Limits only are present so the scheduler can bin-pack correctly;
+          # a missing request means the pod is treated as Burstable QoS.
+          resources:
+            limits:
+              cpu: "1"
+              memory: 512Mi
+          # Per-container (not pod-level) securityContext for privilege drops.
+          securityContext:
+            allowPrivilegeEscalation: false
+            capabilities:
+              drop: ["ALL"]
+          # preStop sleep gives kube-proxy time to deregister this endpoint
+          # before SIGTERM is delivered.  10 s covers the typical iptables/IPVS
+          # propagation delay in a single-region cluster.
+          lifecycle:
+            preStop:
+              exec:
+                command: ["/bin/sh", "-c", "sleep 10"]
+          livenessProbe:
+            httpGet: { path: /healthz, port: http }
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet: { path: /readyz, port: http }
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 10
+            failureThreshold: 3

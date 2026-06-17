@@ -1,0 +1,6 @@
+apiVersion: v1
+kind: Service
+metadata: { name: auth-ui, labels: { app.kubernetes.io/name: auth-ui } }
+spec:
+  selector: { app.kubernetes.io/name: auth-ui }
+  ports: [{ name: http, port: 3000, targetPort: http }]

@@ -1,0 +1,47 @@
+@import 'tailwindcss';
+@import '@datum-cloud/datum-ui/styles';
+
+/* Self-hosted woff2 font overrides — converted from @datum-cloud/datum-ui v1.2.0 TTFs.
+   These declarations intentionally repeat datum-ui's font-family/weight/style with the woff2
+   source listed first, and appear AFTER the datum-ui @import so they win the cascade.
+   Browser picks the woff2 entry first (matching format hint), skipping the TTF entirely. */
+@font-face {
+  font-family: 'Alliance No1';
+  src: url('./fonts/AllianceNo1-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Alliance No1';
+  src: url('./fonts/AllianceNo1-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Alliance No1';
+  src: url('./fonts/AllianceNo1-SemiBold.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* A11y fix: datum-ui alpha theme sets --primary to oklch(0.61 …) (medium lightness) with
+   --primary-foreground = white, which fails WCAG AA (≈2.8:1). Override foreground to near-black
+   so the primary button always passes 4.5:1 contrast in both light and dark modes.
+   Phase 6 design audit should align the alpha theme's canyon-clay-links token instead. */
+:root {
+  --primary-foreground: oklch(0.1 0 0);
+}
+
+/* A11y fix: datum-ui Form.Field renders the required-field asterisk as
+   span[aria-hidden] with class text-destructive/80 (80% alpha on white ≈ 2.5:1 — fails WCAG AA).
+   At 80% alpha the max achievable contrast on white is 4.2:1 (pure black), so we must
+   set a fully-opaque dark red (≥ 4.5:1) on this specific element.
+   Phase 6 design audit should fix the datum-ui Form.Field component's alpha token instead. */
+form span[aria-hidden] {
+  color: oklch(0.448 0.163 22); /* ≈ #b91c1c, 6.5:1 on white */
+}
