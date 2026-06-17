@@ -1,5 +1,7 @@
 // Self-hosted woff2 — converted from @datum-cloud/datum-ui v1.2.0 TTFs (see app/styles/fonts/).
 // Vite content-hashes the file into /id/assets/AllianceNo1-Regular-[hash].woff2.
+import { ClientHintCheck } from './components/misc/client-hints';
+import { DynamicFaviconLinks } from './components/misc/dynamic-favicon';
 import allianceFontRegularUrl from './styles/fonts/AllianceNo1-Regular.woff2?url';
 import './styles/root.css';
 import { AuthCard } from '@/components/auth-card/auth-card';
@@ -69,6 +71,13 @@ export function Layout({ children }: { children: React.ReactNode }) {
         <meta charSet="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
         <meta name="robots" content="noindex, nofollow" />
+
+        <meta charSet="utf-8" />
+
+        <DynamicFaviconLinks />
+
+        <ClientHintCheck nonce={data?.cspNonce} />
+
         <Meta />
         <Links />
         <ThemeScript nonce={data?.cspNonce} attribute="class" defaultTheme="light" />

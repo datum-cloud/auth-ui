@@ -24,7 +24,7 @@ export default [
     ]),
   ]),
 
-  route('signup', 'routes/signup/layout.tsx', [
+  route('signup', 'routes/signup/layout.tsx', { id: 'signup' }, [
     index('routes/signup/index.tsx'),
     route('password', 'routes/signup/password.tsx'),
   ]),

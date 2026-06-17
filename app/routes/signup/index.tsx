@@ -1,5 +1,6 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
 import { SubmitButton } from '@/components/auth-form/auth-form';
+import SplitLayout from '@/layouts/split.layout';
 import { TrackOnMount } from '@/modules/analytics/fathom';
 import { readSessions, serializeSessions } from '@/modules/auth/session/cookie';
 import { MaxMindTracker, readMaxMindTrackingToken } from '@/modules/fraud/maxmind-tracker';
@@ -196,7 +197,15 @@ export default function Signup() {
   return (
     <>
       <MaxMindTracker accountId={maxmindAccountId} />
-      <AuthCard title={<Trans>Create your account</Trans>}>
+      <SplitLayout>
+        <div className="mb-8 flex flex-col gap-3">
+          <h1 className="text-foreground text-2xl leading-6 font-semibold">
+            <Trans>Get started</Trans>
+          </h1>
+          <p className="text-foreground/80 text-sm">
+            <Trans>Create a new account</Trans>
+          </p>
+        </div>
         <Form.Root
           schema={registerClientSchema}
           formComponent={RRForm}
@@ -239,7 +248,7 @@ export default function Signup() {
             <Trans>Continue</Trans>
           </SubmitButton>
         </Form.Root>
-      </AuthCard>
+      </SplitLayout>
     </>
   );
 }

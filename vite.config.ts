@@ -12,7 +12,15 @@ export default defineConfig({
   // (trailing slash required for correct asset URL joins; react-router.config.ts
   // basename must match it — RR dev requires basename to begin with base)
   base: '/id/',
-  server: { port: 3000 },
+  server: {
+    port: 3000,
+    // Listen on all network interfaces so VS Code can forward it properly
+    host: '127.0.0.1',
+    hmr: {
+      // Forces the browser to connect to your local forwarding address
+      host: 'localhost',
+    },
+  },
   resolve: { tsconfigPaths: true },
   plugins: [
     tailwindcss(),

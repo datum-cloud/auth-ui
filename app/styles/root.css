@@ -1,6 +1,15 @@
 @import 'tailwindcss';
 @import '@datum-cloud/datum-ui/styles';
 
+/* Custom type scale — generates .text-{name} utilities in Tailwind v4.
+   Placed after the datum-ui @import so these tokens win the cascade. */
+@theme {
+  --text-xs: 12px;
+  --text-xs--line-height: 1rem;
+  --text-2xs: 0.625rem; /* 10px — remove if unused */
+  --text-2xs--line-height: 0.875rem;
+}
+
 /* Self-hosted woff2 font overrides — converted from @datum-cloud/datum-ui v1.2.0 TTFs.
    These declarations intentionally repeat datum-ui's font-family/weight/style with the woff2
    source listed first, and appear AFTER the datum-ui @import so they win the cascade.
@@ -34,7 +43,7 @@
    so the primary button always passes 4.5:1 contrast in both light and dark modes.
    Phase 6 design audit should align the alpha theme's canyon-clay-links token instead. */
 :root {
-  --primary-foreground: oklch(0.1 0 0);
+  /* --primary-foreground: oklch(0.1 0 0); */
 }
 
 /* A11y fix: datum-ui Form.Field renders the required-field asterisk as

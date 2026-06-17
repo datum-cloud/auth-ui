@@ -1,6 +1,6 @@
-import { AuthCard } from '@/components/auth-card/auth-card';
 import { SubmitButton } from '@/components/auth-form/auth-form';
 import { FormError } from '@/components/form-error/form-error';
+import SplitLayout from '@/layouts/split.layout';
 // ADAPTATION (plan-drift fix): readSessions + serializeSessions live in @/modules/auth/session/cookie.
 // The locked plan block incorrectly listed them as coming from @/modules/auth/session/session
 // (that module only has pure helpers, no cookie I/O).
@@ -19,7 +19,11 @@ import { providerForRequest } from '@/server/auth-context.server';
 import { getCsrfToken, assertCsrf } from '@/server/csrf';
 import { Button } from '@datum-cloud/datum-ui/button';
 import { Form } from '@datum-cloud/datum-ui/form';
+import { Icon } from '@datum-cloud/datum-ui/icons';
+import { cn } from '@datum-cloud/datum-ui/utils';
 import { Trans, useLingui } from '@lingui/react/macro';
+import { Mail, UserKey } from 'lucide-react';
+import { useState } from 'react';
 import {
   data,
   redirect,
@@ -128,9 +132,9 @@ export default function Login() {
   const identifierLabel = field.allowEmail
     ? field.allowPhone
       ? t`Email, phone, or username`
-      : t`Email or username`
+      : t`Email`
     : field.allowPhone
-      ? t`Phone or username`
+      ? t`Phone`
       : t`Username`;
   const identifierPlaceholder = field.allowEmail
     ? 'email@example.com'
@@ -177,43 +181,18 @@ export default function Login() {
     ? `/login/passkey?${passkeyParams.toString()}`
     : '/login/passkey';
 
-  return (
-    <AuthCard title={<Trans>Sign in</Trans>} branding={branding}>
-      {view.showPasswordForm ? (
-        <Form.Root
-          schema={identifierClientSchema}
-          formComponent={RRForm}
-          method="POST"
-          defaultValues={{ loginName: loginName ?? '' }}
-          isSubmitting={navigation.state === 'submitting'}
-          className="flex flex-col gap-4">
-          <input type="hidden" name="csrf" value={csrfToken} />
-          {requestId ? <input type="hidden" name="requestId" value={requestId} /> : null}
-          {organization ? <input type="hidden" name="organization" value={organization} /> : null}
-          <Form.Field name="loginName" label={identifierLabel} required>
-            <Form.Input
-              type="text"
-              autoFocus
-              autoComplete="username"
-              placeholder={identifierPlaceholder}
-            />
-          </Form.Field>
-          <FormError>{serverError}</FormError>
-          <SubmitButton loading={identifierSubmitting}>
-            <Trans>Continue</Trans>
-          </SubmitButton>
-        </Form.Root>
-      ) : null}
+  const [showEmailField, setShowEmailField] = useState(false);
 
-      {view.showPasswordForm && view.showIdpButtons ? (
-        <div className="relative my-4 flex items-center" aria-hidden="true">
-          <div className="flex-grow border-t border-gray-200" />
-          <span className="mx-3 shrink-0 text-sm text-gray-600">
-            <Trans>or</Trans>
-          </span>
-          <div className="flex-grow border-t border-gray-200" />
-        </div>
-      ) : null}
+  return (
+    <SplitLayout branding={branding}>
+      <div className="mb-8 flex flex-col gap-3">
+        <h1 className="text-foreground text-2xl leading-6 font-semibold">
+          <Trans>Welcome</Trans>
+        </h1>
+        <p className="text-foreground/80 text-sm">
+          <Trans>Choose your login method</Trans>
+        </p>
+      </div>
 
       {view.showIdpButtons ? (
         <div className="flex flex-col gap-3">
@@ -227,20 +206,23 @@ export default function Login() {
                 <input type="hidden" name="organization" value={organization} />
               ) : null}
               <Button
-                type="secondary"
+                size="large"
+                className="h-13 gap-3"
+                type="quaternary"
                 theme="outline"
                 block
                 htmlType="submit"
-                loading={submittingIdpId === idp.id}>
-                {idp.logoUrl ? (
+                loading={submittingIdpId === idp.id}
+                iconPosition="left"
+                icon={
                   <img
-                    src={idp.logoUrl}
-                    alt=""
+                    src={`/images/idps/${idp.name.toLowerCase().replace(/\s+/g, '-')}.png`}
+                    alt={idp.name}
                     aria-hidden="true"
-                    className="mr-2 h-5 w-5 object-contain"
+                    className="size-4 object-contain"
                   />
-                ) : null}
-                <Trans>Continue with {idp.name}</Trans>
+                }>
+                <Trans>{idp.name}</Trans>
               </Button>
             </RRForm>
           ))}
@@ -248,17 +230,86 @@ export default function Login() {
       ) : null}
 
       {view.showPasskeyPrompt ? (
-        <Link
-          to={passkeyHref}
-          className="mt-3 flex w-full items-center justify-center rounded-md border border-gray-300 px-4 py-2 text-sm font-medium text-gray-700 hover:bg-gray-50">
-          <Trans>Sign in with a passkey</Trans>
-        </Link>
+        <Button
+          size="large"
+          className={cn('h-13 gap-3', view.showIdpButtons && 'mt-3')}
+          type="quaternary"
+          theme="outline"
+          block
+          asChild
+          iconPosition="left"
+          icon={<Icon icon={UserKey} />}>
+          <Link to={passkeyHref}>
+            <Trans>Passkey</Trans>
+          </Link>
+        </Button>
       ) : null}
 
       {!view.showPasswordForm && view.showIdpButtons ? (
         // IdP buttons rendered above but the password form is gated off — still surface
         // any server error (e.g. IDP_UNAVAILABLE) for the screen-reader.
         <FormError>{serverError}</FormError>
+      ) : null}
+
+      {view.showPasswordForm && view.showIdpButtons ? (
+        <div className="relative my-8 flex items-center" aria-hidden="true">
+          <div className="border-border flex-grow border-t" />
+          <span className="text-foreground/60 mx-3 shrink-0 text-xs">
+            <Trans>or</Trans>
+          </span>
+          <div className="border-border flex-grow border-t" />
+        </div>
+      ) : null}
+
+      {view.showPasswordForm ? (
+        <>
+          {!showEmailField ? (
+            <Button
+              size="large"
+              className="h-13 gap-3"
+              type="quaternary"
+              theme="outline"
+              block
+              asChild
+              iconPosition="left"
+              icon={<Icon icon={Mail} />}
+              onClick={() => setShowEmailField(true)}>
+              <Trans>Email</Trans>
+            </Button>
+          ) : (
+            <Form.Root
+              schema={identifierClientSchema}
+              formComponent={RRForm}
+              method="POST"
+              defaultValues={{ loginName: loginName ?? '' }}
+              isSubmitting={navigation.state === 'submitting'}
+              className="flex flex-col gap-4">
+              <input type="hidden" name="csrf" value={csrfToken} />
+              {requestId ? <input type="hidden" name="requestId" value={requestId} /> : null}
+              {organization ? (
+                <input type="hidden" name="organization" value={organization} />
+              ) : null}
+              <Form.Field
+                name="loginName"
+                label={identifierLabel}
+                required
+                labelClassName="text-xs"
+                className="mb-0">
+                <Form.Input
+                  type="text"
+                  autoFocus
+                  autoComplete="username"
+                  placeholder={identifierPlaceholder}
+                  className="h-9"
+                />
+              </Form.Field>
+              <FormError>{serverError}</FormError>
+              <SubmitButton loading={identifierSubmitting}>
+                <Trans>Continue</Trans>
+              </SubmitButton>
+            </Form.Root>
+          )}
+        </>
       ) : null}
 
       {view.signInUnavailable ? (
@@ -270,13 +321,16 @@ export default function Login() {
       ) : null}
 
       {view.showRegisterLink ? (
-        <p className="mt-4 text-center text-sm text-gray-600">
-          <Trans>Don't have an account?</Trans>{' '}
-          <Link to={signupHref} className="underline">
-            <Trans>Create account</Trans>
-          </Link>
-        </p>
+        <>
+          <div className="border-border my-8 flex-grow border-t" />
+          <p className="text-foreground/80 text-center text-sm">
+            <Trans>Don't have an account?</Trans>{' '}
+            <Link to={signupHref} className="underline">
+              <Trans>Create account</Trans>
+            </Link>
+          </p>
+        </>
       ) : null}
-    </AuthCard>
+    </SplitLayout>
   );
 }

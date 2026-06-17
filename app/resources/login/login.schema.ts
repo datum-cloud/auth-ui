@@ -23,7 +23,9 @@ export const loginIdpSchema = z.object({
 
 // Client-side validation subset for the /login identifier form; advisory only
 // (the server action's schema is the real gate).
-export const loginIdentifierClientSchema = z.object({ loginName: z.string().min(1) });
+export const loginIdentifierClientSchema = z.object({
+  loginName: z.string({ error: 'Field is required.' }).min(1),
+});
 
 /**
  * Phone-shaped identifier detector. Requires NO `@` (so it never matches an email or a
@@ -56,7 +58,7 @@ const PHONE_DISABLED_MESSAGE = "Phone sign-in isn't available — use your email
 export function makeLoginIdentifierClientSchema({ rejectPhone }: { rejectPhone: boolean }) {
   const loginName = rejectPhone
     ? z
-        .string()
+        .string({ error: 'Field is required.' })
         .min(1)
         .refine((v) => !isPhoneLike(v), { message: PHONE_DISABLED_MESSAGE })
     : z.string().min(1);
@@ -65,7 +67,7 @@ export function makeLoginIdentifierClientSchema({ rejectPhone }: { rejectPhone: 
 
 // Password submission parsed by the /login/password action.
 export const loginPasswordSchema = z.object({
-  password: z.string().min(1).max(512),
+  password: z.string({ error: 'Password is required.' }).min(1).max(512),
   loginName: z.string().min(1),
   requestId: z.string().regex(REQUEST_ID_PATTERN).optional(),
   organization: z.string().optional(),
@@ -73,4 +75,6 @@ export const loginPasswordSchema = z.object({
 
 // Client-side validation subset for the /login/password form; advisory only
 // (the server action's schema is the real gate).
-export const loginPasswordClientSchema = z.object({ password: z.string().min(1) });
+export const loginPasswordClientSchema = z.object({
+  password: z.string({ error: 'Password is required.' }).min(1),
+});
