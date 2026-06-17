@@ -58,7 +58,7 @@ describe('FakeAuthProvider — MFA (P5)', () => {
       users: [{ id: 'u1', loginName: 'a@acme.test' }],
       passwords: { u1: 'pw' },
     });
-    const s = await p.createSession({ password: 'pw' }, { metadata: { userId: 'u1' } });
+    const s = await p.createSession({ password: 'pw' }, { userId: 'u1' });
     const s2 = await p.updateSession(s.id, s.token, { totp: '123456' });
     expect(s2.factors.totp?.verifiedAt).not.toBeNull();
   });
@@ -68,7 +68,7 @@ describe('FakeAuthProvider — MFA (P5)', () => {
       users: [{ id: 'u1', loginName: 'a@acme.test' }],
       passwords: { u1: 'pw' },
     });
-    const s = await p.createSession({ password: 'pw' }, { metadata: { userId: 'u1' } });
+    const s = await p.createSession({ password: 'pw' }, { userId: 'u1' });
     const s2 = await p.updateSession(s.id, s.token, { otpEmail: '654321' });
     expect(s2.factors.otpEmail?.verifiedAt).not.toBeNull();
   });
@@ -78,7 +78,7 @@ describe('FakeAuthProvider — MFA (P5)', () => {
       users: [{ id: 'u1', loginName: 'a@acme.test' }],
       passwords: { u1: 'pw' },
     });
-    const s = await p.createSession({ password: 'pw' }, { metadata: { userId: 'u1' } });
+    const s = await p.createSession({ password: 'pw' }, { userId: 'u1' });
     const s2 = await p.updateSession(s.id, s.token, { otpEmail: '' });
     // Empty string is no-op — factor must NOT be verified
     expect(s2.factors.otpEmail).toBeUndefined();
@@ -91,7 +91,7 @@ describe('FakeAuthProvider — MFA (P5)', () => {
       users: [{ id: 'u1', loginName: 'a@acme.test' }],
       passwords: { u1: 'pw' },
     });
-    const s = await p.createSession({ password: 'pw' }, { metadata: { userId: 'u1' } });
+    const s = await p.createSession({ password: 'pw' }, { userId: 'u1' });
     const s2 = await p.updateSession(s.id, s.token, { challenges: { otpEmail: true } });
     // Factor must NOT be verified
     expect(s2.factors.otpEmail).toBeUndefined();
@@ -107,7 +107,7 @@ describe('FakeAuthProvider — MFA (P5)', () => {
       users: [{ id: 'u1', loginName: 'a@acme.test' }],
       passwords: { u1: 'pw' },
     });
-    const s = await p.createSession({ password: 'pw' }, { metadata: { userId: 'u1' } });
+    const s = await p.createSession({ password: 'pw' }, { userId: 'u1' });
     const s2 = await p.updateSession(s.id, s.token, { otpSms: '111111' });
     expect(s2.factors.otpSms?.verifiedAt).not.toBeNull();
   });
@@ -117,7 +117,7 @@ describe('FakeAuthProvider — MFA (P5)', () => {
       users: [{ id: 'u1', loginName: 'a@acme.test' }],
       passwords: { u1: 'pw' },
     });
-    const s = await p.createSession({ password: 'pw' }, { metadata: { userId: 'u1' } });
+    const s = await p.createSession({ password: 'pw' }, { userId: 'u1' });
     const s2 = await p.updateSession(s.id, s.token, { otpSms: '' });
     // Empty string is no-op — factor must NOT be verified
     expect(s2.factors.otpSms).toBeUndefined();
@@ -130,7 +130,7 @@ describe('FakeAuthProvider — MFA (P5)', () => {
       users: [{ id: 'u1', loginName: 'a@acme.test' }],
       passwords: { u1: 'pw' },
     });
-    const s = await p.createSession({ password: 'pw' }, { metadata: { userId: 'u1' } });
+    const s = await p.createSession({ password: 'pw' }, { userId: 'u1' });
     const s2 = await p.updateSession(s.id, s.token, { challenges: { otpSms: true } });
     // Factor must NOT be verified
     expect(s2.factors.otpSms).toBeUndefined();
@@ -146,7 +146,7 @@ describe('FakeAuthProvider — MFA (P5)', () => {
       users: [{ id: 'u1', loginName: 'a@acme.test' }],
       passwords: { u1: 'pw' },
     });
-    const s = await p.createSession({ password: 'pw' }, { metadata: { userId: 'u1' } });
+    const s = await p.createSession({ password: 'pw' }, { userId: 'u1' });
     const s2 = await p.updateSession(s.id, s.token, {
       challenges: { webAuthN: { domain: 'localhost', userVerificationRequirement: 'required' } },
     });
@@ -168,7 +168,7 @@ describe('FakeAuthProvider — MFA (P5)', () => {
       users: [{ id: 'u1', loginName: 'a@acme.test' }],
       passwords: { u1: 'pw' },
     });
-    const s = await p.createSession({ password: 'pw' }, { metadata: { userId: 'u1' } });
+    const s = await p.createSession({ password: 'pw' }, { userId: 'u1' });
     const s2 = await p.updateSession(s.id, s.token, {
       webAuthN: { credentialAssertionData: { fake: true } },
     });

@@ -47,7 +47,7 @@ export async function signInWithIdpIntent(
 
   const session = await provider.createSession(
     { idpIntent: { idpIntentId, idpIntentToken } },
-    { requestId, orgId: organization, metadata: { userId } }
+    { requestId, orgId: organization, userId }
   );
 
   const user = await provider.getUser(userId);

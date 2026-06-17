@@ -547,7 +547,7 @@ export async function processIdpCallback(
         await provider.addIdpLink(decision.userId, decision.link);
         const session = await provider.createSession(
           { idpIntent: { idpIntentId: id, idpIntentToken: token } },
-          { requestId, orgId: organization, metadata: { userId: decision.userId } }
+          { requestId, orgId: organization, userId: decision.userId }
         );
         const user = await provider.getUser(decision.userId);
         const loginName = user?.loginName ?? intent.information.idpUserName;

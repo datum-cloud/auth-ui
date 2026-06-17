@@ -1,6 +1,7 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
 import { SubmitButton } from '@/components/auth-form/auth-form';
 import { TrackOnMount } from '@/modules/analytics/fathom';
+import { MaxMindTracker, readMaxMindTrackingToken } from '@/modules/fraud/maxmind-tracker';
 import { readSessions, serializeSessions } from '@/modules/auth/session/cookie';
 import { genericCheckYourEmail } from '@/resources/schemas/check-your-email.schema';
 import { registerAndLinkIdp, passwordFirstHandoff, registerPasskeyFirst } from '@/resources/signup';
@@ -9,8 +10,10 @@ import { trustedAppOrigin } from '@/server/app-origin.server';
 import { providerForRequest } from '@/server/auth-context.server';
 import { getCsrfToken, assertCsrf } from '@/server/csrf';
 import { requireEmailVerification } from '@/server/env';
+import { env } from '@/utils/env/env.server';
 import { Form } from '@datum-cloud/datum-ui/form';
 import { Trans, useLingui } from '@lingui/react/macro';
+import { useEffect, useRef } from 'react';
 import {
   data,
   redirect,
@@ -57,6 +60,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
         firstName: url.searchParams.get('firstName') ?? '',
         lastName: url.searchParams.get('lastName') ?? '',
       },
+      maxmindAccountId: env.MAXMIND_ACCOUNT_ID ?? '',
     },
     { headers }
   );
@@ -127,6 +131,7 @@ export async function action({ request }: ActionFunctionArgs) {
     lastName,
     organization,
     requestId,
+    deviceTrackingToken,
     requireVerification: requireEmailVerification(),
     origin: trustedAppOrigin(request),
   });
@@ -144,7 +149,30 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function Signup() {
-  const { csrfToken, organization, requestId, idp, prefill } = useLoaderData<typeof loader>();
+  const { csrfToken, organization, requestId, idp, prefill, maxmindAccountId } =
+    useLoaderData<typeof loader>();
+  const deviceTokenRef = useRef<HTMLInputElement>(null);
+
+  // Keep the hidden deviceTrackingToken input populated from the token the
+  // MaxMindTracker mirrors into sessionStorage. The token may land a moment after
+  // mount, so re-read on a short interval until it appears (or the field unmounts).
+  useEffect(() => {
+    if (!maxmindAccountId) return;
+    const sync = () => {
+      const token = readMaxMindTrackingToken();
+      if (token && deviceTokenRef.current) {
+        deviceTokenRef.current.value = token;
+        return true;
+      }
+      return false;
+    };
+    if (sync()) return;
+    const handle = window.setInterval(() => {
+      if (sync()) window.clearInterval(handle);
+    }, 300);
+    return () => window.clearInterval(handle);
+  }, [maxmindAccountId]);
+
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
   const { t } = useLingui();
@@ -166,48 +194,52 @@ export default function Signup() {
   }
 
   return (
-    <AuthCard title={<Trans>Create your account</Trans>}>
-      <Form.Root
-        schema={registerClientSchema}
-        formComponent={RRForm}
-        method="POST"
-        defaultValues={{
-          email: prefill.email,
-          firstName: prefill.firstName,
-          lastName: prefill.lastName,
-        }}
-        isSubmitting={navigation.state === 'submitting'}
-        className="flex flex-col gap-4">
-        <input type="hidden" name="csrf" value={csrfToken} />
-        {organization ? <input type="hidden" name="organization" value={organization} /> : null}
-        {requestId ? <input type="hidden" name="requestId" value={requestId} /> : null}
-        {idp ? (
-          <>
-            <input type="hidden" name="idpIntentId" value={idp.idpIntentId} />
-            <input type="hidden" name="idpIntentToken" value={idp.idpIntentToken} />
-            <input type="hidden" name="idpId" value={idp.idpId} />
-            <input type="hidden" name="idpUserId" value={idp.idpUserId} />
-            <input type="hidden" name="idpUserName" value={idp.idpUserName} />
-          </>
-        ) : null}
-        <Form.Field name="email" label={t`Email`} required>
-          <Form.Input type="email" autoComplete="email" autoFocus />
-        </Form.Field>
-        <Form.Field name="firstName" label={t`First name`} required>
-          <Form.Input type="text" autoComplete="given-name" />
-        </Form.Field>
-        <Form.Field name="lastName" label={t`Last name`} required>
-          <Form.Input type="text" autoComplete="family-name" />
-        </Form.Field>
-        {serverError ? (
-          <p role="alert" className="text-sm text-red-700">
-            {serverError}
-          </p>
-        ) : null}
-        <SubmitButton>
-          <Trans>Continue</Trans>
-        </SubmitButton>
-      </Form.Root>
-    </AuthCard>
+    <>
+      <MaxMindTracker accountId={maxmindAccountId} />
+      <AuthCard title={<Trans>Create your account</Trans>}>
+        <Form.Root
+          schema={registerClientSchema}
+          formComponent={RRForm}
+          method="POST"
+          defaultValues={{
+            email: prefill.email,
+            firstName: prefill.firstName,
+            lastName: prefill.lastName,
+          }}
+          isSubmitting={navigation.state === 'submitting'}
+          className="flex flex-col gap-4">
+          <input type="hidden" name="csrf" value={csrfToken} />
+          <input type="hidden" name="deviceTrackingToken" ref={deviceTokenRef} defaultValue="" />
+          {organization ? <input type="hidden" name="organization" value={organization} /> : null}
+          {requestId ? <input type="hidden" name="requestId" value={requestId} /> : null}
+          {idp ? (
+            <>
+              <input type="hidden" name="idpIntentId" value={idp.idpIntentId} />
+              <input type="hidden" name="idpIntentToken" value={idp.idpIntentToken} />
+              <input type="hidden" name="idpId" value={idp.idpId} />
+              <input type="hidden" name="idpUserId" value={idp.idpUserId} />
+              <input type="hidden" name="idpUserName" value={idp.idpUserName} />
+            </>
+          ) : null}
+          <Form.Field name="email" label={t`Email`} required>
+            <Form.Input type="email" autoComplete="email" autoFocus />
+          </Form.Field>
+          <Form.Field name="firstName" label={t`First name`} required>
+            <Form.Input type="text" autoComplete="given-name" />
+          </Form.Field>
+          <Form.Field name="lastName" label={t`Last name`} required>
+            <Form.Input type="text" autoComplete="family-name" />
+          </Form.Field>
+          {serverError ? (
+            <p role="alert" className="text-sm text-red-700">
+              {serverError}
+            </p>
+          ) : null}
+          <SubmitButton>
+            <Trans>Continue</Trans>
+          </SubmitButton>
+        </Form.Root>
+      </AuthCard>
+    </>
   );
 }

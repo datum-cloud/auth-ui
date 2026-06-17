@@ -52,6 +52,11 @@ const schema = z
     // loader (see resolveFathomSiteId in app/modules/analytics/fathom.tsx): dev and
     // preview never contact Fathom even when this is set.
     FATHOM_ID: z.string().optional(),
+    // MaxMind minFraud device-fingerprinting account id. Optional in EVERY environment
+    // (staging may want fraud detection too). Unset ⇒ the signup MaxMind tracker is a
+    // true no-op (no device.js loaded, no token captured). Exposed to the client only
+    // via the signup loaders (no window.ENV machinery in this app).
+    MAXMIND_ACCOUNT_ID: z.string().optional(),
   })
   .superRefine((v, ctx) => {
     // Zitadel creds are only required when the Zitadel adapter is actually selected.

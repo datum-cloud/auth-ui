@@ -17,6 +17,15 @@ import { postRegisterStep } from '@/resources/signup/post-register';
 import { verifyUrlTemplate } from '@/resources/verify/verify-url-template';
 import { logAuthEvent, hashActor } from '@/server/observability';
 
+/**
+ * Zitadel session-metadata key for the MaxMind device-tracking token. This string is a
+ * HARD CONTRACT with the Go backend: auth-provider-zitadel reads this exact key and
+ * mirrors it to the milo annotation `iam.miloapis.com/maxmind-tracking-token`, which the
+ * fraud service consumes. The backend allowlists metadata keys — keep this in sync with
+ * the Go-side metadataAnnotationKeys allowlist or the token is silently dropped.
+ */
+const MAXMIND_TRACKING_TOKEN_METADATA_KEY = 'maxmind/tracking-token';
+
 // ── shared result shapes ──────────────────────────────────────────────────────
 
 /**
@@ -94,7 +103,7 @@ export async function registerAndLinkIdp(
   await provider.addIdpLink(user.id, idpLink);
   const session = await provider.createSession(
     { idpIntent: { idpIntentId: input.idpIntentId, idpIntentToken: input.idpIntentToken } },
-    { orgId: organization, requestId, metadata: { userId: user.id } }
+    { orgId: organization, requestId, userId: user.id }
   );
   const sessions = addSession(list, {
     id: session.id,
@@ -153,6 +162,8 @@ export interface PasskeyFirstRegisterInput {
    * Host-header email-link injection.
    */
   origin: string;
+  /** MaxMind device-fingerprint token captured client-side; attached as session metadata. */
+  deviceTrackingToken?: string;
 }
 
 export type PasskeyFirstRegisterResult =
@@ -174,7 +185,10 @@ export async function registerPasskeyFirst(
   list: SessionEntry[],
   input: PasskeyFirstRegisterInput
 ): Promise<PasskeyFirstRegisterResult> {
-  const { email, firstName, lastName, organization, requestId, origin } = input;
+  const { email, firstName, lastName, organization, requestId, origin, deviceTrackingToken } = input;
+  const sessionMetadata = deviceTrackingToken
+    ? { [MAXMIND_TRACKING_TOKEN_METADATA_KEY]: deviceTrackingToken }
+    : undefined;
 
   if (input.requireVerification) {
     try {
@@ -187,7 +201,7 @@ export async function registerPasskeyFirst(
       });
       const session = await provider.createSession(
         {},
-        { orgId: organization, requestId, metadata: { userId: user.id } }
+        { orgId: organization, requestId, userId: user.id, metadata: sessionMetadata }
       );
       const sessions = addSession(list, {
         id: session.id,
@@ -217,7 +231,7 @@ export async function registerPasskeyFirst(
     const user = await provider.register({ email, firstName, lastName, orgId: organization });
     const session = await provider.createSession(
       {},
-      { orgId: organization, requestId, metadata: { userId: user.id } }
+      { orgId: organization, requestId, userId: user.id, metadata: sessionMetadata }
     );
     const sessions = addSession(list, {
       id: session.id,
@@ -263,6 +277,8 @@ export interface RegisterWithPasswordInput {
   requireVerification: boolean;
   /** TRUSTED app origin (scheme + host) from trustedAppOrigin(request). See above. */
   origin: string;
+  /** MaxMind device-fingerprint token captured client-side; attached as session metadata. */
+  deviceTrackingToken?: string;
 }
 
 export type RegisterWithPasswordResult =
@@ -284,7 +300,11 @@ export async function registerWithPassword(
   list: SessionEntry[],
   input: RegisterWithPasswordInput
 ): Promise<RegisterWithPasswordResult> {
-  const { email, firstName, lastName, password, organization, requestId, origin } = input;
+  const { email, firstName, lastName, password, organization, requestId, origin, deviceTrackingToken } =
+    input;
+  const sessionMetadata = deviceTrackingToken
+    ? { [MAXMIND_TRACKING_TOKEN_METADATA_KEY]: deviceTrackingToken }
+    : undefined;
 
   // Steer the verification mail's link back to OUR /verify route (raw provider
   // placeholders, filled by Zitadel). requestId rides along so the post-verify step
@@ -307,7 +327,7 @@ export async function registerWithPassword(
       const user = await register();
       const session = await provider.createSession(
         {},
-        { orgId: organization, requestId, metadata: { userId: user.id } }
+        { orgId: organization, requestId, userId: user.id, metadata: sessionMetadata }
       );
       const sessions = addSession(list, {
         id: session.id,
@@ -337,7 +357,7 @@ export async function registerWithPassword(
     const user = await register();
     const session = await provider.createSession(
       {},
-      { orgId: organization, requestId, metadata: { userId: user.id } }
+      { orgId: organization, requestId, userId: user.id, metadata: sessionMetadata }
     );
     const sessions = addSession(list, {
       id: session.id,

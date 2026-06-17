@@ -81,7 +81,7 @@ describe('FakeAuthProvider — device / saml / ldap (P6)', () => {
     // createSession with the returned intent must succeed and bind the correct user.
     const session = await p.createSession(
       { idpIntent: { idpIntentId, idpIntentToken } },
-      { metadata: { userId } }
+      { userId }
     );
     expect(session.user?.id).toBe('u13');
     expect(session.user?.loginName).toBe('ldap-bob@acme.test');

@@ -141,22 +141,60 @@ describe('ZitadelAuthProvider — RPC deadline', () => {
   }, 15_000);
 });
 
-describe('ZitadelAuthProvider — createSession lifetime', () => {
-  it('requests an explicit session lifetime so Zitadel returns an expirationDate (fixes empty /accounts picker)', async () => {
+describe('ZitadelAuthProvider — createSession lifetime + opts', () => {
+  type CapturedReq = {
+    lifetime?: { seconds?: bigint };
+    metadata?: Record<string, Uint8Array>;
+    checks?: { user?: { search?: { case?: string; value?: string } } };
+  };
+
+  it('requests an explicit session lifetime and builds the user check from opts.userId', async () => {
     // Without a lifetime the created session has no expirationDate → mapper stores expiresAt='' →
     // listSessions drops every entry → the multi-account picker is always empty. createSession
     // must send a positive lifetime so sessions carry a real expiry.
-    let captured: { lifetime?: { seconds?: bigint } } | undefined;
+    let captured: CapturedReq | undefined;
     stubClient({
-      createSession: async (req: { lifetime?: { seconds?: bigint } }) => {
+      createSession: async (req: CapturedReq) => {
         captured = req;
         return { sessionId: 's1', sessionToken: 'tok' };
       },
       getSession: async () => ({ session: { id: 's1' } }),
     });
-    await provider().createSession({ password: 'p' }, { metadata: { userId: 'u1' } });
+    await provider().createSession({ password: 'p' }, { userId: 'u1' });
     expect(captured?.lifetime).toBeDefined();
     expect(Number(captured?.lifetime?.seconds)).toBeGreaterThan(0);
+    expect(captured?.checks?.user?.search?.value).toBe('u1');
+  });
+
+  it('forwards opts.metadata to the CreateSession proto metadata map, encoded string→bytes', async () => {
+    let captured: CapturedReq | undefined;
+    stubClient({
+      createSession: async (req: CapturedReq) => {
+        captured = req;
+        return { sessionId: 's1', sessionToken: 'tok' };
+      },
+      getSession: async () => ({ session: { id: 's1' } }),
+    });
+    await provider().createSession(
+      {},
+      { userId: 'u1', metadata: { 'maxmind/tracking-token': 'tok-abc' } }
+    );
+    const bytes = captured?.metadata?.['maxmind/tracking-token'];
+    expect(bytes).toBeInstanceOf(Uint8Array);
+    expect(new TextDecoder().decode(bytes)).toBe('tok-abc');
+  });
+
+  it('omits the metadata field entirely when opts.metadata is absent', async () => {
+    let captured: CapturedReq | undefined;
+    stubClient({
+      createSession: async (req: CapturedReq) => {
+        captured = req;
+        return { sessionId: 's1', sessionToken: 'tok' };
+      },
+      getSession: async () => ({ session: { id: 's1' } }),
+    });
+    await provider().createSession({}, { userId: 'u1' });
+    expect(captured?.metadata).toBeUndefined();
   });
 });
 

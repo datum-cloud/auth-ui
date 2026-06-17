@@ -44,6 +44,18 @@ export interface SessionChecks {
 export interface SessionOpts {
   orgId?: string;
   requestId?: string;
+  /**
+   * Control hint: the user the session is being created for. Used to build the
+   * Zitadel user-selection check (checks.user.search.userId). NOT forwarded to
+   * Zitadel as session metadata.
+   */
+  userId?: string;
+  /**
+   * REAL Zitadel session metadata — forwarded to the CreateSession proto
+   * `metadata` map (map<string, bytes>; string values are TextEncoder-encoded to
+   * bytes by the adapter). Used to carry the MaxMind device-tracking token under
+   * the key 'maxmind/tracking-token'.
+   */
   metadata?: Record<string, string>;
 }
 

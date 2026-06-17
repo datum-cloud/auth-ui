@@ -6,7 +6,7 @@
 // using the fake provider exactly as the original did.
 import { FakeAuthProvider } from '@/modules/auth/providers/fake/fake-provider';
 import { getAuthProvider } from '@/modules/auth/select.server';
-import { registerAndLinkIdp } from '@/resources/signup';
+import { registerAndLinkIdp, registerWithPassword } from '@/resources/signup';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 
 afterEach(() => {
@@ -27,6 +27,32 @@ function idpInput(overrides: Record<string, string> = {}) {
     ...overrides,
   };
 }
+
+describe('signup register-with-password — MaxMind token → session metadata', () => {
+  const baseInput = {
+    email: 'bob@acme.test',
+    firstName: 'Bob',
+    lastName: 'Acme',
+    password: 'hunter2hunter2',
+    requireVerification: false,
+    origin: 'https://auth.datum.test',
+  };
+
+  it('forwards deviceTrackingToken as metadata["maxmind/tracking-token"] plus userId', async () => {
+    const fake = getAuthProvider({ AUTH_PROVIDER: 'fake' }) as FakeAuthProvider;
+    await registerWithPassword(fake, [], { ...baseInput, deviceTrackingToken: 'tok' });
+    expect(fake.lastCreateSessionOpts?.metadata).toEqual({ 'maxmind/tracking-token': 'tok' });
+    expect(typeof fake.lastCreateSessionOpts?.userId).toBe('string');
+    expect(fake.lastCreateSessionOpts?.userId).toBeTruthy();
+  });
+
+  it('sets no metadata when deviceTrackingToken is absent', async () => {
+    const fake = getAuthProvider({ AUTH_PROVIDER: 'fake' }) as FakeAuthProvider;
+    await registerWithPassword(fake, [], baseInput);
+    expect(fake.lastCreateSessionOpts?.metadata).toBeUndefined();
+    expect(fake.lastCreateSessionOpts?.userId).toBeTruthy();
+  });
+});
 
 describe('signup register-and-link path (CODE-MIN-04)', () => {
   it('register-and-link calls addIdpLink once and does not pass idpLink to register (CODE-MIN-04)', async () => {

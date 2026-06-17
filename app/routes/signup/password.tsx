@@ -2,6 +2,7 @@ import { AuthCard } from '@/components/auth-card/auth-card';
 import { SubmitButton } from '@/components/auth-form/auth-form';
 import { BackLink } from '@/components/back-link/back-link';
 import { TrackOnMount } from '@/modules/analytics/fathom';
+import { MaxMindTracker, readMaxMindTrackingToken } from '@/modules/fraud/maxmind-tracker';
 import { readSessions, serializeSessions } from '@/modules/auth/session/cookie';
 import { genericCheckYourEmail } from '@/resources/schemas/check-your-email.schema';
 import { registerWithPassword } from '@/resources/signup';
@@ -10,8 +11,10 @@ import { trustedAppOrigin } from '@/server/app-origin.server';
 import { providerForRequest } from '@/server/auth-context.server';
 import { getCsrfToken, assertCsrf } from '@/server/csrf';
 import { requireEmailVerification } from '@/server/env';
+import { env } from '@/utils/env/env.server';
 import { Form } from '@datum-cloud/datum-ui/form';
 import { Trans, useLingui } from '@lingui/react/macro';
+import { useEffect, useRef } from 'react';
 import {
   data,
   redirect,
@@ -39,6 +42,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
       lastName: url.searchParams.get('lastName') ?? '',
       organization: url.searchParams.get('organization') ?? undefined,
       requestId: url.searchParams.get('requestId') ?? undefined,
+      deviceTrackingToken: url.searchParams.get('deviceTrackingToken') ?? '',
+      maxmindAccountId: env.MAXMIND_ACCOUNT_ID ?? '',
     },
     { headers }
   );
@@ -64,6 +69,9 @@ export async function action({ request }: ActionFunctionArgs) {
     password: parsed.data.password,
     organization: fields.organization ? String(fields.organization) : undefined,
     requestId: fields.requestId ? String(fields.requestId) : undefined,
+    deviceTrackingToken: fields.deviceTrackingToken
+      ? String(fields.deviceTrackingToken)
+      : undefined,
     requireVerification: requireEmailVerification(),
     origin: trustedAppOrigin(request),
   });
@@ -81,8 +89,38 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function SignupPassword() {
-  const { csrfToken, loginName, firstName, lastName, organization, requestId } =
-    useLoaderData<typeof loader>();
+  const {
+    csrfToken,
+    loginName,
+    firstName,
+    lastName,
+    organization,
+    requestId,
+    deviceTrackingToken,
+    maxmindAccountId,
+  } = useLoaderData<typeof loader>();
+  const deviceTokenRef = useRef<HTMLInputElement>(null);
+
+  // The hidden input is seeded (defaultValue) with the token handed off in the URL so
+  // it survives even with JS disabled. When MaxMindTracker mirrors a fresh token into
+  // sessionStorage, prefer that — re-read on a short interval until it appears.
+  useEffect(() => {
+    if (!maxmindAccountId) return;
+    const sync = () => {
+      const token = readMaxMindTrackingToken();
+      if (token && deviceTokenRef.current) {
+        deviceTokenRef.current.value = token;
+        return true;
+      }
+      return false;
+    };
+    if (sync()) return;
+    const handle = window.setInterval(() => {
+      if (sync()) window.clearInterval(handle);
+    }, 300);
+    return () => window.clearInterval(handle);
+  }, [maxmindAccountId]);
+
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
   const { t } = useLingui();
@@ -104,38 +142,47 @@ export default function SignupPassword() {
   }
 
   return (
-    <AuthCard title={<Trans>Set a password</Trans>}>
-      <div className="mb-4">
-        <BackLink />
-      </div>
-      <Form.Root
-        schema={signupPasswordSchema}
-        formComponent={RRForm}
-        method="POST"
-        defaultValues={{ password: '', confirm: '' }}
-        isSubmitting={navigation.state === 'submitting'}
-        className="flex flex-col gap-4">
-        <input type="hidden" name="csrf" value={csrfToken} />
-        <input type="hidden" name="loginName" value={loginName} />
-        <input type="hidden" name="firstName" value={firstName} />
-        <input type="hidden" name="lastName" value={lastName} />
-        {organization ? <input type="hidden" name="organization" value={organization} /> : null}
-        {requestId ? <input type="hidden" name="requestId" value={requestId} /> : null}
-        <Form.Field name="password" label={t`Password`} required>
-          <Form.Input type="password" autoComplete="new-password" autoFocus />
-        </Form.Field>
-        <Form.Field name="confirm" label={t`Confirm password`} required>
-          <Form.Input type="password" autoComplete="new-password" />
-        </Form.Field>
-        {serverError ? (
-          <p role="alert" className="text-sm text-red-700">
-            {serverError}
-          </p>
-        ) : null}
-        <SubmitButton>
-          <Trans>Create account</Trans>
-        </SubmitButton>
-      </Form.Root>
-    </AuthCard>
+    <>
+      <MaxMindTracker accountId={maxmindAccountId} />
+      <AuthCard title={<Trans>Set a password</Trans>}>
+        <div className="mb-4">
+          <BackLink />
+        </div>
+        <Form.Root
+          schema={signupPasswordSchema}
+          formComponent={RRForm}
+          method="POST"
+          defaultValues={{ password: '', confirm: '' }}
+          isSubmitting={navigation.state === 'submitting'}
+          className="flex flex-col gap-4">
+          <input type="hidden" name="csrf" value={csrfToken} />
+          <input type="hidden" name="loginName" value={loginName} />
+          <input type="hidden" name="firstName" value={firstName} />
+          <input type="hidden" name="lastName" value={lastName} />
+          {organization ? <input type="hidden" name="organization" value={organization} /> : null}
+          {requestId ? <input type="hidden" name="requestId" value={requestId} /> : null}
+          <input
+            type="hidden"
+            name="deviceTrackingToken"
+            ref={deviceTokenRef}
+            defaultValue={deviceTrackingToken}
+          />
+          <Form.Field name="password" label={t`Password`} required>
+            <Form.Input type="password" autoComplete="new-password" autoFocus />
+          </Form.Field>
+          <Form.Field name="confirm" label={t`Confirm password`} required>
+            <Form.Input type="password" autoComplete="new-password" />
+          </Form.Field>
+          {serverError ? (
+            <p role="alert" className="text-sm text-red-700">
+              {serverError}
+            </p>
+          ) : null}
+          <SubmitButton>
+            <Trans>Create account</Trans>
+          </SubmitButton>
+        </Form.Root>
+      </AuthCard>
+    </>
   );
 }

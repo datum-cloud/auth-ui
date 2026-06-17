@@ -281,3 +281,21 @@ describe('env schema — FATHOM_ID (optional analytics site id)', () => {
     }
   });
 });
+
+describe('env schema — MAXMIND_ACCOUNT_ID (optional, device fingerprinting)', () => {
+  it('passes through MAXMIND_ACCOUNT_ID when set', () => {
+    const result = _envSchema.safeParse({ ...BASE, MAXMIND_ACCOUNT_ID: '123456' });
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.MAXMIND_ACCOUNT_ID).toBe('123456');
+    }
+  });
+
+  it('leaves MAXMIND_ACCOUNT_ID undefined when not set (no-op default)', () => {
+    const result = _envSchema.safeParse(BASE);
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.MAXMIND_ACCOUNT_ID).toBeUndefined();
+    }
+  });
+});

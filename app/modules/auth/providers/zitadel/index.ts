@@ -388,8 +388,8 @@ export class ZitadelAuthProvider implements AuthProvider {
     const sessions = this.svc(SessionService);
     return this.call(async () => {
       // Phase 1: user-only or user+password. User must be selected before createSession in the real flow;
-      // /login resolves the user first via findUser, so we pass the userId via opts.metadata.userId.
-      const userId = opts?.metadata?.userId;
+      // /login resolves the user first via findUser, so we pass the userId via opts.userId.
+      const userId = opts?.userId;
       const builtChecks = create(ChecksSchema, {
         ...(userId ? { user: { search: { case: 'userId', value: userId } } } : {}),
         // Use presence semantics (undefined check, not truthiness) so an empty-string password
@@ -411,8 +411,22 @@ export class ZitadelAuthProvider implements AuthProvider {
       // "expired" (Number('')===0), leaving the multi-account picker permanently empty. 12h matches
       // the access-token window and stays well under typical instance session caps.
       const lifetimeSeconds = 12 * 60 * 60;
+      // Forward REAL session metadata (e.g. the MaxMind device-tracking token under
+      // 'maxmind/tracking-token'). The proto field is map<string, bytes>, so each
+      // string value is TextEncoder-encoded to bytes. Omit the field entirely when
+      // there is no metadata so we never send an empty map.
+      const encoder = new TextEncoder();
+      const metadata = opts?.metadata
+        ? Object.fromEntries(
+            Object.entries(opts.metadata).map(([k, v]) => [k, encoder.encode(v)])
+          )
+        : undefined;
       const created = await sessions.createSession(
-        { checks: builtChecks, lifetime: { seconds: BigInt(lifetimeSeconds) } },
+        {
+          checks: builtChecks,
+          lifetime: { seconds: BigInt(lifetimeSeconds) },
+          ...(metadata ? { metadata } : {}),
+        },
         {}
       );
       const got = await sessions.getSession(

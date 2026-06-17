@@ -115,6 +115,8 @@ export class FakeAuthProvider implements AuthProvider {
   // ON test flips THIS, not a settingsByOrg key (which is never consulted for an empty orgId).
   private allowDomainDiscovery = false;
   private seq = 0;
+  /** Last opts passed to createSession — test-only, lets specs assert userId + metadata. */
+  lastCreateSessionOpts: SessionOpts | undefined;
 
   constructor(seed: Seed = {}) {
     this.users = seed.users ?? [];
@@ -280,10 +282,11 @@ export class FakeAuthProvider implements AuthProvider {
 
   async createSession(checks: SessionChecks, opts?: SessionOpts): Promise<Session> {
     const id = `sess-${++this.seq}`;
+    this.lastCreateSessionOpts = opts;
 
-    // P4: resolve idpIntent from seeded intents; prefer intent's userId over opts.metadata.userId
+    // P4: resolve idpIntent from seeded intents; prefer intent's userId over opts.userId
     const intent = checks.idpIntent ? this.idpIntents[checks.idpIntent.idpIntentId] : undefined;
-    const boundUserId = intent?.userId ?? opts?.metadata?.userId ?? null;
+    const boundUserId = intent?.userId ?? opts?.userId ?? null;
 
     const user = boundUserId
       ? (this.users.find((u) => u.id === boundUserId) ?? undefined)

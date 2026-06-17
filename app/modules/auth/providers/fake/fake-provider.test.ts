@@ -86,12 +86,19 @@ describe('FakeAuthProvider — Phase 1 surface', () => {
     expect(updated.factors.password?.verifiedAt).not.toBeNull();
   });
 
-  it('createSession attaches the user named by opts.metadata.userId, and updateSession preserves it', async () => {
+  it('createSession attaches the user named by opts.userId, and updateSession preserves it', async () => {
     const p = make();
-    const s = await p.createSession({}, { metadata: { userId: 'u1' } });
+    const s = await p.createSession({}, { userId: 'u1' });
     expect(s.user?.id).toBe('u1');
     const updated = await p.updateSession(s.id, s.token, { password: 'hunter2' });
     expect(updated.user?.id).toBe('u1');
+  });
+
+  it('createSession records opts.userId and opts.metadata for assertion', async () => {
+    const p = make();
+    await p.createSession({}, { userId: 'u1', metadata: { 'maxmind/tracking-token': 'tok-abc' } });
+    expect(p.lastCreateSessionOpts?.userId).toBe('u1');
+    expect(p.lastCreateSessionOpts?.metadata).toEqual({ 'maxmind/tracking-token': 'tok-abc' });
   });
 
   it('updateSession with wrong password throws ProviderError(INVALID_CREDENTIALS)', async () => {

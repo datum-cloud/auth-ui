@@ -202,10 +202,7 @@ export async function resolveIdentifier(
   }
   logAuthEvent('identifier', 'success', { actor: hashActor(loginName) });
 
-  const session = await provider.createSession(
-    {},
-    { requestId, orgId: org, metadata: { userId: user.id } }
-  );
+  const session = await provider.createSession({}, { requestId, orgId: org, userId: user.id });
   const methods = await provider.listAuthMethods(user.id);
   const settings = await provider.getLoginSettings(org);
   const decision = decideAfterIdentifier({ methods, settings });
