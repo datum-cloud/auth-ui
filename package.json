@@ -17,7 +17,7 @@
     "test:unit": "vitest run",
     "test:unit:watch": "vitest",
     "test:e2e": "start-server-and-test 'bun run dev' http-get://localhost:3000/healthz 'bunx cypress run'",
-    "test:e2e:fast": "AUTH_PROVIDER=fake start-server-and-test 'bun run dev' http-get://localhost:3000/healthz 'bunx cypress run --spec cypress/e2e/core-signin.cy.ts'",
+    "test:e2e:fast": "bun run build && AUTH_PROVIDER=fake start-server-and-test 'bun run start' http-get://localhost:3000/healthz 'bunx cypress run --spec cypress/e2e/core-signin.cy.ts'",
     "test:acceptance": "bunx cypress run --spec acceptance/core-signin.acceptance.cy.ts",
     "size": "size-limit"
   },
