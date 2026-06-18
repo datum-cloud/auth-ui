@@ -1,3 +1,4 @@
+import { legacyRedirects } from './server/middleware/legacy-redirects';
 import {
   loginPasswordRateLimit,
   signupRateLimit,
@@ -17,7 +18,6 @@ import { env } from '@/utils/env/env.server';
 import { serveStatic } from 'hono/bun';
 import { compress } from 'hono/compress';
 import { createHonoServer } from 'react-router-hono-server/bun';
-import { legacyRedirects } from './server/middleware/legacy-redirects';
 
 declare module 'react-router' {
   interface AppLoadContext {
