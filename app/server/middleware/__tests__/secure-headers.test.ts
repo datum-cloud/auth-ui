@@ -1,4 +1,4 @@
-import { cspDirectives } from '@/server/middleware/secure-headers';
+import { cspDirectives, resolveFrameAncestors } from '@/server/middleware/secure-headers';
 import { describe, it, expect } from 'vitest';
 
 describe('cspDirectives', () => {
@@ -16,8 +16,59 @@ describe('cspDirectives', () => {
     expect(csp.connectSrc).toContain('https://cdn.usefathom.com');
   });
 
-  it('keeps frameAncestors hardcoded to none (auth UI is never embeddable)', () => {
+  it("defaults frameAncestors to 'none' when no override is provided", () => {
     expect(cspDirectives(false).frameAncestors).toEqual(["'none'"]);
     expect(cspDirectives(true).frameAncestors).toEqual(["'none'"]);
+  });
+
+  it('uses the provided frame-ancestors allowlist when configured', () => {
+    const csp = cspDirectives(false, ["'self'", 'https://staging.example.com']);
+    expect(csp.frameAncestors).toEqual(["'self'", 'https://staging.example.com']);
+  });
+});
+
+describe('resolveFrameAncestors', () => {
+  it("defaults to 'none' when unset or blank", () => {
+    expect(resolveFrameAncestors(undefined)).toEqual(["'none'"]);
+    expect(resolveFrameAncestors('')).toEqual(["'none'"]);
+    expect(resolveFrameAncestors('   ')).toEqual(["'none'"]);
+  });
+
+  it('parses a space- or comma-separated allowlist of origins', () => {
+    expect(resolveFrameAncestors('https://a.example.com https://b.example.com')).toEqual([
+      'https://a.example.com',
+      'https://b.example.com',
+    ]);
+    expect(resolveFrameAncestors('https://a.example.com, https://b.example.com')).toEqual([
+      'https://a.example.com',
+      'https://b.example.com',
+    ]);
+  });
+
+  it("supports 'self'", () => {
+    expect(resolveFrameAncestors('self')).toEqual(["'self'"]);
+    expect(resolveFrameAncestors("'self' https://a.example.com")).toEqual([
+      "'self'",
+      'https://a.example.com',
+    ]);
+  });
+
+  it("rejects a bare wildcard and falls back to 'none' (clickjacking footgun)", () => {
+    expect(resolveFrameAncestors('*')).toEqual(["'none'"]);
+    expect(resolveFrameAncestors('https://a.example.com *')).toEqual(["'none'"]);
+  });
+
+  it("treats an explicit 'none' as locked down", () => {
+    expect(resolveFrameAncestors('none')).toEqual(["'none'"]);
+    expect(resolveFrameAncestors("'none'")).toEqual(["'none'"]);
+  });
+
+  it("drops unparseable / non-http(s) tokens, falling back to 'none' if nothing valid remains", () => {
+    expect(resolveFrameAncestors('not-a-url')).toEqual(["'none'"]);
+    expect(resolveFrameAncestors('ftp://x.example.com')).toEqual(["'none'"]);
+    // path is stripped down to the origin
+    expect(resolveFrameAncestors('https://a.example.com/embed')).toEqual([
+      'https://a.example.com',
+    ]);
   });
 });

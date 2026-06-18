@@ -64,6 +64,14 @@ const schema = z
       .string()
       .optional()
       .transform((v) => v === 'true' || v === '1'),
+    // CSP `frame-ancestors` override. Unset ⇒ 'none' (secure default — the auth UI is
+    // not embeddable; X-Frame-Options: DENY is kept in lock-step). Set to a space/comma-
+    // separated allowlist of full origins (e.g. "https://staging.portal.example.com") in
+    // environments that MUST embed the auth UI. Parsed/validated by resolveFrameAncestors
+    // (a bare `*` is rejected). NEXT_PUBLIC_FRAME_ANCESTORS is the legacy alias from the
+    // old Next.js app — FRAME_ANCESTORS is canonical and wins when both are set.
+    FRAME_ANCESTORS: z.string().optional(),
+    NEXT_PUBLIC_FRAME_ANCESTORS: z.string().optional(),
   })
   .superRefine((v, ctx) => {
     // Zitadel creds are only required when the Zitadel adapter is actually selected.
@@ -107,6 +115,10 @@ const schema = z
   .transform((v) => ({
     ...v,
     ZITADEL_API_URL: v.ZITADEL_API_URL ?? 'http://localhost:8080',
+    // Canonical FRAME_ANCESTORS, falling back to the legacy NEXT_PUBLIC_ alias. Still a
+    // raw string here (or undefined) — resolveFrameAncestors validates/parses it at the
+    // header layer (app/server/middleware/secure-headers.ts).
+    FRAME_ANCESTORS: v.FRAME_ANCESTORS ?? v.NEXT_PUBLIC_FRAME_ANCESTORS,
     // Parse comma-separated trusted hosts into an array (undefined when unset → empty = reject all).
     ZITADEL_TRUSTED_FORWARD_HOSTS: v.ZITADEL_TRUSTED_FORWARD_HOSTS
       ? v.ZITADEL_TRUSTED_FORWARD_HOSTS.split(',')

@@ -10,7 +10,7 @@ import {
   verifyEmailSendRateLimit,
 } from '@/server/middleware/rate-limit';
 import { requestContext, type RequestContextEnv } from '@/server/middleware/request-context';
-import { appSecureHeaders } from '@/server/middleware/secure-headers';
+import { appSecureHeaders, resolveFrameAncestors } from '@/server/middleware/secure-headers';
 import { registry, httpMetrics } from '@/server/observability';
 import { samlPostHandler } from '@/server/routes/saml-post';
 import { env } from '@/utils/env/env.server';
@@ -51,7 +51,7 @@ export default await createHonoServer<RequestContextEnv>({
     // httpMetrics must be first so the timer captures total request latency.
     app.use('*', httpMetrics);
     app.use('*', requestContext);
-    app.use('*', appSecureHeaders(isDev));
+    app.use('*', appSecureHeaders(isDev, resolveFrameAncestors(env.FRAME_ANCESTORS)));
     // Compress STATIC ASSETS ONLY — never SSR HTML. Auth pages embed a per-session
     // CSRF token (remix-utils commitToken reuses the cookie token) alongside
     // attacker-reflectable query params (loginName, user_code, …); compressing that
