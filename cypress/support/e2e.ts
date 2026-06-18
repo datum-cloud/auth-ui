@@ -31,8 +31,7 @@ Cypress.on('uncaught:exception', (err) => {
   // Narrowed to the ClientHintCheck component name in the React diff so we don't suppress
   // real mismatches. The diff always shows the component wrapper name.
   const isClientHintNoise =
-    err.message.includes('Hydration failed') &&
-    err.message.includes('ClientHintCheck');
+    err.message.includes('Hydration failed') && err.message.includes('ClientHintCheck');
   // Production builds MINIFY React errors, so the dev-mode "Hydration failed" text never
   // appears — the same Cypress-head-injection hydration mismatch (see settleHydration note
   // below: Cypress ALWAYS injects a <script> into <head>, which real browsers/Playwright do

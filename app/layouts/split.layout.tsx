@@ -115,7 +115,12 @@ export default function SplitLayout({
               <span className="text-xs text-[#595F65]">Co-founder and CEO</span>
             </div>
 
-            <img src={assetUrl('/images/zac-sign.png')} alt="" aria-hidden="true" className="h-[38px] w-24" />
+            <img
+              src={assetUrl('/images/zac-sign.png')}
+              alt=""
+              aria-hidden="true"
+              className="h-[38px] w-24"
+            />
           </div>
         </div>
 

@@ -1,11 +1,6 @@
 import BlankLayout from '@/layouts/blank.layout';
 import type { BrandingTheme } from '@/modules/auth/types';
-import {
-  Card,
-  CardContent,
-  CardHeader,
-  CardDescription,
-} from '@datum-cloud/datum-ui/card';
+import { Card, CardContent, CardHeader, CardDescription } from '@datum-cloud/datum-ui/card';
 import { cn } from '@datum-cloud/datum-ui/utils';
 import type { ReactNode } from 'react';
 

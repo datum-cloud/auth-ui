@@ -15,7 +15,12 @@ export function BackLink() {
   if (!target) return null;
   const to = location.search ? `${target}${location.search}` : target;
   return (
-    <LinkButton theme="link" type="quaternary" as={Link} href={to} className="mx-auto flex flex-col">
+    <LinkButton
+      theme="link"
+      type="quaternary"
+      as={Link}
+      href={to}
+      className="mx-auto flex flex-col">
       <Trans>Back</Trans>
     </LinkButton>
   );
