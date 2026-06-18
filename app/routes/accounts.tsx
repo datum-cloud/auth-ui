@@ -1,4 +1,5 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
+import { useActionErrorToast } from '@/hooks/use-action-error-toast';
 import {
   listAccounts,
   resolveAccountAction,
@@ -6,6 +7,7 @@ import {
 } from '@/resources/session';
 import { providerForRequest } from '@/server/auth-context.server';
 import { getCsrfToken, assertCsrf } from '@/server/csrf';
+import { useAuthErrorMessage } from '@/utils/errors/auth-error-messages';
 import { Button } from '@datum-cloud/datum-ui/button';
 import { Icon } from '@datum-cloud/datum-ui/icons';
 import { Tooltip } from '@datum-cloud/datum-ui/tooltip';
@@ -54,24 +56,15 @@ export default function AccountPicker() {
   const { csrfToken, accounts } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
 
+  const getErrorMessage = useAuthErrorMessage();
+  useActionErrorToast(getErrorMessage((actionData as { error?: string } | undefined)?.error));
+
   return (
     <AuthCard
       title={<Trans>Choose an account</Trans>}
       description={<Trans>Select an account to continue or add a new one.</Trans>}
       className="max-w-[450px]">
       <div className="flex flex-col gap-3">
-        {actionData && 'error' in actionData && (
-          <p role="alert" className="text-destructive text-center text-xs">
-            {actionData.error === 'SESSION_EXPIRED' ? (
-              <Trans>Your session has expired.</Trans>
-            ) : actionData.error === 'NOT_FOUND' ? (
-              <Trans>Account not found.</Trans>
-            ) : (
-              <Trans>Something went wrong. Please try again.</Trans>
-            )}
-          </p>
-        )}
-
         {accounts.length === 0 ? (
           <div className="flex flex-col items-center gap-4 py-4">
             <p className="text-muted-foreground text-center text-sm">

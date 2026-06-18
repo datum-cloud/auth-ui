@@ -3,14 +3,17 @@ import { ErrorView } from './root';
 import { setupI18n } from '@lingui/core';
 import { I18nProvider } from '@lingui/react';
 import { render } from '@testing-library/react';
+import { MemoryRouter } from 'react-router';
 import { describe, it, expect } from 'vitest';
 
 function renderErrorView() {
   const i18n = setupI18n({ locale: 'en', messages: { en: {} } });
   return render(
-    <I18nProvider i18n={i18n}>
-      <ErrorView />
-    </I18nProvider>
+    <MemoryRouter>
+      <I18nProvider i18n={i18n}>
+        <ErrorView />
+      </I18nProvider>
+    </MemoryRouter>
   );
 }
 

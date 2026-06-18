@@ -1,10 +1,8 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
-import { SubmitButton } from '@/components/auth-form/auth-form';
 import { useActionErrorToast } from '@/hooks/use-action-error-toast';
 import { readSessions, serializeSessions } from '@/modules/auth/session/cookie';
 import { genericCheckYourEmail } from '@/resources/schemas/check-your-email.schema';
 import {
-  registerAndLinkIdp,
   passwordFirstHandoff,
   registerPasskeyFirst,
   registerEmailLinkSignup,
@@ -45,13 +43,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const requestId = url.searchParams.get('requestId') ?? undefined;
   const deviceTrackingToken = url.searchParams.get('deviceTrackingToken') ?? undefined;
 
-  // IdP params (set when /sso/:provider/callback redirected here after a brand-new IdP user)
-  const idpIntentId = url.searchParams.get('idpIntentId') ?? undefined;
-  const idpIntentToken = url.searchParams.get('idpIntentToken') ?? '';
-  const idpId = url.searchParams.get('idpId') ?? '';
-  const idpUserId = url.searchParams.get('idpUserId') ?? '';
-  const idpUserName = url.searchParams.get('idpUserName') ?? '';
-
   const [settings, idps] = await Promise.all([
     provider.getLoginSettings(organization),
     provider.capabilities.externalIdp ? provider.getActiveIdPs(organization) : Promise.resolve([]),
@@ -71,12 +62,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
       organization,
       requestId,
       deviceTrackingToken,
-      idpIntentId,
-      idpIntentToken,
-      idpId,
-      idpUserId,
-      idpUserName,
-      isIdp: Boolean(idpIntentId),
       view,
     },
     { headers }
@@ -148,41 +133,16 @@ export async function action({ request }: ActionFunctionArgs) {
     }
   }
 
-  if (intent === 'password') {
-    const result = passwordFirstHandoff({
-      email: loginName,
-      firstName,
-      lastName,
-      organization,
-      requestId,
-      deviceTrackingToken,
-    });
-    return redirect(result.target);
-  }
-
-  // intent === 'idp-register'
-  try {
-    const idpIntentId = String(form.get('idpIntentId') ?? '');
-    const idpIntentToken = String(form.get('idpIntentToken') ?? '');
-    const idpId = String(form.get('idpId') ?? '');
-    const result = await registerAndLinkIdp(provider, await readSessions(request), {
-      email: loginName,
-      firstName,
-      lastName,
-      organization,
-      requestId,
-      idpIntentId,
-      idpIntentToken,
-      idpId,
-      idpUserId: String(form.get('idpUserId') ?? ''),
-      idpUserName: String(form.get('idpUserName') ?? ''),
-    });
-    return redirect(result.target, {
-      headers: { 'set-cookie': await serializeSessions(result.sessions) },
-    });
-  } catch (err) {
-    return actionError(err);
-  }
+  // intent === 'password'
+  const result = passwordFirstHandoff({
+    email: loginName,
+    firstName,
+    lastName,
+    organization,
+    requestId,
+    deviceTrackingToken,
+  });
+  return redirect(result.target);
 }
 
 // ── Shared hidden fields carried in every method form ──────────────────────────
@@ -232,12 +192,6 @@ export default function SignupMethod() {
     organization,
     requestId,
     deviceTrackingToken,
-    idpIntentId,
-    idpIntentToken,
-    idpId,
-    idpUserId,
-    idpUserName,
-    isIdp,
     view,
   } = useLoaderData<typeof loader>();
 
@@ -279,87 +233,64 @@ export default function SignupMethod() {
     <AuthCard
       title={<Trans>Finish creating your account</Trans>}
       description={
-        <Trans>
-          We've sent a verification link to <strong>{loginName}</strong>
-        </Trans>
+        <>
+          {firstName} {lastName} · {loginName}
+        </>
       }>
-      {errorMessage ? (
-        <p role="alert" className="text-sm text-red-700">
-          {errorMessage}
-        </p>
-      ) : null}
       <div className="flex flex-col gap-3">
-        {isIdp ? (
-          // IdP register-and-link: single form, single button
+        {/* Email-link (passwordless) — always shown when email entry is allowed */}
+        {view.showEmailLink ? (
           <RRForm method="post">
             <HiddenContext {...contextProps} />
-            <input type="hidden" name="intent" value="idp-register" />
-            <input type="hidden" name="idpIntentId" value={idpIntentId ?? ''} />
-            <input type="hidden" name="idpIntentToken" value={idpIntentToken} />
-            <input type="hidden" name="idpId" value={idpId} />
-            <input type="hidden" name="idpUserId" value={idpUserId} />
-            <input type="hidden" name="idpUserName" value={idpUserName} />
-            <SubmitButton loading={submitting}>
-              <Trans>Create account</Trans>
-            </SubmitButton>
+            <input type="hidden" name="intent" value="email-link" />
+            <Button
+              size="large"
+              className="h-13"
+              type="quaternary"
+              theme="outline"
+              block
+              htmlType="submit"
+              loading={submitting && navigation.formData?.get('intent') === 'email-link'}>
+              <Trans>Email me a sign-in link</Trans>
+            </Button>
           </RRForm>
-        ) : (
-          <>
-            {/* Email-link (passwordless) — always shown when email entry is allowed */}
-            {view.showEmailLink ? (
-              <RRForm method="post">
-                <HiddenContext {...contextProps} />
-                <input type="hidden" name="intent" value="email-link" />
-                <Button
-                  size="large"
-                  className="h-13"
-                  type="quaternary"
-                  theme="outline"
-                  block
-                  htmlType="submit"
-                  loading={submitting && navigation.formData?.get('intent') === 'email-link'}>
-                  <Trans>Email me a sign-in link</Trans>
-                </Button>
-              </RRForm>
-            ) : null}
+        ) : null}
 
-            {/* Passkey */}
-            {view.showPasskey ? (
-              <RRForm method="post">
-                <HiddenContext {...contextProps} />
-                <input type="hidden" name="intent" value="passkey" />
-                <Button
-                  size="large"
-                  className="h-13"
-                  type="quaternary"
-                  theme="outline"
-                  block
-                  htmlType="submit"
-                  loading={submitting && navigation.formData?.get('intent') === 'passkey'}>
-                  <Trans>Use a passkey</Trans>
-                </Button>
-              </RRForm>
-            ) : null}
+        {/* Passkey */}
+        {view.showPasskey ? (
+          <RRForm method="post">
+            <HiddenContext {...contextProps} />
+            <input type="hidden" name="intent" value="passkey" />
+            <Button
+              size="large"
+              className="h-13"
+              type="quaternary"
+              theme="outline"
+              block
+              htmlType="submit"
+              loading={submitting && navigation.formData?.get('intent') === 'passkey'}>
+              <Trans>Use a passkey</Trans>
+            </Button>
+          </RRForm>
+        ) : null}
 
-            {/* Password */}
-            {view.showPassword ? (
-              <RRForm method="post">
-                <HiddenContext {...contextProps} />
-                <input type="hidden" name="intent" value="password" />
-                <Button
-                  size="large"
-                  className="h-13"
-                  type="quaternary"
-                  theme="outline"
-                  block
-                  htmlType="submit"
-                  loading={submitting && navigation.formData?.get('intent') === 'password'}>
-                  <Trans>Set a password</Trans>
-                </Button>
-              </RRForm>
-            ) : null}
-          </>
-        )}
+        {/* Password */}
+        {view.showPassword ? (
+          <RRForm method="post">
+            <HiddenContext {...contextProps} />
+            <input type="hidden" name="intent" value="password" />
+            <Button
+              size="large"
+              className="h-13"
+              type="quaternary"
+              theme="outline"
+              block
+              htmlType="submit"
+              loading={submitting && navigation.formData?.get('intent') === 'password'}>
+              <Trans>Set a password</Trans>
+            </Button>
+          </RRForm>
+        ) : null}
       </div>
     </AuthCard>
   );

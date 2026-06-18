@@ -1,4 +1,5 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
+import { useActionErrorToast } from '@/hooks/use-action-error-toast';
 import {
   decisionOutcomeToResponse,
   loadDeviceConsent,
@@ -6,6 +7,7 @@ import {
 } from '@/resources/device';
 import { providerForRequest } from '@/server/auth-context.server';
 import { getCsrfToken, assertCsrf } from '@/server/csrf';
+import { useAuthErrorMessage } from '@/utils/errors/auth-error-messages';
 import { Button } from '@datum-cloud/datum-ui/button';
 import { Trans, useLingui } from '@lingui/react/macro';
 import {
@@ -49,6 +51,9 @@ export default function DeviceAuthorize() {
   const { t } = useLingui();
   const isSubmitting = navigation.state === 'submitting';
 
+  const getErrorMessage = useAuthErrorMessage();
+  useActionErrorToast(getErrorMessage((actionData as { error?: string } | undefined)?.error));
+
   if (actionData && 'done' in actionData) {
     return (
       <AuthCard
@@ -59,15 +64,9 @@ export default function DeviceAuthorize() {
   }
 
   const { csrfToken, appName, scope, deviceAuthId, requestId } = loaderData;
-  const actionError = actionData && 'error' in actionData;
 
   return (
     <AuthCard title={<Trans>Authorize device</Trans>}>
-      {actionError && (
-        <p role="alert" className="text-sm text-red-700">
-          <Trans>Something went wrong. Please return to your device and try again.</Trans>
-        </p>
-      )}
       {appName && (
         <p>
           <Trans>
@@ -82,7 +81,7 @@ export default function DeviceAuthorize() {
           ))}
         </ul>
       )}
-      <RRForm method="post" className="flex flex-col gap-4">
+      <RRForm method="post" className="flex w-full flex-col gap-4">
         <input type="hidden" name="csrf" value={csrfToken} />
         <input type="hidden" name="deviceAuthId" value={deviceAuthId} />
         <input type="hidden" name="requestId" value={requestId} />

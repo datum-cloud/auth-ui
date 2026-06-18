@@ -76,6 +76,12 @@ export interface RegisterInput {
    * build it as `/verify?code={{.Code}}&userId={{.UserID}}&organization={{.OrgID}}`.
    */
   verifyUrlTemplate?: string;
+  /**
+   * When true, the user is created with an already-verified email (no verification
+   * code is sent). Used on the IdP register path where the IdP has already vouched
+   * for the email address. Takes precedence over verifyUrlTemplate.
+   */
+  emailVerified?: boolean;
 }
 
 export interface AuthProvider {
@@ -175,6 +181,15 @@ export interface AuthProvider {
 
   // ldap ─ (P6)
   startLdapIntent(idpId: string, username: string, password: string): Promise<LdapIntent>; // P6
+
+  // idp auto-link helpers
+  /**
+   * Mark the user's current email as verified without sending a code.
+   * Implementation: request a returnCode email-verification code then immediately
+   * call verifyEmail with it. Used after IdP auto-link when the IdP has already
+   * vouched for the email address.
+   */
+  markEmailVerified(userId: string): Promise<void>;
 
   // admin routing
   /**

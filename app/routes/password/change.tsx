@@ -20,7 +20,7 @@ import {
   type LoaderFunctionArgs,
   type MetaFunction,
 } from 'react-router';
-import { Form as RRForm, Link } from 'react-router';
+import { Form as RRForm } from 'react-router';
 
 export const meta: MetaFunction = () => [{ title: 'Change your password' }];
 
@@ -73,8 +73,6 @@ export default function PasswordChange() {
   const errorMessage = getErrorMessage((actionData as { error?: string } | undefined)?.error);
   useActionErrorToast(errorMessage);
 
-  const error = actionData && 'error' in actionData ? actionData.error : undefined;
-
   return (
     <AuthCard title={<Trans>Change your password</Trans>}>
       <Form.Root
@@ -83,7 +81,7 @@ export default function PasswordChange() {
         method="POST"
         defaultValues={{ password: '', confirm: '' }}
         isSubmitting={navigation.state === 'submitting'}
-        className="flex flex-col gap-4">
+        className="flex w-full flex-col gap-4">
         <input type="hidden" name="csrf" value={csrfToken} />
         <input type="hidden" name="sessionId" value={sessionId} />
         {requestId ? <input type="hidden" name="requestId" value={requestId} /> : null}
@@ -94,26 +92,6 @@ export default function PasswordChange() {
         <Form.Field name="confirm" label={t`Confirm password`} required>
           <Form.Input type="password" autoComplete="new-password" />
         </Form.Field>
-
-        {error === 'PERMISSION_DENIED' && (
-          <p role="alert" className="text-sm text-red-700">
-            <Trans>This account must be activated from its invitation email first.</Trans>
-          </p>
-        )}
-        {error === 'SESSION_EXPIRED' && (
-          <p role="alert" className="text-sm text-red-700">
-            <Trans>Your session has expired. Please</Trans>{' '}
-            <Link to="/login" className="underline">
-              <Trans>sign in again</Trans>
-            </Link>
-            .
-          </p>
-        )}
-        {error && error !== 'PERMISSION_DENIED' && error !== 'SESSION_EXPIRED' && errorMessage ? (
-          <p role="alert" className="text-sm text-red-700">
-            {errorMessage}
-          </p>
-        ) : null}
 
         <SubmitButton>
           <Trans>Change password</Trans>

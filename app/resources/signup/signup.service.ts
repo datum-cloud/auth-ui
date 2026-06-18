@@ -80,6 +80,8 @@ export interface SignupIdpLinkInput {
   idpId: string;
   idpUserId: string;
   idpUserName: string;
+  /** When true the IdP has vouched for the email — create the user already-verified. */
+  emailVerified?: boolean;
 }
 
 /**
@@ -102,7 +104,13 @@ export async function registerAndLinkIdp(
     idpUserId: input.idpUserId,
     idpUserName: input.idpUserName,
   };
-  const user = await provider.register({ email, firstName, lastName, orgId: organization });
+  const user = await provider.register({
+    email,
+    firstName,
+    lastName,
+    orgId: organization,
+    emailVerified: input.emailVerified ?? false,
+  });
   await provider.addIdpLink(user.id, idpLink);
   const session = await provider.createSession(
     { idpIntent: { idpIntentId: input.idpIntentId, idpIntentToken: input.idpIntentToken } },

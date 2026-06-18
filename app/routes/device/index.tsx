@@ -1,9 +1,11 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
 import { SubmitButton } from '@/components/auth-form/auth-form';
+import { useActionErrorToast } from '@/hooks/use-action-error-toast';
 import { lookupDeviceCode, lookupOutcomeToResponse } from '@/resources/device';
 import { codeSchema } from '@/resources/device/device.schema';
 import { providerForRequest } from '@/server/auth-context.server';
 import { getCsrfToken, assertCsrf } from '@/server/csrf';
+import { useAuthErrorMessage } from '@/utils/errors/auth-error-messages';
 import { Form } from '@datum-cloud/datum-ui/form';
 import { Trans, useLingui } from '@lingui/react/macro';
 import {
@@ -48,12 +50,8 @@ export default function Device() {
   const navigation = useNavigation();
   const { t } = useLingui();
 
-  const error =
-    actionData && 'error' in actionData
-      ? actionData.error === 'not_found'
-        ? 'not_found'
-        : 'invalid_code'
-      : undefined;
+  const getErrorMessage = useAuthErrorMessage();
+  useActionErrorToast(getErrorMessage((actionData as { error?: string } | undefined)?.error));
 
   return (
     <AuthCard
@@ -65,21 +63,11 @@ export default function Device() {
         method="POST"
         defaultValues={{ userCode: userCode }}
         isSubmitting={navigation.state === 'submitting'}
-        className="flex flex-col gap-4">
+        className="flex w-full flex-col gap-4">
         <input type="hidden" name="csrf" value={csrfToken} />
         <Form.Field name="userCode" label={t`Device code`} required>
           <Form.Input placeholder={t`WDJB-MJHT`} autoFocus autoComplete="off" />
         </Form.Field>
-        {error === 'not_found' && (
-          <p role="alert" className="text-sm text-red-700">
-            <Trans>Code not found. Check your device and try again.</Trans>
-          </p>
-        )}
-        {error === 'invalid_code' && (
-          <p role="alert" className="text-sm text-red-700">
-            <Trans>Invalid code. Please try again.</Trans>
-          </p>
-        )}
         <SubmitButton>
           <Trans>Continue</Trans>
         </SubmitButton>

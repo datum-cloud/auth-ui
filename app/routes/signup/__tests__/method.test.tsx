@@ -85,25 +85,29 @@ const IDENTITY = {
 // ─── Loader ──────────────────────────────────────────────────────────────────
 
 describe('signup/method — loader', () => {
-  it('returns csrfToken, view, and isIdp=false for a plain email URL', async () => {
+  it('returns csrfToken, view, and loginName for a plain email URL', async () => {
     const search = '?loginName=john.doe@example.com&firstName=John&lastName=Doe';
     const res = await runLoader(search);
     const body = await bodyOf(res);
 
     expect(body?.csrfToken).toBeTruthy();
-    expect(body?.isIdp).toBe(false);
     expect(body?.loginName).toBe('john.doe@example.com');
     expect(body?.view).toBeDefined();
+    // isIdp was removed — IdP users no longer reach this route (auto-created in SSO callback)
+    expect(body?.isIdp).toBeUndefined();
   });
 
-  it('returns isIdp=true when idpIntentId is present', async () => {
+  it('ignores idpIntentId params (IdP users are now auto-created in the SSO callback)', async () => {
     const search =
       '?loginName=john@example.com&firstName=John&lastName=Doe&idpIntentId=intent-abc&idpIntentToken=tok&idpId=idp-g&idpUserId=u1&idpUserName=john';
     const res = await runLoader(search);
     const body = await bodyOf(res);
 
-    expect(body?.isIdp).toBe(true);
-    expect(body?.idpIntentId).toBe('intent-abc');
+    // isIdp and idpIntentId are no longer part of loader output
+    expect(body?.isIdp).toBeUndefined();
+    expect(body?.idpIntentId).toBeUndefined();
+    // other fields still work
+    expect(body?.loginName).toBe('john@example.com');
   });
 });
 

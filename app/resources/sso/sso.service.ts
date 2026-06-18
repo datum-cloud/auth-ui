@@ -23,6 +23,7 @@ import {
 } from '@/modules/auth/session/cookie';
 import { ProviderError } from '@/modules/auth/types';
 import type { IdpIntentResult, IdpLink, IdProvider } from '@/modules/auth/types';
+import { registerAndLinkIdp } from '@/resources/signup';
 import { decideIdpCallback } from '@/resources/sso/idp-callback';
 import { idpReturnUrls } from '@/resources/sso/idp-return-urls';
 import { signInWithIdpIntent } from '@/resources/sso/idp-session';
@@ -488,16 +489,35 @@ export async function processIdpCallback(
     if (recent) {
       // CODE-MIN-05: recent.id is a SESSION id, not a user id — getUser(recent.id) was
       // semantically wrong and a wasted call. Resolve the user directly from the session.
-      const session = await provider.getSession(recent.id, recent.token);
-      sessionUserId = session?.user?.id ?? null;
+      try {
+        const session = await provider.getSession(recent.id, recent.token);
+        sessionUserId = session?.user?.id ?? null;
+      } catch {
+        // A stale/expired/invalid ceremony-session entry must not abort a fresh IdP sign-in.
+        // (Zitadel getSession throws NOT_FOUND for an expired session.) Treat as no ceremony user.
+        sessionUserId = null;
+      }
     }
 
     const settings = await provider.getLoginSettings(organization);
+
+    // Resolve a same-email account ONLY on the register path (not linked, not a link
+    // ceremony, creation allowed, draft present) — keeps the lookup off the sign-in path.
+    let existingAccount: { userId: string; hasPassword: boolean } | null = null;
+    if (link !== 'true' && !intent.userId && settings.allowRegister && intent.draft?.email) {
+      const existing = await provider.findUser(intent.draft.email, organization);
+      if (existing) {
+        const methods = await provider.listAuthMethods(existing.id);
+        existingAccount = { userId: existing.id, hasPassword: methods.includes('password') };
+      }
+    }
+
     decision = decideIdpCallback({
       intent,
       link: link === 'true',
       sessionUserId,
       creationAllowed: settings.allowRegister,
+      existingAccount,
     });
   } catch (err) {
     if (err instanceof ProviderError) {
@@ -542,9 +562,25 @@ export async function processIdpCallback(
       return { kind: 'redirect', location: target, setCookie };
     }
 
-    case 'link': {
+    case 'link':
+    case 'auto-link': {
       try {
         await provider.addIdpLink(decision.userId, decision.link);
+
+        // Task 6: on auto-link, mark the email verified immediately — the IdP has already
+        // vouched for it and Zitadel's account stays "unverified" otherwise. Best-effort:
+        // a failure here must NOT abort the link/createSession/redirect (the IdP link itself
+        // succeeded and the sign-in is valid). Do NOT emit an idp.link 'failure' audit event
+        // for a verify-only side-effect.
+        if (decision.kind === 'auto-link' && intent.draft?.email) {
+          try {
+            await provider.markEmailVerified(decision.userId);
+          } catch {
+            // best-effort: the IdP already vouched for the email; if the verify call fails the
+            // account simply stays unverified (prior behavior) — never block the link + sign-in.
+          }
+        }
+
         const session = await provider.createSession(
           { idpIntent: { idpIntentId: id, idpIntentToken: token } },
           { requestId, orgId: organization, userId: decision.userId }
@@ -565,6 +601,7 @@ export async function processIdpCallback(
           userId: decision.userId,
           idpId: decision.link.idpId,
           requestId,
+          auto: decision.kind === 'auto-link',
         });
         const target = requestId
           ? `/authorize?requestId=${encodeURIComponent(requestId)}`
@@ -587,24 +624,47 @@ export async function processIdpCallback(
       }
     }
 
-    case 'register': {
-      // register-and-link: redirect to /signup/method prefilled with IdP draft data + intent
-      // params so the method screen can confirm and compose register → addIdpLink → createSession.
-      const qs = new URLSearchParams({
-        idpIntentId: id,
-        idpIntentToken: token,
-        idpId: decision.link.idpId,
-        idpUserId: decision.link.idpUserId,
-        idpUserName: decision.link.idpUserName,
-      });
-      // /signup/method reads `loginName` (the email is the loginName), matching the
-      // email-identifier flow in signup/index.tsx — NOT `email`, or it arrives empty.
-      if (decision.draft.email) qs.set('loginName', decision.draft.email);
-      if (decision.draft.firstName) qs.set('firstName', decision.draft.firstName);
-      if (decision.draft.lastName) qs.set('lastName', decision.draft.lastName);
+    case 'link-needs-auth': {
+      logAuthEvent('idp.link.denied', 'failure', { reason: 'account-exists', requestId });
+      const qs = new URLSearchParams({ loginName: decision.email, notice: 'link-existing' });
       if (requestId) qs.set('requestId', requestId);
       if (organization) qs.set('organization', organization);
-      return { kind: 'redirect', location: `/signup/method?${qs.toString()}` };
+      return { kind: 'redirect', location: `/login?${qs.toString()}` };
+    }
+
+    case 'auto-create': {
+      // New IdP user: auto-create (email already verified by the IdP), link, and sign in
+      // directly — no /signup/method hop needed.
+      try {
+        const result = await registerAndLinkIdp(provider, entries, {
+          email: decision.draft.email ?? '',
+          firstName: decision.draft.firstName ?? '',
+          lastName: decision.draft.lastName ?? '',
+          organization,
+          requestId,
+          idpId: decision.link.idpId,
+          idpUserId: decision.link.idpUserId,
+          idpUserName: decision.link.idpUserName,
+          idpIntentId: id,
+          idpIntentToken: token,
+          emailVerified: intent.draft?.emailVerified ?? false,
+        });
+        return {
+          kind: 'redirect',
+          location: result.target,
+          setCookie: await serializeSessions(result.sessions),
+        };
+      } catch (err) {
+        if (err instanceof ProviderError) {
+          deps.onAuthEvent?.('idp.register', 'failure');
+          logAuthEvent('idp.register', 'failure', { reason: err.code, requestId });
+          return {
+            kind: 'redirect',
+            location: `/sso/${slug}/error?reason=${providerErrorCode(err.code)}`,
+          };
+        }
+        throw err; // unknown → root ErrorBoundary (CCD-10)
+      }
     }
 
     case 'error': {
@@ -614,6 +674,11 @@ export async function processIdpCallback(
         requestId,
       });
       return { kind: 'redirect', location: `/sso/${slug}/error?reason=${decision.reason}` };
+    }
+
+    default: {
+      const exhausted: never = decision;
+      throw new Error(`Unhandled decision type: ${exhausted}`);
     }
   }
 }

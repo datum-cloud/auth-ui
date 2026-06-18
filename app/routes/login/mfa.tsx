@@ -6,6 +6,7 @@ import { resolveMfaPicker, chooseMfaMethod, type SecondFactorMethod } from '@/re
 import { type LoginLayoutData } from '@/routes/login/layout';
 import { providerForRequest } from '@/server/auth-context.server';
 import { getCsrfToken, assertCsrf } from '@/server/csrf';
+import { assetUrl } from '@/utils/asset-url';
 import { Button } from '@datum-cloud/datum-ui/button';
 import { Icon } from '@datum-cloud/datum-ui/icons';
 import { Trans } from '@lingui/react/macro';
@@ -29,7 +30,13 @@ export const meta: MetaFunction = () => [{ title: 'Choose your verification meth
 const METHOD_LABELS: Record<SecondFactorMethod, { label: ReactNode; icon: ReactNode }> = {
   totp: {
     label: <Trans>Authenticator app</Trans>,
-    icon: <img src="/idps/totp.png" alt="Authenticator app" className="size-4 object-contain" />,
+    icon: (
+      <img
+        src={assetUrl('/images/idps/totp.png')}
+        alt="Authenticator app"
+        className="size-4 object-contain"
+      />
+    ),
   },
   otp_email: {
     label: <Trans>Email one-time code</Trans>,

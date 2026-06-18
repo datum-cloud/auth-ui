@@ -131,9 +131,9 @@ export default function SetupSecurityKey() {
           Register a hardware security key (e.g. YubiKey) as a second factor for your account.
         </Trans>
       }>
-      <div className="flex flex-col gap-4">
+      <div className="flex w-full flex-col gap-4">
         {/* Hidden form that WebAuthnButton populates and submits. */}
-        <RRForm ref={formRef} method="POST" className="flex flex-col gap-4">
+        <RRForm ref={formRef} method="POST" className="flex w-full flex-col gap-4">
           <input type="hidden" name="csrf" value={csrfToken} />
           <input type="hidden" name="loginName" value={loginName} />
           <input type="hidden" name="u2fId" value={u2fId ?? ''} />
@@ -143,20 +143,6 @@ export default function SetupSecurityKey() {
           {checkAfter ? <input type="hidden" name="checkAfter" value={checkAfter} /> : null}
           {/* credential is populated by WebAuthnButton before submit */}
           <input type="hidden" name="credential" defaultValue="" />
-
-          {errorMessage &&
-          actionData &&
-          'error' in actionData &&
-          actionData.error !== 'SESSION_EXPIRED' ? (
-            <p role="alert" className="text-sm text-red-700">
-              {errorMessage}
-            </p>
-          ) : null}
-          {actionData && 'error' in actionData && actionData.error === 'SESSION_EXPIRED' ? (
-            <p role="alert" className="text-sm text-red-700">
-              <Trans>Your session has expired. Please sign in again.</Trans>
-            </p>
-          ) : null}
 
           <WebAuthnButton
             publicKey={publicKey}

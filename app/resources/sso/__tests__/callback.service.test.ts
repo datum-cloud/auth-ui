@@ -78,6 +78,239 @@ describe('processIdpCallback — provider error handling (CODE-MAJ-04)', () => {
 });
 
 // ---------------------------------------------------------------------------
+// Task-3: existingAccount lookup + link-needs-auth redirect with notice
+// ---------------------------------------------------------------------------
+
+// Base intent for the register path: no userId, draft present, emailVerified true.
+const REGISTER_INTENT_VERIFIED: IdpIntentResult = {
+  userId: null,
+  information: { idpId: 'idp-g', idpUserId: 'g-1', idpUserName: 'you@gmail.com' },
+  draft: {
+    email: 'you@gmail.com',
+    firstName: 'You',
+    lastName: 'User',
+    emailVerified: true,
+  },
+};
+
+describe('processIdpCallback — existing same-email account auto-link (Task-3)', () => {
+  it('auto-links and signs in when existing account is passwordless + email is IdP-verified', async () => {
+    const { FakeAuthProvider } = await import('@/modules/auth/providers/fake/fake-provider');
+    const provider = new FakeAuthProvider({
+      users: [{ id: 'u1', loginName: 'you@gmail.com', displayName: 'You User' }],
+      // no password seeded → listAuthMethods returns []
+    });
+    const { processIdpCallback, outcomeToResponse } = await import('@/resources/sso');
+
+    const request = new Request(
+      'https://auth.localtest.me/sso/google/callback?id=intent-1&token=tok-1'
+    );
+    const outcome = await processIdpCallback(provider, request, 'google', {
+      retrieveIdpIntent: async () => REGISTER_INTENT_VERIFIED,
+      onAuthEvent: () => {},
+    });
+    const res = outcomeToResponse(outcome) as Response;
+
+    expect(res.status).toBe(302);
+    // auto-link path: addIdpLink + createSession → signed-in or /authorize
+    const loc = res.headers.get('location') ?? '';
+    expect(loc === '/signed-in' || loc.startsWith('/authorize')).toBe(true);
+    // session cookie must be set
+    expect(res.headers.get('set-cookie')).toBeTruthy();
+  });
+
+  it('routes to /login with notice=link-existing when existing account has a password', async () => {
+    const { FakeAuthProvider } = await import('@/modules/auth/providers/fake/fake-provider');
+    const provider = new FakeAuthProvider({
+      users: [{ id: 'u1', loginName: 'you@gmail.com', displayName: 'You User' }],
+      authMethods: { u1: ['password'] }, // has a password
+    });
+    const { processIdpCallback, outcomeToResponse } = await import('@/resources/sso');
+
+    const request = new Request(
+      'https://auth.localtest.me/sso/google/callback?id=intent-1&token=tok-1'
+    );
+    const outcome = await processIdpCallback(provider, request, 'google', {
+      retrieveIdpIntent: async () => REGISTER_INTENT_VERIFIED,
+      onAuthEvent: () => {},
+    });
+    const res = outcomeToResponse(outcome) as Response;
+
+    expect(res.status).toBe(302);
+    const loc = res.headers.get('location') ?? '';
+    expect(loc).toContain('/login');
+    expect(loc).toContain('notice=link-existing');
+    expect(loc).toContain('loginName=you%40gmail.com');
+    // must NOT have set a session cookie (no addIdpLink should have happened)
+    const cookie = res.headers.get('set-cookie') ?? '';
+    expect(cookie).not.toContain('sess-');
+  });
+
+  it('auto-creates and signs in when no existing account with the same email (new IdP user)', async () => {
+    const { FakeAuthProvider } = await import('@/modules/auth/providers/fake/fake-provider');
+    // empty store → findUser returns null → auto-create path
+    const provider = new FakeAuthProvider({});
+    const { processIdpCallback, outcomeToResponse } = await import('@/resources/sso');
+
+    const request = new Request(
+      'https://auth.localtest.me/sso/google/callback?id=intent-1&token=tok-1'
+    );
+    const outcome = await processIdpCallback(provider, request, 'google', {
+      retrieveIdpIntent: async () => REGISTER_INTENT_VERIFIED,
+      onAuthEvent: () => {},
+    });
+    const res = outcomeToResponse(outcome) as Response;
+
+    // new-user path: auto-create → sign in directly (no /signup/method hop)
+    expect(res.status).toBe(302);
+    const loc = res.headers.get('location') ?? '';
+    expect(loc === '/signed-in' || loc.startsWith('/authorize')).toBe(true);
+    // session cookie must be set (user was created and signed in)
+    expect(res.headers.get('set-cookie')).toBeTruthy();
+    // the created user's email must be verified (IdP vouched for it)
+    const newUser = await provider.findUser('you@gmail.com');
+    expect(newUser).toBeDefined();
+    expect(provider.isEmailVerified(newUser!.id)).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Task-6: mark email verified on IdP auto-link
+// ---------------------------------------------------------------------------
+
+describe('processIdpCallback — mark email verified on auto-link (Task-6)', () => {
+  it('calls markEmailVerified with the account userId and draft email after a successful auto-link', async () => {
+    const { FakeAuthProvider } = await import('@/modules/auth/providers/fake/fake-provider');
+    const provider = new FakeAuthProvider({
+      users: [{ id: 'u1', loginName: 'you@gmail.com', displayName: 'You User' }],
+      // no password seeded → listAuthMethods returns [] → auto-link decision
+    });
+    const { processIdpCallback, outcomeToResponse } = await import('@/resources/sso');
+
+    const request = new Request(
+      'https://auth.localtest.me/sso/google/callback?id=intent-1&token=tok-1'
+    );
+    const outcome = await processIdpCallback(provider, request, 'google', {
+      retrieveIdpIntent: async () => REGISTER_INTENT_VERIFIED,
+      onAuthEvent: () => {},
+    });
+    const res = outcomeToResponse(outcome) as Response;
+
+    // auto-link succeeded → redirect
+    expect(res.status).toBe(302);
+    const loc = res.headers.get('location') ?? '';
+    expect(loc === '/signed-in' || loc.startsWith('/authorize')).toBe(true);
+
+    // The account's email must now be marked verified via the fake's observable state.
+    expect(provider.isEmailVerified('u1')).toBe(true);
+  });
+
+  it('does NOT mark email verified on a plain link ceremony (link=true)', async () => {
+    const { FakeAuthProvider } = await import('@/modules/auth/providers/fake/fake-provider');
+    // Seed the user as already linked so decideIdpCallback returns 'link' (not 'auto-link').
+    const provider = new FakeAuthProvider({
+      users: [{ id: 'u2', loginName: 'you@gmail.com', displayName: 'You User' }],
+      // no password, but link=true forces the 'link' ceremony path
+    });
+    // Seed the intent so userId is known (direct link path — intent.userId set)
+    const LINK_INTENT: IdpIntentResult = {
+      userId: 'u2',
+      information: { idpId: 'idp-g', idpUserId: 'g-1', idpUserName: 'you@gmail.com' },
+      draft: { email: 'you@gmail.com', firstName: 'You', lastName: 'User', emailVerified: true },
+    };
+    const { processIdpCallback, outcomeToResponse } = await import('@/resources/sso');
+
+    const request = new Request(
+      'https://auth.localtest.me/sso/google/callback?id=intent-1&token=tok-1&link=true'
+    );
+    const outcome = await processIdpCallback(provider, request, 'google', {
+      retrieveIdpIntent: async () => LINK_INTENT,
+      onAuthEvent: () => {},
+    });
+    const res = outcomeToResponse(outcome) as Response;
+
+    // link ceremony succeeded → redirect
+    expect(res.status).toBe(302);
+
+    // email must NOT have been marked verified via markEmailVerified
+    expect(provider.isEmailVerified('u2')).toBe(false);
+  });
+
+  it('still redirects even if markEmailVerified throws (best-effort)', async () => {
+    const { FakeAuthProvider } = await import('@/modules/auth/providers/fake/fake-provider');
+    const provider = new FakeAuthProvider({
+      users: [{ id: 'u3', loginName: 'you@gmail.com', displayName: 'You User' }],
+    });
+    // Inject a failing markEmailVerified
+    vi.spyOn(provider, 'markEmailVerified').mockRejectedValue(new Error('Zitadel SetEmail failed'));
+    const { processIdpCallback, outcomeToResponse } = await import('@/resources/sso');
+
+    const request = new Request(
+      'https://auth.localtest.me/sso/google/callback?id=intent-1&token=tok-1'
+    );
+    const outcome = await processIdpCallback(provider, request, 'google', {
+      retrieveIdpIntent: async () => ({
+        ...REGISTER_INTENT_VERIFIED,
+        draft: { ...REGISTER_INTENT_VERIFIED.draft!, email: 'you@gmail.com' },
+      }),
+      onAuthEvent: () => {},
+    });
+    const res = outcomeToResponse(outcome) as Response;
+
+    // must still succeed — the markEmailVerified failure must not abort the link+sign-in
+    expect(res.status).toBe(302);
+    const loc = res.headers.get('location') ?? '';
+    expect(loc === '/signed-in' || loc.startsWith('/authorize')).toBe(true);
+    expect(res.headers.get('set-cookie')).toBeTruthy();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Stale-session resilience: a stale/expired sessions cookie must not abort a
+// fresh IdP sign-in (getSession throws NOT_FOUND → tolerate, treat as no user)
+// ---------------------------------------------------------------------------
+
+describe('processIdpCallback — stale ceremony-session cookie resilience', () => {
+  it('proceeds with a fresh IdP sign-in when the sessions cookie entry causes getSession to throw', async () => {
+    // Arrange: plant a sessions cookie with ONE stale entry.
+    const cookieHeader = await sessionsCookie.serialize([
+      {
+        id: 'stale-session',
+        token: 'stale-token',
+        loginName: 'stale@example.test',
+        creationTs: '2020-01-01T00:00:00.000Z',
+        expirationTs: '2020-01-02T00:00:00.000Z',
+        changeTs: '2020-01-01T00:00:00.000Z',
+      },
+    ]);
+
+    // Stub getSession to throw NOT_FOUND (as Zitadel does for expired sessions).
+    const fake = getAuthProvider({ AUTH_PROVIDER: 'fake' }) as FakeAuthProvider;
+    vi.spyOn(fake, 'getSession').mockRejectedValue(
+      new ProviderError('NOT_FOUND', 'Session not found')
+    );
+
+    // Drive a NEW-user intent (userId: null, draft with email that findUser returns null for).
+    const res = (await runCallback({
+      provider: 'google',
+      query: { id: 'intent-fresh', token: 'tok-fresh' },
+      retrieveIdpIntent: () => Promise.resolve(REGISTER_INTENT),
+      onAuthEvent: () => {},
+      sessionsCookieHeader: cookieHeader,
+    })) as Response;
+
+    // Assert: must NOT redirect to /sso/…/error?reason=request_expired.
+    // New-user path now auto-creates and signs in directly (no /signup/method hop).
+    expect(res.status).toBe(302);
+    const loc = res.headers.get('location') ?? '';
+    expect(loc).not.toContain('/error');
+    expect(loc).not.toContain('request_expired');
+    // auto-create path → signed-in or /authorize
+    expect(loc === '/signed-in' || loc.startsWith('/authorize')).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
 // CODE-MIN-05: resolve ceremony user via getSession, NOT getUser(sessionId)
 // ---------------------------------------------------------------------------
 
@@ -116,12 +349,12 @@ describe('processIdpCallback — session-user resolution (CODE-MIN-05)', () => {
       sessionsCookieHeader: cookieHeader,
     })) as Response;
 
-    // Assert: redirected to /signup/method (register path) and getUser was NOT called for session resolution.
+    // Assert: the callback resolves (redirects somewhere) and getUser was NOT called
+    // with the session id 's1' (the regression this test guards against).
     expect(res.status).toBe(302);
-    expect(res.headers.get('location')).toContain('/signup/method');
-    // Regression guard: /signup/method reads `loginName` (the email is the loginName),
-    // so the IdP draft email MUST ride as `loginName=` — `email=` arrives empty and 400s.
-    expect(res.headers.get('location')).toContain('loginName=');
+    const loc2 = res.headers.get('location') ?? '';
+    // Must not redirect to an error page (session resolution must not throw).
+    expect(loc2).not.toContain('/error');
     // getUser must not have been called with the session id (recent.id = 's1').
     const calledWithSessionId = getUserSpy.mock.calls.some(([id]) => id === 's1');
     expect(calledWithSessionId).toBe(false);

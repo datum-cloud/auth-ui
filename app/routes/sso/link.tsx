@@ -37,7 +37,7 @@ export default function SsoLinkPage() {
     <AuthCard
       title={<Trans>Link your account</Trans>}
       description={<Trans>You must be signed in to link an external account.</Trans>}>
-      <div className="flex flex-col gap-4">
+      <div className="flex w-full flex-col gap-4">
         {providers.length > 0 ? (
           <section className="flex flex-col gap-3">
             <p className="text-foreground text-sm font-medium">

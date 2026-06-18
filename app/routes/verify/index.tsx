@@ -1,11 +1,13 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
 import { SubmitButton } from '@/components/auth-form/auth-form';
+import { useActionErrorToast } from '@/hooks/use-action-error-toast';
 import { readSessions, mostRecent } from '@/modules/auth/session/cookie';
 import { dispatchEmailCode, resendEmailCode, submitEmailCode } from '@/resources/verify';
 import { verifyCodeSchema, verifyCodeClientSchema } from '@/resources/verify/verify.schema';
 import { trustedAppOrigin } from '@/server/app-origin.server';
 import { providerForRequest } from '@/server/auth-context.server';
 import { getCsrfToken, assertCsrf } from '@/server/csrf';
+import { useAuthErrorMessage } from '@/utils/errors/auth-error-messages';
 import { Button } from '@datum-cloud/datum-ui/button';
 import { Form } from '@datum-cloud/datum-ui/form';
 import { Trans, useLingui } from '@lingui/react/macro';
@@ -125,18 +127,14 @@ export default function Verify() {
   const navigation = useNavigation();
   const { t } = useLingui();
 
-  const serverError =
-    actionData && 'error' in actionData
-      ? actionData.error === 'INVALID_CREDENTIALS'
-        ? t`The code is invalid or has expired. Please request a new one.`
-        : t`Please enter your verification code.`
-      : undefined;
+  const getErrorMessage = useAuthErrorMessage();
+  useActionErrorToast(getErrorMessage((actionData as { error?: string } | undefined)?.error));
 
   return (
     <AuthCard
       title={<Trans>Verify your email</Trans>}
       description={<Trans>Enter the verification code sent to your email address.</Trans>}>
-      <div className="flex flex-col gap-4">
+      <div className="flex w-full flex-col gap-4">
         {/* Primary verify form — datum-ui Form.Root; intent=verify is submitted via SubmitButton */}
         <Form.Root
           schema={verifyCodeClientSchema}
@@ -144,7 +142,7 @@ export default function Verify() {
           method="POST"
           defaultValues={{ code }}
           isSubmitting={navigation.state === 'submitting'}
-          className="flex flex-col gap-4">
+          className="flex w-full flex-col gap-4">
           <input type="hidden" name="csrf" value={csrfToken} />
           <input type="hidden" name="userId" value={userId} />
           <input type="hidden" name="intent" value="verify" />
@@ -155,11 +153,6 @@ export default function Verify() {
           <Form.Field name="code" label={t`Verification code`} required>
             <Form.Input inputMode="numeric" autoComplete="one-time-code" autoFocus />
           </Form.Field>
-          {serverError ? (
-            <p role="alert" className="text-sm text-red-700">
-              {serverError}
-            </p>
-          ) : null}
           {'notice' in (actionData ?? {}) &&
             'notice' in actionData! &&
             actionData.notice === 'CODE_SENT' && (

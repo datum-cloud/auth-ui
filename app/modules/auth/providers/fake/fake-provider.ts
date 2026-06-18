@@ -220,7 +220,8 @@ export class FakeAuthProvider implements AuthProvider {
       orgId: input.orgId,
     };
     this.users = [...this.users, user];
-    this.emailVerified.set(id, false);
+    // When emailVerified:true the user is created already-verified (IdP register path).
+    this.emailVerified.set(id, input.emailVerified === true);
     this.emailCodes.set(id, `email-${id}`);
     return user;
   }
@@ -265,6 +266,12 @@ export class FakeAuthProvider implements AuthProvider {
   async resendEmailCode(userId: string, _urlTemplate: string): Promise<void> {
     if (this.emailVerified.get(userId)) throw new ProviderError('ALREADY_DONE', 'already verified');
     this.emailCodes.set(userId, `email-resend-${userId}`);
+  }
+
+  async markEmailVerified(userId: string): Promise<void> {
+    // Two-step: generate a code then verify it (mirrors the Zitadel returnCode impl).
+    // In the fake we can do this directly — observable via isEmailVerified().
+    this.emailVerified.set(userId, true);
   }
 
   // ─── fake-only inspection helpers (not on AuthProvider interface) ─────────────

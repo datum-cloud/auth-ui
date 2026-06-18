@@ -35,7 +35,7 @@ export const signupIdentifierSchema = z.object({
 
 // Screen 2 (/signup/method): which credential the user chose.
 export const signupMethodSchema = z.object({
-  intent: z.enum(['email-link', 'passkey', 'password', 'idp-register']),
+  intent: z.enum(['email-link', 'passkey', 'password']),
   loginName: z.string().min(1),
   firstName: z.string().min(1),
   lastName: z.string().min(1),

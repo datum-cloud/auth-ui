@@ -162,7 +162,7 @@ export default function SignupPassword() {
           method="POST"
           defaultValues={{ password: '', confirm: '' }}
           isSubmitting={navigation.state === 'submitting'}
-          className="flex flex-col gap-4">
+          className="flex w-full flex-col gap-4">
           <input type="hidden" name="csrf" value={csrfToken} />
           <input type="hidden" name="loginName" value={loginName} />
           <input type="hidden" name="firstName" value={firstName} />
@@ -181,11 +181,6 @@ export default function SignupPassword() {
           <Form.Field name="confirm" label={t`Confirm password`} required>
             <Form.Input type="password" autoComplete="new-password" />
           </Form.Field>
-          {errorMessage ? (
-            <p role="alert" className="text-sm text-red-700">
-              {errorMessage}
-            </p>
-          ) : null}
           <SubmitButton>
             <Trans>Create account</Trans>
           </SubmitButton>

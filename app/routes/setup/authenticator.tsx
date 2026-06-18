@@ -96,7 +96,7 @@ export default function SetupAuthenticator() {
           enrollment.
         </Trans>
       }>
-      <div className="flex flex-col gap-4">
+      <div className="flex w-full flex-col gap-4">
         {/* Manual entry fallback — the otpauth URI and the raw secret.
             NOTE: A rendered QR image would improve UX here. The `qrcode` package
             is not yet in this project's dependency tree; adding it is deferred to a
@@ -127,7 +127,7 @@ export default function SetupAuthenticator() {
           method="POST"
           defaultValues={{ code: '' }}
           isSubmitting={navigation.state === 'submitting'}
-          className="flex flex-col gap-4">
+          className="flex w-full flex-col gap-4">
           <input type="hidden" name="csrf" value={csrfToken} />
           <input type="hidden" name="loginName" value={loginName} />
           {requestId ? <input type="hidden" name="requestId" value={requestId} /> : null}
@@ -137,19 +137,6 @@ export default function SetupAuthenticator() {
           <Form.Field name="code" label={t`Authenticator code`} required>
             <Form.Input inputMode="numeric" autoComplete="one-time-code" autoFocus />
           </Form.Field>
-          {errorMessage &&
-          actionData &&
-          'error' in actionData &&
-          actionData.error !== 'SESSION_EXPIRED' ? (
-            <p role="alert" className="text-sm text-red-700">
-              {errorMessage}
-            </p>
-          ) : null}
-          {actionData && 'error' in actionData && actionData.error === 'SESSION_EXPIRED' ? (
-            <p role="alert" className="text-sm text-red-700">
-              <Trans>Your session has expired. Please sign in again.</Trans>
-            </p>
-          ) : null}
           <SubmitButton>
             <Trans>Verify and enable</Trans>
           </SubmitButton>

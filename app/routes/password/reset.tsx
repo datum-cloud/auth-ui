@@ -125,11 +125,6 @@ export default function PasswordReset() {
             placeholder="email@example.com"
           />
         </Form.Field>
-        {errorMessage ? (
-          <p role="alert" className="text-sm text-red-700">
-            {errorMessage}
-          </p>
-        ) : null}
         <SubmitButton>
           <Trans>Send reset link</Trans>
         </SubmitButton>

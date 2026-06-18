@@ -256,7 +256,7 @@ export default function Signup() {
                     method="POST"
                     defaultValues={{ email: prefill.email }}
                     isSubmitting={navigation.state === 'submitting'}
-                    className="flex flex-col gap-4">
+                    className="flex w-full flex-col gap-4">
                     <input type="hidden" name="csrf" value={csrfToken} />
                     <input
                       type="hidden"

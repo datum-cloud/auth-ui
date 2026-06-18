@@ -41,27 +41,14 @@ export default function SetupSms() {
           you sign in.
         </Trans>
       }>
-      <div className="flex flex-col gap-4">
-        <RRForm method="POST" className="flex flex-col gap-4">
+      <div className="flex w-full flex-col gap-4">
+        <RRForm method="POST" className="flex w-full flex-col gap-4">
           <input type="hidden" name="csrf" value={csrfToken} />
           <input type="hidden" name="loginName" value={loginName} />
           {requestId ? <input type="hidden" name="requestId" value={requestId} /> : null}
           {organization ? <input type="hidden" name="organization" value={organization} /> : null}
           {force ? <input type="hidden" name="force" value={force} /> : null}
           {checkAfter ? <input type="hidden" name="checkAfter" value={checkAfter} /> : null}
-          {errorMessage &&
-          actionData &&
-          'error' in actionData &&
-          actionData.error !== 'SESSION_EXPIRED' ? (
-            <p role="alert" className="text-sm text-red-700">
-              {errorMessage}
-            </p>
-          ) : null}
-          {actionData && 'error' in actionData && actionData.error === 'SESSION_EXPIRED' ? (
-            <p role="alert" className="text-sm text-red-700">
-              <Trans>Your session has expired. Please sign in again.</Trans>
-            </p>
-          ) : null}
           <SubmitButton loading={navigation.state === 'submitting'}>
             <Trans>Enable SMS one-time code</Trans>
           </SubmitButton>

@@ -2,26 +2,77 @@ import { decideIdpCallback } from '../idp-callback';
 import type { IdpIntentResult } from '@/modules/auth/types';
 import { describe, it, expect } from 'vitest';
 
-const baseInfo = { idpId: 'idp-g', idpUserId: 'g-1', idpUserName: 'alice' };
-const linked: IdpIntentResult = { information: baseInfo, userId: 'u1', draft: null };
-const unknownUser: IdpIntentResult = {
-  information: baseInfo,
-  userId: null,
-  draft: { email: 'alice@acme.test', firstName: 'Alice', lastName: 'A', emailVerified: true },
-};
+function intentOf(
+  over: Partial<{ userId: string | null; emailVerified: boolean; email: string }> = {}
+): IdpIntentResult {
+  return {
+    userId: over.userId ?? null,
+    information: { idpId: 'idp-g', idpUserId: 'g-1', idpUserName: 'you@gmail.com' },
+    draft: {
+      email: over.email ?? 'you@gmail.com',
+      firstName: 'You',
+      lastName: 'User',
+      emailVerified: over.emailVerified ?? true,
+    },
+  } as IdpIntentResult;
+}
 
-describe('decideIdpCallback', () => {
-  it('outcome 1 — existing+linked, not a link request → sign-in', () => {
+const base = { link: false, sessionUserId: null, creationAllowed: true } as const;
+const LINK = { idpId: 'idp-g', idpUserId: 'g-1', idpUserName: 'you@gmail.com' };
+
+describe('decideIdpCallback — existing-account handling', () => {
+  it('auto-links when email is IdP-verified and the account has no password', () => {
     const d = decideIdpCallback({
-      intent: linked,
-      link: false,
-      sessionUserId: null,
-      creationAllowed: true,
+      ...base,
+      intent: intentOf({ emailVerified: true }),
+      existingAccount: { userId: 'u1', hasPassword: false },
     });
-    expect(d).toEqual({ kind: 'sign-in', userId: 'u1' });
+    expect(d).toEqual({ kind: 'auto-link', userId: 'u1', link: LINK });
   });
 
-  it('outcome 2 — link request whose session user matches → link-then-sign-in', () => {
+  it('requires sign-in when the existing account has a password', () => {
+    const d = decideIdpCallback({
+      ...base,
+      intent: intentOf({ emailVerified: true }),
+      existingAccount: { userId: 'u1', hasPassword: true },
+    });
+    expect(d).toEqual({ kind: 'link-needs-auth', email: 'you@gmail.com' });
+  });
+
+  it('requires sign-in when the IdP did not verify the email', () => {
+    const d = decideIdpCallback({
+      ...base,
+      intent: intentOf({ emailVerified: false }),
+      existingAccount: { userId: 'u1', hasPassword: false },
+    });
+    expect(d).toEqual({ kind: 'link-needs-auth', email: 'you@gmail.com' });
+  });
+
+  it('auto-creates when no existing account matches', () => {
+    const d = decideIdpCallback({ ...base, intent: intentOf(), existingAccount: null });
+    expect(d.kind).toBe('auto-create');
+  });
+
+  it('still signs in when the IdP identity is already linked', () => {
+    const d = decideIdpCallback({
+      ...base,
+      intent: intentOf({ userId: 'u9' }),
+      existingAccount: null,
+    });
+    expect(d).toEqual({ kind: 'sign-in', userId: 'u9' });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Security-boundary cases (recovered from pre-auto-link commit e74960c78)
+// ---------------------------------------------------------------------------
+
+// Fixtures matching the original test's shape (linked user, unknown user).
+const baseInfo = { idpId: 'idp-g', idpUserId: 'g-1', idpUserName: 'alice' };
+const linked: IdpIntentResult = { information: baseInfo, userId: 'u1', draft: null };
+
+describe('decideIdpCallback — link-ceremony and creation-disabled guards', () => {
+  it('link request whose session user matches → kind "link"', () => {
     const d = decideIdpCallback({
       intent: linked,
       link: true,
@@ -35,21 +86,7 @@ describe('decideIdpCallback', () => {
     });
   });
 
-  it('outcome 3 — not found, creation allowed → register-and-link (signup prefill)', () => {
-    const d = decideIdpCallback({
-      intent: unknownUser,
-      link: false,
-      sessionUserId: null,
-      creationAllowed: true,
-    });
-    expect(d).toEqual({
-      kind: 'register',
-      draft: unknownUser.draft,
-      link: { idpId: 'idp-g', idpUserId: 'g-1', idpUserName: 'alice' },
-    });
-  });
-
-  it('guard — link request whose session user differs → access-denied error', () => {
+  it('link request whose session user differs → kind "error" reason "access-denied"', () => {
     const d = decideIdpCallback({
       intent: linked,
       link: true,
@@ -59,9 +96,9 @@ describe('decideIdpCallback', () => {
     expect(d).toEqual({ kind: 'error', reason: 'access-denied' });
   });
 
-  it('guard — not found and creation disabled → error', () => {
+  it('not found and creation disabled → kind "error" reason "creation-disabled"', () => {
     const d = decideIdpCallback({
-      intent: unknownUser,
+      intent: intentOf(),
       link: false,
       sessionUserId: null,
       creationAllowed: false,

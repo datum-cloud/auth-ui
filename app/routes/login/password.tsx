@@ -123,7 +123,7 @@ export default function Password() {
           method="POST"
           defaultValues={{ password: '' }}
           isSubmitting={navigation.state === 'submitting'}
-          className="flex flex-col gap-4">
+          className="flex w-full flex-col gap-4">
           <input type="hidden" name="csrf" value={csrfToken} />
           <input type="hidden" name="loginName" value={loginName} />
           {requestId ? <input type="hidden" name="requestId" value={requestId} /> : null}

@@ -1,9 +1,11 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
 import { SubmitButton } from '@/components/auth-form/auth-form';
+import { useActionErrorToast } from '@/hooks/use-action-error-toast';
 import { submitLdapCredentials, outcomeToResponse, type LdapActionData } from '@/resources/sso';
 import { ldapClientSchema } from '@/resources/sso/sso.schema';
 import { providerForRequest } from '@/server/auth-context.server';
 import { getCsrfToken, assertCsrf } from '@/server/csrf';
+import { useAuthErrorMessage } from '@/utils/errors/auth-error-messages';
 import { Form } from '@datum-cloud/datum-ui/form';
 import { Trans, useLingui } from '@lingui/react/macro';
 import {
@@ -55,7 +57,8 @@ export default function SsoLdap() {
   const navigation = useNavigation();
   const { t } = useLingui();
 
-  const error = actionData?.error;
+  const getErrorMessage = useAuthErrorMessage();
+  useActionErrorToast(getErrorMessage((actionData as { error?: string } | undefined)?.error));
 
   return (
     <AuthCard title={<Trans>Sign in with LDAP</Trans>}>
@@ -64,7 +67,7 @@ export default function SsoLdap() {
         formComponent={RRForm}
         method="POST"
         isSubmitting={navigation.state === 'submitting'}
-        className="flex flex-col gap-4">
+        className="flex w-full flex-col gap-4">
         <input type="hidden" name="csrf" value={csrfToken} />
         <input type="hidden" name="idpId" value={idpId} />
         {requestId ? <input type="hidden" name="requestId" value={requestId} /> : null}
@@ -77,24 +80,6 @@ export default function SsoLdap() {
         <Form.Field name="password" label={t`Password`} required>
           <Form.Input type="password" autoComplete="current-password" />
         </Form.Field>
-
-        {error === 'INVALID_CREDENTIALS' && (
-          <p role="alert" className="text-sm text-red-700">
-            <Trans>Invalid username or password.</Trans>
-          </p>
-        )}
-        {error === 'ACCOUNT_NOT_LINKED' && (
-          <p role="alert" className="text-sm text-red-700">
-            <Trans>
-              No account is linked to these LDAP credentials. Please contact your administrator.
-            </Trans>
-          </p>
-        )}
-        {error && error !== 'INVALID_CREDENTIALS' && error !== 'ACCOUNT_NOT_LINKED' && (
-          <p role="alert" className="text-sm text-red-700">
-            <Trans>An error occurred. Please try again.</Trans>
-          </p>
-        )}
 
         <SubmitButton>
           <Trans>Sign in</Trans>

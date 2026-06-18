@@ -12,7 +12,7 @@ import { useAuthErrorMessage } from '@/utils/errors/auth-error-messages';
 import { Trans } from '@lingui/react/macro';
 import { useRef } from 'react';
 import { useActionData, useLoaderData, type MetaFunction } from 'react-router';
-import { Form as RRForm, Link } from 'react-router';
+import { Form as RRForm } from 'react-router';
 
 export const meta: MetaFunction = () => [{ title: 'Verify with passkey' }];
 
@@ -56,7 +56,7 @@ export default function LoginPasskey() {
       <div className="flex flex-col items-baseline justify-center gap-4">
         <IdentityBadge loginName={loginName} requestId={requestId} organization={organization} />
         {/* Hidden form that WebAuthnButton populates and submits. */}
-        <RRForm ref={formRef} method="POST" className="flex flex-col gap-4">
+        <RRForm ref={formRef} method="POST" className="flex w-full flex-col gap-4">
           <input type="hidden" name="csrf" value={csrfToken} />
           <input type="hidden" name="loginName" value={loginName} />
           {requestId ? <input type="hidden" name="requestId" value={requestId} /> : null}
@@ -64,19 +64,6 @@ export default function LoginPasskey() {
           {/* credential is populated by WebAuthnButton before submit */}
           <input type="hidden" name="credential" defaultValue="" />
 
-          {actionData?.error === 'INVALID_CREDENTIALS' ? (
-            <p role="alert" className="text-sm text-red-700">
-              <Trans>The passkey verification failed. Please try again.</Trans>
-            </p>
-          ) : null}
-          {actionData?.error === 'SESSION_EXPIRED' ? (
-            <p role="alert" className="text-sm text-red-700">
-              <Trans>Your session has expired.</Trans>{' '}
-              <Link to="/login" className="underline">
-                <Trans>Sign in again</Trans>
-              </Link>
-            </p>
-          ) : null}
           <WebAuthnButton publicKey={publicKey} formRef={formRef} />
         </RRForm>
 

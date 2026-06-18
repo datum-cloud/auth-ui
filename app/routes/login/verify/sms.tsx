@@ -28,7 +28,7 @@ import {
   type LoaderFunctionArgs,
   type MetaFunction,
 } from 'react-router';
-import { Form as RRForm, Link } from 'react-router';
+import { Form as RRForm } from 'react-router';
 
 export const meta: MetaFunction = () => [{ title: 'Enter your SMS code' }];
 
@@ -107,7 +107,7 @@ export default function VerifySms() {
           method="POST"
           defaultValues={{ code: '' }}
           isSubmitting={navigation.state === 'submitting'}
-          className="flex flex-col gap-4">
+          className="flex w-full flex-col gap-4">
           <input type="hidden" name="csrf" value={csrfToken} />
           <input type="hidden" name="loginName" value={loginName} />
           {requestId ? <input type="hidden" name="requestId" value={requestId} /> : null}
@@ -115,22 +115,6 @@ export default function VerifySms() {
           <Form.Field name="code" label={t`SMS code`} required>
             <Form.Input inputMode="numeric" autoComplete="one-time-code" autoFocus />
           </Form.Field>
-          {errorMessage &&
-          actionData &&
-          'error' in actionData &&
-          actionData.error !== 'SESSION_EXPIRED' ? (
-            <p role="alert" className="text-sm text-red-700">
-              {errorMessage}
-            </p>
-          ) : null}
-          {actionData && 'error' in actionData && actionData.error === 'SESSION_EXPIRED' ? (
-            <p role="alert" className="text-sm text-red-700">
-              <Trans>Your session has expired.</Trans>{' '}
-              <Link to="/login" className="underline">
-                <Trans>Sign in again</Trans>
-              </Link>
-            </p>
-          ) : null}
           <SubmitButton>
             <Trans>Verify</Trans>
           </SubmitButton>

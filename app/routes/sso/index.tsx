@@ -75,7 +75,7 @@ export default function SsoPage() {
     <AuthCard
       title={<Trans>Linked accounts</Trans>}
       description={<Trans>You can link multiple accounts to your Datum account.</Trans>}>
-      <div className="flex flex-col gap-4">
+      <div className="flex w-full flex-col gap-4">
         {loginName ? <p className="text-foreground text-center text-sm">{loginName}</p> : null}
 
         {/* Linked IdPs */}

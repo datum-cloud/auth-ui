@@ -1,5 +1,4 @@
 import { SubmitButton } from '@/components/auth-form/auth-form';
-import { FormError } from '@/components/form-error/form-error';
 import { useActionErrorToast } from '@/hooks/use-action-error-toast';
 import SplitLayout from '@/layouts/split.layout';
 // ADAPTATION (plan-drift fix): readSessions + serializeSessions live in @/modules/auth/session/cookie.
@@ -66,6 +65,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   // ADAPTATION (getCsrfToken null handling): only set 'set-cookie' when non-null.
   const headers: Record<string, string> = {};
   if (setCookie !== null) headers['set-cookie'] = setCookie;
+  const notice = url.searchParams.get('notice') ?? undefined;
   return data(
     {
       settings,
@@ -73,6 +73,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       csrfToken,
       idps,
       emailDeliveryEnabled: env.AUTH_EMAIL_DELIVERY_ENABLED,
+      notice,
     },
     { headers }
   );
@@ -154,7 +155,7 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function Login() {
-  const { csrfToken, idps, settings, branding, emailDeliveryEnabled } =
+  const { csrfToken, idps, settings, branding, emailDeliveryEnabled, notice } =
     useLoaderData<typeof loader>();
   const { loginName, requestId, organization } = useRouteLoaderData('login') as LoginLayoutData;
   const actionData = useActionData<typeof action>();
@@ -183,19 +184,6 @@ export default function Login() {
   const identifierClientSchema = makeLoginIdentifierClientSchema({
     rejectPhone: field.rejectPhone,
   });
-
-  const serverError =
-    actionData && 'error' in actionData
-      ? actionData.error === 'USER_NOT_FOUND'
-        ? t`We could not find an account for that identifier.`
-        : actionData.error === 'PHONE_LOGIN_DISABLED'
-          ? t`Phone sign-in isn't available — use your email or username.`
-          : actionData.error === 'EMAIL_LOGIN_DISABLED'
-            ? t`Email sign-in isn't available — use your username.`
-            : actionData.error === 'IDP_UNAVAILABLE'
-              ? t`This sign-in provider is currently unavailable. Please try again later.`
-              : t`Please check your input and try again.`
-      : undefined;
 
   const submittingIdpId =
     navigation.state !== 'idle' && navigation.formData?.get('intent') === 'idp'
@@ -231,13 +219,12 @@ export default function Login() {
         <p className="text-foreground/80 text-sm">
           <Trans>Choose your login method</Trans>
         </p>
+        {notice === 'link-existing' ? (
+          <p role="status" className="text-foreground/80 mb-4 text-sm">
+            <Trans>An account with this email already exists — sign in to continue.</Trans>
+          </p>
+        ) : null}
       </div>
-
-      {!view.showPasswordForm && view.showIdpButtons ? (
-        // IdP buttons rendered above but the password form is gated off — still surface
-        // any server error (e.g. IDP_UNAVAILABLE) for the screen-reader.
-        <FormError>{serverError}</FormError>
-      ) : null}
 
       {view.showIdpButtons ? (
         <div className="flex flex-col gap-3">
@@ -324,7 +311,7 @@ export default function Login() {
               method="POST"
               defaultValues={{ loginName: loginName ?? '' }}
               isSubmitting={navigation.state === 'submitting'}
-              className="flex flex-col gap-4">
+              className="flex w-full flex-col gap-4">
               <input type="hidden" name="csrf" value={csrfToken} />
               {requestId ? <input type="hidden" name="requestId" value={requestId} /> : null}
               {organization ? (
@@ -344,7 +331,6 @@ export default function Login() {
                   className="h-9"
                 />
               </Form.Field>
-              <FormError>{serverError}</FormError>
               <SubmitButton loading={identifierSubmitting}>
                 <Trans>Continue</Trans>
               </SubmitButton>

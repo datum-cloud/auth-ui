@@ -15,7 +15,7 @@ export function BackLink() {
   if (!target) return null;
   const to = location.search ? `${target}${location.search}` : target;
   return (
-    <Button theme="link" type="quaternary" asChild>
+    <Button theme="link" type="quaternary" asChild className="mx-auto flex flex-col">
       <Link to={to}>
         <Trans>Back</Trans>
       </Link>

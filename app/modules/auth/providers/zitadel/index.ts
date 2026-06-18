@@ -383,6 +383,31 @@ export class ZitadelAuthProvider implements AuthProvider {
     });
   }
 
+  async markEmailVerified(userId: string): Promise<void> {
+    // Two-step verify: request a returnCode email-verification code (no email sent),
+    // then immediately call verifyEmail with it.
+    // Background: setEmail with isVerified throws FAILED_PRECONDITION ("Email not changed")
+    // when the email address is already set to the same value on the account — which is
+    // always true on the auto-link path. The returnCode approach works regardless.
+    const users = this.svc(UserService);
+    await this.call(async () => {
+      const codeReq = create(SendEmailCodeRequestSchema, {
+        userId,
+        verification: { case: 'returnCode', value: {} },
+      });
+      const codeResp = await users.sendEmailCode(codeReq);
+      const code = codeResp.verificationCode;
+      if (!code) {
+        throw new ProviderError(
+          'FAILED_PRECONDITION',
+          'markEmailVerified: Zitadel did not return a verification code'
+        );
+      }
+      const verifyReq = create(VerifyEmailRequestSchema, { userId, verificationCode: code });
+      await users.verifyEmail(verifyReq);
+    });
+  }
+
   // session
   async createSession(checks: SessionChecks, opts?: SessionOpts): Promise<Session> {
     const sessions = this.svc(SessionService);

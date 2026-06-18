@@ -6,6 +6,7 @@ import { resolveMfaSetup, recordMfaSetupSkip } from '@/resources/mfa';
 import { setupSkipSchema } from '@/resources/mfa/mfa.schema';
 import { providerForRequest } from '@/server/auth-context.server';
 import { getCsrfToken, assertCsrf } from '@/server/csrf';
+import { assetUrl } from '@/utils/asset-url';
 import { useAuthErrorMessage } from '@/utils/errors/auth-error-messages';
 import { Button } from '@datum-cloud/datum-ui/button';
 import { Icon } from '@datum-cloud/datum-ui/icons';
@@ -47,7 +48,13 @@ const CAPABILITY_ROUTES: Array<{
     key: 'totpOtp',
     path: 'authenticator',
     label: <Trans>Authenticator app</Trans>,
-    icon: <img src="/idps/totp.png" alt="Authenticator app" className="size-4 object-contain" />,
+    icon: (
+      <img
+        src={assetUrl('/images/idps/totp.png')}
+        alt="Authenticator app"
+        className="size-4 object-contain"
+      />
+    ),
   },
   {
     key: 'emailOtp',
@@ -140,13 +147,7 @@ export default function SetupMfa() {
       description={
         <Trans>Add an extra layer of security to your account by setting up a second factor.</Trans>
       }>
-      <div className="flex flex-col gap-4">
-        {errorMessage ? (
-          <p role="alert" className="text-sm text-red-700">
-            {errorMessage}
-          </p>
-        ) : null}
-
+      <div className="flex w-full flex-col gap-4">
         <div className="flex flex-col gap-3">
           {offerableRoutes.map((r) => (
             <Button
@@ -175,8 +176,7 @@ export default function SetupMfa() {
             {force ? <input type="hidden" name="force" value={force} /> : null}
             {checkAfter ? <input type="hidden" name="checkAfter" value={checkAfter} /> : null}
             <Button
-              size="large"
-              className={cn('h-13 gap-3', offerableRoutes.length > 0 && 'mt-3')}
+              className={cn(offerableRoutes.length > 0 && 'mt-3')}
               type="quaternary"
               theme="link"
               block

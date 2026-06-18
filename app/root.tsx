@@ -128,7 +128,7 @@ export default function App() {
           <ConformAdapter>
             <FathomAnalytics siteId={fathomSiteId} />
             <Outlet />
-            <Toaster />
+            <Toaster position="top-right" />
           </ConformAdapter>
         </I18nProvider>
       </QueryClientProvider>

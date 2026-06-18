@@ -45,7 +45,11 @@ export function AuthCard({ title, description, children, branding, className }: 
             </CardDescription>
           )}
         </CardHeader>
-        {children && <CardContent className="p-0">{children}</CardContent>}
+        {children && (
+          <CardContent className="flex w-full flex-col items-center justify-center p-0 *:w-full">
+            {children}
+          </CardContent>
+        )}
       </Card>
     </BlankLayout>
   );

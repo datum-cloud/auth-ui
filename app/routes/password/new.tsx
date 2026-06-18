@@ -19,7 +19,7 @@ import {
   type LoaderFunctionArgs,
   type MetaFunction,
 } from 'react-router';
-import { Form as RRForm, Link } from 'react-router';
+import { Form as RRForm } from 'react-router';
 
 export const meta: MetaFunction = () => [{ title: 'Set new password' }];
 
@@ -67,9 +67,6 @@ export default function PasswordNew() {
   const errorMessage = getErrorMessage((actionData as { error?: string } | undefined)?.error);
   useActionErrorToast(errorMessage);
 
-  const invalidCredentials =
-    actionData && 'error' in actionData && actionData.error === 'INVALID_CREDENTIALS';
-
   return (
     <AuthCard title={<Trans>Choose a new password</Trans>}>
       <Form.Root
@@ -78,7 +75,7 @@ export default function PasswordNew() {
         method="POST"
         defaultValues={{ password: '', confirm: '' }}
         isSubmitting={navigation.state === 'submitting'}
-        className="flex flex-col gap-4">
+        className="flex w-full flex-col gap-4">
         <input type="hidden" name="csrf" value={csrfToken} />
         <input type="hidden" name="code" value={code} />
         <input type="hidden" name="userId" value={userId} />
@@ -90,19 +87,6 @@ export default function PasswordNew() {
         <Form.Field name="confirm" label={t`Confirm new password`} required>
           <Form.Input type="password" autoComplete="new-password" />
         </Form.Field>
-        {errorMessage && !invalidCredentials ? (
-          <p role="alert" className="text-sm text-red-700">
-            {errorMessage}
-          </p>
-        ) : null}
-        {invalidCredentials ? (
-          <p role="alert" className="text-sm text-red-700">
-            <Trans>
-              This reset link is invalid or has expired.{' '}
-              <Link to="/password/reset">Please request a new one.</Link>
-            </Trans>
-          </p>
-        ) : null}
         <SubmitButton>
           <Trans>Set password</Trans>
         </SubmitButton>

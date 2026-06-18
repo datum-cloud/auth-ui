@@ -422,19 +422,20 @@ export function toRegisterRequest(input: RegisterInput): {
     | {
         email: string;
         verification: { case: 'sendCode'; value: { urlTemplate: string } };
+      }
+    | {
+        email: string;
+        verification: { case: 'isVerified'; value: true };
       };
   organization?: { org: { case: 'orgId'; value: string } };
   passwordType:
     | { case: 'password'; value: { password: string; changeRequired: boolean } }
     | { case: undefined; value?: undefined };
 } {
-  return {
-    profile: { givenName: input.firstName, familyName: input.lastName },
-    // When a verifyUrlTemplate is supplied, set the email sendCode verification so
-    // Zitadel's verification mail links back to OUR /verify (placeholders {{.Code}},
-    // {{.UserID}}, {{.OrgID}}). Otherwise leave the oneof unset → Zitadel uses its
-    // built-in url (and still sends the mail by default).
-    email: input.verifyUrlTemplate
+  // Priority: emailVerified > verifyUrlTemplate > plain (Zitadel default sends mail).
+  const emailField: ReturnType<typeof toRegisterRequest>['email'] = input.emailVerified
+    ? { email: input.email, verification: { case: 'isVerified' as const, value: true as const } }
+    : input.verifyUrlTemplate
       ? {
           email: input.email,
           verification: {
@@ -442,7 +443,11 @@ export function toRegisterRequest(input: RegisterInput): {
             value: { urlTemplate: input.verifyUrlTemplate },
           },
         }
-      : { email: input.email },
+      : { email: input.email };
+
+  return {
+    profile: { givenName: input.firstName, familyName: input.lastName },
+    email: emailField,
     ...(input.orgId
       ? { organization: { org: { case: 'orgId' as const, value: input.orgId } } }
       : {}),
