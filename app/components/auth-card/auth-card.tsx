@@ -5,7 +5,6 @@ import {
   CardContent,
   CardHeader,
   CardDescription,
-  CardTitle,
 } from '@datum-cloud/datum-ui/card';
 import { cn } from '@datum-cloud/datum-ui/utils';
 import type { ReactNode } from 'react';
@@ -38,7 +37,7 @@ export function AuthCard({ title, description, children, branding, className }: 
         <CardHeader className="items-center gap-3 p-0">
           {/* Use <h1> directly: datum-ui CardTitle renders as <div>, which would fail
               axe's page-has-heading-one rule. The h1 carries CardTitle's visual styling. */}
-          <CardTitle className="text-center text-2xl font-semibold">{title}</CardTitle>
+          <h1 className="text-center text-2xl font-semibold">{title}</h1>
           {description && (
             <CardDescription className="text-foreground/80 text-center text-sm">
               {description}

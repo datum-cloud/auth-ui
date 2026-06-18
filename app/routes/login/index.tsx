@@ -20,7 +20,7 @@ import { getCsrfToken, assertCsrf } from '@/server/csrf';
 import { assetUrl } from '@/utils/asset-url';
 import { env } from '@/utils/env/env.server';
 import { useAuthErrorMessage } from '@/utils/errors/auth-error-messages';
-import { Button } from '@datum-cloud/datum-ui/button';
+import { Button, LinkButton } from '@datum-cloud/datum-ui/button';
 import { Form } from '@datum-cloud/datum-ui/form';
 import { Icon } from '@datum-cloud/datum-ui/icons';
 import { cn } from '@datum-cloud/datum-ui/utils';
@@ -264,19 +264,18 @@ export default function Login() {
       ) : null}
 
       {view.showPasskeyPrompt ? (
-        <Button
+        <LinkButton
           size="large"
           className={cn('h-13 gap-3', view.showIdpButtons && 'mt-3')}
           type="quaternary"
           theme="outline"
           block
-          asChild
+          as={Link}
+          href={passkeyHref}
           iconPosition="left"
           icon={<Icon icon={UserKey} />}>
-          <Link to={passkeyHref}>
-            <Trans>Passkey</Trans>
-          </Link>
-        </Button>
+          <Trans>Passkey</Trans>
+        </LinkButton>
       ) : null}
 
       {view.showPasswordForm && view.showIdpButtons ? (
@@ -298,7 +297,6 @@ export default function Login() {
               type="quaternary"
               theme="outline"
               block
-              asChild
               iconPosition="left"
               icon={<Icon icon={Mail} />}
               onClick={() => setShowEmailField(true)}>

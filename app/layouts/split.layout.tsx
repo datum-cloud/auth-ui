@@ -1,7 +1,7 @@
 import type { BrandingTheme } from '@/modules/auth/types';
 import { assetUrl } from '@/utils/asset-url';
 import { Avatar, AvatarFallback, AvatarImage } from '@datum-cloud/datum-ui/avatar';
-import { Button } from '@datum-cloud/datum-ui/button';
+import { LinkButton } from '@datum-cloud/datum-ui/button';
 import { Icon } from '@datum-cloud/datum-ui/icons';
 import { Logo } from '@datum-cloud/datum-ui/logo';
 import { Trans } from '@lingui/react/macro';
@@ -28,11 +28,11 @@ export default function SplitLayout({
             )}
           </Link>
         </div>
-        <div className="flex w-full flex-1 items-center justify-center">
+        <main className="flex w-full flex-1 items-center justify-center">
           <div className="w-full max-w-[400px]">{children}</div>
-        </div>
+        </main>
 
-        <footer className="text-foreground/50 mx-auto w-full max-w-[400px] text-center text-xs leading-4 md:text-left">
+        <footer className="text-foreground/70 mx-auto w-full max-w-[400px] text-center text-xs leading-4 md:text-left">
           <Trans>
             By continuing, you agree to Datum's{' '}
             <Link
@@ -55,18 +55,21 @@ export default function SplitLayout({
         </footer>
       </div>
       {/* Right panel is a marketing / branding panel.*/}
-      <div className="bg-background dark:bg-background/50 relative hidden min-h-screen w-full flex-col p-3 sm:p-4 md:flex md:px-[41px] md:py-8">
+      <aside
+        aria-label="Datum overview"
+        className="bg-background dark:bg-background/50 relative hidden min-h-screen w-full flex-col p-3 sm:p-4 md:flex md:px-[41px] md:py-8">
         <div className="flex items-center justify-end">
-          <Button
+          <LinkButton
             type="quaternary"
             theme="outline"
             iconPosition="left"
             icon={<Icon icon={BookOpen} />}
-            asChild>
-            <Link to="https://www.datum.net/docs" target="_blank" rel="noopener noreferrer">
-              Documentation
-            </Link>
-          </Button>
+            as={Link}
+            href="https://www.datum.net/docs"
+            target="_blank"
+            rel="noopener noreferrer">
+            Documentation
+          </LinkButton>
         </div>
 
         <div className="flex w-full flex-1 items-center justify-center">
@@ -74,6 +77,8 @@ export default function SplitLayout({
             <div className="absolute -top-36 -left-24 z-0 max-w-[115px]">
               <img
                 src={assetUrl('/images/illustration-2.png')}
+                alt=""
+                aria-hidden="true"
                 className="size-auto w-full object-cover"
               />
             </div>
@@ -107,20 +112,22 @@ export default function SplitLayout({
                 <AvatarFallback>ZS</AvatarFallback>
               </Avatar>
               <span className="leading-4 text-[#67717C]">Zac Smith</span>
-              <span className="text-xs text-[#90969C]">Co-founder and CEO</span>
+              <span className="text-xs text-[#595F65]">Co-founder and CEO</span>
             </div>
 
-            <img src={assetUrl('/images/zac-sign.png')} className="h-[38px] w-24" />
+            <img src={assetUrl('/images/zac-sign.png')} alt="" aria-hidden="true" className="h-[38px] w-24" />
           </div>
         </div>
 
         <div className="absolute right-0 bottom-0 z-0 max-w-[500px] md:max-w-[800px]">
           <img
             src={assetUrl('/images/illustration-1.png')}
+            alt=""
+            aria-hidden="true"
             className="size-auto w-full object-cover"
           />
         </div>
-      </div>
+      </aside>
     </div>
   );
 }

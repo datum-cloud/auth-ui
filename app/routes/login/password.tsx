@@ -3,7 +3,6 @@ import { SubmitButton } from '@/components/auth-form/auth-form';
 import { BackLink } from '@/components/back-link/back-link';
 import { FormError } from '@/components/form-error/form-error';
 import { IdentityBadge } from '@/components/identity-badge/identity-badge';
-import { useActionErrorToast } from '@/hooks/use-action-error-toast';
 // ADAPTATION (plan-drift fix): readSessions/serializeSessions live in @/modules/auth/session/cookie
 // (which re-exports them from session.ts) — the canonical one-stop import for route-layer session I/O.
 import { readSessions, serializeSessions } from '@/modules/auth/session/cookie';
@@ -13,7 +12,6 @@ import { loginPasswordSchema, loginPasswordClientSchema } from '@/resources/logi
 import { type LoginLayoutData } from '@/routes/login/layout';
 import { providerForRequest } from '@/server/auth-context.server';
 import { getCsrfToken, assertCsrf } from '@/server/csrf';
-import { useAuthErrorMessage } from '@/utils/errors/auth-error-messages';
 import { Form } from '@datum-cloud/datum-ui/form';
 import { Trans, Plural, useLingui } from '@lingui/react/macro';
 import {
@@ -84,10 +82,6 @@ export default function Password() {
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
   const { t } = useLingui();
-
-  const getErrorMessage = useAuthErrorMessage();
-  const errorMessage = getErrorMessage((actionData as { error?: string } | undefined)?.error);
-  useActionErrorToast(errorMessage);
 
   const serverError =
     actionData && 'error' in actionData

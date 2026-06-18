@@ -25,6 +25,14 @@ Cypress.on('uncaught:exception', (err) => {
     err.message.includes('Hydration failed') &&
     (err.message.includes('data-react-router-critical-css') ||
       !!document.querySelector('[data-react-router-critical-css]'));
+  // ClientHintCheck (<script> in <head>) causes a hydration mismatch in dev because
+  // Cypress's proxy injects its own <script> into <head>, shifting the node order that
+  // React 19's strict head reconciler checks. Real browsers / Playwright are unaffected.
+  // Narrowed to the ClientHintCheck component name in the React diff so we don't suppress
+  // real mismatches. The diff always shows the component wrapper name.
+  const isClientHintNoise =
+    err.message.includes('Hydration failed') &&
+    err.message.includes('ClientHintCheck');
   // Production builds MINIFY React errors, so the dev-mode "Hydration failed" text never
   // appears — the same Cypress-head-injection hydration mismatch (see settleHydration note
   // below: Cypress ALWAYS injects a <script> into <head>, which real browsers/Playwright do
@@ -35,6 +43,7 @@ Cypress.on('uncaught:exception', (err) => {
   if (
     err.message.includes('Failed to fetch dynamically imported module') ||
     isCriticalCssNoise ||
+    isClientHintNoise ||
     isMinifiedHydrationNoise
   ) {
     return false;

@@ -27,7 +27,7 @@ export default function BlankLayout({
           )}
         </Link>
       </div>
-      <div className="flex flex-1 flex-col items-center justify-center">{children}</div>
+      <main className="flex flex-1 flex-col items-center justify-center">{children}</main>
     </div>
   );
 }

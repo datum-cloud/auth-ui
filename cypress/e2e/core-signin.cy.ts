@@ -3,8 +3,11 @@ import { checkA11y } from '../support/a11y';
 describe('core sign-in (fake provider)', () => {
   it('identifier → password → signed-in', () => {
     cy.visit('/id/login');
+    cy.settleHydration();
     checkA11y(); // /login renders
 
+    // The email input is behind an "Email" reveal button (IdP-first UX); click it first.
+    cy.contains('button', 'Email').click();
     cy.get('input[name="loginName"]').type('alice@acme.test');
     cy.get('input[name="loginName"]:visible').closest('form').submit();
 
@@ -21,6 +24,8 @@ describe('core sign-in (fake provider)', () => {
 
   it('wrong password shows an error and stays on the password screen', () => {
     cy.visit('/id/login');
+    cy.settleHydration();
+    cy.contains('button', 'Email').click();
     cy.get('input[name="loginName"]').type('alice@acme.test');
     cy.get('input[name="loginName"]:visible').closest('form').submit();
     cy.get('input[name="password"]').type('wrong-password');

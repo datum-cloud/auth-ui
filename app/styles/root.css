@@ -43,8 +43,12 @@
    so the primary button always passes 4.5:1 contrast in both light and dark modes.
    Phase 6 design audit should align the alpha theme's canyon-clay-links token instead. */
 :root {
-  /* --primary-foreground: oklch(0.1 0 0); */
+  --primary-foreground: oklch(0.1 0 0); /* WCAG AA fix: near-black on canyon-clay primary (≈8:1) */
+  /* Darken canyon-clay link color to pass WCAG AA (4.5:1) on white/cream backgrounds.
+     oklch(0.61 …) ≈ #a46969 → ~5.25:1 on white but borderline; 0.50 ≈ #7e4a4a → ~7.5:1. */
+  --primary: oklch(0.50 0.044 18.4);
 }
+
 
 /* A11y fix: datum-ui Form.Field renders the required-field asterisk as
    span[aria-hidden] with class text-destructive/80 (80% alpha on white ≈ 2.5:1 — fails WCAG AA).
