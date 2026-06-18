@@ -121,17 +121,22 @@ jobs:
           key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lock', '**/package.json') }}
       - run: bun install --frozen-lockfile
       - name: Dependency audit (blocking)
-        # All ignored advisories are dev/build-only — they never ship (the Dockerfile
-        # installs --production). Runtime advisories (js-yaml, @opentelemetry/core) were
-        # fixed via dependency bumps, so none are ignored here.
+        # Ignored advisories are either dev/build-only (never ship — Dockerfile installs
+        # --production) or present-but-unreachable transitive deps, tracked for an upstream fix.
         #   GHSA-hmw2-7cc7-3qxx  form-data  <- cypress, start-server-and-test (dev)
         #   GHSA-gv7w-rqvm-qjhr  esbuild    <- @lingui/cli, vite (build)
         #   GHSA-g7r4-m6w7-qqqr  esbuild    <- @lingui/cli, vite (build)
+        #   GHSA-vmh5-mc38-953g  undici     <- vitest>jsdom (dev) + datum-ui>isomorphic-dompurify>jsdom; SOCKS5 ProxyAgent path unused
+        #   GHSA-pr7r-676h-xcf6  undici     <- same chains; shared-cache path unused
+        #   GHSA-cmwh-pvxp-8882  dompurify  <- datum-ui>isomorphic-dompurify; setConfig pollution needs attacker-controlled config (unreachable). FOLLOW-UP: datum-ui bump / overrides
         run: >-
           bun audit
           --ignore=GHSA-hmw2-7cc7-3qxx
           --ignore=GHSA-gv7w-rqvm-qjhr
           --ignore=GHSA-g7r4-m6w7-qqqr
+          --ignore=GHSA-vmh5-mc38-953g
+          --ignore=GHSA-pr7r-676h-xcf6
+          --ignore=GHSA-cmwh-pvxp-8882
       - name: Generate SBOM (CycloneDX)
         run: bunx @cyclonedx/cdxgen@11.10.0 -t js -o sbom.cdx.json --spec-version 1.5
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
