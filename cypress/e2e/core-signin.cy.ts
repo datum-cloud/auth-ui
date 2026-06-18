@@ -1,8 +1,21 @@
 import { checkA11y } from '../support/a11y';
 
 describe('core sign-in (fake provider)', () => {
-  it('identifier → password → signed-in', () => {
+  // Warm Vite's dep optimization once. The first cold route load triggers a hard reload
+  // (Vite re-optimizing deps) that drops the onBeforeLoad __CYPRESS_HYDRATE__ flag, so
+  // hydration is skipped and settleHydration() times out. Warming up first keeps every real
+  // visit hydrated. We wait for the SSR'd "Email" button so the cold reload has fully settled.
+  before(() => {
     cy.visit('/id/login');
+    cy.contains('button', 'Email');
+  });
+
+  it('identifier → password → signed-in', () => {
+    cy.visit('/id/login', {
+      onBeforeLoad: (win) => {
+        win.__CYPRESS_HYDRATE__ = true; // hydrate so the IdP-first "Email" reveal + form work (see entry.client.tsx)
+      },
+    });
     cy.settleHydration();
     checkA11y(); // /login renders
 
@@ -23,7 +36,11 @@ describe('core sign-in (fake provider)', () => {
   });
 
   it('wrong password shows an error and stays on the password screen', () => {
-    cy.visit('/id/login');
+    cy.visit('/id/login', {
+      onBeforeLoad: (win) => {
+        win.__CYPRESS_HYDRATE__ = true; // hydrate so the IdP-first "Email" reveal + form work (see entry.client.tsx)
+      },
+    });
     cy.settleHydration();
     cy.contains('button', 'Email').click();
     cy.get('input[name="loginName"]').type('alice@acme.test');
