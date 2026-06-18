@@ -17,6 +17,7 @@ import { env } from '@/utils/env/env.server';
 import { serveStatic } from 'hono/bun';
 import { compress } from 'hono/compress';
 import { createHonoServer } from 'react-router-hono-server/bun';
+import { legacyRedirects } from './server/middleware/legacy-redirects';
 
 declare module 'react-router' {
   interface AppLoadContext {
@@ -52,6 +53,8 @@ export default await createHonoServer<RequestContextEnv>({
     app.use('*', httpMetrics);
     app.use('*', requestContext);
     app.use('*', appSecureHeaders(isDev, resolveFrameAncestors(env.FRAME_ANCESTORS)));
+    // Legacy 301s: redirect hardcoded /ui/v2/login/* links (sibling repos) to /id/* before routing.
+    app.use('*', legacyRedirects);
     // Compress STATIC ASSETS ONLY — never SSR HTML. Auth pages embed a per-session
     // CSRF token (remix-utils commitToken reuses the cookie token) alongside
     // attacker-reflectable query params (loginName, user_code, …); compressing that
