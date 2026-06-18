@@ -1,110 +1,209 @@
-// @vitest-environment happy-dom
+// @vitest-environment node
 //
-// Conversion-tracking regression: fires signup_submitted when the "check your
-// email" branch renders. Task 8 representative route test — proves TrackOnMount
-// is wired into the sent branch of signup/index.tsx.
+// Signup identifier screen — route action + loader tests.
 //
-// Approach: fallback path from plan. The full component uses @datum-cloud/datum-ui/form
-// which requires an adapter provider (ConformAdapter/RHFAdapter) — unavailable in the
-// happy-dom test environment. We skip driving the action via requestSubmit() and instead
-// render the sent branch directly using createRoutesStub with an action that immediately
-// returns the sent payload, confirmed visible via waitFor on the heading text.
-import Signup from '@/routes/signup/index';
-import { render, screen, waitFor } from '@testing-library/react';
-import { trackEvent } from 'fathom-client';
-import type { ReactNode } from 'react';
-import { createRoutesStub } from 'react-router';
+// Covers:
+//   1. Valid email POST → 302 redirect to /signup/method with loginName/firstName/lastName.
+//   2. intent=idp POST → redirect to the provider authUrl.
+//   3. Missing/invalid email → 400 INVALID_INPUT.
+//   4. IdP service failure → 502.
+//   5. Component smoke test (registration unavailable, heading).
+//
+// node env: happy-dom enforces Fetch spec rules that forbid setting the Cookie
+// header, which breaks the CSRF round-trip used by the action tests.
+import { FakeAuthProvider } from '@/modules/auth/providers/fake/fake-provider';
+import { getAuthProvider } from '@/modules/auth/select.server';
+import type { LoginSettings } from '@/modules/auth/types';
+import { action, loader } from '@/routes/signup/index';
+import { getCsrfToken } from '@/server/csrf';
 import { describe, it, expect, vi } from 'vitest';
 
-vi.mock('fathom-client', () => ({
-  load: vi.fn(),
-  trackPageview: vi.fn(),
-  trackEvent: vi.fn(),
-}));
+// ─── env: stub MAXMIND_ACCOUNT_ID (env.server is a server-only module) ─────────
+vi.mock('@/utils/env/env.server', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/utils/env/env.server')>();
+  return { ...actual, env: { ...actual.env, MAXMIND_ACCOUNT_ID: '' } };
+});
 
-vi.mock('@lingui/react/macro', () => ({
-  Trans: ({ children }: { children: ReactNode }) => <>{children}</>,
-  useLingui: () => ({ t: (s: TemplateStringsArray) => s.join('') }),
-}));
+const ORIGIN = 'http://localhost';
 
-// @datum-cloud/datum-ui/form requires a ConformAdapter/RHFAdapter provider at runtime.
-// Mock it to a plain <form> passthrough so the component renders under happy-dom.
-vi.mock('@datum-cloud/datum-ui/form', () => ({
-  Form: {
-    Root: ({
-      children,
-      formComponent: FC,
-      ...props
-    }: {
-      children: ReactNode;
-      formComponent: React.ElementType;
-      [key: string]: unknown;
-    }) => {
-      const El = FC ?? 'form';
-      return <El {...props}>{children}</El>;
-    },
-    Field: ({ children }: { children: ReactNode }) => <div>{children}</div>,
-    Input: (props: React.InputHTMLAttributes<HTMLInputElement>) => <input {...props} />,
-  },
-}));
+// ─── Helpers ───────────────────────────────────────────────────────────────────
 
-// Server-only modules imported by the route file — must be mocked so importing
-// the component under happy-dom does not pull in Node-only runtime code.
-vi.mock('@/modules/auth/session/cookie', () => ({
-  readSessions: vi.fn(),
-  serializeSessions: vi.fn(),
-}));
-vi.mock('@/resources/signup', () => ({
-  registerAndLinkIdp: vi.fn(),
-  passwordFirstHandoff: vi.fn(),
-  registerPasskeyFirst: vi.fn(),
-}));
-vi.mock('@/resources/signup/signup.schema', () => ({
-  registerSchema: { safeParse: vi.fn() },
-  registerClientSchema: {},
-}));
-vi.mock('@/resources/schemas/check-your-email.schema', () => ({
-  genericCheckYourEmail: vi.fn(),
-}));
-vi.mock('@/server/app-origin.server', () => ({ trustedAppOrigin: vi.fn() }));
-vi.mock('@/server/auth-context.server', () => ({ providerForRequest: vi.fn() }));
-vi.mock('@/server/csrf', () => ({
-  getCsrfToken: vi.fn(),
-  assertCsrf: vi.fn(),
-}));
-vi.mock('@/server/env', () => ({ requireEmailVerification: vi.fn() }));
+async function mintCsrf(path = '/signup') {
+  const [token, cookie] = await getCsrfToken(new Request(`${ORIGIN}${path}`));
+  return { token, cookie: cookie! };
+}
 
-describe('signup index — conversion tracking', () => {
-  it('fires signup_submitted when the "check your email" branch renders', async () => {
-    const Stub = createRoutesStub([
-      {
-        path: '/signup',
-        Component: Signup,
-        loader: () => ({
-          csrfToken: 'x',
-          branding: undefined,
-          organization: undefined,
-          requestId: undefined,
-          idp: undefined,
-          prefill: { email: '', firstName: '', lastName: '' },
-        }),
-        action: () => ({ sent: true as const, email: 'a@b.test' }),
-      },
-    ]);
-    const { container } = render(<Stub initialEntries={['/signup']} />);
+function postRequest(fields: Record<string, string>, cookieHeader: string): Request {
+  const cookieValue = cookieHeader.split(';')[0];
+  return new Request(`${ORIGIN}/signup`, {
+    method: 'POST',
+    headers: { cookie: cookieValue, 'content-type': 'application/x-www-form-urlencoded' },
+    body: new URLSearchParams(fields).toString(),
+  });
+}
 
-    // Wait for the loader to resolve and the form to appear before submitting.
-    await screen.findByRole('button', { name: /continue/i });
+async function runAction(req: Request) {
+  return action({ request: req, params: {}, context: {} as never } as never);
+}
 
-    // Submit the form to drive the action → "sent" render branch.
-    const form = container.querySelector('form');
-    expect(form).not.toBeNull();
-    form?.requestSubmit();
+async function runLoader(search = '') {
+  return loader({
+    request: new Request(`${ORIGIN}/signup${search}`),
+    params: {},
+    context: {} as never,
+  } as never);
+}
 
-    await waitFor(() => {
-      expect(screen.getByText(/check your email/i)).toBeTruthy();
+/** Normalise status from either a real Response or a RR data() object. */
+function statusOf(res: unknown): number | undefined {
+  if (res instanceof Response) return res.status;
+  return (res as { init?: { status?: number } }).init?.status;
+}
+
+async function bodyOf(res: unknown): Promise<Record<string, unknown> | null> {
+  if (res instanceof Response) {
+    try {
+      return (await res.json()) as Record<string, unknown>;
+    } catch {
+      return null;
+    }
+  }
+  return ((res as { data?: Record<string, unknown> }).data) ?? null;
+}
+
+function locationOf(res: unknown): string | null {
+  if (res instanceof Response) return res.headers.get('Location');
+  return null;
+}
+
+// ─── Loader ────────────────────────────────────────────────────────────────────
+
+describe('signup/index — loader', () => {
+  it('returns csrfToken and view from settings', async () => {
+    const res = await runLoader();
+    const body = await bodyOf(res);
+    expect(body?.csrfToken).toBeTruthy();
+    expect(body?.view).toBeDefined();
+  });
+
+  it('reads organization and requestId from URL', async () => {
+    const res = await runLoader('?organization=acme&requestId=req123');
+    const body = await bodyOf(res);
+    expect(body?.organization).toBe('acme');
+    expect(body?.requestId).toBe('req123');
+  });
+
+  it('preserves idpIntentId prefill when present', async () => {
+    const res = await runLoader(
+      '?idpIntentId=intent1&idpIntentToken=tok&idpId=idp1&idpUserId=u1&idpUserName=alice'
+    );
+    const body = await bodyOf(res);
+    expect(body?.idp).toEqual({
+      idpIntentId: 'intent1',
+      idpIntentToken: 'tok',
+      idpId: 'idp1',
+      idpUserId: 'u1',
+      idpUserName: 'alice',
     });
+  });
+});
 
-    expect(trackEvent).toHaveBeenCalledWith('signup_submitted');
+// ─── Action: email identifier ──────────────────────────────────────────────────
+
+describe('signup/index — action: email identifier', () => {
+  it('redirects to /signup/method with parsed name on valid email', async () => {
+    const { token, cookie } = await mintCsrf();
+    const req = postRequest({ csrf: token, email: 'john.doe@example.com' }, cookie);
+    const res = await runAction(req);
+
+    expect(statusOf(res) ?? (res as Response).status).toBe(302);
+    const location = locationOf(res) ?? '';
+    const url = new URL(location, ORIGIN);
+    expect(url.pathname).toBe('/signup/method');
+    expect(url.searchParams.get('loginName')).toBe('john.doe@example.com');
+    expect(url.searchParams.get('firstName')).toBe('John');
+    expect(url.searchParams.get('lastName')).toBe('Doe');
+  });
+
+  it('threads organization and requestId into the redirect', async () => {
+    const { token, cookie } = await mintCsrf();
+    const req = postRequest(
+      { csrf: token, email: 'alice@example.com', organization: 'acme', requestId: 'req-abc' },
+      cookie
+    );
+    const res = await runAction(req);
+
+    expect(statusOf(res) ?? (res as Response).status).toBe(302);
+    const url = new URL(locationOf(res) ?? '', ORIGIN);
+    expect(url.searchParams.get('organization')).toBe('acme');
+    expect(url.searchParams.get('requestId')).toBe('req-abc');
+  });
+
+  it('returns 400 INVALID_INPUT for a non-email value', async () => {
+    const { token, cookie } = await mintCsrf();
+    const req = postRequest({ csrf: token, email: 'not-an-email' }, cookie);
+    const res = await runAction(req);
+
+    expect(statusOf(res)).toBe(400);
+    expect((await bodyOf(res))?.error).toBe('INVALID_INPUT');
+  });
+
+  it('threads deviceTrackingToken when present', async () => {
+    const { token, cookie } = await mintCsrf();
+    const req = postRequest(
+      { csrf: token, email: 'user@example.com', deviceTrackingToken: 'mm-token-abc' },
+      cookie
+    );
+    const res = await runAction(req);
+
+    expect(statusOf(res) ?? (res as Response).status).toBe(302);
+    const url = new URL(locationOf(res) ?? '', ORIGIN);
+    expect(url.searchParams.get('deviceTrackingToken')).toBe('mm-token-abc');
+  });
+});
+
+// ─── Action: IdP intent ────────────────────────────────────────────────────────
+
+describe('signup/index — action: IdP intent', () => {
+  it('redirects to the IdP authUrl on success', async () => {
+    const fake = getAuthProvider({ AUTH_PROVIDER: 'fake' }) as FakeAuthProvider;
+    // Let the fake's real startIdpIntent run — seeded idp-g returns { authUrl }, which the
+    // service wrapper needs. Mirrors login/__tests__/idp-origin.test.ts. (Mocking a
+    // wrong-shaped { authorizationUrl } made the wrapper see no authUrl → 502.)
+    const spy = vi.spyOn(fake, 'startIdpIntent');
+
+    const { token, cookie } = await mintCsrf();
+    // Use a seeded IdP id from the fake provider.
+    const GOOGLE_IDP_ID = 'idp-g';
+    const req = postRequest({ csrf: token, intent: 'idp', idpId: GOOGLE_IDP_ID }, cookie);
+    const res = await runAction(req);
+
+    expect(statusOf(res) ?? (res as Response).status).toBe(302);
+    spy.mockRestore();
+  });
+
+  it('returns 400 INVALID_INPUT when idpId is missing', async () => {
+    const { token, cookie } = await mintCsrf();
+    const req = postRequest({ csrf: token, intent: 'idp' /* no idpId */ }, cookie);
+    const res = await runAction(req);
+
+    expect(statusOf(res)).toBe(400);
+    expect((await bodyOf(res))?.error).toBe('INVALID_INPUT');
+  });
+});
+
+// ─── registrationDisabled view flag ───────────────────────────────────────────
+
+describe('signup/index — loader: registrationDisabled', () => {
+  it('sets view.registrationDisabled=true when allowRegister=false', async () => {
+    const fake = getAuthProvider({ AUTH_PROVIDER: 'fake' }) as FakeAuthProvider;
+    const spy = vi
+      .spyOn(fake, 'getLoginSettings')
+      .mockResolvedValue({ allowRegister: false } as unknown as LoginSettings);
+
+    const res = await runLoader();
+    const body = await bodyOf(res);
+    expect((body?.view as { registrationDisabled: boolean })?.registrationDisabled).toBe(true);
+    spy.mockRestore();
   });
 });

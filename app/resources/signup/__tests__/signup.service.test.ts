@@ -6,7 +6,12 @@
 // using the fake provider exactly as the original did.
 import { FakeAuthProvider } from '@/modules/auth/providers/fake/fake-provider';
 import { getAuthProvider } from '@/modules/auth/select.server';
-import { registerAndLinkIdp, registerWithPassword } from '@/resources/signup';
+import {
+  completeEmailLinkSignup,
+  registerAndLinkIdp,
+  registerEmailLinkSignup,
+  registerWithPassword,
+} from '@/resources/signup';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 
 afterEach(() => {
@@ -54,6 +59,32 @@ describe('signup register-with-password — MaxMind token → session metadata',
   });
 });
 
+describe('registerEmailLinkSignup', () => {
+  it('registers passwordless and returns sent for a new email', async () => {
+    const p = new FakeAuthProvider({ users: [] });
+    const r = await registerEmailLinkSignup(p, [], {
+      email: 'new@x.com',
+      firstName: 'New',
+      lastName: 'User',
+      origin: 'https://auth.test',
+    });
+    expect(r).toEqual({ kind: 'sent', email: 'new@x.com' });
+  });
+
+  it('returns the identical sent result for an existing email (no enumeration)', async () => {
+    const p = new FakeAuthProvider({
+      users: [{ id: 'u1', loginName: 'dupe@x.com', displayName: 'Dupe' }],
+    });
+    const r = await registerEmailLinkSignup(p, [], {
+      email: 'dupe@x.com',
+      firstName: 'Dupe',
+      lastName: 'Dupe',
+      origin: 'https://auth.test',
+    });
+    expect(r).toEqual({ kind: 'sent', email: 'dupe@x.com' });
+  });
+});
+
 describe('signup register-and-link path (CODE-MIN-04)', () => {
   it('register-and-link calls addIdpLink once and does not pass idpLink to register (CODE-MIN-04)', async () => {
     const fake = getAuthProvider({ AUTH_PROVIDER: 'fake' }) as FakeAuthProvider;
@@ -79,5 +110,27 @@ describe('signup register-and-link path (CODE-MIN-04)', () => {
 
     expect(registerCalls[0]).not.toHaveProperty('idpLink');
     expect(addIdpLinkCalls).toHaveLength(1);
+  });
+});
+
+describe('completeEmailLinkSignup', () => {
+  it('verifies email, enrolls otpEmail, self-authenticates, returns a redirect + session', async () => {
+    const p = new FakeAuthProvider({ users: [] });
+    // register() sets emailCodes.set(id, `email-${id}`) — the fake's first user gets
+    // id 'user-1' (seq increments from 0). Pass that deterministic code to verifyEmail.
+    const user = await p.register({ email: 'new@x.com', firstName: 'New', lastName: 'User' });
+    const verifyCode = `email-${user.id}`;
+    const r = await completeEmailLinkSignup(p, [], {
+      userId: user.id,
+      code: verifyCode,
+      loginName: 'new@x.com',
+      next: 'passkey',
+    });
+    expect(r.kind).toBe('redirect');
+    if (r.kind === 'redirect') {
+      expect(r.target).toContain('/setup/passkey');
+      expect(r.target).toContain('checkAfter=false');
+      expect(r.sessions.length).toBe(1);
+    }
   });
 });

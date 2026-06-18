@@ -1,6 +1,7 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
 import { SubmitButton } from '@/components/auth-form/auth-form';
 import { BackLink } from '@/components/back-link/back-link';
+import { useActionErrorToast } from '@/hooks/use-action-error-toast';
 import { TrackOnMount } from '@/modules/analytics/fathom';
 import { readSessions, serializeSessions } from '@/modules/auth/session/cookie';
 import { MaxMindTracker, readMaxMindTrackingToken } from '@/modules/fraud/maxmind-tracker';
@@ -12,6 +13,8 @@ import { providerForRequest } from '@/server/auth-context.server';
 import { getCsrfToken, assertCsrf } from '@/server/csrf';
 import { requireEmailVerification } from '@/server/env';
 import { env } from '@/utils/env/env.server';
+import { actionError } from '@/utils/errors/auth-error';
+import { useAuthErrorMessage } from '@/utils/errors/auth-error-messages';
 import { Form } from '@datum-cloud/datum-ui/form';
 import { Trans, useLingui } from '@lingui/react/macro';
 import { useEffect, useRef } from 'react';
@@ -62,30 +65,34 @@ export async function action({ request }: ActionFunctionArgs) {
   // (trustedAppOrigin → PUBLIC_ORIGIN), NOT the request Host header, to block
   // Host-header email-link injection. The enumeration-safe register dispatch and
   // post-register routing live in the service; the route only parses + renders.
-  const result = await registerWithPassword(provider, await readSessions(request), {
-    email: String(fields.loginName ?? ''),
-    firstName: String(fields.firstName ?? ''),
-    lastName: String(fields.lastName ?? ''),
-    password: parsed.data.password,
-    organization: fields.organization ? String(fields.organization) : undefined,
-    requestId: fields.requestId ? String(fields.requestId) : undefined,
-    deviceTrackingToken: fields.deviceTrackingToken
-      ? String(fields.deviceTrackingToken)
-      : undefined,
-    requireVerification: requireEmailVerification(),
-    origin: trustedAppOrigin(request),
-  });
+  try {
+    const result = await registerWithPassword(provider, await readSessions(request), {
+      email: String(fields.loginName ?? ''),
+      firstName: String(fields.firstName ?? ''),
+      lastName: String(fields.lastName ?? ''),
+      password: parsed.data.password,
+      organization: fields.organization ? String(fields.organization) : undefined,
+      requestId: fields.requestId ? String(fields.requestId) : undefined,
+      deviceTrackingToken: fields.deviceTrackingToken
+        ? String(fields.deviceTrackingToken)
+        : undefined,
+      requireVerification: requireEmailVerification(),
+      origin: trustedAppOrigin(request),
+    });
 
-  if (result.kind === 'sent') return genericCheckYourEmail(result.email);
-  if (result.kind === 'sent-with-session') {
-    return data(
-      { sent: true as const, email: result.email },
-      { status: 200, headers: { 'set-cookie': await serializeSessions(result.sessions) } }
-    );
+    if (result.kind === 'sent') return genericCheckYourEmail(result.email);
+    if (result.kind === 'sent-with-session') {
+      return data(
+        { sent: true as const, email: result.email },
+        { status: 200, headers: { 'set-cookie': await serializeSessions(result.sessions) } }
+      );
+    }
+    return redirect(result.target, {
+      headers: { 'set-cookie': await serializeSessions(result.sessions) },
+    });
+  } catch (err) {
+    return actionError(err);
   }
-  return redirect(result.target, {
-    headers: { 'set-cookie': await serializeSessions(result.sessions) },
-  });
 }
 
 export default function SignupPassword() {
@@ -125,10 +132,9 @@ export default function SignupPassword() {
   const navigation = useNavigation();
   const { t } = useLingui();
 
-  const serverError =
-    actionData && 'error' in actionData && actionData.error === 'INVALID_INPUT'
-      ? t`Passwords must match and be at least 8 characters.`
-      : undefined;
+  const getErrorMessage = useAuthErrorMessage();
+  const errorMessage = getErrorMessage((actionData as { error?: string } | undefined)?.error);
+  useActionErrorToast(errorMessage);
 
   if (actionData && 'sent' in actionData) {
     return (
@@ -173,9 +179,9 @@ export default function SignupPassword() {
           <Form.Field name="confirm" label={t`Confirm password`} required>
             <Form.Input type="password" autoComplete="new-password" />
           </Form.Field>
-          {serverError ? (
+          {errorMessage ? (
             <p role="alert" className="text-sm text-red-700">
-              {serverError}
+              {errorMessage}
             </p>
           ) : null}
           <SubmitButton>

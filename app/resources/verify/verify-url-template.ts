@@ -4,6 +4,30 @@
 // of our route.
 import { APP_BASENAME } from '@/resources/shared/app-basename';
 
+export interface SignupCompleteUrlTemplateInput {
+  /** Trusted app origin — scheme + host (e.g. `https://auth.datum.net`). */
+  origin: string;
+  /** Carried through so the post-verify step can resume an OIDC/SAML ceremony. */
+  requestId?: string;
+  /** Organization hint forwarded into the completion URL. */
+  organization?: string;
+}
+
+/**
+ * Builds the verification-email URL template for the passwordless email-link signup
+ * path. The link lands on `/signup/complete` (not `/verify`) so the completion UI
+ * can prompt for passkey registration. `&next=passkey` tells that route which step
+ * follows code verification.
+ *
+ * Like `verifyUrlTemplate`, the Zitadel placeholders {{.Code}}/{{.UserID}}/{{.OrgID}}
+ * MUST stay literal — Zitadel fills them when sending the mail.
+ */
+export function signupCompleteUrlTemplate(input: SignupCompleteUrlTemplateInput): string {
+  const placeholders = `code={{.Code}}&userId={{.UserID}}&organization={{.OrgID}}`;
+  const extra = input.requestId ? `&requestId=${encodeURIComponent(input.requestId)}` : '';
+  return `${input.origin}${APP_BASENAME}/signup/complete?${placeholders}&next=passkey${extra}`;
+}
+
 export interface VerifyUrlTemplateInput {
   /**
    * Trusted app origin — scheme + host (e.g. `https://auth.datum.net` or

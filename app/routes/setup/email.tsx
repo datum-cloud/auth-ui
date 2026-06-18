@@ -1,10 +1,12 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
 import { SubmitButton } from '@/components/auth-form/auth-form';
+import { useActionErrorToast } from '@/hooks/use-action-error-toast';
 import {
   createOtpEnrollHandlers,
   type OtpEnrollLoaderData,
   type OtpEnrollActionData,
 } from '@/resources/otp';
+import { useAuthErrorMessage } from '@/utils/errors/auth-error-messages';
 import { Trans } from '@lingui/react/macro';
 import { useActionData, useLoaderData, useNavigation, type MetaFunction } from 'react-router';
 import { Form as RRForm } from 'react-router';
@@ -26,6 +28,10 @@ export default function SetupEmail() {
   const actionData = useActionData() as OtpEnrollActionData | undefined;
   const navigation = useNavigation();
 
+  const getErrorMessage = useAuthErrorMessage();
+  const errorMessage = getErrorMessage((actionData as { error?: string } | undefined)?.error);
+  useActionErrorToast(errorMessage);
+
   return (
     <AuthCard
       title={<Trans>Set up email one-time code</Trans>}
@@ -43,14 +49,17 @@ export default function SetupEmail() {
           {organization ? <input type="hidden" name="organization" value={organization} /> : null}
           {force ? <input type="hidden" name="force" value={force} /> : null}
           {checkAfter ? <input type="hidden" name="checkAfter" value={checkAfter} /> : null}
+          {errorMessage &&
+          actionData &&
+          'error' in actionData &&
+          actionData.error !== 'SESSION_EXPIRED' ? (
+            <p role="alert" className="text-sm text-red-700">
+              {errorMessage}
+            </p>
+          ) : null}
           {actionData && 'error' in actionData && actionData.error === 'SESSION_EXPIRED' ? (
             <p role="alert" className="text-sm text-red-700">
               <Trans>Your session has expired. Please sign in again.</Trans>
-            </p>
-          ) : null}
-          {actionData && 'error' in actionData && actionData.error === 'ENROLL_FAILED' ? (
-            <p role="alert" className="text-sm text-red-700">
-              <Trans>Enrollment failed. Please try again.</Trans>
             </p>
           ) : null}
           <SubmitButton loading={navigation.state === 'submitting'}>

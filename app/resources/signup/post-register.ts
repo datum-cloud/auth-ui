@@ -17,7 +17,7 @@ export function postRegisterStep(input: PostRegisterInput): string {
     if (input.requestId) p.set('requestId', input.requestId);
     return p.toString();
   };
-  if (!input.hasPassword) return `/setup/passkey?${q({})}`;
+  if (!input.hasPassword) return `/setup/passkey?${q({ force: 'false', checkAfter: 'true' })}`;
   const gate = emailVerificationGate({
     emailVerified: input.emailVerified,
     requireVerification: input.requireVerification,

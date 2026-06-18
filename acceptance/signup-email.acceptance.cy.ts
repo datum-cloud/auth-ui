@@ -1,6 +1,7 @@
 // Email signup → verification acceptance (real Zitadel + Mailpit).
-// Proves the full registration entry/exit: /id/signup (collect email/names) →
-// /id/signup/password (set password → register() creates a REAL Zitadel user and
+// Proves the full registration entry/exit: /id/signup (collect email; name parsed from
+// it) → /id/signup/method (choose "Set a password") → /id/signup/password (set password
+// → register() creates a REAL Zitadel user and
 // Zitadel sends a verification email to Mailpit) → the emailed link lands on OUR
 // /id/verify with the code pre-filled (the verifyUrlTemplate fix; without it the
 // link would point at Zitadel's built-in page) → POST /id/verify → /verify/success.
@@ -44,15 +45,18 @@ function pollForCode(attempt: number): Cypress.Chainable<{ code: string; userId:
 
 (RUN ? describe : describe.skip)('signup → email verification (real Zitadel + Mailpit)', () => {
   it('registers a real user, receives the Mailpit code, and verifies the email', () => {
-    // 1. Collect email + names on /signup.
+    // 1. Collect email on /signup. The name is parsed from the email now (no name
+    //    fields); the email input is behind an "Email" reveal button (mirrors login).
     cy.visit('/id/signup');
-    cy.get('input[name="email"]').type(EMAIL);
-    cy.get('input[name="firstName"]').type('E2E');
-    cy.get('input[name="lastName"]').type('Signup');
-    cy.get('button[type="submit"]').first().click();
+    cy.contains('button', /^Email$/).click();
+    cy.get('input[name="email"]:visible').type(EMAIL);
+    cy.contains('button', /^Continue$/i).click();
 
-    // 2. Org allows password → /signup/password. Setting a password registers the
-    //    user in Zitadel, which sends the verification email to Mailpit.
+    // 2. Method screen — org allows password → choose "Set a password" → /signup/password.
+    //    Setting a password registers the user in Zitadel, which sends the verification
+    //    email to Mailpit.
+    cy.location('pathname').should('include', '/id/signup/method');
+    cy.contains('button', /set a password/i).click();
     cy.location('pathname').should('include', '/id/signup/password');
     cy.get('input[name="password"]').type(PASSWORD, { log: false });
     cy.get('input[name="confirm"]').type(PASSWORD, { log: false });

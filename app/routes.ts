@@ -13,6 +13,7 @@ export default [
 
   route('login', 'routes/login/layout.tsx', { id: 'login' }, [
     index('routes/login/index.tsx'),
+    route('method', 'routes/login/method.tsx'),
     route('password', 'routes/login/password.tsx'),
     route('mfa', 'routes/login/mfa.tsx'),
     route('passkey', 'routes/login/passkey.tsx'),
@@ -26,7 +27,9 @@ export default [
 
   route('signup', 'routes/signup/layout.tsx', { id: 'signup' }, [
     index('routes/signup/index.tsx'),
+    route('method', 'routes/signup/method.tsx'),
     route('password', 'routes/signup/password.tsx'),
+    route('complete', 'routes/signup/complete.tsx'),
   ]),
 
   route('password', 'routes/password/layout.tsx', [

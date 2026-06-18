@@ -5,6 +5,7 @@ export interface LoginView {
   showIdpButtons: boolean;
   showRegisterLink: boolean;
   showPasskeyPrompt: boolean;
+  showEmailLink: boolean;
   signInUnavailable: boolean;
 }
 
@@ -21,19 +22,26 @@ export interface LoginView {
 export function resolveLoginView(
   settings: Pick<
     LoginSettings,
-    'allowPassword' | 'allowRegister' | 'allowExternalIdp' | 'passkeysType'
+    | 'allowPassword'
+    | 'allowRegister'
+    | 'allowExternalIdp'
+    | 'passkeysType'
+    | 'disableLoginWithEmail'
   >,
-  idps: IdProvider[]
+  idps: IdProvider[],
+  emailDeliveryEnabled: boolean
 ): LoginView {
   const showPasswordForm = settings.allowPassword;
   const showIdpButtons = settings.allowExternalIdp && idps.length > 0;
   const showRegisterLink = settings.allowRegister;
   const showPasskeyPrompt = settings.passkeysType === 'allowed';
+  const showEmailLink = settings.disableLoginWithEmail !== true && emailDeliveryEnabled;
   return {
     showPasswordForm,
     showIdpButtons,
     showRegisterLink,
     showPasskeyPrompt,
+    showEmailLink,
     // Passkey is a real sign-in path, so it also clears the "unavailable" state.
     signInUnavailable: !showPasswordForm && !showIdpButtons && !showPasskeyPrompt,
   };

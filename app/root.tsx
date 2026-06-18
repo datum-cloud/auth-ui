@@ -12,6 +12,7 @@ import { env } from '@/utils/env/env.server';
 import { authErrorMessage } from '@/utils/errors/auth-error';
 import { ConformAdapter } from '@datum-cloud/datum-ui/form/adapters/conform';
 import { ThemeProvider, ThemeScript } from '@datum-cloud/datum-ui/theme';
+import { Toaster } from '@datum-cloud/datum-ui/toast';
 import { setupI18n } from '@lingui/core';
 import { I18nProvider } from '@lingui/react';
 import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
@@ -127,6 +128,7 @@ export default function App() {
           <ConformAdapter>
             <FathomAnalytics siteId={fathomSiteId} />
             <Outlet />
+            <Toaster />
           </ConformAdapter>
         </I18nProvider>
       </QueryClientProvider>

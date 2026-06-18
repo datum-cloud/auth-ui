@@ -14,7 +14,10 @@ import { describe, it, expect } from 'vitest';
 describe('resolveIdentifier — allowDomainDiscovery', () => {
   it('OFF (default): no domain lookup; unknown user → USER_NOT_FOUND', async () => {
     const p = new FakeAuthProvider({ orgDomains: { 'acme.test': 'org-acme' } });
-    const r = await resolveIdentifier(p, [], { loginName: 'ghost@acme.test' });
+    const r = await resolveIdentifier(p, [], {
+      loginName: 'ghost@acme.test',
+      emailDeliveryEnabled: true,
+    });
     expect(r).toEqual({ ok: false, error: 'USER_NOT_FOUND' });
   });
 
@@ -24,7 +27,10 @@ describe('resolveIdentifier — allowDomainDiscovery', () => {
       authMethods: { u1: ['password'] },
       orgDomains: { 'acme.test': 'org-acme' },
     });
-    const r = await resolveIdentifier(p, [], { loginName: 'alice@acme.test' });
+    const r = await resolveIdentifier(p, [], {
+      loginName: 'alice@acme.test',
+      emailDeliveryEnabled: true,
+    });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.target).toBe('/login/password');
@@ -41,7 +47,10 @@ describe('resolveIdentifier — allowDomainDiscovery', () => {
       settingsByOrg: { 'org-acme': { allowPassword: true } },
     });
     p.setAllowDomainDiscovery(true); // base flag governs whether discovery runs
-    const r = await resolveIdentifier(p, [], { loginName: 'alice@acme.test' });
+    const r = await resolveIdentifier(p, [], {
+      loginName: 'alice@acme.test',
+      emailDeliveryEnabled: true,
+    });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.target).toBe('/login/password');
@@ -53,7 +62,10 @@ describe('resolveIdentifier — allowDomainDiscovery', () => {
   it('ON but the domain maps to no org: falls through to today behavior (USER_NOT_FOUND)', async () => {
     const p = new FakeAuthProvider({ orgDomains: { 'acme.test': 'org-acme' } });
     p.setAllowDomainDiscovery(true);
-    const r = await resolveIdentifier(p, [], { loginName: 'ghost@other.test' });
+    const r = await resolveIdentifier(p, [], {
+      loginName: 'ghost@other.test',
+      emailDeliveryEnabled: true,
+    });
     expect(r).toEqual({ ok: false, error: 'USER_NOT_FOUND' });
   });
 
@@ -69,6 +81,7 @@ describe('resolveIdentifier — allowDomainDiscovery', () => {
     const r = await resolveIdentifier(p, [], {
       loginName: 'alice@acme.test',
       organization: 'org-explicit',
+      emailDeliveryEnabled: true,
     });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
@@ -79,7 +92,7 @@ describe('resolveIdentifier — allowDomainDiscovery', () => {
   it('ON but the loginName is not an email: no domain lookup (USER_NOT_FOUND)', async () => {
     const p = new FakeAuthProvider({ orgDomains: { 'acme.test': 'org-acme' } });
     p.setAllowDomainDiscovery(true);
-    const r = await resolveIdentifier(p, [], { loginName: 'ghost' });
+    const r = await resolveIdentifier(p, [], { loginName: 'ghost', emailDeliveryEnabled: true });
     expect(r).toEqual({ ok: false, error: 'USER_NOT_FOUND' });
   });
 
@@ -91,7 +104,10 @@ describe('resolveIdentifier — allowDomainDiscovery', () => {
       settingsByOrg: { 'org-corp': { allowPassword: false, allowExternalIdp: true } },
     });
     p.setAllowDomainDiscovery(true);
-    const r = await resolveIdentifier(p, [], { loginName: 'someone@corp.test' });
+    const r = await resolveIdentifier(p, [], {
+      loginName: 'someone@corp.test',
+      emailDeliveryEnabled: true,
+    });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
     expect(r.target).toBe('/sso');

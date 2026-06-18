@@ -5,7 +5,10 @@ import { describe, it, expect } from 'vitest';
 describe('resolveIdentifier — ignoreUnknownUsernames', () => {
   it('OFF (default): unknown identifier returns USER_NOT_FOUND (unchanged)', async () => {
     const p = new FakeAuthProvider({ users: [{ id: 'u1', loginName: 'alice@acme.test' }] });
-    const r = await resolveIdentifier(p, [], { loginName: 'ghost@acme.test' });
+    const r = await resolveIdentifier(p, [], {
+      loginName: 'ghost@acme.test',
+      emailDeliveryEnabled: true,
+    });
     expect(r).toEqual({ ok: false, error: 'USER_NOT_FOUND' });
   });
 
@@ -17,6 +20,7 @@ describe('resolveIdentifier — ignoreUnknownUsernames', () => {
     const r = await resolveIdentifier(p, [], {
       loginName: 'ghost@acme.test',
       organization: 'org-x',
+      emailDeliveryEnabled: true,
     });
     expect(r.ok).toBe(true);
     if (!r.ok) return;
@@ -35,6 +39,7 @@ describe('resolveIdentifier — ignoreUnknownUsernames', () => {
     const r = await resolveIdentifier(p, [], {
       loginName: 'alice@acme.test',
       organization: 'org-x',
+      emailDeliveryEnabled: true,
     });
     expect(r.ok).toBe(true);
     if (!r.ok) return;

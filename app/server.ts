@@ -77,6 +77,19 @@ export default await createHonoServer<RequestContextEnv>({
           rewriteRequestPath: (path) => path.replace('/id/assets/', '/assets/'),
         })
       );
+      // Public assets (vite copies public/ → build/client root) also carry the /id base.
+      // Same gateway situation as /id/assets/*: serve them under the prefix so a local
+      // `bun run start` (prefix preserved) doesn't fall through to the RR catch-all error.
+      // Not content-hashed, so no immutable cache header here.
+      for (const prefix of ['/id/images/*', '/id/favicons/*']) {
+        app.use(
+          prefix,
+          serveStatic({
+            root: 'build/client',
+            rewriteRequestPath: (path) => path.replace('/id/', '/'),
+          })
+        );
+      }
     }
     // Mount covers all sub-paths of /id/login/* so Hono's stricter path-equality matching cannot
     // be bypassed by trailing-slash or case variants that RR7 still routes to the action.

@@ -1,14 +1,17 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
+import { useActionErrorToast } from '@/hooks/use-action-error-toast';
 import { readSessions } from '@/modules/auth/session/cookie';
 import type { ProviderCapabilities } from '@/modules/auth/types';
 import { resolveMfaSetup, recordMfaSetupSkip } from '@/resources/mfa';
 import { setupSkipSchema } from '@/resources/mfa/mfa.schema';
 import { providerForRequest } from '@/server/auth-context.server';
 import { getCsrfToken, assertCsrf } from '@/server/csrf';
+import { useAuthErrorMessage } from '@/utils/errors/auth-error-messages';
 import { Trans } from '@lingui/react/macro';
 import {
   data,
   redirect,
+  useActionData,
   useLoaderData,
   type ActionFunctionArgs,
   type LoaderFunctionArgs,
@@ -86,6 +89,11 @@ export async function action({ request }: ActionFunctionArgs) {
 export default function SetupMfa() {
   const { csrfToken, loginName, requestId, organization, force, checkAfter, offerableKeys } =
     useLoaderData<typeof loader>();
+  const actionData = useActionData<typeof action>();
+
+  const getErrorMessage = useAuthErrorMessage();
+  const errorMessage = getErrorMessage((actionData as { error?: string } | undefined)?.error);
+  useActionErrorToast(errorMessage);
 
   // Build query params that thread through to each enrollment screen.
   const sharedParams = new URLSearchParams({ loginName });
@@ -120,6 +128,12 @@ export default function SetupMfa() {
             </li>
           ))}
         </ul>
+
+        {errorMessage ? (
+          <p role="alert" className="text-sm text-red-700">
+            {errorMessage}
+          </p>
+        ) : null}
 
         {force !== 'true' ? (
           <RRForm method="POST">

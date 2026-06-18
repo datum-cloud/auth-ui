@@ -46,6 +46,8 @@ export interface SessionChallenges {
     publicKeyCredentialCreationOptions?: unknown; // attestation (register)
   };
   otpEmail?: unknown;
+  /** Present when the otpEmail challenge was requested with { returnCode: true }; carries the OTP code returned server-side instead of emailing it. */
+  otpEmailCode?: string;
   otpSms?: unknown;
 }
 export interface Session {

@@ -57,6 +57,13 @@ const schema = z
     // true no-op (no device.js loaded, no token captured). Exposed to the client only
     // via the signup loaders (no window.ENV machinery in this app).
     MAXMIND_ACCOUNT_ID: z.string().optional(),
+    // Whether email delivery is wired in THIS environment. Email is sent via our BE/infra
+    // (not Zitadel SMTP), so this is an explicit switch, not auto-detected. Unset => OFF
+    // (fail-safe): magic-link + password-reset stay hidden so we never offer a dead-end flow.
+    AUTH_EMAIL_DELIVERY_ENABLED: z
+      .string()
+      .optional()
+      .transform((v) => v === 'true' || v === '1'),
   })
   .superRefine((v, ctx) => {
     // Zitadel creds are only required when the Zitadel adapter is actually selected.

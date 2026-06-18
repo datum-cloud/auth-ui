@@ -1,11 +1,13 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
 import { WebAuthnButton } from '@/components/webauthn-button/webauthn-button';
+import { useActionErrorToast } from '@/hooks/use-action-error-toast';
 import { readSessions } from '@/modules/auth/session/cookie';
 import { credentialSchema, setupSkipSchema } from '@/resources/mfa/mfa.schema';
 import { requestU2FAttestation, verifyU2FEnrollment } from '@/resources/webauthn';
 import { providerForRequest } from '@/server/auth-context.server';
 import { getCsrfToken, assertCsrf } from '@/server/csrf';
-import { Trans, useLingui } from '@lingui/react/macro';
+import { useAuthErrorMessage } from '@/utils/errors/auth-error-messages';
+import { Trans } from '@lingui/react/macro';
 import { useRef } from 'react';
 import {
   data,
@@ -116,16 +118,10 @@ export default function SetupSecurityKey() {
     useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const formRef = useRef<HTMLFormElement>(null);
-  const { t } = useLingui();
 
-  const serverError =
-    actionData && 'error' in actionData
-      ? actionData.error === 'INVALID_CREDENTIALS'
-        ? t`The security key enrollment failed. Please try again.`
-        : actionData.error === 'SESSION_EXPIRED'
-          ? t`Your session has expired. Please sign in again.`
-          : t`Please try again.`
-      : undefined;
+  const getErrorMessage = useAuthErrorMessage();
+  const errorMessage = getErrorMessage((actionData as { error?: string } | undefined)?.error);
+  useActionErrorToast(errorMessage);
 
   return (
     <AuthCard
@@ -148,9 +144,17 @@ export default function SetupSecurityKey() {
           {/* credential is populated by WebAuthnButton before submit */}
           <input type="hidden" name="credential" defaultValue="" />
 
-          {serverError ? (
+          {errorMessage &&
+          actionData &&
+          'error' in actionData &&
+          actionData.error !== 'SESSION_EXPIRED' ? (
             <p role="alert" className="text-sm text-red-700">
-              {serverError}
+              {errorMessage}
+            </p>
+          ) : null}
+          {actionData && 'error' in actionData && actionData.error === 'SESSION_EXPIRED' ? (
+            <p role="alert" className="text-sm text-red-700">
+              <Trans>Your session has expired. Please sign in again.</Trans>
             </p>
           ) : null}
 

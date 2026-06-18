@@ -14,7 +14,10 @@ import type { AuthProvider } from '@/modules/auth/auth-provider';
 import { addSession, type SessionEntry } from '@/modules/auth/session/cookie';
 import { ProviderError } from '@/modules/auth/types';
 import { postRegisterStep } from '@/resources/signup/post-register';
-import { verifyUrlTemplate } from '@/resources/verify/verify-url-template';
+import {
+  verifyUrlTemplate,
+  signupCompleteUrlTemplate,
+} from '@/resources/verify/verify-url-template';
 import { logAuthEvent, hashActor } from '@/server/observability';
 
 /**
@@ -399,6 +402,136 @@ export async function registerWithPassword(
     }
     throw error;
   }
+}
+
+// ── email-link (passwordless) register ────────────────────────────────────────
+
+export interface EmailLinkSignupInput {
+  email: string;
+  firstName: string;
+  lastName: string;
+  organization?: string;
+  requestId?: string;
+  /**
+   * TRUSTED app origin (scheme + host) from trustedAppOrigin(request) — used to
+   * steer the verification mail's link back to OUR /signup/complete route. MUST come
+   * from trusted config (PUBLIC_ORIGIN), never the request Host header, to prevent
+   * Host-header email-link injection.
+   */
+  origin: string;
+  /** MaxMind device-fingerprint token captured client-side (unused in the sessionless path, reserved for future use). */
+  deviceTrackingToken?: string;
+}
+
+/**
+ * Passwordless email-link signup: register without a password and send ONE
+ * verification email whose link targets /signup/complete (to prompt passkey setup).
+ *
+ * Enumeration-safe: a duplicate-email ALREADY_EXISTS error is caught and
+ * silently discarded — the caller receives the IDENTICAL generic "sent" result
+ * as a fresh signup, so account existence is not detectable.
+ */
+export async function registerEmailLinkSignup(
+  provider: AuthProvider,
+  _list: SessionEntry[],
+  input: EmailLinkSignupInput
+): Promise<SignupSentResult> {
+  const { email, firstName, lastName, organization, requestId, origin } = input;
+  try {
+    await provider.register({
+      email,
+      firstName,
+      lastName,
+      orgId: organization,
+      verifyUrlTemplate: signupCompleteUrlTemplate({ origin, requestId, organization }),
+    });
+  } catch (error) {
+    if (!(error instanceof ProviderError && error.code === 'ALREADY_EXISTS')) throw error;
+    // ENUMERATION SAFETY: fall through — identical response as the success path.
+  }
+  logAuthEvent('signup.requested', 'success', { actor: hashActor(email), organization });
+  return { kind: 'sent', email };
+}
+
+// ── email-link signup completion (/signup/complete) ────────────────────────────
+
+export interface CompleteEmailLinkInput {
+  userId: string;
+  code: string;
+  loginName: string;
+  organization?: string;
+  requestId?: string;
+  /** When present, nudge the user toward passkey setup (skippable). */
+  next?: 'passkey';
+  /** MaxMind device-fingerprint token captured client-side; attached as session metadata. */
+  deviceTrackingToken?: string;
+}
+
+/**
+ * Completion step for the passwordless email-link signup flow. Called when the
+ * user clicks the verification link in their email:
+ *
+ * 1. verifyEmail  — proves the user owns the address
+ * 2. addOtpEmail  — enroll the email OTP factor (now allowed, email is verified)
+ * 3. createSession / updateSession x2 — self-authenticate via returnCode challenge
+ *    (the OTP code is never emailed; the provider returns it in-band)
+ * 4. Return a redirect to /setup/passkey (skippable nudge) plus the new session.
+ */
+export async function completeEmailLinkSignup(
+  provider: AuthProvider,
+  list: SessionEntry[],
+  input: CompleteEmailLinkInput
+): Promise<SignupRedirectResult> {
+  const { userId, code, loginName, organization, requestId, deviceTrackingToken } = input;
+
+  // Step 1: verify email ownership using the code from the verification link.
+  await provider.verifyEmail(userId, code);
+
+  // Step 2: enroll the email OTP factor (requires verified email — just proven above).
+  await provider.addOtpEmail(userId);
+
+  // Step 3a: open a session for this user.
+  const metadata = deviceTrackingToken
+    ? { [MAXMIND_TRACKING_TOKEN_METADATA_KEY]: deviceTrackingToken }
+    : undefined;
+  const session = await provider.createSession(
+    {},
+    { orgId: organization, requestId, userId, metadata }
+  );
+
+  // Step 3b: request a returnCode challenge — the OTP code lands on the returned session,
+  // NOT in the user's inbox, so we can complete the factor in the next call.
+  const challenged = await provider.updateSession(session.id, session.token, {
+    challenges: { otpEmail: { returnCode: true } },
+  });
+  const otpCode = challenged.challenges?.otpEmailCode ?? '';
+
+  // Step 3c: complete the otpEmail factor server-side with the returned code.
+  const verified = await provider.updateSession(session.id, challenged.token, {
+    otpEmail: otpCode,
+  });
+
+  // Step 4: persist the session and redirect to the (skippable) passkey-setup nudge.
+  const sessions = addSession(list, {
+    id: session.id,
+    token: verified.token,
+    loginName,
+    organization,
+    creationTs: verified.changedAt,
+    expirationTs: verified.expiresAt,
+    changeTs: verified.changedAt,
+    requestId,
+  });
+
+  logAuthEvent('signup.created', 'success', { userId, actor: hashActor(loginName) });
+
+  const params = new URLSearchParams({ loginName, userId });
+  if (organization) params.set('organization', organization);
+  if (requestId) params.set('requestId', requestId);
+  params.set('force', 'false');
+  params.set('checkAfter', 'false');
+
+  return { kind: 'redirect', target: `/setup/passkey?${params.toString()}`, sessions };
 }
 
 // Re-exported so callers/tests can reach post-register routing through the barrel.

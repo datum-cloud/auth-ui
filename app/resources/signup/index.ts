@@ -4,9 +4,11 @@ export {
   passwordFirstHandoff,
   registerPasskeyFirst,
   registerWithPassword,
+  registerEmailLinkSignup,
+  completeEmailLinkSignup,
   postRegisterStep,
 } from './signup.service';
-export { registerSchema, registerClientSchema, signupPasswordSchema } from './signup.schema';
+export { registerSchema, registerClientSchema, signupPasswordSchema, signupIdentifierSchema, signupMethodSchema } from './signup.schema';
 export type {
   SignupRedirectResult,
   SignupSentWithSessionResult,
@@ -18,5 +20,7 @@ export type {
   PasskeyFirstRegisterResult,
   RegisterWithPasswordInput,
   RegisterWithPasswordResult,
+  EmailLinkSignupInput,
+  CompleteEmailLinkInput,
   PostRegisterInput,
 } from './signup.service';

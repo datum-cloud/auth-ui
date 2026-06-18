@@ -1,4 +1,5 @@
 import { useSystemTheme } from '@/hooks/useSystemTheme';
+import { assetUrl } from '@/utils/asset-url';
 import * as React from 'react';
 
 // Favicon configuration for responsive theme support
@@ -152,7 +153,7 @@ export const DynamicFaviconLinks = () => {
         link.setAttribute('sizes', config.sizes);
       }
 
-      link.href = `/favicons/${themeFolder}/${config.filename}`;
+      link.href = assetUrl(`/favicons/${themeFolder}/${config.filename}`);
 
       // Add the link to the document head
       document.head.appendChild(link);
@@ -162,7 +163,7 @@ export const DynamicFaviconLinks = () => {
     MSTILE_CONFIGS.forEach((config) => {
       const meta = document.createElement('meta');
       meta.name = config.name;
-      meta.content = `/favicons/${themeFolder}/${config.filename}`;
+      meta.content = assetUrl(`/favicons/${themeFolder}/${config.filename}`);
       document.head.appendChild(meta);
     });
   }, [isDarkMode]);

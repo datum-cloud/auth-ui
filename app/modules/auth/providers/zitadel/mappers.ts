@@ -262,6 +262,10 @@ export function toSessionChallenges(proto: {
   otpSms?: string | null;
   otpEmail?: string | null;
 }): SessionChallenges {
+  // proto.otpEmail is a string when Zitadel returns the code (returnCode delivery); it is
+  // a non-empty string only for the returnCode case — for sendCode the field is absent/null.
+  // We populate both otpEmail (existing field, unknown) and the new otpEmailCode (string) so
+  // callers that already read otpEmail keep working while new callers can use otpEmailCode.
   return {
     ...(proto.webAuthN != null
       ? {
@@ -270,7 +274,7 @@ export function toSessionChallenges(proto: {
           },
         }
       : {}),
-    ...(proto.otpEmail != null ? { otpEmail: proto.otpEmail } : {}),
+    ...(proto.otpEmail != null ? { otpEmail: proto.otpEmail, otpEmailCode: proto.otpEmail } : {}),
     ...(proto.otpSms != null ? { otpSms: proto.otpSms } : {}),
   };
 }
@@ -681,30 +685,47 @@ export function toSamlResponse(p: {
 //   RequestChallenges.webAuthN: { domain: string; userVerificationRequirement: UserVerificationRequirement }
 //   RequestChallenges.otpSms:   { returnCode: boolean }
 //   RequestChallenges.otpEmail: { deliveryType: { case: 'sendCode', value: {} } }
+//                             | { deliveryType: { case: 'returnCode', value: {} } }
 export function toChallengeRequest(challenges: NonNullable<SessionChecks['challenges']>): {
   webAuthN?: {
     domain: string;
     userVerificationRequirement: UserVerificationRequirement;
   };
   otpSms?: { returnCode: boolean };
-  otpEmail?: { deliveryType: { case: 'sendCode'; value: { urlTemplate?: string } } };
+  otpEmail?:
+    | { deliveryType: { case: 'sendCode'; value: { urlTemplate?: string } } }
+    | { deliveryType: { case: 'returnCode'; value: Record<string, never> } };
 } {
-  // OTPEmail.SendCode.url_template (proto field `url_template`, TS `urlTemplate`) — set it
-  // when the caller passes an object carrying a template so Zitadel mails OUR link; bare
-  // `true` (or an object with no template) leaves the value empty → provider default link.
-  // Three-way discriminant on the otpEmail challenge:
-  //   true   → request a sendCode with an empty value ({})
-  //   object → sendCode, carrying urlTemplate only when the object supplies one
+  // Four-way discriminant on the otpEmail challenge:
+  //   true              → sendCode with an empty value ({}) → provider default link
+  //   { urlTemplate }   → sendCode, carrying the template so Zitadel mails OUR link
+  //   { returnCode: true } → returnCode delivery — code is NOT emailed; it is returned on
+  //                          the SetSession response and surfaces on Session.challenges.otpEmailCode
   //   else (false/undefined) → no otpEmail challenge requested (undefined)
   const otpEmail = challenges.otpEmail;
-  const deriveOtpEmailValue = (): { urlTemplate?: string } | undefined => {
-    if (otpEmail === true) return {};
+  type OtpEmailProto =
+    | { deliveryType: { case: 'sendCode'; value: { urlTemplate?: string } } }
+    | { deliveryType: { case: 'returnCode'; value: Record<string, never> } }
+    | undefined;
+  const deriveOtpEmail = (): OtpEmailProto => {
+    if (otpEmail === true) {
+      return { deliveryType: { case: 'sendCode' as const, value: {} } };
+    }
     if (otpEmail && typeof otpEmail === 'object') {
-      return otpEmail.urlTemplate ? { urlTemplate: otpEmail.urlTemplate } : {};
+      if ('returnCode' in otpEmail && (otpEmail as { returnCode: true }).returnCode === true) {
+        return { deliveryType: { case: 'returnCode' as const, value: {} } };
+      }
+      const template = (otpEmail as { urlTemplate?: string }).urlTemplate;
+      return {
+        deliveryType: {
+          case: 'sendCode' as const,
+          value: template ? { urlTemplate: template } : {},
+        },
+      };
     }
     return undefined;
   };
-  const otpEmailValue = deriveOtpEmailValue();
+  const otpEmailProto = deriveOtpEmail();
 
   return {
     ...(challenges.webAuthN !== undefined
@@ -719,8 +740,6 @@ export function toChallengeRequest(challenges: NonNullable<SessionChecks['challe
         }
       : {}),
     ...(challenges.otpSms === true ? { otpSms: { returnCode: false } } : {}),
-    ...(otpEmailValue !== undefined
-      ? { otpEmail: { deliveryType: { case: 'sendCode' as const, value: otpEmailValue } } }
-      : {}),
+    ...(otpEmailProto !== undefined ? { otpEmail: otpEmailProto } : {}),
   };
 }

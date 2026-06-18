@@ -5,7 +5,10 @@ import { describe, it, expect } from 'vitest';
 describe('resolveIdentifier — disableLoginWithEmail (detect-for-copy)', () => {
   it('OFF (default): email-shaped unknown identifier → USER_NOT_FOUND (unchanged)', async () => {
     const p = new FakeAuthProvider({ users: [{ id: 'u1', loginName: 'alice' }] });
-    const r = await resolveIdentifier(p, [], { loginName: 'ghost@acme.test' });
+    const r = await resolveIdentifier(p, [], {
+      loginName: 'ghost@acme.test',
+      emailDeliveryEnabled: true,
+    });
     expect(r).toEqual({ ok: false, error: 'USER_NOT_FOUND' });
   });
 
@@ -17,6 +20,7 @@ describe('resolveIdentifier — disableLoginWithEmail (detect-for-copy)', () => 
     const r = await resolveIdentifier(p, [], {
       loginName: 'ghost@acme.test',
       organization: 'org-x',
+      emailDeliveryEnabled: true,
     });
     expect(r).toEqual({ ok: false, error: 'EMAIL_LOGIN_DISABLED' });
   });
@@ -26,7 +30,11 @@ describe('resolveIdentifier — disableLoginWithEmail (detect-for-copy)', () => 
       users: [{ id: 'u1', loginName: 'alice' }],
       settingsByOrg: { 'org-x': { disableLoginWithEmail: true } },
     });
-    const r = await resolveIdentifier(p, [], { loginName: 'bob', organization: 'org-x' });
+    const r = await resolveIdentifier(p, [], {
+      loginName: 'bob',
+      organization: 'org-x',
+      emailDeliveryEnabled: true,
+    });
     expect(r).toEqual({ ok: false, error: 'USER_NOT_FOUND' });
   });
 
@@ -38,6 +46,7 @@ describe('resolveIdentifier — disableLoginWithEmail (detect-for-copy)', () => 
     const r = await resolveIdentifier(p, [], {
       loginName: 'ghost@acme.test',
       organization: 'org-x',
+      emailDeliveryEnabled: true,
     });
     expect(r.ok).toBe(true);
     if (!r.ok) return;

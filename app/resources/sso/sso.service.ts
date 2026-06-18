@@ -588,8 +588,8 @@ export async function processIdpCallback(
     }
 
     case 'register': {
-      // register-and-link: redirect to /signup prefilled with IdP draft data + intent params
-      // so the signup action can compose register → addIdpLink → createSession.
+      // register-and-link: redirect to /signup/method prefilled with IdP draft data + intent
+      // params so the method screen can confirm and compose register → addIdpLink → createSession.
       const qs = new URLSearchParams({
         idpIntentId: id,
         idpIntentToken: token,
@@ -597,12 +597,14 @@ export async function processIdpCallback(
         idpUserId: decision.link.idpUserId,
         idpUserName: decision.link.idpUserName,
       });
-      if (decision.draft.email) qs.set('email', decision.draft.email);
+      // /signup/method reads `loginName` (the email is the loginName), matching the
+      // email-identifier flow in signup/index.tsx — NOT `email`, or it arrives empty.
+      if (decision.draft.email) qs.set('loginName', decision.draft.email);
       if (decision.draft.firstName) qs.set('firstName', decision.draft.firstName);
       if (decision.draft.lastName) qs.set('lastName', decision.draft.lastName);
       if (requestId) qs.set('requestId', requestId);
       if (organization) qs.set('organization', organization);
-      return { kind: 'redirect', location: `/signup?${qs.toString()}` };
+      return { kind: 'redirect', location: `/signup/method?${qs.toString()}` };
     }
 
     case 'error': {

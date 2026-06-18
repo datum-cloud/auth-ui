@@ -86,6 +86,7 @@ export interface ResolveIdentifierInput {
   loginName: string;
   requestId?: string;
   organization?: string;
+  emailDeliveryEnabled: boolean;
 }
 
 export type ResolveIdentifierError = 'USER_NOT_FOUND' | 'EMAIL_LOGIN_DISABLED';
@@ -126,7 +127,7 @@ function emailDomain(loginName: string): string | null {
 export async function resolveIdentifier(
   provider: AuthProvider,
   list: SessionEntry[],
-  { loginName, requestId, organization }: ResolveIdentifierInput
+  { loginName, requestId, organization, emailDeliveryEnabled }: ResolveIdentifierInput
 ): Promise<ResolveIdentifierResult> {
   // allowDomainDiscovery (settings-gated, DEFAULT-OFF): when the caller pinned no org and the
   // BASE/instance policy enables discovery, map an email domain → org and thread it through the
@@ -205,7 +206,7 @@ export async function resolveIdentifier(
   const session = await provider.createSession({}, { requestId, orgId: org, userId: user.id });
   const methods = await provider.listAuthMethods(user.id);
   const settings = await provider.getLoginSettings(org);
-  const decision = decideAfterIdentifier({ methods, settings });
+  const decision = decideAfterIdentifier({ methods, settings, emailDeliveryEnabled });
 
   // Persist the ceremony session into the (to-be-serialized) cookie list.
   const sessions = addSession(list, {

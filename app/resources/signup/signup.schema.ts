@@ -24,3 +24,22 @@ export const registerClientSchema = registerSchema.pick({
 export const signupPasswordSchema = z
   .object({ password: z.string().min(8), confirm: z.string().min(8) })
   .refine((v) => v.password === v.confirm, { path: ['confirm'], message: 'Passwords must match' });
+
+// Screen 1 (/signup): collect just the email identifier (name is parsed from it).
+export const signupIdentifierSchema = z.object({
+  email: z.string().email(),
+  organization: z.string().optional(),
+  requestId: z.string().optional(),
+  deviceTrackingToken: z.string().optional(),
+});
+
+// Screen 2 (/signup/method): which credential the user chose.
+export const signupMethodSchema = z.object({
+  intent: z.enum(['email-link', 'passkey', 'password', 'idp-register']),
+  loginName: z.string().min(1),
+  firstName: z.string().min(1),
+  lastName: z.string().min(1),
+  organization: z.string().optional(),
+  requestId: z.string().optional(),
+  deviceTrackingToken: z.string().optional(),
+});

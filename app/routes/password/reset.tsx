@@ -1,6 +1,7 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
 import { SubmitButton } from '@/components/auth-form/auth-form';
 import { BackLink } from '@/components/back-link/back-link';
+import { useActionErrorToast } from '@/hooks/use-action-error-toast';
 import { TrackOnMount } from '@/modules/analytics/fathom';
 import { requestPasswordReset } from '@/resources/password';
 import { resetRequestSchema, resetRequestClientSchema } from '@/resources/password/password.schema';
@@ -8,10 +9,14 @@ import { genericCheckYourEmail } from '@/resources/schemas/check-your-email.sche
 import { trustedAppOrigin } from '@/server/app-origin.server';
 import { providerForRequest } from '@/server/auth-context.server';
 import { getCsrfToken, assertCsrf } from '@/server/csrf';
+import { env } from '@/utils/env/env.server';
+import { actionError } from '@/utils/errors/auth-error';
+import { useAuthErrorMessage } from '@/utils/errors/auth-error-messages';
 import { Form } from '@datum-cloud/datum-ui/form';
 import { Trans, useLingui } from '@lingui/react/macro';
 import {
   data,
+  redirect,
   useLoaderData,
   useActionData,
   useNavigation,
@@ -24,6 +29,7 @@ import { Form as RRForm } from 'react-router';
 export const meta: MetaFunction = () => [{ title: 'Reset password' }];
 
 export async function loader({ request }: LoaderFunctionArgs) {
+  if (!env.AUTH_EMAIL_DELIVERY_ENABLED) return redirect('/login');
   const url = new URL(request.url);
   const [csrfToken, setCookie] = await getCsrfToken(request);
   const headers: Record<string, string> = {};
@@ -43,6 +49,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
 }
 
 export async function action({ request }: ActionFunctionArgs) {
+  if (!env.AUTH_EMAIL_DELIVERY_ENABLED)
+    return data({ error: 'INVALID_INPUT' as const }, { status: 400 });
   const provider = providerForRequest(request);
   const form = await request.formData();
   await assertCsrf(request, form);
@@ -57,15 +65,19 @@ export async function action({ request }: ActionFunctionArgs) {
   // real reset code + userId) to their own host. The enumeration-safe dispatch (build
   // template → findUser → conditional send/no-op → single audit event) lives in the
   // service; the route only resolves the trusted origin and renders the response.
-  await requestPasswordReset(provider, {
-    loginName,
-    organization,
-    origin: trustedAppOrigin(request),
-    requestId,
-  });
+  try {
+    await requestPasswordReset(provider, {
+      loginName,
+      organization,
+      origin: trustedAppOrigin(request),
+      requestId,
+    });
 
-  // Echoing loginName is safe: the user typed it themselves (not server-derived).
-  return genericCheckYourEmail(loginName);
+    // Echoing loginName is safe: the user typed it themselves (not server-derived).
+    return genericCheckYourEmail(loginName);
+  } catch (err) {
+    return actionError(err);
+  }
 }
 
 export default function PasswordReset() {
@@ -73,6 +85,10 @@ export default function PasswordReset() {
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
   const { t } = useLingui();
+
+  const getErrorMessage = useAuthErrorMessage();
+  const errorMessage = getErrorMessage((actionData as { error?: string } | undefined)?.error);
+  useActionErrorToast(errorMessage);
 
   // On success, swap out the form for the confirmation message
   if (actionData && 'sent' in actionData) {
@@ -85,11 +101,6 @@ export default function PasswordReset() {
       </AuthCard>
     );
   }
-
-  const serverError =
-    actionData && 'error' in actionData && actionData.error === 'INVALID_INPUT'
-      ? t`Please enter your email or username.`
-      : undefined;
 
   return (
     <AuthCard title={<Trans>Reset your password</Trans>}>
@@ -114,9 +125,9 @@ export default function PasswordReset() {
             placeholder="email@example.com"
           />
         </Form.Field>
-        {serverError ? (
+        {errorMessage ? (
           <p role="alert" className="text-sm text-red-700">
-            {serverError}
+            {errorMessage}
           </p>
         ) : null}
         <SubmitButton>

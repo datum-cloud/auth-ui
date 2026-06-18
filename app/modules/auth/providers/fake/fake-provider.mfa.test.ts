@@ -30,8 +30,10 @@ describe('FakeAuthProvider — MFA (P5)', () => {
     expect(await p.listAuthMethods('u1')).toContain('u2f');
   });
 
-  it('addOtpEmail enrolls otp_email', async () => {
+  it('addOtpEmail enrolls otp_email (requires email verified first)', async () => {
     const p = new FakeAuthProvider({ users: [{ id: 'u1', loginName: 'a@acme.test' }] });
+    // Seeded users have their email code set as `email-<id>` by the constructor
+    await p.verifyEmail('u1', 'email-u1');
     await p.addOtpEmail('u1');
     expect(await p.listAuthMethods('u1')).toContain('otp_email');
   });
@@ -47,6 +49,8 @@ describe('FakeAuthProvider — MFA (P5)', () => {
       users: [{ id: 'u1', loginName: 'a@acme.test' }],
       authMethods: { u1: ['password'] },
     });
+    // Seeded users have their email code set as `email-<id>` by the constructor
+    await p.verifyEmail('u1', 'email-u1');
     await p.addOtpEmail('u1');
     const methods = await p.listAuthMethods('u1');
     expect(methods).toContain('password');

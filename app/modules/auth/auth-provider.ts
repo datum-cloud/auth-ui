@@ -36,8 +36,10 @@ export interface SessionChecks {
      * with `urlTemplate` (built by flows/otp-email-url-template.ts) to override the emailed
      * link so it lands on OUR /id/login/verify/email route instead of the provider's default
      * /ui/v2/login/otp/email page. The mapper sets proto OTPEmail.SendCode.url_template from it.
+     * Pass `{ returnCode: true }` to request a return-code challenge — the OTP code is NOT
+     * emailed; instead it is returned on the session under Session.challenges.otpEmailCode.
      */
-    otpEmail?: boolean | { urlTemplate?: string };
+    otpEmail?: boolean | { urlTemplate?: string } | { returnCode: true };
     otpSms?: boolean;
   };
 }

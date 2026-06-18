@@ -1,11 +1,13 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
 import { SubmitButton } from '@/components/auth-form/auth-form';
+import { useActionErrorToast } from '@/hooks/use-action-error-toast';
 import { readSessions, byLoginName } from '@/modules/auth/session/cookie';
 import { setupSkipSchema } from '@/resources/mfa/mfa.schema';
 import { enrollTotp } from '@/resources/otp';
 import { otpCodeClientSchema } from '@/resources/otp/otp.schema';
 import { providerForRequest } from '@/server/auth-context.server';
 import { getCsrfToken, assertCsrf } from '@/server/csrf';
+import { useAuthErrorMessage } from '@/utils/errors/auth-error-messages';
 import { Form } from '@datum-cloud/datum-ui/form';
 import { Trans, useLingui } from '@lingui/react/macro';
 import {
@@ -81,14 +83,9 @@ export default function SetupAuthenticator() {
   const navigation = useNavigation();
   const { t } = useLingui();
 
-  const serverError =
-    actionData && 'error' in actionData
-      ? actionData.error === 'INVALID_CREDENTIALS'
-        ? t`The code is invalid or has expired. Please try again.`
-        : actionData.error === 'SESSION_EXPIRED'
-          ? t`Your session has expired. Please sign in again.`
-          : t`Please check your input and try again.`
-      : undefined;
+  const getErrorMessage = useAuthErrorMessage();
+  const errorMessage = getErrorMessage((actionData as { error?: string } | undefined)?.error);
+  useActionErrorToast(errorMessage);
 
   return (
     <AuthCard
@@ -140,9 +137,17 @@ export default function SetupAuthenticator() {
           <Form.Field name="code" label={t`Authenticator code`} required>
             <Form.Input inputMode="numeric" autoComplete="one-time-code" autoFocus />
           </Form.Field>
-          {serverError ? (
+          {errorMessage &&
+          actionData &&
+          'error' in actionData &&
+          actionData.error !== 'SESSION_EXPIRED' ? (
             <p role="alert" className="text-sm text-red-700">
-              {serverError}
+              {errorMessage}
+            </p>
+          ) : null}
+          {actionData && 'error' in actionData && actionData.error === 'SESSION_EXPIRED' ? (
+            <p role="alert" className="text-sm text-red-700">
+              <Trans>Your session has expired. Please sign in again.</Trans>
             </p>
           ) : null}
           <SubmitButton>

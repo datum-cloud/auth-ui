@@ -116,9 +116,12 @@ describe('processIdpCallback — session-user resolution (CODE-MIN-05)', () => {
       sessionsCookieHeader: cookieHeader,
     })) as Response;
 
-    // Assert: redirected to /signup (register path) and getUser was NOT called for session resolution.
+    // Assert: redirected to /signup/method (register path) and getUser was NOT called for session resolution.
     expect(res.status).toBe(302);
-    expect(res.headers.get('location')).toContain('/signup');
+    expect(res.headers.get('location')).toContain('/signup/method');
+    // Regression guard: /signup/method reads `loginName` (the email is the loginName),
+    // so the IdP draft email MUST ride as `loginName=` — `email=` arrives empty and 400s.
+    expect(res.headers.get('location')).toContain('loginName=');
     // getUser must not have been called with the session id (recent.id = 's1').
     const calledWithSessionId = getUserSpy.mock.calls.some(([id]) => id === 's1');
     expect(calledWithSessionId).toBe(false);

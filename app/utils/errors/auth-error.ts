@@ -8,7 +8,8 @@
 //
 // Boundary: this module is pure and imports provider TYPES only (no provider implementation).
 // No i18n — these are plain English strings (the error page renders them untranslated by design).
-import type { ProviderError } from '@/modules/auth/types';
+import { ProviderError } from '@/modules/auth/types';
+import { data } from 'react-router';
 
 export type AuthErrorCode =
   | 'request_expired'
@@ -95,4 +96,56 @@ export function providerErrorCode(code: ProviderError['code'] | undefined): Auth
     default:
       return 'signin_failed';
   }
+}
+
+// ── Action-level error resolution ────────────────────────────────────────────
+//
+// resolveAuthError / actionError let route actions turn an expected ProviderError
+// into a surfaceable error CODE (stable string, not a user-facing message — i18n
+// happens client-side). Non-ProviderError values are returned as null so the
+// caller can rethrow and let the error boundary handle truly unexpected failures.
+
+export interface ResolvedAuthError {
+  error: string;
+  status: number;
+}
+
+function passwordComplexityCode(message: string): string | null {
+  const m = message.toLowerCase();
+  if (m.includes('symbol')) return 'PASSWORD_NEEDS_SYMBOL';
+  if (m.includes('upper')) return 'PASSWORD_NEEDS_UPPERCASE';
+  if (m.includes('lower')) return 'PASSWORD_NEEDS_LOWERCASE';
+  if (m.includes('number') || m.includes('digit')) return 'PASSWORD_NEEDS_NUMBER';
+  if (m.includes('too short') || m.includes('minlength') || m.includes('length'))
+    return 'PASSWORD_TOO_SHORT';
+  return null;
+}
+
+/**
+ * Resolve an unknown thrown value to a stable error code + HTTP status, or null
+ * if the error is not a recognised ProviderError (caller should rethrow).
+ */
+export function resolveAuthError(err: unknown): ResolvedAuthError | null {
+  if (!(err instanceof ProviderError)) return null;
+  const pw = passwordComplexityCode(err.message);
+  if (pw) return { error: pw, status: 400 };
+  const status =
+    err.code === 'UNAVAILABLE'
+      ? 503
+      : err.code === 'INVALID_CREDENTIALS'
+        ? 401
+        : err.code === 'ALREADY_EXISTS'
+          ? 409
+          : 400;
+  return { error: err.code, status };
+}
+
+/**
+ * Convenience wrapper for route actions: resolves a ProviderError to a `data()`
+ * response the action can return, or rethrows unexpected errors to the boundary.
+ */
+export function actionError(err: unknown) {
+  const r = resolveAuthError(err);
+  if (!r) throw err;
+  return data({ error: r.error }, { status: r.status });
 }

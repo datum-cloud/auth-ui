@@ -2,11 +2,13 @@ import { AuthCard } from '@/components/auth-card/auth-card';
 import { BackLink } from '@/components/back-link/back-link';
 import { IdentityBadge } from '@/components/identity-badge/identity-badge';
 import { WebAuthnButton } from '@/components/webauthn-button/webauthn-button';
+import { useActionErrorToast } from '@/hooks/use-action-error-toast';
 import {
   createWebAuthnVerifyHandlers,
   type WebAuthnVerifyActionData,
   type WebAuthnVerifyLoaderData,
 } from '@/resources/webauthn/webauthn-verify';
+import { useAuthErrorMessage } from '@/utils/errors/auth-error-messages';
 import { Trans } from '@lingui/react/macro';
 import { useRef } from 'react';
 import { useActionData, useLoaderData, type MetaFunction } from 'react-router';
@@ -34,6 +36,10 @@ export default function LoginPasskey() {
   // Use the exported concrete type instead.
   const actionData = useActionData() as WebAuthnVerifyActionData | undefined;
   const formRef = useRef<HTMLFormElement>(null);
+
+  const getErrorMessage = useAuthErrorMessage();
+  const errorMessage = getErrorMessage((actionData as { error?: string } | undefined)?.error);
+  useActionErrorToast(errorMessage);
 
   // Extract the inner publicKey object that marshalAssertion expects.
   const publicKey =

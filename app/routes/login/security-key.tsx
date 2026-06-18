@@ -2,11 +2,13 @@ import { AuthCard } from '@/components/auth-card/auth-card';
 import { BackLink } from '@/components/back-link/back-link';
 import { IdentityBadge } from '@/components/identity-badge/identity-badge';
 import { WebAuthnButton } from '@/components/webauthn-button/webauthn-button';
+import { useActionErrorToast } from '@/hooks/use-action-error-toast';
 import {
   createWebAuthnVerifyHandlers,
   type WebAuthnVerifyActionData,
   type WebAuthnVerifyLoaderData,
 } from '@/resources/webauthn/webauthn-verify';
+import { useAuthErrorMessage } from '@/utils/errors/auth-error-messages';
 import { Trans } from '@lingui/react/macro';
 import { useRef } from 'react';
 import { useActionData, useLoaderData, type MetaFunction } from 'react-router';
@@ -43,6 +45,10 @@ export default function LoginSecurityKey() {
       ? (publicKeyCredentialRequestOptions as { publicKey: unknown }).publicKey
       : publicKeyCredentialRequestOptions;
 
+  const getErrorMessage = useAuthErrorMessage();
+  const errorMessage = getErrorMessage((actionData as { error?: string } | undefined)?.error);
+  useActionErrorToast(errorMessage);
+
   return (
     <AuthCard title={<Trans>Verify with security key</Trans>}>
       <div className="mb-4 flex flex-col items-center gap-2">
@@ -76,6 +82,13 @@ export default function LoginSecurityKey() {
               <Link to="/login" className="underline">
                 <Trans>Sign in again</Trans>
               </Link>
+            </p>
+          ) : null}
+          {errorMessage &&
+          actionData?.error !== 'INVALID_CREDENTIALS' &&
+          actionData?.error !== 'SESSION_EXPIRED' ? (
+            <p role="alert" className="text-sm text-red-700">
+              {errorMessage}
             </p>
           ) : null}
           <WebAuthnButton

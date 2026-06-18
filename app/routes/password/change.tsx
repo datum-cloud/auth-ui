@@ -1,10 +1,13 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
 import { SubmitButton } from '@/components/auth-form/auth-form';
+import { useActionErrorToast } from '@/hooks/use-action-error-toast';
 import { readSessions, mostRecent, byId } from '@/modules/auth/session/cookie';
 import { changePassword } from '@/resources/password';
 import { changePasswordClientSchema } from '@/resources/password/password.schema';
 import { providerForRequest } from '@/server/auth-context.server';
 import { getCsrfToken, assertCsrf } from '@/server/csrf';
+import { actionError } from '@/utils/errors/auth-error';
+import { useAuthErrorMessage } from '@/utils/errors/auth-error-messages';
 import { Form } from '@datum-cloud/datum-ui/form';
 import { Trans, useLingui } from '@lingui/react/macro';
 import {
@@ -49,11 +52,15 @@ export async function action({ request }: ActionFunctionArgs) {
   // owns this request I/O and hands the service a lookup closure; the service parses,
   // dispatches changePasswordWithSession, and maps ProviderError → typed errors.
   const sessions = await readSessions(request);
-  const result = await changePassword(provider, Object.fromEntries(form), (sessionId) =>
-    byId(sessions, sessionId)
-  );
-  if (result.ok) return redirect(result.target);
-  return data({ error: result.error }, { status: 400 });
+  try {
+    const result = await changePassword(provider, Object.fromEntries(form), (sessionId) =>
+      byId(sessions, sessionId)
+    );
+    if (result.ok) return redirect(result.target);
+    return data({ error: result.error }, { status: 400 });
+  } catch (err) {
+    return actionError(err);
+  }
 }
 
 export default function PasswordChange() {
@@ -61,6 +68,10 @@ export default function PasswordChange() {
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
   const { t } = useLingui();
+
+  const getErrorMessage = useAuthErrorMessage();
+  const errorMessage = getErrorMessage((actionData as { error?: string } | undefined)?.error);
+  useActionErrorToast(errorMessage);
 
   const error = actionData && 'error' in actionData ? actionData.error : undefined;
 
@@ -84,16 +95,6 @@ export default function PasswordChange() {
           <Form.Input type="password" autoComplete="new-password" />
         </Form.Field>
 
-        {error === 'PASSWORD_COMPLEXITY' && (
-          <p role="alert" className="text-sm text-red-700">
-            <Trans>Your password does not meet the required complexity.</Trans>
-          </p>
-        )}
-        {error === 'INVALID_CREDENTIALS' && (
-          <p role="alert" className="text-sm text-red-700">
-            <Trans>Could not change your password. Please try again.</Trans>
-          </p>
-        )}
         {error === 'PERMISSION_DENIED' && (
           <p role="alert" className="text-sm text-red-700">
             <Trans>This account must be activated from its invitation email first.</Trans>
@@ -108,11 +109,11 @@ export default function PasswordChange() {
             .
           </p>
         )}
-        {error === 'INVALID_INPUT' && (
+        {error && error !== 'PERMISSION_DENIED' && error !== 'SESSION_EXPIRED' && errorMessage ? (
           <p role="alert" className="text-sm text-red-700">
-            <Trans>Passwords must match and be at least 8 characters.</Trans>
+            {errorMessage}
           </p>
-        )}
+        ) : null}
 
         <SubmitButton>
           <Trans>Change password</Trans>

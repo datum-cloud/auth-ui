@@ -14,6 +14,9 @@ export default defineConfig({
   base: '/id/',
   server: {
     port: 3000,
+    // Dev server must accept the gateway host when accessed via the local stack
+    // (auth.localtest.me). Explicit list (not `true`) to avoid a wildcard allow.
+    allowedHosts: ['localhost', '127.0.0.1', 'auth.localtest.me'],
     // Listen on all network interfaces so VS Code can forward it properly
     host: '127.0.0.1',
     hmr: {
@@ -39,6 +42,9 @@ export default defineConfig({
           /^\/id\/app\/(?!.*\.data(\?|$)).*\..*(\?.*)?$/,
           /^\/id\/@.+$/,
           /^\/id\/node_modules\/.*/,
+          // Public assets (public/images, public/favicons) carry the /id base too; route
+          // them to Vite's publicDir instead of the RR catch-all (which SSRs an error page).
+          /^\/id\/(images|favicons)\/.+/,
         ],
       },
     }),

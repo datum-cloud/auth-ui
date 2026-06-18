@@ -1,5 +1,6 @@
 import { SubmitButton } from '@/components/auth-form/auth-form';
 import { FormError } from '@/components/form-error/form-error';
+import { useActionErrorToast } from '@/hooks/use-action-error-toast';
 import SplitLayout from '@/layouts/split.layout';
 // ADAPTATION (plan-drift fix): readSessions + serializeSessions live in @/modules/auth/session/cookie.
 // The locked plan block incorrectly listed them as coming from @/modules/auth/session/session
@@ -17,6 +18,9 @@ import { type LoginLayoutData } from '@/routes/login/layout';
 import { trustedAppOrigin } from '@/server/app-origin.server';
 import { providerForRequest } from '@/server/auth-context.server';
 import { getCsrfToken, assertCsrf } from '@/server/csrf';
+import { assetUrl } from '@/utils/asset-url';
+import { env } from '@/utils/env/env.server';
+import { useAuthErrorMessage } from '@/utils/errors/auth-error-messages';
 import { Button } from '@datum-cloud/datum-ui/button';
 import { Form } from '@datum-cloud/datum-ui/form';
 import { Icon } from '@datum-cloud/datum-ui/icons';
@@ -68,6 +72,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       branding,
       csrfToken,
       idps,
+      emailDeliveryEnabled: env.AUTH_EMAIL_DELIVERY_ENABLED,
     },
     { headers }
   );
@@ -96,6 +101,30 @@ export async function action({ request }: ActionFunctionArgs) {
     return redirect(result.authUrl);
   }
 
+  // Email-link branch — resolve the user + create the ceremony session, then redirect
+  // to /login/verify/email which dispatches the OTP email on arrival.
+  if (form.get('intent') === 'email-link') {
+    if (!env.AUTH_EMAIL_DELIVERY_ENABLED) return data({ error: 'INVALID_INPUT' }, { status: 400 });
+    const parsed = loginIdentifierSchema.safeParse(Object.fromEntries(form));
+    if (!parsed.success) return data({ error: 'INVALID_INPUT' }, { status: 400 });
+    const { loginName, requestId, organization } = parsed.data;
+    const list = await readSessions(request);
+    const result = await resolveIdentifier(provider, list, {
+      loginName,
+      requestId,
+      organization,
+      emailDeliveryEnabled: env.AUTH_EMAIL_DELIVERY_ENABLED,
+    });
+    if (!result.ok) {
+      const status = result.error === 'EMAIL_LOGIN_DISABLED' ? 400 : 404;
+      return data({ error: result.error }, { status });
+    }
+    const verifyParams = new URLSearchParams(result.params);
+    return redirect(`/login/verify/email?${verifyParams.toString()}`, {
+      headers: { 'set-cookie': await serializeSessions(result.sessions) },
+    });
+  }
+
   // Identifier flow.
   const parsed = loginIdentifierSchema.safeParse(Object.fromEntries(form));
   if (!parsed.success) return data({ error: 'INVALID_INPUT' }, { status: 400 });
@@ -108,7 +137,12 @@ export async function action({ request }: ActionFunctionArgs) {
   }
 
   const list = await readSessions(request);
-  const result = await resolveIdentifier(provider, list, { loginName, requestId, organization });
+  const result = await resolveIdentifier(provider, list, {
+    loginName,
+    requestId,
+    organization,
+    emailDeliveryEnabled: env.AUTH_EMAIL_DELIVERY_ENABLED,
+  });
   if (!result.ok) {
     const status = result.error === 'EMAIL_LOGIN_DISABLED' ? 400 : 404;
     return data({ error: result.error }, { status });
@@ -120,13 +154,18 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function Login() {
-  const { csrfToken, idps, settings, branding } = useLoaderData<typeof loader>();
+  const { csrfToken, idps, settings, branding, emailDeliveryEnabled } =
+    useLoaderData<typeof loader>();
   const { loginName, requestId, organization } = useRouteLoaderData('login') as LoginLayoutData;
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
   const { t } = useLingui();
 
-  const view = resolveLoginView(settings, idps);
+  const getErrorMessage = useAuthErrorMessage();
+  const errorMessage = getErrorMessage((actionData as { error?: string } | undefined)?.error);
+  useActionErrorToast(errorMessage);
+
+  const view = resolveLoginView(settings, idps, emailDeliveryEnabled);
 
   const field = resolveIdentifierField(settings);
   const identifierLabel = field.allowEmail
@@ -216,7 +255,9 @@ export default function Login() {
                 iconPosition="left"
                 icon={
                   <img
-                    src={`/images/idps/${idp.name.toLowerCase().replace(/\s+/g, '-')}.png`}
+                    src={assetUrl(
+                      `/images/idps/${idp.name.toLowerCase().replace(/\s+/g, '-')}.png`
+                    )}
                     alt={idp.name}
                     aria-hidden="true"
                     className="size-4 object-contain"
@@ -307,6 +348,16 @@ export default function Login() {
               <SubmitButton loading={identifierSubmitting}>
                 <Trans>Continue</Trans>
               </SubmitButton>
+              {view.showEmailLink ? (
+                <button
+                  type="submit"
+                  name="intent"
+                  value="email-link"
+                  className="text-foreground/70 hover:text-foreground mt-1 w-full text-center text-sm underline underline-offset-2 transition-colors"
+                  disabled={navigation.state !== 'idle'}>
+                  <Trans>Email me a sign-in link</Trans>
+                </button>
+              ) : null}
             </Form.Root>
           )}
         </>

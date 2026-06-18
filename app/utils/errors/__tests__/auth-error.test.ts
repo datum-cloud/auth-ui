@@ -2,8 +2,10 @@ import {
   AUTH_ERRORS,
   authErrorMessage,
   providerErrorCode,
+  resolveAuthError,
   type AuthErrorCode,
 } from '../auth-error';
+import { ProviderError } from '@/modules/auth/types';
 import { describe, it, expect } from 'vitest';
 
 const GENERIC = {
@@ -91,5 +93,28 @@ describe('providerErrorCode', () => {
   it('only ever returns a known AuthErrorCode (so authErrorMessage never falls through)', () => {
     const result = providerErrorCode('UNAVAILABLE');
     expect(AUTH_ERRORS[result]).toBeDefined();
+  });
+});
+
+describe('resolveAuthError', () => {
+  it('maps password-complexity (symbol) to a precise code', () => {
+    const r = resolveAuthError(
+      new ProviderError(
+        'PASSWORD_COMPLEXITY',
+        '[invalid_argument] Password must contain symbol (COMMA-ZDLwA)'
+      )
+    );
+    expect(r).toEqual({ error: 'PASSWORD_NEEDS_SYMBOL', status: 400 });
+  });
+
+  it('maps a generic provider code (UNAVAILABLE)', () => {
+    expect(resolveAuthError(new ProviderError('UNAVAILABLE', 'x'))).toEqual({
+      error: 'UNAVAILABLE',
+      status: 503,
+    });
+  });
+
+  it('returns null for a non-ProviderError (caller rethrows)', () => {
+    expect(resolveAuthError(new Error('boom'))).toBeNull();
   });
 });

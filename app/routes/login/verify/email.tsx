@@ -2,6 +2,7 @@ import { AuthCard } from '@/components/auth-card/auth-card';
 import { SubmitButton } from '@/components/auth-form/auth-form';
 import { BackLink } from '@/components/back-link/back-link';
 import { IdentityBadge } from '@/components/identity-badge/identity-badge';
+import { useActionErrorToast } from '@/hooks/use-action-error-toast';
 import {
   readSessions,
   byLoginName,
@@ -14,6 +15,7 @@ import { type LoginLayoutData } from '@/routes/login/layout';
 import { trustedAppOrigin } from '@/server/app-origin.server';
 import { providerForRequest } from '@/server/auth-context.server';
 import { getCsrfToken, assertCsrf } from '@/server/csrf';
+import { useAuthErrorMessage } from '@/utils/errors/auth-error-messages';
 import { Form } from '@datum-cloud/datum-ui/form';
 import { Trans, useLingui } from '@lingui/react/macro';
 import {
@@ -61,7 +63,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const headers: Record<string, string> = {};
   if (setCookie !== null) headers['set-cookie'] = setCookie;
 
-  return data({ csrfToken, code }, { headers });
+  const next = url.searchParams.get('next') ?? undefined;
+
+  return data({ csrfToken, code, next }, { headers });
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -72,6 +76,8 @@ export async function action({ request }: ActionFunctionArgs) {
   const formEntries = Object.fromEntries(form);
   const organization = (formEntries.organization as string) || undefined;
   const loginName = (formEntries.loginName as string) ?? '';
+  const requestId = (formEntries.requestId as string) || undefined;
+  const nextParam = String(formEntries.next ?? '');
 
   const sessions = await readSessions(request);
   const entry = byLoginName(sessions, loginName, organization);
@@ -83,33 +89,37 @@ export async function action({ request }: ActionFunctionArgs) {
   }
 
   // Write back the (potentially rotated) session token.
-  const next = addSession(sessions, {
+  const updatedSessions = addSession(sessions, {
     ...entry!,
     token: result.session.token,
     changeTs: result.session.changedAt,
     expirationTs: result.session.expiresAt,
   });
 
+  if (nextParam === 'passkey') {
+    const p = new URLSearchParams({ loginName, force: 'false', checkAfter: 'false' });
+    if (organization) p.set('organization', organization);
+    if (requestId) p.set('requestId', requestId);
+    return redirect(`/setup/passkey?${p.toString()}`, {
+      headers: { 'set-cookie': await serializeSessions(updatedSessions) },
+    });
+  }
+
   return redirect(result.target, {
-    headers: { 'set-cookie': await serializeSessions(next) },
+    headers: { 'set-cookie': await serializeSessions(updatedSessions) },
   });
 }
 
 export default function VerifyEmail() {
-  const { csrfToken, code } = useLoaderData<typeof loader>();
+  const { csrfToken, code, next } = useLoaderData<typeof loader>();
   const { loginName, requestId, organization } = useRouteLoaderData('login') as LoginLayoutData;
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
   const { t } = useLingui();
 
-  const serverError =
-    actionData && 'error' in actionData
-      ? actionData.error === 'INVALID_CREDENTIALS'
-        ? t`The code is invalid or has expired. Please try again.`
-        : actionData.error === 'SESSION_EXPIRED'
-          ? null // handled inline with a link
-          : t`Please check your input and try again.`
-      : undefined;
+  const getErrorMessage = useAuthErrorMessage();
+  const errorMessage = getErrorMessage((actionData as { error?: string } | undefined)?.error);
+  useActionErrorToast(errorMessage);
 
   return (
     <AuthCard title={<Trans>Enter your email code</Trans>}>
@@ -135,12 +145,16 @@ export default function VerifyEmail() {
           <input type="hidden" name="loginName" value={loginName} />
           {requestId ? <input type="hidden" name="requestId" value={requestId} /> : null}
           {organization ? <input type="hidden" name="organization" value={organization} /> : null}
+          {next ? <input type="hidden" name="next" value={next} /> : null}
           <Form.Field name="code" label={t`Email code`} required>
             <Form.Input inputMode="numeric" autoComplete="one-time-code" autoFocus />
           </Form.Field>
-          {serverError ? (
+          {errorMessage &&
+          actionData &&
+          'error' in actionData &&
+          actionData.error !== 'SESSION_EXPIRED' ? (
             <p role="alert" className="text-sm text-red-700">
-              {serverError}
+              {errorMessage}
             </p>
           ) : null}
           {actionData && 'error' in actionData && actionData.error === 'SESSION_EXPIRED' ? (

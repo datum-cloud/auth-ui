@@ -26,6 +26,7 @@ describe('device_ requestId threading through the login ceremony', () => {
     const result = await resolveIdentifier(fake, [], {
       loginName: 'alice@acme.test',
       requestId: REQUEST_ID,
+      emailDeliveryEnabled: true,
     });
 
     expect(result.ok).toBe(true);
@@ -41,6 +42,7 @@ describe('device_ requestId threading through the login ceremony', () => {
     const idResult = await resolveIdentifier(fake, [], {
       loginName: 'alice@acme.test',
       requestId: REQUEST_ID,
+      emailDeliveryEnabled: true,
     });
     expect(idResult.ok).toBe(true);
     if (!idResult.ok) return;

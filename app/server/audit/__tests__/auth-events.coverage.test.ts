@@ -190,6 +190,7 @@ const DELEGATED_TO_SHARED: Record<string, string[]> = {
   // lives in resources/signup/signup.service.ts.
   'signup/index.tsx': ['signup.service.ts'],
   'signup/password.tsx': ['signup.service.ts'],
+  'signup/method.tsx': ['signup.service.ts'],
   // Pass 2: the verify route is thin — its action logic (and the email.verified /
   // invite.verified logAuthEvent calls) lives in resources/verify/verify.service.ts.
   'verify/index.tsx': ['verify.service.ts'],

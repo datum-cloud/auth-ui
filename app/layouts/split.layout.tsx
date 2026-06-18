@@ -1,4 +1,5 @@
 import type { BrandingTheme } from '@/modules/auth/types';
+import { assetUrl } from '@/utils/asset-url';
 import { Avatar, AvatarFallback, AvatarImage } from '@datum-cloud/datum-ui/avatar';
 import { Button } from '@datum-cloud/datum-ui/button';
 import { Icon } from '@datum-cloud/datum-ui/icons';
@@ -72,7 +73,10 @@ export default function SplitLayout({
         <div className="flex w-full flex-1 items-center justify-center">
           <div className="relative flex w-full max-w-[400px] flex-col gap-6">
             <div className="absolute -top-36 -left-24 z-0 max-w-[115px]">
-              <img src="/images/illustration-2.png" className="size-auto w-full object-cover" />
+              <img
+                src={assetUrl('/images/illustration-2.png')}
+                className="size-auto w-full object-cover"
+              />
             </div>
 
             <div className="stretch leading-6 text-[#67717C]">
@@ -100,19 +104,22 @@ export default function SplitLayout({
 
             <div className="flex flex-col">
               <Avatar className="mb-2 size-10 rounded-lg">
-                <AvatarImage alt="Zac Smith" src="/images/zac-avatar.png" />
+                <AvatarImage alt="Zac Smith" src={assetUrl('/images/zac-avatar.png')} />
                 <AvatarFallback>ZS</AvatarFallback>
               </Avatar>
               <span className="leading-4 text-[#67717C]">Zac Smith</span>
               <span className="text-xs text-[#90969C]">Co-founder and CEO</span>
             </div>
 
-            <img src="/images/zac-sign.png" className="h-[38px] w-24" />
+            <img src={assetUrl('/images/zac-sign.png')} className="h-[38px] w-24" />
           </div>
         </div>
 
         <div className="absolute right-0 bottom-0 z-0 max-w-[500px] md:max-w-[800px]">
-          <img src="/images/illustration-1.png" className="size-auto w-full object-cover" />
+          <img
+            src={assetUrl('/images/illustration-1.png')}
+            className="size-auto w-full object-cover"
+          />
         </div>
       </div>
     </div>

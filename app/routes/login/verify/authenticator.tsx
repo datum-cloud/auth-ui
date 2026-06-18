@@ -2,6 +2,7 @@ import { AuthCard } from '@/components/auth-card/auth-card';
 import { SubmitButton } from '@/components/auth-form/auth-form';
 import { BackLink } from '@/components/back-link/back-link';
 import { IdentityBadge } from '@/components/identity-badge/identity-badge';
+import { useActionErrorToast } from '@/hooks/use-action-error-toast';
 import {
   readSessions,
   byLoginName,
@@ -13,6 +14,7 @@ import { otpCodeClientSchema } from '@/resources/otp/otp.schema';
 import { type LoginLayoutData } from '@/routes/login/layout';
 import { providerForRequest } from '@/server/auth-context.server';
 import { getCsrfToken, assertCsrf } from '@/server/csrf';
+import { useAuthErrorMessage } from '@/utils/errors/auth-error-messages';
 import { Form } from '@datum-cloud/datum-ui/form';
 import { Trans, useLingui } from '@lingui/react/macro';
 import {
@@ -85,14 +87,9 @@ export default function VerifyAuthenticator() {
   const navigation = useNavigation();
   const { t } = useLingui();
 
-  const serverError =
-    actionData && 'error' in actionData
-      ? actionData.error === 'INVALID_CREDENTIALS'
-        ? t`The code is invalid or has expired. Please try again.`
-        : actionData.error === 'SESSION_EXPIRED'
-          ? null // handled inline with a link
-          : t`Please check your input and try again.`
-      : undefined;
+  const getErrorMessage = useAuthErrorMessage();
+  const errorMessage = getErrorMessage((actionData as { error?: string } | undefined)?.error);
+  useActionErrorToast(errorMessage);
 
   return (
     <AuthCard title={<Trans>Enter your authenticator code</Trans>}>
@@ -121,9 +118,12 @@ export default function VerifyAuthenticator() {
           <Form.Field name="code" label={t`Authenticator code`} required>
             <Form.Input inputMode="numeric" autoComplete="one-time-code" autoFocus />
           </Form.Field>
-          {serverError ? (
+          {errorMessage &&
+          actionData &&
+          'error' in actionData &&
+          actionData.error !== 'SESSION_EXPIRED' ? (
             <p role="alert" className="text-sm text-red-700">
-              {serverError}
+              {errorMessage}
             </p>
           ) : null}
           {actionData && 'error' in actionData && actionData.error === 'SESSION_EXPIRED' ? (

@@ -101,6 +101,7 @@ export class FakeAuthProvider implements AuthProvider {
   private orgDomains: Record<string, string>; // P2 domain discovery: email domain → orgId
   private enrolled = new Map<string, Set<AuthMethod>>(); // P5: dynamically enrolled methods (merged with seeded authMethods)
   private mfaSkippedAt = new Map<string, string>(); // P5: userId → ISO timestamp of last skip (BLK-06)
+  private issuedOtpEmailCodes = new Map<string, string>(); // sessionId → returnCode issued for that session
   private deviceAuthSeeds: DeviceAuthSeed[]; // P6
   private samlRequestSeeds: SamlRequestSeed[]; // P6
   private ldapUserSeeds: LdapUserSeed[]; // P6
@@ -366,6 +367,16 @@ export class FakeAuthProvider implements AuthProvider {
         // Empty code is a no-op (treated as invalid input); callers must use checks.challenges
         // to request a challenge. Keep this guard to avoid accidentally marking the factor verified.
       } else {
+        // If a returnCode was issued for this session, validate against it; otherwise accept any non-empty code
+        // (legacy / link-click path where the provider validates the code server-side via the email link).
+        const issuedCode = this.issuedOtpEmailCodes.get(id);
+        if (issuedCode !== undefined && checks.otpEmail !== issuedCode) {
+          throw new ProviderError('INVALID_CREDENTIALS', 'OTP email code mismatch');
+        }
+        if (issuedCode !== undefined) {
+          // Consume the code so it cannot be reused
+          this.issuedOtpEmailCodes.delete(id);
+        }
         updated = {
           ...updated,
           factors: { ...updated.factors, otpEmail: { verifiedAt: FIXED_NOW } },
@@ -412,10 +423,21 @@ export class FakeAuthProvider implements AuthProvider {
           },
         };
       }
-      // otpEmail may be bare `true` (default link) or an object carrying a urlTemplate
-      // (custom /id/login/verify/email link) — both request the email-OTP challenge.
+      // otpEmail may be bare `true` (default link), an object carrying urlTemplate, or
+      // { returnCode: true } (code returned in-band, not emailed — used by passwordless signup flow).
       if (checks.challenges.otpEmail) {
-        challengeResult.otpEmail = {};
+        const isReturnCode =
+          typeof checks.challenges.otpEmail === 'object' &&
+          'returnCode' in checks.challenges.otpEmail &&
+          checks.challenges.otpEmail.returnCode === true;
+        if (isReturnCode) {
+          const code = '123456';
+          this.issuedOtpEmailCodes.set(id, code);
+          challengeResult.otpEmail = {};
+          challengeResult.otpEmailCode = code;
+        } else {
+          challengeResult.otpEmail = {};
+        }
       }
       if (checks.challenges.otpSms === true) {
         challengeResult.otpSms = {};
@@ -531,6 +553,12 @@ export class FakeAuthProvider implements AuthProvider {
   }
 
   async addOtpEmail(userId: string): Promise<void> {
+    if (!this.emailVerified.get(userId)) {
+      throw new ProviderError(
+        'FAILED_PRECONDITION',
+        'Email must be verified before enrolling OTP email'
+      );
+    }
     this.enroll(userId, 'otp_email');
   }
 

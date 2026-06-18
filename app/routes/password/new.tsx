@@ -1,9 +1,12 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
 import { SubmitButton } from '@/components/auth-form/auth-form';
+import { useActionErrorToast } from '@/hooks/use-action-error-toast';
 import { submitNewPassword } from '@/resources/password';
 import { newPasswordClientSchema } from '@/resources/password/password.schema';
 import { providerForRequest } from '@/server/auth-context.server';
 import { getCsrfToken, assertCsrf } from '@/server/csrf';
+import { actionError } from '@/utils/errors/auth-error';
+import { useAuthErrorMessage } from '@/utils/errors/auth-error-messages';
 import { Form } from '@datum-cloud/datum-ui/form';
 import { Trans, useLingui } from '@lingui/react/macro';
 import {
@@ -45,9 +48,13 @@ export async function action({ request }: ActionFunctionArgs) {
   // The service parses (incl. the CODE-MIN-24 requestId allowlist), calls the provider,
   // and maps ProviderError → typed errors. The route only wires the result to a
   // redirect (success) or a 400 data() error (the render reads `error`).
-  const result = await submitNewPassword(provider, Object.fromEntries(form));
-  if (result.ok) return redirect(result.target);
-  return data({ error: result.error }, { status: 400 });
+  try {
+    const result = await submitNewPassword(provider, Object.fromEntries(form));
+    if (result.ok) return redirect(result.target);
+    return data({ error: result.error }, { status: 400 });
+  } catch (err) {
+    return actionError(err);
+  }
 }
 
 export default function PasswordNew() {
@@ -56,14 +63,9 @@ export default function PasswordNew() {
   const navigation = useNavigation();
   const { t } = useLingui();
 
-  const serverError =
-    actionData && 'error' in actionData
-      ? actionData.error === 'INVALID_INPUT'
-        ? t`Passwords must match and be at least 8 characters.`
-        : actionData.error === 'PASSWORD_COMPLEXITY'
-          ? t`The password does not meet the complexity requirements. Please choose a stronger password.`
-          : null
-      : null;
+  const getErrorMessage = useAuthErrorMessage();
+  const errorMessage = getErrorMessage((actionData as { error?: string } | undefined)?.error);
+  useActionErrorToast(errorMessage);
 
   const invalidCredentials =
     actionData && 'error' in actionData && actionData.error === 'INVALID_CREDENTIALS';
@@ -88,9 +90,9 @@ export default function PasswordNew() {
         <Form.Field name="confirm" label={t`Confirm new password`} required>
           <Form.Input type="password" autoComplete="new-password" />
         </Form.Field>
-        {serverError ? (
+        {errorMessage && !invalidCredentials ? (
           <p role="alert" className="text-sm text-red-700">
-            {serverError}
+            {errorMessage}
           </p>
         ) : null}
         {invalidCredentials ? (

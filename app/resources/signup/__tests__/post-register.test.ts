@@ -55,4 +55,16 @@ describe('postRegisterStep', () => {
       })
     ).toBe('/signed-in');
   });
+  it('routes passwordless (passkey) signup to /setup/passkey with checkAfter=true', () => {
+    const target = postRegisterStep({
+      loginName: 'a@x.com',
+      userId: 'u1',
+      hasPassword: false,
+      emailVerified: false,
+      requireVerification: false,
+    });
+    expect(target).toContain('/setup/passkey');
+    expect(target).toContain('checkAfter=true');
+    expect(target).toContain('force=false');
+  });
 });
