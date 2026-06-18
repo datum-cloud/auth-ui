@@ -233,6 +233,12 @@ export default function Login() {
         </p>
       </div>
 
+      {!view.showPasswordForm && view.showIdpButtons ? (
+        // IdP buttons rendered above but the password form is gated off — still surface
+        // any server error (e.g. IDP_UNAVAILABLE) for the screen-reader.
+        <FormError>{serverError}</FormError>
+      ) : null}
+
       {view.showIdpButtons ? (
         <div className="flex flex-col gap-3">
           {idps.map((idp) => (
@@ -284,12 +290,6 @@ export default function Login() {
             <Trans>Passkey</Trans>
           </Link>
         </Button>
-      ) : null}
-
-      {!view.showPasswordForm && view.showIdpButtons ? (
-        // IdP buttons rendered above but the password form is gated off — still surface
-        // any server error (e.g. IDP_UNAVAILABLE) for the screen-reader.
-        <FormError>{serverError}</FormError>
       ) : null}
 
       {view.showPasswordForm && view.showIdpButtons ? (
@@ -375,7 +375,7 @@ export default function Login() {
         <>
           <div className="border-border my-8 flex-grow border-t" />
           <p className="text-foreground/80 text-center text-sm">
-            <Trans>Don't have an account?</Trans>{' '}
+            <Trans>Not registered?</Trans>{' '}
             <Link to={signupHref} className="underline">
               <Trans>Create account</Trans>
             </Link>

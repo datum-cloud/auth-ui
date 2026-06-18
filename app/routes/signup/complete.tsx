@@ -13,6 +13,7 @@ import { readSessions, serializeSessions } from '@/modules/auth/session/cookie';
 import { ProviderError } from '@/modules/auth/types';
 import { completeEmailLinkSignup } from '@/resources/signup';
 import { providerForRequest } from '@/server/auth-context.server';
+import { Button } from '@datum-cloud/datum-ui/button';
 import { Trans } from '@lingui/react/macro';
 import {
   data,
@@ -76,14 +77,15 @@ export default function SignupComplete() {
 
   if (hasError) {
     return (
-      <AuthCard title={<Trans>Link expired</Trans>}>
+      <AuthCard
+        title={<Trans>Link expired</Trans>}
+        description={<Trans>This sign-in link is invalid or has expired.</Trans>}>
         <div className="flex flex-col gap-4 text-center">
-          <p className="text-foreground/80 text-sm">
-            <Trans>This sign-in link is invalid or has expired.</Trans>
-          </p>
-          <Link to="/signup" className="text-sm underline">
-            <Trans>Start over</Trans>
-          </Link>
+          <Button theme="link" type="quaternary" block asChild>
+            <Link to="/signup">
+              <Trans>Start over</Trans>
+            </Link>
+          </Button>
         </div>
       </AuthCard>
     );

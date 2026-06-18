@@ -31,12 +31,17 @@ export async function loader({ request }: LoaderFunctionArgs) {
 export default function SignedIn() {
   const { loginName, csrfToken } = useLoaderData<typeof loader>();
   return (
-    <AuthCard title={<Trans>You are signed in</Trans>}>
+    <AuthCard
+      title={<Trans>You are signed in</Trans>}
+      description={
+        loginName ? (
+          <Trans>
+            You are signed in as <strong>{loginName}</strong>
+          </Trans>
+        ) : null
+      }>
       <TrackOnMount event="login_completed" />
       <div className="flex flex-col gap-4 text-center">
-        {/* ADAPTATION (contrast fix): text-foreground instead of text-muted-foreground
-            (Phase 0 finding: muted-foreground fails WCAG AA at 3.47:1). */}
-        {loginName ? <p className="text-foreground">{loginName}</p> : null}
         {/* Sign-out form posts to the logout INDEX route. Its action lives on
             routes/logout/index, which shares /id/logout with the action-less layout, so
             React Router needs ?index to target the index action — a native <form> won't

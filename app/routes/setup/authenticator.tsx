@@ -96,7 +96,7 @@ export default function SetupAuthenticator() {
           enrollment.
         </Trans>
       }>
-      <div className="flex flex-col gap-6">
+      <div className="flex flex-col gap-4">
         {/* Manual entry fallback — the otpauth URI and the raw secret.
             NOTE: A rendered QR image would improve UX here. The `qrcode` package
             is not yet in this project's dependency tree; adding it is deferred to a

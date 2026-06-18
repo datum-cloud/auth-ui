@@ -22,8 +22,8 @@ export function IdentityBadge({ loginName, requestId, organization }: IdentityBa
   const qs = params.toString();
   const to = qs ? `/login?${qs}` : '/login';
   return (
-    <p className="text-center text-sm text-gray-600">
-      <Trans>Signing in as</Trans> <span className="font-medium text-gray-900">{loginName}</span>{' '}
+    <p className="text-foreground text-center text-sm">
+      <Trans>Signing in as</Trans> <strong>{loginName}</strong>.{' '}
       <Link to={to} className="underline">
         <Trans>Not you?</Trans>
       </Link>

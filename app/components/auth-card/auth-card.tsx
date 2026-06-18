@@ -1,19 +1,27 @@
-import { brandingToStyle } from '@/components/auth-card/branding';
+import BlankLayout from '@/layouts/blank.layout';
 import type { BrandingTheme } from '@/modules/auth/types';
-import { Card, CardContent, CardHeader, CardDescription } from '@datum-cloud/datum-ui/card';
-import { Logo } from '@datum-cloud/datum-ui/logo';
+import {
+  Card,
+  CardContent,
+  CardHeader,
+  CardDescription,
+  CardTitle,
+} from '@datum-cloud/datum-ui/card';
+import { cn } from '@datum-cloud/datum-ui/utils';
 import type { ReactNode } from 'react';
 
 interface AuthCardProps {
   title: ReactNode;
   description?: ReactNode;
-  children: ReactNode;
+  children?: ReactNode;
   /**
    * Optional org branding (P2). Themes the card via CSS custom properties
    * (--primary / --background) and swaps the datum logo for the org logo when
    * present. Absent/null ⇒ datum defaults (unchanged from Phase 1).
    */
   branding?: BrandingTheme | null;
+
+  className?: string;
 }
 
 /**
@@ -23,28 +31,22 @@ interface AuthCardProps {
  * form content as children.  Max-width is ~sm (384px), centered
  * vertically and horizontally with min-h-screen.
  */
-export function AuthCard({ title, description, children, branding }: AuthCardProps) {
+export function AuthCard({ title, description, children, branding, className }: AuthCardProps) {
   return (
-    <main
-      className="flex min-h-screen items-center justify-center p-8"
-      style={brandingToStyle(branding)}>
-      <Card className="w-full max-w-sm">
-        <CardHeader className="items-center gap-4 pt-6 pb-2">
-          {branding?.logoUrl ? (
-            // Decorative: the <h1> title carries the accessible name; the logo is presentational.
-            <img src={branding.logoUrl} alt="" aria-hidden="true" className="h-7 w-auto" />
-          ) : (
-            <Logo.Flat decorative className="h-7 w-auto" />
-          )}
+    <BlankLayout branding={branding}>
+      <Card className={cn('w-full max-w-[410px] gap-3 p-8 md:p-11', className)}>
+        <CardHeader className="items-center gap-3 p-0">
           {/* Use <h1> directly: datum-ui CardTitle renders as <div>, which would fail
               axe's page-has-heading-one rule. The h1 carries CardTitle's visual styling. */}
-          <h1 className="text-center text-xl font-semibold">{title}</h1>
-          {description ? (
-            <CardDescription className="text-center">{description}</CardDescription>
-          ) : null}
+          <CardTitle className="text-center text-2xl font-semibold">{title}</CardTitle>
+          {description && (
+            <CardDescription className="text-foreground/80 text-center text-sm">
+              {description}
+            </CardDescription>
+          )}
         </CardHeader>
-        <CardContent className="pt-2 pb-6">{children}</CardContent>
+        {children && <CardContent className="p-0">{children}</CardContent>}
       </Card>
-    </main>
+    </BlankLayout>
   );
 }

@@ -1,5 +1,4 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
-import { SubmitButton } from '@/components/auth-form/auth-form';
 import { BackLink } from '@/components/back-link/back-link';
 import { IdentityBadge } from '@/components/identity-badge/identity-badge';
 import { readSessions } from '@/modules/auth/session/cookie';
@@ -7,7 +6,10 @@ import { resolveMfaPicker, chooseMfaMethod, type SecondFactorMethod } from '@/re
 import { type LoginLayoutData } from '@/routes/login/layout';
 import { providerForRequest } from '@/server/auth-context.server';
 import { getCsrfToken, assertCsrf } from '@/server/csrf';
+import { Button } from '@datum-cloud/datum-ui/button';
+import { Icon } from '@datum-cloud/datum-ui/icons';
 import { Trans } from '@lingui/react/macro';
+import { KeyRound, Mail, MessageSquareMore } from 'lucide-react';
 import type { ReactNode } from 'react';
 import {
   data,
@@ -24,11 +26,23 @@ export const meta: MetaFunction = () => [{ title: 'Choose your verification meth
 
 // ─── Labels for each 2nd-factor method ───────────────────────────────────────
 
-const METHOD_LABELS: Record<SecondFactorMethod, ReactNode> = {
-  totp: <Trans>Authenticator app</Trans>,
-  otp_email: <Trans>Email one-time code</Trans>,
-  otp_sms: <Trans>SMS one-time code</Trans>,
-  u2f: <Trans>Security key</Trans>,
+const METHOD_LABELS: Record<SecondFactorMethod, { label: ReactNode; icon: ReactNode }> = {
+  totp: {
+    label: <Trans>Authenticator app</Trans>,
+    icon: <img src="/idps/totp.png" alt="Authenticator app" className="size-4 object-contain" />,
+  },
+  otp_email: {
+    label: <Trans>Email one-time code</Trans>,
+    icon: <Icon icon={Mail} size={16} />,
+  },
+  otp_sms: {
+    label: <Trans>SMS one-time code</Trans>,
+    icon: <Icon icon={MessageSquareMore} size={16} />,
+  },
+  u2f: {
+    label: <Trans>Security key</Trans>,
+    icon: <Icon icon={KeyRound} size={16} />,
+  },
 };
 
 // ─── Loader ──────────────────────────────────────────────────────────────────
@@ -91,23 +105,35 @@ export default function MfaPicker() {
     <AuthCard
       title={<Trans>Two-factor verification</Trans>}
       description={<Trans>Choose how you want to verify your identity.</Trans>}>
-      <div className="mb-4 flex flex-col items-center gap-2">
-        <div className="self-start">
-          <BackLink />
-        </div>
+      <div className="flex flex-col items-baseline justify-center gap-4">
         <IdentityBadge loginName={loginName} requestId={requestId} organization={organization} />
-      </div>
-      <div className="flex flex-col gap-3">
-        {secondFactors.map((method) => (
-          <RRForm key={method} method="POST">
-            <input type="hidden" name="csrf" value={csrfToken} />
-            <input type="hidden" name="loginName" value={loginName} />
-            <input type="hidden" name="method" value={method} />
-            {requestId ? <input type="hidden" name="requestId" value={requestId} /> : null}
-            {organization ? <input type="hidden" name="organization" value={organization} /> : null}
-            <SubmitButton>{METHOD_LABELS[method]}</SubmitButton>
-          </RRForm>
-        ))}
+        <div className="flex flex-col gap-3">
+          {secondFactors.map((method) => (
+            <RRForm key={method} method="POST">
+              <input type="hidden" name="csrf" value={csrfToken} />
+              <input type="hidden" name="loginName" value={loginName} />
+              <input type="hidden" name="method" value={method} />
+              {requestId ? <input type="hidden" name="requestId" value={requestId} /> : null}
+              {organization ? (
+                <input type="hidden" name="organization" value={organization} />
+              ) : null}
+
+              <Button
+                size="large"
+                className="h-13 gap-3"
+                type="quaternary"
+                theme="outline"
+                block
+                htmlType="submit"
+                iconPosition="left"
+                icon={METHOD_LABELS[method].icon}>
+                {METHOD_LABELS[method].label}
+              </Button>
+            </RRForm>
+          ))}
+        </div>
+
+        <BackLink />
       </div>
     </AuthCard>
   );

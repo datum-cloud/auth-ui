@@ -1,11 +1,15 @@
+import type { BrandingTheme } from '@/modules/auth/types';
 import { Logo } from '@datum-cloud/datum-ui/logo';
 import { cn } from '@datum-cloud/datum-ui/utils';
+import { Link } from 'react-router';
 
 export default function BlankLayout({
   children,
+  branding,
   className,
 }: {
   children: React.ReactNode;
+  branding?: BrandingTheme | null;
   className?: string;
 }) {
   return (
@@ -15,9 +19,15 @@ export default function BlankLayout({
         className
       )}>
       <div className="justify-flex-start mb-6 flex items-center">
-        <Logo.Flat aria-label="Datum" className="h-6 w-auto" tone="brand" />
+        <Link to="/">
+          {branding?.logoUrl ? (
+            <img src={branding.logoUrl} alt="" aria-hidden="true" className="h-6 w-auto" />
+          ) : (
+            <Logo.Flat aria-label="Datum" className="h-6 w-auto" tone="brand" />
+          )}
+        </Link>
       </div>
-      {children}
+      <div className="flex flex-1 flex-col items-center justify-center">{children}</div>
     </div>
   );
 }

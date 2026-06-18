@@ -115,73 +115,72 @@ export default function Password() {
 
   return (
     <AuthCard title={<Trans>Enter your password</Trans>}>
-      <div className="mb-4 flex flex-col items-center gap-2">
-        <div className="self-start">
-          <BackLink />
-        </div>
+      <div className="flex flex-col items-baseline justify-center gap-4">
         <IdentityBadge loginName={loginName} requestId={requestId} organization={organization} />
-      </div>
-      <Form.Root
-        schema={loginPasswordClientSchema}
-        formComponent={RRForm}
-        method="POST"
-        defaultValues={{ password: '' }}
-        isSubmitting={navigation.state === 'submitting'}
-        className="flex flex-col gap-4">
-        <input type="hidden" name="csrf" value={csrfToken} />
-        <input type="hidden" name="loginName" value={loginName} />
-        {requestId ? <input type="hidden" name="requestId" value={requestId} /> : null}
-        {organization ? <input type="hidden" name="organization" value={organization} /> : null}
-        <Form.Field name="password" label={t`Enter your password`} required>
-          <Form.Input type="password" autoComplete="current-password" autoFocus />
-        </Form.Field>
+        <Form.Root
+          schema={loginPasswordClientSchema}
+          formComponent={RRForm}
+          method="POST"
+          defaultValues={{ password: '' }}
+          isSubmitting={navigation.state === 'submitting'}
+          className="flex flex-col gap-4">
+          <input type="hidden" name="csrf" value={csrfToken} />
+          <input type="hidden" name="loginName" value={loginName} />
+          {requestId ? <input type="hidden" name="requestId" value={requestId} /> : null}
+          {organization ? <input type="hidden" name="organization" value={organization} /> : null}
+          <Form.Field name="password" label={t`Enter your password`} required>
+            <Form.Input type="password" autoComplete="current-password" autoFocus />
+          </Form.Field>
 
-        {serverError?.kind === 'INVALID_CREDENTIALS' && (
-          <FormError>
-            {serverError.message}
-            {attempts?.kind === 'locked' ? (
-              <>
-                {' '}
-                <Trans>Your account is temporarily locked after too many attempts.</Trans>
-              </>
-            ) : attempts?.kind === 'remaining' ? (
-              <>
-                {' '}
-                <Plural
-                  value={attempts.count}
-                  one="# attempt remaining."
-                  other="# attempts remaining."
-                />
-              </>
-            ) : null}
-          </FormError>
-        )}
-        {serverError?.kind === 'SESSION_EXPIRED' && (
-          <FormError>
-            <Trans>Your session has expired.</Trans>{' '}
-            <Link to="/login" className="underline">
-              <Trans>Sign in again</Trans>
+          {serverError?.kind === 'INVALID_CREDENTIALS' && (
+            <FormError>
+              {serverError.message}
+              {attempts?.kind === 'locked' ? (
+                <>
+                  {' '}
+                  <Trans>Your account is temporarily locked after too many attempts.</Trans>
+                </>
+              ) : attempts?.kind === 'remaining' ? (
+                <>
+                  {' '}
+                  <Plural
+                    value={attempts.count}
+                    one="# attempt remaining."
+                    other="# attempts remaining."
+                  />
+                </>
+              ) : null}
+            </FormError>
+          )}
+          {serverError?.kind === 'SESSION_EXPIRED' && (
+            <FormError>
+              <Trans>Your session has expired.</Trans>{' '}
+              <Link to="/login" className="underline">
+                <Trans>Sign in again</Trans>
+              </Link>
+            </FormError>
+          )}
+          {serverError?.kind === 'INVALID_INPUT' && (
+            <FormError>
+              <Trans>Please check your input and try again.</Trans>
+            </FormError>
+          )}
+
+          <SubmitButton>
+            <Trans>Sign in</Trans>
+          </SubmitButton>
+        </Form.Root>
+
+        {!hidePasswordReset ? (
+          <p className="mt-4 text-center text-sm">
+            <Link to={resetHref} className="text-gray-600 underline">
+              <Trans>Forgot password?</Trans>
             </Link>
-          </FormError>
-        )}
-        {serverError?.kind === 'INVALID_INPUT' && (
-          <FormError>
-            <Trans>Please check your input and try again.</Trans>
-          </FormError>
-        )}
+          </p>
+        ) : null}
 
-        <SubmitButton>
-          <Trans>Sign in</Trans>
-        </SubmitButton>
-      </Form.Root>
-
-      {!hidePasswordReset ? (
-        <p className="mt-4 text-center text-sm">
-          <Link to={resetHref} className="text-gray-600 underline">
-            <Trans>Forgot password?</Trans>
-          </Link>
-        </p>
-      ) : null}
+        <BackLink />
+      </div>
     </AuthCard>
   );
 }

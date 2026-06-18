@@ -92,17 +92,11 @@ export default function VerifyAuthenticator() {
   useActionErrorToast(errorMessage);
 
   return (
-    <AuthCard title={<Trans>Enter your authenticator code</Trans>}>
-      <div className="mb-4 flex flex-col items-center gap-2">
-        <div className="self-start">
-          <BackLink />
-        </div>
+    <AuthCard
+      title={<Trans>Enter your authenticator code</Trans>}
+      description={<Trans>Open your authenticator app and enter the 6-digit code.</Trans>}>
+      <div className="flex flex-col items-baseline justify-center gap-4">
         <IdentityBadge loginName={loginName} requestId={requestId} organization={organization} />
-      </div>
-      <div className="flex flex-col gap-4">
-        <p className="text-foreground text-center text-sm">
-          <Trans>Open your authenticator app and enter the 6-digit code.</Trans>
-        </p>
 
         <Form.Root
           schema={otpCodeClientSchema}
@@ -138,6 +132,8 @@ export default function VerifyAuthenticator() {
             <Trans>Verify</Trans>
           </SubmitButton>
         </Form.Root>
+
+        <BackLink />
       </div>
     </AuthCard>
   );

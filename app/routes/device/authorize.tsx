@@ -51,12 +51,10 @@ export default function DeviceAuthorize() {
 
   if (actionData && 'done' in actionData) {
     return (
-      <AuthCard title={<Trans>Authorization complete</Trans>}>
-        {/* role="status": polite live-region so AT announces the in-page state swap */}
-        <p role="status">
-          <Trans>You may return to your device.</Trans>
-        </p>
-      </AuthCard>
+      <AuthCard
+        title={<Trans>Authorization complete</Trans>}
+        description={<Trans>You may return to your device.</Trans>}
+      />
     );
   }
 

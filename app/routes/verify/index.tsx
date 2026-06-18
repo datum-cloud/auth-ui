@@ -133,12 +133,10 @@ export default function Verify() {
       : undefined;
 
   return (
-    <AuthCard title={<Trans>Verify your email</Trans>}>
+    <AuthCard
+      title={<Trans>Verify your email</Trans>}
+      description={<Trans>Enter the verification code sent to your email address.</Trans>}>
       <div className="flex flex-col gap-4">
-        <p className="text-foreground text-center text-sm">
-          <Trans>Enter the verification code sent to your email address.</Trans>
-        </p>
-
         {/* Primary verify form — datum-ui Form.Root; intent=verify is submitted via SubmitButton */}
         <Form.Root
           schema={verifyCodeClientSchema}

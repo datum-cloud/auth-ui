@@ -50,17 +50,11 @@ export default function LoginSecurityKey() {
   useActionErrorToast(errorMessage);
 
   return (
-    <AuthCard title={<Trans>Verify with security key</Trans>}>
-      <div className="mb-4 flex flex-col items-center gap-2">
-        <div className="self-start">
-          <BackLink />
-        </div>
+    <AuthCard
+      title={<Trans>Verify with security key</Trans>}
+      description={<Trans>Use your security key to verify your identity.</Trans>}>
+      <div className="flex flex-col items-baseline justify-center gap-4">
         <IdentityBadge loginName={loginName} requestId={requestId} organization={organization} />
-      </div>
-      <div className="flex flex-col gap-4">
-        <p className="text-foreground text-center text-sm">
-          <Trans>Use your security key to verify your identity.</Trans>
-        </p>
 
         {/* Hidden form that WebAuthnButton populates and submits. */}
         <RRForm ref={formRef} method="POST" className="flex flex-col gap-4">
@@ -97,6 +91,8 @@ export default function LoginSecurityKey() {
             label={<Trans>Verify with security key</Trans>}
           />
         </RRForm>
+
+        <BackLink />
       </div>
     </AuthCard>
   );

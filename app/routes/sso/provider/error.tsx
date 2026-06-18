@@ -1,4 +1,5 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
+import { Button } from '@datum-cloud/datum-ui/button';
 import { Trans } from '@lingui/react/macro';
 import { Link, useParams, useSearchParams } from 'react-router';
 
@@ -22,13 +23,18 @@ export default function SsoError() {
   const { provider } = useParams();
   const [sp] = useSearchParams();
   const reason = sp.get('reason') ?? '';
-  const message = REASONS[reason] ?? <Trans>Something went wrong with {provider}.</Trans>;
+  const message = REASONS[reason] ?? (
+    <Trans>
+      Something went wrong with <strong>{provider}</strong>.
+    </Trans>
+  );
   return (
-    <AuthCard title={<Trans>Couldn't sign in</Trans>}>
-      <p className="text-foreground text-center">{message}</p>
-      <Link to="/login" className="mt-4 text-sm underline">
-        <Trans>Back to sign in</Trans>
-      </Link>
+    <AuthCard title={<Trans>Couldn't sign in</Trans>} description={message}>
+      <Button theme="link" type="quaternary" className="mt-4" asChild>
+        <Link to="/login">
+          <Trans>Back to sign in</Trans>
+        </Link>
+      </Button>
     </AuthCard>
   );
 }

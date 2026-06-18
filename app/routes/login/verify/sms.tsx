@@ -95,17 +95,11 @@ export default function VerifySms() {
   useActionErrorToast(errorMessage);
 
   return (
-    <AuthCard title={<Trans>Enter your SMS code</Trans>}>
-      <div className="mb-4 flex flex-col items-center gap-2">
-        <div className="self-start">
-          <BackLink />
-        </div>
+    <AuthCard
+      title={<Trans>Enter your SMS code</Trans>}
+      description={<Trans>Enter the one-time code sent to your phone.</Trans>}>
+      <div className="flex flex-col items-baseline justify-center gap-4">
         <IdentityBadge loginName={loginName} requestId={requestId} organization={organization} />
-      </div>
-      <div className="flex flex-col gap-4">
-        <p className="text-foreground text-center text-sm">
-          <Trans>Enter the one-time code sent to your phone.</Trans>
-        </p>
 
         <Form.Root
           schema={otpCodeClientSchema}
@@ -141,6 +135,8 @@ export default function VerifySms() {
             <Trans>Verify</Trans>
           </SubmitButton>
         </Form.Root>
+
+        <BackLink />
       </div>
     </AuthCard>
   );

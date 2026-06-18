@@ -141,13 +141,7 @@ export default function App() {
 // NEVER reflected into the DOM (no branching on error contents).
 export function ErrorView() {
   const { title, body } = authErrorMessage(undefined); // always the generic fallback
-  return (
-    <AuthCard title={title}>
-      <div className="flex flex-col gap-4 text-center">
-        <p className="text-foreground">{body}</p>
-      </div>
-    </AuthCard>
-  );
+  return <AuthCard title={title} description={body} />;
 }
 
 // CCD-10 / CODE-MAJ-06: app-wide error boundary. Every route inherits this when a loader,

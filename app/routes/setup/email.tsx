@@ -1,5 +1,6 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
 import { SubmitButton } from '@/components/auth-form/auth-form';
+import { BackLink } from '@/components/back-link/back-link';
 import { useActionErrorToast } from '@/hooks/use-action-error-toast';
 import {
   createOtpEnrollHandlers,
@@ -67,6 +68,8 @@ export default function SetupEmail() {
           </SubmitButton>
         </RRForm>
       </div>
+
+      <BackLink />
     </AuthCard>
   );
 }

@@ -7,7 +7,11 @@ import { setupSkipSchema } from '@/resources/mfa/mfa.schema';
 import { providerForRequest } from '@/server/auth-context.server';
 import { getCsrfToken, assertCsrf } from '@/server/csrf';
 import { useAuthErrorMessage } from '@/utils/errors/auth-error-messages';
+import { Button } from '@datum-cloud/datum-ui/button';
+import { Icon } from '@datum-cloud/datum-ui/icons';
+import { cn } from '@datum-cloud/datum-ui/utils';
 import { Trans } from '@lingui/react/macro';
+import { UserKey, KeyRound, Mail, MessageSquareMore } from 'lucide-react';
 import {
   data,
   redirect,
@@ -30,12 +34,33 @@ const CAPABILITY_ROUTES: Array<{
   key: keyof ProviderCapabilities;
   path: string;
   label: React.ReactNode;
+  icon: React.ReactNode;
 }> = [
-  { key: 'passkey', path: 'passkey', label: <Trans>Passkey</Trans> },
-  { key: 'u2f', path: 'security-key', label: <Trans>Security key</Trans> },
-  { key: 'totpOtp', path: 'authenticator', label: <Trans>Authenticator app</Trans> },
-  { key: 'emailOtp', path: 'email', label: <Trans>Email OTP</Trans> },
-  { key: 'smsOtp', path: 'sms', label: <Trans>SMS OTP</Trans> },
+  { key: 'passkey', path: 'passkey', label: <Trans>Passkey</Trans>, icon: <Icon icon={UserKey} /> },
+  {
+    key: 'u2f',
+    path: 'security-key',
+    label: <Trans>Security key</Trans>,
+    icon: <Icon icon={KeyRound} size={16} />,
+  },
+  {
+    key: 'totpOtp',
+    path: 'authenticator',
+    label: <Trans>Authenticator app</Trans>,
+    icon: <img src="/idps/totp.png" alt="Authenticator app" className="size-4 object-contain" />,
+  },
+  {
+    key: 'emailOtp',
+    path: 'email',
+    label: <Trans>Email OTP</Trans>,
+    icon: <Icon icon={Mail} size={16} />,
+  },
+  {
+    key: 'smsOtp',
+    path: 'sms',
+    label: <Trans>SMS OTP</Trans>,
+    icon: <Icon icon={MessageSquareMore} size={16} />,
+  },
 ];
 
 export async function loader({ request }: LoaderFunctionArgs) {
@@ -116,24 +141,30 @@ export default function SetupMfa() {
         <Trans>Add an extra layer of security to your account by setting up a second factor.</Trans>
       }>
       <div className="flex flex-col gap-4">
-        <ul className="flex flex-col gap-2">
-          {offerableRoutes.map((r) => (
-            <li key={r.path}>
-              <Link
-                to={`/setup/${r.path}?${qs}`}
-                className="border-border hover:bg-muted flex w-full items-center justify-between rounded-md border px-4 py-3 text-sm font-medium transition-colors">
-                {r.label}
-                <span aria-hidden="true">→</span>
-              </Link>
-            </li>
-          ))}
-        </ul>
-
         {errorMessage ? (
           <p role="alert" className="text-sm text-red-700">
             {errorMessage}
           </p>
         ) : null}
+
+        <div className="flex flex-col gap-3">
+          {offerableRoutes.map((r) => (
+            <Button
+              size="large"
+              className="h-13 gap-3"
+              type="quaternary"
+              theme="outline"
+              block
+              htmlType="submit"
+              iconPosition="left"
+              icon={r.icon}
+              asChild>
+              <Link to={`/setup/${r.path}?${qs}`}>
+                <Trans>{r.label}</Trans>
+              </Link>
+            </Button>
+          ))}
+        </div>
 
         {force !== 'true' ? (
           <RRForm method="POST">
@@ -143,11 +174,16 @@ export default function SetupMfa() {
             {organization ? <input type="hidden" name="organization" value={organization} /> : null}
             {force ? <input type="hidden" name="force" value={force} /> : null}
             {checkAfter ? <input type="hidden" name="checkAfter" value={checkAfter} /> : null}
-            <button
-              type="submit"
-              className="border-border text-muted-foreground hover:bg-muted w-full rounded-md border px-4 py-2 text-sm transition-colors">
+            <Button
+              size="large"
+              className={cn('h-13 gap-3', offerableRoutes.length > 0 && 'mt-3')}
+              type="quaternary"
+              theme="link"
+              block
+              asChild
+              htmlType="submit">
               <Trans>Skip for now</Trans>
-            </button>
+            </Button>
           </RRForm>
         ) : null}
       </div>

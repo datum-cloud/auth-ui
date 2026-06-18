@@ -6,7 +6,9 @@ import {
   type WebAuthnChallengeInput,
 } from '@/resources/webauthn/webauthn';
 import { Button } from '@datum-cloud/datum-ui/button';
+import { Icon } from '@datum-cloud/datum-ui/icons';
 import { Trans } from '@lingui/react/macro';
+import { UserKey } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { useNavigation, useSubmit } from 'react-router';
 
@@ -145,9 +147,13 @@ export function WebAuthnButton({
         </p>
       ) : null}
       <Button
-        type="primary"
-        theme="solid"
+        size="large"
+        className="h-13 gap-3"
+        type="quaternary"
+        theme="outline"
         block
+        iconPosition="left"
+        icon={<Icon icon={UserKey} />}
         htmlType="button"
         disabled={!mounted}
         loading={isSubmitting}

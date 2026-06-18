@@ -1,4 +1,5 @@
 import { previousStepFor } from './previous-step';
+import { Button } from '@datum-cloud/datum-ui/button';
 import { Trans } from '@lingui/react/macro';
 import { Link, useLocation } from 'react-router';
 
@@ -14,8 +15,10 @@ export function BackLink() {
   if (!target) return null;
   const to = location.search ? `${target}${location.search}` : target;
   return (
-    <Link to={to} className="text-sm text-gray-600 underline">
-      <Trans>← Back</Trans>
-    </Link>
+    <Button theme="link" type="quaternary" asChild>
+      <Link to={to}>
+        <Trans>Back</Trans>
+      </Link>
+    </Button>
   );
 }

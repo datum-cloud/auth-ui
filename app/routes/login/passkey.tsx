@@ -50,18 +50,11 @@ export default function LoginPasskey() {
       : publicKeyCredentialRequestOptions;
 
   return (
-    <AuthCard title={<Trans>Verify with passkey</Trans>}>
-      <div className="mb-4 flex flex-col items-center gap-2">
-        <div className="self-start">
-          <BackLink />
-        </div>
+    <AuthCard
+      title={<Trans>Verify with passkey</Trans>}
+      description={<Trans>Use your passkey to verify your identity.</Trans>}>
+      <div className="flex flex-col items-baseline justify-center gap-4">
         <IdentityBadge loginName={loginName} requestId={requestId} organization={organization} />
-      </div>
-      <div className="flex flex-col gap-4">
-        <p className="text-foreground text-center text-sm">
-          <Trans>Use your passkey to verify your identity.</Trans>
-        </p>
-
         {/* Hidden form that WebAuthnButton populates and submits. */}
         <RRForm ref={formRef} method="POST" className="flex flex-col gap-4">
           <input type="hidden" name="csrf" value={csrfToken} />
@@ -86,6 +79,8 @@ export default function LoginPasskey() {
           ) : null}
           <WebAuthnButton publicKey={publicKey} formRef={formRef} />
         </RRForm>
+
+        <BackLink />
       </div>
     </AuthCard>
   );

@@ -72,8 +72,10 @@ export default function SsoPage() {
   const { csrfToken, loginName, linked, unlinked, allowUnlink } = useLoaderData<typeof loader>();
 
   return (
-    <AuthCard title={<Trans>Linked accounts</Trans>}>
-      <div className="flex flex-col gap-6">
+    <AuthCard
+      title={<Trans>Linked accounts</Trans>}
+      description={<Trans>You can link multiple accounts to your Datum account.</Trans>}>
+      <div className="flex flex-col gap-4">
         {loginName ? <p className="text-foreground text-center text-sm">{loginName}</p> : null}
 
         {/* Linked IdPs */}

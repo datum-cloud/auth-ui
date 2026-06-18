@@ -17,9 +17,5 @@ export function meta() {
 export default function ErrorScreen() {
   const [params] = useSearchParams();
   const { title, body } = authErrorMessage(params.get('code'));
-  return (
-    <AuthCard title={title}>
-      <p className="text-foreground text-center">{body}</p>
-    </AuthCard>
-  );
+  return <AuthCard title={title} description={body} />;
 }

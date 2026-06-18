@@ -1,5 +1,4 @@
 import { Button } from '@datum-cloud/datum-ui/button';
-import { cn } from '@datum-cloud/datum-ui/utils';
 import type { ReactNode } from 'react';
 import { useNavigation } from 'react-router';
 
@@ -25,7 +24,7 @@ export function SubmitButton({ children, loading, className }: SubmitButtonProps
       block
       htmlType="submit"
       loading={isSubmitting}
-      className={cn('h-9', className)}>
+      className={className}>
       {children}
     </Button>
   );

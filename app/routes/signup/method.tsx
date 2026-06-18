@@ -1,6 +1,6 @@
+import { AuthCard } from '@/components/auth-card/auth-card';
 import { SubmitButton } from '@/components/auth-form/auth-form';
 import { useActionErrorToast } from '@/hooks/use-action-error-toast';
-import SplitLayout from '@/layouts/split.layout';
 import { readSessions, serializeSessions } from '@/modules/auth/session/cookie';
 import { genericCheckYourEmail } from '@/resources/schemas/check-your-email.schema';
 import {
@@ -254,18 +254,14 @@ export default function SignupMethod() {
   // would silently re-render with no feedback.
   if (actionData && 'sent' in actionData) {
     return (
-      <SplitLayout>
-        <div className="flex flex-col gap-3">
-          <h1 className="text-foreground text-2xl leading-6 font-semibold">
-            <Trans>Check your email</Trans>
-          </h1>
-          <p className="text-foreground/80 text-sm">
-            <Trans>
-              We've sent a verification link to {(actionData as { email: string }).email}
-            </Trans>
-          </p>
-        </div>
-      </SplitLayout>
+      <AuthCard
+        title={<Trans>Check your email</Trans>}
+        description={
+          <Trans>
+            We've sent a verification link to{' '}
+            <strong>{(actionData as { email: string }).email}</strong>
+          </Trans>
+        }></AuthCard>
     );
   }
 
@@ -280,16 +276,18 @@ export default function SignupMethod() {
   };
 
   return (
-    <SplitLayout>
-      <div className="mb-8 flex flex-col gap-3">
-        <h1 className="text-foreground text-2xl leading-6 font-semibold">
-          <Trans>Finish creating your account</Trans>
-        </h1>
-        <p className="text-foreground/80 text-sm">
-          {firstName} {lastName} · {loginName}
+    <AuthCard
+      title={<Trans>Finish creating your account</Trans>}
+      description={
+        <Trans>
+          We've sent a verification link to <strong>{loginName}</strong>
+        </Trans>
+      }>
+      {errorMessage ? (
+        <p role="alert" className="text-sm text-red-700">
+          {errorMessage}
         </p>
-      </div>
-
+      ) : null}
       <div className="flex flex-col gap-3">
         {isIdp ? (
           // IdP register-and-link: single form, single button
@@ -362,12 +360,7 @@ export default function SignupMethod() {
             ) : null}
           </>
         )}
-        {errorMessage ? (
-          <p role="alert" className="text-sm text-red-700">
-            {errorMessage}
-          </p>
-        ) : null}
       </div>
-    </SplitLayout>
+    </AuthCard>
   );
 }

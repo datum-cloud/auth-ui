@@ -93,27 +93,27 @@ export default function PasswordReset() {
   // On success, swap out the form for the confirmation message
   if (actionData && 'sent' in actionData) {
     return (
-      <AuthCard title={<Trans>Check your email</Trans>}>
+      <AuthCard
+        title={<Trans>Check your email</Trans>}
+        description={
+          <Trans>
+            We've sent a password reset link to <strong>{actionData.email}</strong>
+          </Trans>
+        }>
         <TrackOnMount event="password_reset_requested" />
-        <p className="text-foreground text-center text-sm">
-          <Trans>We've sent a password reset link to {actionData.email}</Trans>
-        </p>
       </AuthCard>
     );
   }
 
   return (
     <AuthCard title={<Trans>Reset your password</Trans>}>
-      <div className="mb-4">
-        <BackLink />
-      </div>
       <Form.Root
         schema={resetRequestClientSchema}
         formComponent={RRForm}
         method="POST"
         defaultValues={{ loginName: '' }}
         isSubmitting={navigation.state === 'submitting'}
-        className="flex flex-col gap-4">
+        className="mb-4 flex flex-col gap-4">
         <input type="hidden" name="csrf" value={csrfToken} />
         {organization ? <input type="hidden" name="organization" value={organization} /> : null}
         {requestId ? <input type="hidden" name="requestId" value={requestId} /> : null}
@@ -134,6 +134,8 @@ export default function PasswordReset() {
           <Trans>Send reset link</Trans>
         </SubmitButton>
       </Form.Root>
+
+      <BackLink />
     </AuthCard>
   );
 }

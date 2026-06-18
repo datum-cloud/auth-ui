@@ -1,5 +1,4 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
-import { SubmitButton } from '@/components/auth-form/auth-form';
 import {
   listAccounts,
   resolveAccountAction,
@@ -7,7 +6,11 @@ import {
 } from '@/resources/session';
 import { providerForRequest } from '@/server/auth-context.server';
 import { getCsrfToken, assertCsrf } from '@/server/csrf';
+import { Button } from '@datum-cloud/datum-ui/button';
+import { Icon } from '@datum-cloud/datum-ui/icons';
+import { Tooltip } from '@datum-cloud/datum-ui/tooltip';
 import { Trans } from '@lingui/react/macro';
+import { ArrowLeftRight, Trash2 } from 'lucide-react';
 import {
   data,
   useLoaderData,
@@ -54,10 +57,11 @@ export default function AccountPicker() {
   return (
     <AuthCard
       title={<Trans>Choose an account</Trans>}
-      description={<Trans>Select an account to continue or add a new one.</Trans>}>
+      description={<Trans>Select an account to continue or add a new one.</Trans>}
+      className="max-w-[450px]">
       <div className="flex flex-col gap-3">
         {actionData && 'error' in actionData && (
-          <p role="alert" className="text-sm text-red-700">
+          <p role="alert" className="text-destructive text-center text-xs">
             {actionData.error === 'SESSION_EXPIRED' ? (
               <Trans>Your session has expired.</Trans>
             ) : actionData.error === 'NOT_FOUND' ? (
@@ -76,11 +80,11 @@ export default function AccountPicker() {
             {/* Plain styled Link: this Button API (semi-style type/theme props) has no
                 Slot-based asChild — Button asChild renders <button><a>, an axe
                 nested-interactive violation. */}
-            <Link
-              to="/login"
-              className="bg-btn-primary border-btn-primary-border text-btn-primary-foreground hover:bg-btn-primary-hover inline-flex w-full items-center justify-center rounded-lg border px-4 py-2 text-sm font-medium transition-colors">
-              <Trans>Add an account</Trans>
-            </Link>
+            <Button theme="link" type="quaternary" asChild>
+              <Link to="/login">
+                <Trans>Add an account</Trans>
+              </Link>
+            </Button>
           </div>
         ) : (
           <>
@@ -92,14 +96,8 @@ export default function AccountPicker() {
                   <span className="truncate text-sm font-medium">
                     {account.displayName ?? account.loginName}
                   </span>
-                  {account.displayName && (
-                    <span className="text-muted-foreground truncate text-xs">
-                      {account.loginName}
-                    </span>
-                  )}
-                  {/* 700-shades: green-600/amber-600 fail axe color-contrast at text-xs on white */}
                   <span
-                    className={`mt-0.5 text-xs ${account.isActive ? 'text-green-700' : 'text-amber-700'}`}>
+                    className={`mt-0.5 text-xs ${account.isActive ? 'text-muted-foreground' : 'text-destructive/80'}`}>
                     {account.isActive ? (
                       <Trans>Session active</Trans>
                     ) : (
@@ -108,37 +106,55 @@ export default function AccountPicker() {
                   </span>
                 </div>
 
-                <div className="flex shrink-0 items-center gap-2">
+                <div className="flex shrink-0 items-center gap-3">
                   {/* Switch form */}
-                  <RRForm method="POST">
+                  <RRForm method="POST" className="flex items-center">
                     <input type="hidden" name="csrf" value={csrfToken} />
                     <input type="hidden" name="intent" value="switch" />
                     <input type="hidden" name="sessionId" value={account.sessionId} />
-                    <SubmitButton className="px-3 py-1.5 text-xs">
-                      <Trans>Switch</Trans>
-                    </SubmitButton>
+                    <Button
+                      size="xs"
+                      theme="link"
+                      type="quaternary"
+                      htmlType="submit"
+                      className="text-foreground/80 p-0"
+                      asChild>
+                      <Tooltip message={<Trans>Switch</Trans>}>
+                        <Icon icon={ArrowLeftRight} size={16} />
+                      </Tooltip>
+                    </Button>
                   </RRForm>
 
                   {/* Remove form */}
-                  <RRForm method="POST">
+                  <RRForm method="POST" className="flex items-center">
                     <input type="hidden" name="csrf" value={csrfToken} />
                     <input type="hidden" name="intent" value="remove" />
                     <input type="hidden" name="sessionId" value={account.sessionId} />
-                    <button
-                      type="submit"
-                      className="text-muted-foreground text-xs underline hover:text-red-600">
-                      <Trans>Remove</Trans>
-                    </button>
+                    <Button
+                      size="xs"
+                      theme="link"
+                      type="danger"
+                      htmlType="submit"
+                      className="text-destructive p-0"
+                      asChild>
+                      <Tooltip message={<Trans>Remove</Trans>}>
+                        <Icon icon={Trash2} size={16} />
+                      </Tooltip>
+                    </Button>
                   </RRForm>
                 </div>
               </div>
             ))}
 
-            <Link
-              to="/login"
-              className="text-muted-foreground mt-1 text-center text-sm hover:underline">
-              <Trans>Add another account</Trans>
-            </Link>
+            <Button
+              theme="link"
+              type="quaternary"
+              className="text-muted-foreground text-sm"
+              asChild>
+              <Link to="/login">
+                <Trans>Add another account</Trans>
+              </Link>
+            </Button>
           </>
         )}
       </div>

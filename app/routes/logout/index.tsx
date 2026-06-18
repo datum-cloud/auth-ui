@@ -44,14 +44,10 @@ export async function action({ request }: ActionFunctionArgs) {
 export default function Logout() {
   const { csrfToken } = useLoaderData<typeof loader>();
   return (
-    <AuthCard title={<Trans>Sign out</Trans>}>
+    <AuthCard
+      title={<Trans>Sign out</Trans>}
+      description={<Trans>Are you sure you want to sign out?</Trans>}>
       <div className="flex flex-col gap-4 text-center">
-        <p className="text-foreground">
-          <Trans>Are you sure you want to sign out?</Trans>
-        </p>
-        {/* ?index targets routes/logout/index (which owns the action). Without it RR
-            routes this native POST to the action-less logout/layout → 405. RR <Form>
-            adds ?index automatically; a native <form> must carry it explicitly. */}
         <form method="post" action="?index">
           <input type="hidden" name="csrf" value={csrfToken} />
           <Button type="primary" theme="solid" htmlType="submit" block>

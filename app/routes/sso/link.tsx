@@ -6,6 +6,7 @@ import { Button } from '@datum-cloud/datum-ui/button';
 import { Trans } from '@lingui/react/macro';
 import { redirect, useLoaderData, type LoaderFunctionArgs } from 'react-router';
 import type { MetaFunction } from 'react-router';
+import { Link } from 'react-router';
 
 export const meta: MetaFunction = () => [{ title: 'Link account' }];
 
@@ -33,12 +34,10 @@ export default function SsoLinkPage() {
   const loginHref = `/login?returnTo=${encodeURIComponent(returnTo)}`;
 
   return (
-    <AuthCard title={<Trans>Link your account</Trans>}>
-      <div className="flex flex-col gap-6">
-        <p className="text-muted-foreground text-center text-sm">
-          <Trans>You must be signed in to link an external account.</Trans>
-        </p>
-
+    <AuthCard
+      title={<Trans>Link your account</Trans>}
+      description={<Trans>You must be signed in to link an external account.</Trans>}>
+      <div className="flex flex-col gap-4">
         {providers.length > 0 ? (
           <section className="flex flex-col gap-3">
             <p className="text-foreground text-sm font-medium">
@@ -59,9 +58,11 @@ export default function SsoLinkPage() {
           </section>
         ) : null}
 
-        <a href={loginHref} className="text-foreground text-center text-sm underline">
-          <Trans>Sign in to continue</Trans>
-        </a>
+        <Button theme="link" type="quaternary" asChild>
+          <Link to={loginHref}>
+            <Trans>Back</Trans>
+          </Link>
+        </Button>
       </div>
     </AuthCard>
   );

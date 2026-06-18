@@ -220,6 +220,8 @@ export async function listAccounts(
 
   // For each live cookie entry, build an EnrichedAccount. Per-session failures are tolerated
   // gracefully (renders needs-re-auth card).
+  //
+  console.log(liveSessions);
   return Promise.all(
     liveSessions.map(async (entry): Promise<EnrichedAccount> => {
       const pSession = providerMap.get(entry.id);
@@ -262,7 +264,8 @@ export async function listAccounts(
         organization: entry.organization,
         displayName: pSession.user?.displayName,
         nextPath,
-        isActive: nextPath === '/signed-in' || nextPath.startsWith('/signed-in?'),
+        // isActive: nextPath === '/signed-in' || nextPath.startsWith('/signed-in?'),
+        isActive: entry.loginName === pSession.user?.loginName,
       };
     })
   );

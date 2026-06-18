@@ -22,7 +22,6 @@ export default function SplitLayout({
         <div className="justify-flex-start flex items-center">
           <Link to="/">
             {branding?.logoUrl ? (
-              // Decorative: the <h1> title carries the accessible name; the logo is presentational.
               <img src={branding.logoUrl} alt="" aria-hidden="true" className="h-6 w-auto" />
             ) : (
               <Logo.Flat aria-label="Datum" className="h-6 w-auto" tone="brand" />
@@ -90,7 +89,7 @@ export default function SplitLayout({
               <Trans>
                 Prefer a demo instead? Just{' '}
                 <Link
-                  to="https://www.datum.net/contact"
+                  to="https://link.datum.net/founders"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="hover:text-foreground underline transition-all">

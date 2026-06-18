@@ -138,11 +138,14 @@ export default function SignupPassword() {
 
   if (actionData && 'sent' in actionData) {
     return (
-      <AuthCard title={<Trans>Check your email</Trans>}>
+      <AuthCard
+        title={<Trans>Check your email</Trans>}
+        description={
+          <Trans>
+            We've sent a verification link to <strong>{actionData.email}</strong>
+          </Trans>
+        }>
         <TrackOnMount event="signup_submitted" />
-        <p className="text-foreground text-center text-sm">
-          <Trans>We've sent a verification link to {actionData.email}</Trans>
-        </p>
       </AuthCard>
     );
   }
@@ -150,10 +153,9 @@ export default function SignupPassword() {
   return (
     <>
       <MaxMindTracker accountId={maxmindAccountId} />
-      <AuthCard title={<Trans>Set a password</Trans>}>
-        <div className="mb-4">
-          <BackLink />
-        </div>
+      <AuthCard
+        title={<Trans>Set a password</Trans>}
+        description={<Trans>You'll need to set a password to complete your signup.</Trans>}>
         <Form.Root
           schema={signupPasswordSchema}
           formComponent={RRForm}
@@ -188,6 +190,10 @@ export default function SignupPassword() {
             <Trans>Create account</Trans>
           </SubmitButton>
         </Form.Root>
+
+        <div className="mt-4">
+          <BackLink />
+        </div>
       </AuthCard>
     </>
   );

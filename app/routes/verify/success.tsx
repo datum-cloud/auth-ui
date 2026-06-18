@@ -1,5 +1,6 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
 import { TrackOnMount } from '@/modules/analytics/fathom';
+import { Button } from '@datum-cloud/datum-ui/button';
 import { Trans } from '@lingui/react/macro';
 import {
   data,
@@ -21,14 +22,19 @@ export async function loader({ request }: LoaderFunctionArgs) {
 export default function VerifySuccess() {
   const { loginName } = useLoaderData<typeof loader>();
   return (
-    <AuthCard title={<Trans>Your email is verified</Trans>}>
+    <AuthCard
+      title={<Trans>Your email is verified</Trans>}
+      description={
+        <Trans>
+          You can now sign in using <strong>{loginName}</strong>.
+        </Trans>
+      }>
       <TrackOnMount event="email_verified" />
-      <div className="flex flex-col gap-4 text-center">
-        {loginName ? <p className="text-foreground text-sm">{loginName}</p> : null}
-        <Link to="/login" className="text-sm underline">
-          <Trans>Continue to sign in</Trans>
+      <Button theme="link" type="quaternary" asChild>
+        <Link to="/login">
+          <Trans>Back</Trans>
         </Link>
-      </div>
+      </Button>
     </AuthCard>
   );
 }

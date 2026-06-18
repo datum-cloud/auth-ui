@@ -122,17 +122,11 @@ export default function VerifyEmail() {
   useActionErrorToast(errorMessage);
 
   return (
-    <AuthCard title={<Trans>Enter your email code</Trans>}>
-      <div className="mb-4 flex flex-col items-center gap-2">
-        <div className="self-start">
-          <BackLink />
-        </div>
+    <AuthCard
+      title={<Trans>Enter your email code</Trans>}
+      description={<Trans>Enter the one-time code sent to your email address.</Trans>}>
+      <div className="flex flex-col items-baseline justify-center gap-4">
         <IdentityBadge loginName={loginName} requestId={requestId} organization={organization} />
-      </div>
-      <div className="flex flex-col gap-4">
-        <p className="text-foreground text-center text-sm">
-          <Trans>Enter the one-time code sent to your email address.</Trans>
-        </p>
 
         <Form.Root
           schema={otpCodeClientSchema}
@@ -169,6 +163,8 @@ export default function VerifyEmail() {
             <Trans>Verify</Trans>
           </SubmitButton>
         </Form.Root>
+
+        <BackLink />
       </div>
     </AuthCard>
   );
