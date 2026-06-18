@@ -67,8 +67,6 @@ describe('resolveFrameAncestors', () => {
     expect(resolveFrameAncestors('not-a-url')).toEqual(["'none'"]);
     expect(resolveFrameAncestors('ftp://x.example.com')).toEqual(["'none'"]);
     // path is stripped down to the origin
-    expect(resolveFrameAncestors('https://a.example.com/embed')).toEqual([
-      'https://a.example.com',
-    ]);
+    expect(resolveFrameAncestors('https://a.example.com/embed')).toEqual(['https://a.example.com']);
   });
 });

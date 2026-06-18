@@ -71,7 +71,6 @@ const schema = z
     // (a bare `*` is rejected). NEXT_PUBLIC_FRAME_ANCESTORS is the legacy alias from the
     // old Next.js app — FRAME_ANCESTORS is canonical and wins when both are set.
     FRAME_ANCESTORS: z.string().optional(),
-    NEXT_PUBLIC_FRAME_ANCESTORS: z.string().optional(),
   })
   .superRefine((v, ctx) => {
     // Zitadel creds are only required when the Zitadel adapter is actually selected.
@@ -118,7 +117,7 @@ const schema = z
     // Canonical FRAME_ANCESTORS, falling back to the legacy NEXT_PUBLIC_ alias. Still a
     // raw string here (or undefined) — resolveFrameAncestors validates/parses it at the
     // header layer (app/server/middleware/secure-headers.ts).
-    FRAME_ANCESTORS: v.FRAME_ANCESTORS ?? v.NEXT_PUBLIC_FRAME_ANCESTORS,
+    FRAME_ANCESTORS: v.FRAME_ANCESTORS,
     // Parse comma-separated trusted hosts into an array (undefined when unset → empty = reject all).
     ZITADEL_TRUSTED_FORWARD_HOSTS: v.ZITADEL_TRUSTED_FORWARD_HOSTS
       ? v.ZITADEL_TRUSTED_FORWARD_HOSTS.split(',')

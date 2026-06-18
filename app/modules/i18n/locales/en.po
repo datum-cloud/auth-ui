@@ -165,7 +165,7 @@ msgid "Connected accounts"
 msgstr "Connected accounts"
 
 #: app/routes/device/index.tsx:72
-#: app/routes/login/index.tsx:335
+#: app/routes/login/index.tsx:333
 #: app/routes/signup/index.tsx:287
 msgid "Continue"
 msgstr "Continue"
@@ -186,7 +186,7 @@ msgstr "Couldn't sign in"
 msgid "Create a new account"
 msgstr "Create a new account"
 
-#: app/routes/login/index.tsx:366
+#: app/routes/login/index.tsx:364
 #: app/routes/signup/password.tsx:185
 msgid "Create account"
 msgstr "Create account"
@@ -200,7 +200,7 @@ msgid "Device code"
 msgstr "Device code"
 
 #: app/routes/login/index.tsx:175
-#: app/routes/login/index.tsx:305
+#: app/routes/login/index.tsx:303
 #: app/routes/signup/index.tsx:250
 #: app/routes/signup/index.tsx:273
 msgid "Email"
@@ -210,7 +210,7 @@ msgstr "Email"
 msgid "Email code"
 msgstr "Email code"
 
-#: app/routes/login/index.tsx:344
+#: app/routes/login/index.tsx:342
 #: app/routes/login/method.tsx:117
 #: app/routes/signup/method.tsx:254
 msgid "Email me a sign-in link"
@@ -326,7 +326,7 @@ msgstr "No account was found and sign-up is not available."
 msgid "No signed-in accounts."
 msgstr "No signed-in accounts."
 
-#: app/routes/login/index.tsx:364
+#: app/routes/login/index.tsx:362
 msgid "Not registered?"
 msgstr "Not registered?"
 
@@ -338,7 +338,7 @@ msgstr "Not you?"
 msgid "Open your authenticator app and enter the 6-digit code."
 msgstr "Open your authenticator app and enter the 6-digit code."
 
-#: app/routes/login/index.tsx:286
+#: app/routes/login/index.tsx:285
 #: app/routes/signup/index.tsx:232
 msgid "or"
 msgstr "or"
@@ -392,7 +392,7 @@ msgstr "Phone sign-in isn't available — use your email or username."
 msgid "Please check your input and try again."
 msgstr "Please check your input and try again."
 
-#: app/layouts/split.layout.tsx:89
+#: app/layouts/split.layout.tsx:91
 msgid "Prefer a demo instead? Just <0>reach out</0>."
 msgstr "Prefer a demo instead? Just <0>reach out</0>."
 
@@ -516,7 +516,7 @@ msgstr "Sign in with LDAP"
 msgid "Sign out"
 msgstr "Sign out"
 
-#: app/routes/login/index.tsx:354
+#: app/routes/login/index.tsx:352
 msgid "Sign-in is currently unavailable for this account. Please contact your administrator."
 msgstr "Sign-in is currently unavailable for this account. Please contact your administrator."
 
@@ -556,7 +556,7 @@ msgstr "Start over"
 msgid "Switch"
 msgstr "Switch"
 
-#: app/layouts/split.layout.tsx:101
+#: app/layouts/split.layout.tsx:103
 msgid "Thanks,"
 msgstr "Thanks,"
 
@@ -625,7 +625,7 @@ msgstr "Use your security key to verify your identity."
 msgid "Username"
 msgstr "Username"
 
-#: app/layouts/split.layout.tsx:82
+#: app/layouts/split.layout.tsx:84
 msgid "Using Datum requires setting up a billing account, but to help you explore without cost, we add <0>$50 USD</0> in credit on signup."
 msgstr "Using Datum requires setting up a billing account, but to help you explore without cost, we add <0>$50 USD</0> in credit on signup."
 

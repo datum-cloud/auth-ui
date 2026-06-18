@@ -10,7 +10,6 @@ const LOCKED_DOWN: readonly string[] = ["'none'"];
 
 /**
  * Resolve the CSP `frame-ancestors` source list from a raw env value
- * (FRAME_ANCESTORS, with NEXT_PUBLIC_FRAME_ANCESTORS as a legacy alias — see
  * env.server.ts). Secure by default: unset / empty / wildcard / unparseable all
  * collapse to 'none' (the auth UI is not embeddable). Environments that MUST embed
  * the auth UI (e.g. staging) set an explicit allowlist of full origins, space- or
