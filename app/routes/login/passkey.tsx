@@ -12,7 +12,12 @@ import {
 import { useAuthErrorMessage } from '@/utils/errors/auth-error-messages';
 import { Trans } from '@lingui/react/macro';
 import { useRef } from 'react';
-import { useActionData, useLoaderData, type MetaFunction, type ActionFunctionArgs } from 'react-router';
+import {
+  useActionData,
+  useLoaderData,
+  type MetaFunction,
+  type ActionFunctionArgs,
+} from 'react-router';
 import { Form as RRForm } from 'react-router';
 
 export const meta: MetaFunction = () => [{ title: 'Verify with passkey' }];

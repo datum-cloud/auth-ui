@@ -165,7 +165,7 @@ msgid "Connected accounts"
 msgstr "Connected accounts"
 
 #: app/routes/device/index.tsx:72
-#: app/routes/login/index.tsx:355
+#: app/routes/login/index.tsx:364
 #: app/routes/signup/index.tsx:287
 msgid "Continue"
 msgstr "Continue"
@@ -186,7 +186,7 @@ msgstr "Couldn't sign in"
 msgid "Create a new account"
 msgstr "Create a new account"
 
-#: app/routes/login/index.tsx:386
+#: app/routes/login/index.tsx:395
 #: app/routes/signup/password.tsx:188
 msgid "Create account"
 msgstr "Create account"
@@ -200,7 +200,7 @@ msgid "Device code"
 msgstr "Device code"
 
 #: app/routes/login/index.tsx:182
-#: app/routes/login/index.tsx:320
+#: app/routes/login/index.tsx:326
 #: app/routes/signup/index.tsx:250
 #: app/routes/signup/index.tsx:273
 msgid "Email"
@@ -210,7 +210,7 @@ msgstr "Email"
 msgid "Email code"
 msgstr "Email code"
 
-#: app/routes/login/index.tsx:364
+#: app/routes/login/index.tsx:373
 #: app/routes/login/method.tsx:117
 #: app/routes/signup/method.tsx:256
 msgid "Email me a sign-in link"
@@ -293,9 +293,9 @@ msgstr "Get started"
 msgid "Incorrect credentials. Please try again."
 msgstr "Incorrect credentials. Please try again."
 
-#: app/routes/login/index.tsx:269
-#: app/routes/login/index.tsx:292
-#: app/routes/login/index.tsx:323
+#: app/routes/login/index.tsx:272
+#: app/routes/login/index.tsx:298
+#: app/routes/login/index.tsx:332
 msgid "Last used"
 msgstr "Last used"
 
@@ -332,7 +332,7 @@ msgstr "No account was found and sign-up is not available."
 msgid "No signed-in accounts."
 msgstr "No signed-in accounts."
 
-#: app/routes/login/index.tsx:384
+#: app/routes/login/index.tsx:393
 msgid "Not registered?"
 msgstr "Not registered?"
 
@@ -344,7 +344,7 @@ msgstr "Not you?"
 msgid "Open your authenticator app and enter the 6-digit code."
 msgstr "Open your authenticator app and enter the 6-digit code."
 
-#: app/routes/login/index.tsx:302
+#: app/routes/login/index.tsx:308
 #: app/routes/signup/index.tsx:232
 msgid "or"
 msgstr "or"
@@ -353,7 +353,7 @@ msgstr "or"
 msgid "Or import this URI in your authenticator app"
 msgstr "Or import this URI in your authenticator app"
 
-#: app/routes/login/index.tsx:289
+#: app/routes/login/index.tsx:292
 #: app/routes/login/method.tsx:101
 #: app/routes/setup/mfa.tsx:40
 msgid "Passkey"
@@ -523,7 +523,7 @@ msgstr "Sign in with LDAP"
 msgid "Sign out"
 msgstr "Sign out"
 
-#: app/routes/login/index.tsx:374
+#: app/routes/login/index.tsx:383
 msgid "Sign-in is currently unavailable for this account. Please contact your administrator."
 msgstr "Sign-in is currently unavailable for this account. Please contact your administrator."
 
@@ -619,7 +619,7 @@ msgstr "Unlink"
 msgid "Use a passkey"
 msgstr "Use a passkey"
 
-#: app/routes/login/passkey.tsx:73
+#: app/routes/login/passkey.tsx:78
 msgid "Use your passkey to verify your identity."
 msgstr "Use your passkey to verify your identity."
 
@@ -652,7 +652,7 @@ msgid "Verify and enable"
 msgstr "Verify and enable"
 
 #: app/components/webauthn-button/webauthn-button.tsx:163
-#: app/routes/login/passkey.tsx:72
+#: app/routes/login/passkey.tsx:77
 msgid "Verify with passkey"
 msgstr "Verify with passkey"
 

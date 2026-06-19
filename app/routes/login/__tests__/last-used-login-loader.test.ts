@@ -4,8 +4,8 @@
 // last-used-login cookie into its returned data object.
 //
 // node env: happy-dom forbids setting the Cookie header (breaks CSRF round-trips).
-import { loader } from '@/routes/login/index';
 import { serializeLastUsedLogin } from '@/modules/auth/session/last-used-login';
+import { loader } from '@/routes/login/index';
 import { describe, it, expect } from 'vitest';
 
 const ORIGIN = 'http://localhost';

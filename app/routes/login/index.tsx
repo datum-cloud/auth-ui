@@ -246,7 +246,7 @@ export default function Login() {
               ) : null}
               <Button
                 size="large"
-                className="h-13 gap-3"
+                className="relative h-13 gap-3"
                 type="quaternary"
                 theme="outline"
                 block
@@ -265,7 +265,10 @@ export default function Login() {
                 }>
                 <Trans>{idp.name}</Trans>
                 {lastUsedLogin === `idp:${idp.id}` ? (
-                  <Badge type="secondary" theme="light" className="ml-auto text-xs">
+                  <Badge
+                    type="primary"
+                    theme="solid"
+                    className="absolute -top-3.5 -right-5 rounded-lg text-xs text-white">
                     <Trans>Last used</Trans>
                   </Badge>
                 ) : null}
@@ -278,7 +281,7 @@ export default function Login() {
       {view.showPasskeyPrompt ? (
         <LinkButton
           size="large"
-          className={cn('h-13 gap-3', view.showIdpButtons && 'mt-3')}
+          className={cn('relative h-13 gap-3', view.showIdpButtons && 'mt-3')}
           type="quaternary"
           theme="outline"
           block
@@ -288,7 +291,10 @@ export default function Login() {
           icon={<Icon icon={UserKey} />}>
           <Trans>Passkey</Trans>
           {lastUsedLogin === 'passkey' ? (
-            <Badge type="secondary" theme="light" className="ml-auto text-xs">
+            <Badge
+              type="primary"
+              theme="solid"
+              className="absolute -top-3.5 -right-5 rounded-lg text-xs text-white">
               <Trans>Last used</Trans>
             </Badge>
           ) : null}
@@ -310,7 +316,7 @@ export default function Login() {
           {!showEmailField ? (
             <Button
               size="large"
-              className="h-13 gap-3"
+              className="relative h-13 gap-3"
               type="quaternary"
               theme="outline"
               block
@@ -319,7 +325,10 @@ export default function Login() {
               onClick={() => setShowEmailField(true)}>
               <Trans>Email</Trans>
               {lastUsedLogin === 'email' ? (
-                <Badge type="secondary" theme="light" className="ml-auto text-xs">
+                <Badge
+                  type="primary"
+                  theme="solid"
+                  className="absolute -top-3.5 -right-5 rounded-lg text-xs text-white">
                   <Trans>Last used</Trans>
                 </Badge>
               ) : null}
