@@ -5,6 +5,7 @@ import SplitLayout from '@/layouts/split.layout';
 // The locked plan block incorrectly listed them as coming from @/modules/auth/session/session
 // (that module only has pure helpers, no cookie I/O).
 import { readSessions, serializeSessions } from '@/modules/auth/session/cookie';
+import { readLastUsedLogin } from '@/modules/auth/session/last-used-login';
 import { shouldBridgeToAuthorize, startIdpIntent, resolveIdentifier } from '@/resources/login';
 import { resolveLoginView, resolveIdentifierField } from '@/resources/login/login-view';
 import {
@@ -17,9 +18,11 @@ import { type LoginLayoutData } from '@/routes/login/layout';
 import { trustedAppOrigin } from '@/server/app-origin.server';
 import { providerForRequest } from '@/server/auth-context.server';
 import { getCsrfToken, assertCsrf } from '@/server/csrf';
+import { userAgentFromRequest } from '@/server/user-agent';
 import { assetUrl } from '@/utils/asset-url';
 import { env } from '@/utils/env/env.server';
 import { useAuthErrorMessage } from '@/utils/errors/auth-error-messages';
+import { Badge } from '@datum-cloud/datum-ui/badge';
 import { Button, LinkButton } from '@datum-cloud/datum-ui/button';
 import { Form } from '@datum-cloud/datum-ui/form';
 import { Icon } from '@datum-cloud/datum-ui/icons';
@@ -66,6 +69,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const headers: Record<string, string> = {};
   if (setCookie !== null) headers['set-cookie'] = setCookie;
   const notice = url.searchParams.get('notice') ?? undefined;
+  const lastUsedLogin = await readLastUsedLogin(request);
   return data(
     {
       settings,
@@ -74,6 +78,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       idps,
       emailDeliveryEnabled: env.AUTH_EMAIL_DELIVERY_ENABLED,
       notice,
+      lastUsedLogin,
     },
     { headers }
   );
@@ -115,6 +120,7 @@ export async function action({ request }: ActionFunctionArgs) {
       requestId,
       organization,
       emailDeliveryEnabled: env.AUTH_EMAIL_DELIVERY_ENABLED,
+      userAgent: userAgentFromRequest(request),
     });
     if (!result.ok) {
       const status = result.error === 'EMAIL_LOGIN_DISABLED' ? 400 : 404;
@@ -143,6 +149,7 @@ export async function action({ request }: ActionFunctionArgs) {
     requestId,
     organization,
     emailDeliveryEnabled: env.AUTH_EMAIL_DELIVERY_ENABLED,
+    userAgent: userAgentFromRequest(request),
   });
   if (!result.ok) {
     const status = result.error === 'EMAIL_LOGIN_DISABLED' ? 400 : 404;
@@ -155,7 +162,7 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function Login() {
-  const { csrfToken, idps, settings, branding, emailDeliveryEnabled, notice } =
+  const { csrfToken, idps, settings, branding, emailDeliveryEnabled, notice, lastUsedLogin } =
     useLoaderData<typeof loader>();
   const { loginName, requestId, organization } = useRouteLoaderData('login') as LoginLayoutData;
   const actionData = useActionData<typeof action>();
@@ -257,6 +264,11 @@ export default function Login() {
                   />
                 }>
                 <Trans>{idp.name}</Trans>
+                {lastUsedLogin === `idp:${idp.id}` ? (
+                  <Badge type="secondary" theme="light" className="ml-auto text-xs">
+                    <Trans>Last used</Trans>
+                  </Badge>
+                ) : null}
               </Button>
             </RRForm>
           ))}
@@ -275,6 +287,11 @@ export default function Login() {
           iconPosition="left"
           icon={<Icon icon={UserKey} />}>
           <Trans>Passkey</Trans>
+          {lastUsedLogin === 'passkey' ? (
+            <Badge type="secondary" theme="light" className="ml-auto text-xs">
+              <Trans>Last used</Trans>
+            </Badge>
+          ) : null}
         </LinkButton>
       ) : null}
 
@@ -301,6 +318,11 @@ export default function Login() {
               icon={<Icon icon={Mail} />}
               onClick={() => setShowEmailField(true)}>
               <Trans>Email</Trans>
+              {lastUsedLogin === 'email' ? (
+                <Badge type="secondary" theme="light" className="ml-auto text-xs">
+                  <Trans>Last used</Trans>
+                </Badge>
+              ) : null}
             </Button>
           ) : (
             <Form.Root

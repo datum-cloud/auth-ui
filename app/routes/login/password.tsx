@@ -6,6 +6,7 @@ import { IdentityBadge } from '@/components/identity-badge/identity-badge';
 // ADAPTATION (plan-drift fix): readSessions/serializeSessions live in @/modules/auth/session/cookie
 // (which re-exports them from session.ts) — the canonical one-stop import for route-layer session I/O.
 import { readSessions, serializeSessions } from '@/modules/auth/session/cookie';
+import { serializeLastUsedLogin } from '@/modules/auth/session/last-used-login';
 import { verifyLoginPassword } from '@/resources/login';
 import { attemptsRemaining } from '@/resources/login/login-view';
 import { loginPasswordSchema, loginPasswordClientSchema } from '@/resources/login/login.schema';
@@ -71,9 +72,10 @@ export async function action({ request }: ActionFunctionArgs) {
     );
   }
 
-  return redirect(result.target, {
-    headers: { 'set-cookie': await serializeSessions(result.sessions) },
-  });
+  const headers = new Headers();
+  headers.append('set-cookie', await serializeSessions(result.sessions));
+  headers.append('set-cookie', await serializeLastUsedLogin('email'));
+  return redirect(result.target, { headers });
 }
 
 export default function Password() {

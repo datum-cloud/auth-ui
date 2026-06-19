@@ -67,7 +67,11 @@ import {
   SAMLService,
   SessionSchema as SamlSessionSchema,
 } from '@zitadel/proto/zitadel/saml/v2/saml_service_pb';
-import { SearchQuerySchema as SessionSearchQuerySchema } from '@zitadel/proto/zitadel/session/v2/session_pb';
+import {
+  SearchQuerySchema as SessionSearchQuerySchema,
+  UserAgentSchema,
+  UserAgent_HeaderValuesSchema,
+} from '@zitadel/proto/zitadel/session/v2/session_pb';
 import {
   ChecksSchema,
   SessionService,
@@ -444,11 +448,36 @@ export class ZitadelAuthProvider implements AuthProvider {
       const metadata = opts?.metadata
         ? Object.fromEntries(Object.entries(opts.metadata).map(([k, v]) => [k, encoder.encode(v)]))
         : undefined;
+      // Forward Zitadel UserAgent so cloud-portal shows Device/Location on active sessions.
+      // Map our ZitadelUserAgent shape onto the proto UserAgent message.
+      // header values are repeated strings wrapped in a HeaderValues sub-message.
+      const userAgent = opts?.userAgent
+        ? create(UserAgentSchema, {
+            ...(opts.userAgent.fingerprintId !== undefined
+              ? { fingerprintId: opts.userAgent.fingerprintId }
+              : {}),
+            ...(opts.userAgent.ip !== undefined ? { ip: opts.userAgent.ip } : {}),
+            ...(opts.userAgent.description !== undefined
+              ? { description: opts.userAgent.description }
+              : {}),
+            ...(opts.userAgent.header !== undefined
+              ? {
+                  header: Object.fromEntries(
+                    Object.entries(opts.userAgent.header).map(([k, v]) => [
+                      k,
+                      create(UserAgent_HeaderValuesSchema, { values: v.values }),
+                    ])
+                  ),
+                }
+              : {}),
+          })
+        : undefined;
       const created = await sessions.createSession(
         {
           checks: builtChecks,
           lifetime: { seconds: BigInt(lifetimeSeconds) },
           ...(metadata ? { metadata } : {}),
+          ...(userAgent ? { userAgent } : {}),
         },
         {}
       );

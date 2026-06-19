@@ -12,6 +12,7 @@ import { trustedAppOrigin } from '@/server/app-origin.server';
 import { providerForRequest } from '@/server/auth-context.server';
 import { getCsrfToken, assertCsrf } from '@/server/csrf';
 import { requireEmailVerification } from '@/server/env';
+import { userAgentFromRequest } from '@/server/user-agent';
 import { env } from '@/utils/env/env.server';
 import { actionError } from '@/utils/errors/auth-error';
 import { useAuthErrorMessage } from '@/utils/errors/auth-error-messages';
@@ -66,6 +67,9 @@ export async function action({ request }: ActionFunctionArgs) {
   // Host-header email-link injection. The enumeration-safe register dispatch and
   // post-register routing live in the service; the route only parses + renders.
   try {
+    const deviceTrackingToken = fields.deviceTrackingToken
+      ? String(fields.deviceTrackingToken)
+      : undefined;
     const result = await registerWithPassword(provider, await readSessions(request), {
       email: String(fields.loginName ?? ''),
       firstName: String(fields.firstName ?? ''),
@@ -73,9 +77,8 @@ export async function action({ request }: ActionFunctionArgs) {
       password: parsed.data.password,
       organization: fields.organization ? String(fields.organization) : undefined,
       requestId: fields.requestId ? String(fields.requestId) : undefined,
-      deviceTrackingToken: fields.deviceTrackingToken
-        ? String(fields.deviceTrackingToken)
-        : undefined,
+      deviceTrackingToken,
+      userAgent: userAgentFromRequest(request, deviceTrackingToken),
       requireVerification: requireEmailVerification(),
       origin: trustedAppOrigin(request),
     });

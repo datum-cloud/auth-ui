@@ -21,6 +21,7 @@ import {
   addSession,
   serializeSessions,
 } from '@/modules/auth/session/cookie';
+import { serializeLastUsedLogin } from '@/modules/auth/session/last-used-login';
 import { ProviderError } from '@/modules/auth/types';
 import type { IdpIntentResult, IdpLink, IdProvider } from '@/modules/auth/types';
 import { registerAndLinkIdp } from '@/resources/signup';
@@ -29,6 +30,7 @@ import { idpReturnUrls } from '@/resources/sso/idp-return-urls';
 import { signInWithIdpIntent } from '@/resources/sso/idp-session';
 import { trustedAppOrigin } from '@/server/app-origin.server';
 import { logAuthEvent } from '@/server/observability';
+import { userAgentFromRequest } from '@/server/user-agent';
 import { providerErrorCode } from '@/utils/errors/auth-error';
 import { data, redirect } from 'react-router';
 import { z } from 'zod';
@@ -56,7 +58,7 @@ export interface CallbackLoaderDeps {
 // (used for plain 400 Bad Request and 502 data responses).
 
 export type SsoOutcome =
-  | { kind: 'redirect'; location: string; setCookie?: string }
+  | { kind: 'redirect'; location: string; setCookie?: string; lastUsedCookie?: string }
   | { kind: 'data'; payload: unknown; status?: number; headers?: Record<string, string> }
   | { kind: 'response'; response: Response };
 
@@ -68,9 +70,13 @@ export type SsoOutcome =
 export function outcomeToResponse(outcome: SsoOutcome): Response | ReturnType<typeof data> {
   switch (outcome.kind) {
     case 'redirect':
-      return outcome.setCookie
-        ? redirect(outcome.location, { headers: { 'set-cookie': outcome.setCookie } })
-        : redirect(outcome.location);
+      if (outcome.setCookie || outcome.lastUsedCookie) {
+        const h = new Headers();
+        if (outcome.setCookie) h.append('set-cookie', outcome.setCookie);
+        if (outcome.lastUsedCookie) h.append('set-cookie', outcome.lastUsedCookie);
+        return redirect(outcome.location, { headers: h });
+      }
+      return redirect(outcome.location);
     case 'data':
       return data(outcome.payload, {
         status: outcome.status,
@@ -543,6 +549,7 @@ export async function processIdpCallback(
           requestId,
           organization,
           fallbackLoginName: intent.information.idpUserName,
+          userAgent: userAgentFromRequest(request),
         }));
       } catch (err) {
         const reason = err instanceof Error ? err.message : 'unknown';
@@ -559,7 +566,8 @@ export async function processIdpCallback(
         idpId: intent.information.idpId,
         requestId,
       });
-      return { kind: 'redirect', location: target, setCookie };
+      const lastUsedCookie = await serializeLastUsedLogin(`idp:${intent.information.idpId}`);
+      return { kind: 'redirect', location: target, setCookie, lastUsedCookie };
     }
 
     case 'link':
@@ -583,7 +591,12 @@ export async function processIdpCallback(
 
         const session = await provider.createSession(
           { idpIntent: { idpIntentId: id, idpIntentToken: token } },
-          { requestId, orgId: organization, userId: decision.userId }
+          {
+            requestId,
+            orgId: organization,
+            userId: decision.userId,
+            userAgent: userAgentFromRequest(request),
+          }
         );
         const user = await provider.getUser(decision.userId);
         const loginName = user?.loginName ?? intent.information.idpUserName;
@@ -606,7 +619,13 @@ export async function processIdpCallback(
         const target = requestId
           ? `/authorize?requestId=${encodeURIComponent(requestId)}`
           : '/signed-in';
-        return { kind: 'redirect', location: target, setCookie: await serializeSessions(next) };
+        const lastUsedCookie = await serializeLastUsedLogin(`idp:${decision.link.idpId}`);
+        return {
+          kind: 'redirect',
+          location: target,
+          setCookie: await serializeSessions(next),
+          lastUsedCookie,
+        };
       } catch (err) {
         if (err instanceof ProviderError) {
           deps.onAuthEvent?.('idp.link', 'failure');
@@ -648,11 +667,14 @@ export async function processIdpCallback(
           idpIntentId: id,
           idpIntentToken: token,
           emailVerified: intent.draft?.emailVerified ?? false,
+          userAgent: userAgentFromRequest(request),
         });
+        const lastUsedCookie = await serializeLastUsedLogin(`idp:${decision.link.idpId}`);
         return {
           kind: 'redirect',
           location: result.target,
           setCookie: await serializeSessions(result.sessions),
+          lastUsedCookie,
         };
       } catch (err) {
         if (err instanceof ProviderError) {

@@ -10,7 +10,7 @@
 // route's schema) + the caller's current session list, and returns a typed result
 // the route turns into a redirect()/data() response. No Request parsing, no CSRF,
 // no cookie I/O lives here.
-import type { AuthProvider } from '@/modules/auth/auth-provider';
+import type { AuthProvider, SessionOpts } from '@/modules/auth/auth-provider';
 import { addSession, type SessionEntry } from '@/modules/auth/session/cookie';
 import { ProviderError } from '@/modules/auth/types';
 import { postRegisterStep } from '@/resources/signup/post-register';
@@ -82,6 +82,8 @@ export interface SignupIdpLinkInput {
   idpUserName: string;
   /** When true the IdP has vouched for the email — create the user already-verified. */
   emailVerified?: boolean;
+  /** Zitadel session userAgent metadata (Device/Location in cloud-portal). */
+  userAgent?: SessionOpts['userAgent'];
 }
 
 /**
@@ -98,7 +100,7 @@ export async function registerAndLinkIdp(
   list: SessionEntry[],
   input: SignupIdpLinkInput
 ): Promise<SignupRedirectResult> {
-  const { email, firstName, lastName, organization, requestId } = input;
+  const { email, firstName, lastName, organization, requestId, userAgent } = input;
   const idpLink = {
     idpId: input.idpId,
     idpUserId: input.idpUserId,
@@ -114,7 +116,7 @@ export async function registerAndLinkIdp(
   await provider.addIdpLink(user.id, idpLink);
   const session = await provider.createSession(
     { idpIntent: { idpIntentId: input.idpIntentId, idpIntentToken: input.idpIntentToken } },
-    { orgId: organization, requestId, userId: user.id }
+    { orgId: organization, requestId, userId: user.id, userAgent }
   );
   const sessions = addSession(list, {
     id: session.id,
@@ -175,6 +177,8 @@ export interface PasskeyFirstRegisterInput {
   origin: string;
   /** MaxMind device-fingerprint token captured client-side; attached as session metadata. */
   deviceTrackingToken?: string;
+  /** Zitadel session userAgent metadata (Device/Location in cloud-portal). */
+  userAgent?: SessionOpts['userAgent'];
 }
 
 export type PasskeyFirstRegisterResult =
@@ -196,8 +200,16 @@ export async function registerPasskeyFirst(
   list: SessionEntry[],
   input: PasskeyFirstRegisterInput
 ): Promise<PasskeyFirstRegisterResult> {
-  const { email, firstName, lastName, organization, requestId, origin, deviceTrackingToken } =
-    input;
+  const {
+    email,
+    firstName,
+    lastName,
+    organization,
+    requestId,
+    origin,
+    deviceTrackingToken,
+    userAgent,
+  } = input;
   const sessionMetadata = deviceTrackingToken
     ? { [MAXMIND_TRACKING_TOKEN_METADATA_KEY]: deviceTrackingToken }
     : undefined;
@@ -213,7 +225,7 @@ export async function registerPasskeyFirst(
       });
       const session = await provider.createSession(
         {},
-        { orgId: organization, requestId, userId: user.id, metadata: sessionMetadata }
+        { orgId: organization, requestId, userId: user.id, metadata: sessionMetadata, userAgent }
       );
       const sessions = addSession(list, {
         id: session.id,
@@ -243,7 +255,7 @@ export async function registerPasskeyFirst(
     const user = await provider.register({ email, firstName, lastName, orgId: organization });
     const session = await provider.createSession(
       {},
-      { orgId: organization, requestId, userId: user.id, metadata: sessionMetadata }
+      { orgId: organization, requestId, userId: user.id, metadata: sessionMetadata, userAgent }
     );
     const sessions = addSession(list, {
       id: session.id,
@@ -291,6 +303,8 @@ export interface RegisterWithPasswordInput {
   origin: string;
   /** MaxMind device-fingerprint token captured client-side; attached as session metadata. */
   deviceTrackingToken?: string;
+  /** Zitadel session userAgent metadata (Device/Location in cloud-portal). */
+  userAgent?: SessionOpts['userAgent'];
 }
 
 export type RegisterWithPasswordResult =
@@ -321,6 +335,7 @@ export async function registerWithPassword(
     requestId,
     origin,
     deviceTrackingToken,
+    userAgent,
   } = input;
   const sessionMetadata = deviceTrackingToken
     ? { [MAXMIND_TRACKING_TOKEN_METADATA_KEY]: deviceTrackingToken }
@@ -347,7 +362,7 @@ export async function registerWithPassword(
       const user = await register();
       const session = await provider.createSession(
         {},
-        { orgId: organization, requestId, userId: user.id, metadata: sessionMetadata }
+        { orgId: organization, requestId, userId: user.id, metadata: sessionMetadata, userAgent }
       );
       const sessions = addSession(list, {
         id: session.id,
@@ -377,7 +392,7 @@ export async function registerWithPassword(
     const user = await register();
     const session = await provider.createSession(
       {},
-      { orgId: organization, requestId, userId: user.id, metadata: sessionMetadata }
+      { orgId: organization, requestId, userId: user.id, metadata: sessionMetadata, userAgent }
     );
     const sessions = addSession(list, {
       id: session.id,
@@ -473,6 +488,8 @@ export interface CompleteEmailLinkInput {
   next?: 'passkey';
   /** MaxMind device-fingerprint token captured client-side; attached as session metadata. */
   deviceTrackingToken?: string;
+  /** Zitadel session userAgent metadata (Device/Location in cloud-portal). */
+  userAgent?: SessionOpts['userAgent'];
 }
 
 /**
@@ -490,7 +507,8 @@ export async function completeEmailLinkSignup(
   list: SessionEntry[],
   input: CompleteEmailLinkInput
 ): Promise<SignupRedirectResult> {
-  const { userId, code, loginName, organization, requestId, deviceTrackingToken } = input;
+  const { userId, code, loginName, organization, requestId, deviceTrackingToken, userAgent } =
+    input;
 
   // Step 1: verify email ownership using the code from the verification link.
   await provider.verifyEmail(userId, code);
@@ -504,7 +522,7 @@ export async function completeEmailLinkSignup(
     : undefined;
   const session = await provider.createSession(
     {},
-    { orgId: organization, requestId, userId, metadata }
+    { orgId: organization, requestId, userId, metadata, userAgent }
   );
 
   // Step 3b: request a returnCode challenge — the OTP code lands on the returned session,

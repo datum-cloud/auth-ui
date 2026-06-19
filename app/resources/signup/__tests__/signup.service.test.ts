@@ -10,6 +10,7 @@ import {
   completeEmailLinkSignup,
   registerAndLinkIdp,
   registerEmailLinkSignup,
+  registerPasskeyFirst,
   registerWithPassword,
 } from '@/resources/signup';
 import { describe, it, expect, vi, afterEach } from 'vitest';
@@ -57,6 +58,18 @@ describe('signup register-with-password — MaxMind token → session metadata',
     expect(fake.lastCreateSessionOpts?.metadata).toBeUndefined();
     expect(fake.lastCreateSessionOpts?.userId).toBeTruthy();
   });
+
+  it('forwards userAgent to createSession', async () => {
+    const fake = getAuthProvider({ AUTH_PROVIDER: 'fake' }) as FakeAuthProvider;
+    const ua = {
+      fingerprintId: 'fp-abc',
+      ip: '1.2.3.4',
+      description: 'Chrome, , , , Blink, , macOS, , ',
+      header: { 'user-agent': { values: ['Mozilla/5.0'] } },
+    };
+    await registerWithPassword(fake, [], { ...baseInput, userAgent: ua });
+    expect(fake.lastCreateSessionOpts?.userAgent).toEqual(ua);
+  });
 });
 
 describe('registerEmailLinkSignup', () => {
@@ -82,6 +95,27 @@ describe('registerEmailLinkSignup', () => {
       origin: 'https://auth.test',
     });
     expect(r).toEqual({ kind: 'sent', email: 'dupe@x.com' });
+  });
+});
+
+describe('registerPasskeyFirst — userAgent forwarded to createSession', () => {
+  it('passes userAgent to createSession when provided (requireVerification=false)', async () => {
+    const fake = getAuthProvider({ AUTH_PROVIDER: 'fake' }) as FakeAuthProvider;
+    const ua = {
+      fingerprintId: 'fp-passkey',
+      ip: '1.2.3.4',
+      description: 'Chrome, , , , Blink, , macOS, , ',
+      header: { 'user-agent': { values: ['Mozilla/5.0'] } },
+    };
+    await registerPasskeyFirst(fake, [], {
+      email: 'carol@acme.test',
+      firstName: 'Carol',
+      lastName: 'Acme',
+      requireVerification: false,
+      origin: 'https://auth.datum.test',
+      userAgent: ua,
+    });
+    expect(fake.lastCreateSessionOpts?.userAgent).toEqual(ua);
   });
 });
 
@@ -111,6 +145,31 @@ describe('signup register-and-link path (CODE-MIN-04)', () => {
     expect(registerCalls[0]).not.toHaveProperty('idpLink');
     expect(addIdpLinkCalls).toHaveLength(1);
   });
+
+  it('forwards userAgent to createSession', async () => {
+    const fake = getAuthProvider({ AUTH_PROVIDER: 'fake' }) as FakeAuthProvider;
+    const ua = {
+      fingerprintId: 'fp-idp',
+      ip: '1.2.3.4',
+      description: 'Chrome, , , , Blink, , macOS, , ',
+      header: { 'user-agent': { values: ['Mozilla/5.0'] } },
+    };
+    vi.spyOn(fake, 'register').mockResolvedValue({ id: 'u2', loginName: 'alice@acme.test' });
+    vi.spyOn(fake, 'addIdpLink').mockResolvedValue(undefined as never);
+    vi.spyOn(fake, 'createSession').mockResolvedValue({
+      id: 'sess2',
+      token: 'sess-tok2',
+      changedAt: '2026-01-01T00:00:00.000Z',
+      expiresAt: '2099-01-01T00:00:00.000Z',
+    } as never);
+
+    await registerAndLinkIdp(fake, [], { ...idpInput(), userAgent: ua });
+
+    expect(fake.createSession).toHaveBeenCalledWith(
+      expect.anything(),
+      expect.objectContaining({ userAgent: ua })
+    );
+  });
 });
 
 describe('completeEmailLinkSignup', () => {
@@ -132,5 +191,25 @@ describe('completeEmailLinkSignup', () => {
       expect(r.target).toContain('checkAfter=false');
       expect(r.sessions.length).toBe(1);
     }
+  });
+
+  it('forwards userAgent to createSession', async () => {
+    const fake = getAuthProvider({ AUTH_PROVIDER: 'fake' }) as FakeAuthProvider;
+    const ua = {
+      fingerprintId: 'fp-complete',
+      ip: '1.2.3.4',
+      description: 'Chrome, , , , Blink, , macOS, , ',
+      header: { 'user-agent': { values: ['Mozilla/5.0'] } },
+    };
+    // Register a user so verifyEmail has a valid code
+    const user = await fake.register({ email: 'comp@x.com', firstName: 'C', lastName: 'D' });
+    const verifyCode = `email-${user.id}`;
+    await completeEmailLinkSignup(fake, [], {
+      userId: user.id,
+      code: verifyCode,
+      loginName: 'comp@x.com',
+      userAgent: ua,
+    });
+    expect(fake.lastCreateSessionOpts?.userAgent).toEqual(ua);
   });
 });

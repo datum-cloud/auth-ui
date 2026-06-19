@@ -59,6 +59,25 @@ export interface SessionOpts {
    * the key 'maxmind/tracking-token'.
    */
   metadata?: Record<string, string>;
+  /**
+   * Device/browser context — forwarded to the Zitadel CreateSession proto
+   * `userAgent` field (zitadel.session.v2.UserAgent). Enables the cloud-portal
+   * "Active Sessions → Device/Location" view. Built by `userAgentFromRequest()`
+   * in `app/server/user-agent.ts`. Omit when no request context is available
+   * (e.g. server-side-only session refresh paths).
+   *
+   * Shape mirrors ZitadelUserAgent from user-agent.ts:
+   *   fingerprintId? — opaque client fingerprint id
+   *   ip?            — client IP (last-hop XFF)
+   *   description?   — human-readable browser/device/OS string
+   *   header?        — map<string, { values: string[] }> (proto HeaderValues)
+   */
+  userAgent?: {
+    fingerprintId?: string;
+    ip?: string;
+    description?: string;
+    header?: Record<string, { values: string[] }>;
+  };
 }
 
 export interface RegisterInput {

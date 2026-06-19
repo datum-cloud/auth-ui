@@ -12,7 +12,7 @@
 // route's schema) + the caller's current session list, and returns a typed result
 // the route turns into a redirect()/data() response. No Request parsing, no CSRF,
 // no raw cookie serialization lives here.
-import type { AuthProvider } from '@/modules/auth/auth-provider';
+import type { AuthProvider, SessionOpts } from '@/modules/auth/auth-provider';
 import { idpTypeToSlug } from '@/modules/auth/idp-slug';
 import { addSession, byLoginName, type SessionEntry } from '@/modules/auth/session/cookie';
 import { ProviderError } from '@/modules/auth/types';
@@ -87,6 +87,7 @@ export interface ResolveIdentifierInput {
   requestId?: string;
   organization?: string;
   emailDeliveryEnabled: boolean;
+  userAgent?: SessionOpts['userAgent'];
 }
 
 export type ResolveIdentifierError = 'USER_NOT_FOUND' | 'EMAIL_LOGIN_DISABLED';
@@ -127,7 +128,7 @@ function emailDomain(loginName: string): string | null {
 export async function resolveIdentifier(
   provider: AuthProvider,
   list: SessionEntry[],
-  { loginName, requestId, organization, emailDeliveryEnabled }: ResolveIdentifierInput
+  { loginName, requestId, organization, emailDeliveryEnabled, userAgent }: ResolveIdentifierInput
 ): Promise<ResolveIdentifierResult> {
   // allowDomainDiscovery (settings-gated, DEFAULT-OFF): when the caller pinned no org and the
   // BASE/instance policy enables discovery, map an email domain → org and thread it through the
@@ -185,7 +186,7 @@ export async function resolveIdentifier(
       return { ok: false, error: 'USER_NOT_FOUND' };
     }
     logAuthEvent('identifier', 'success', { actor: hashActor(loginName) });
-    const ghostSession = await provider.createSession({}, { requestId, orgId: org });
+    const ghostSession = await provider.createSession({}, { requestId, orgId: org, userAgent });
     const ghostSessions = addSession(list, {
       id: ghostSession.id,
       token: ghostSession.token,
@@ -203,7 +204,10 @@ export async function resolveIdentifier(
   }
   logAuthEvent('identifier', 'success', { actor: hashActor(loginName) });
 
-  const session = await provider.createSession({}, { requestId, orgId: org, userId: user.id });
+  const session = await provider.createSession(
+    {},
+    { requestId, orgId: org, userId: user.id, userAgent }
+  );
   const methods = await provider.listAuthMethods(user.id);
   const settings = await provider.getLoginSettings(org);
   const decision = decideAfterIdentifier({ methods, settings, emailDeliveryEnabled });

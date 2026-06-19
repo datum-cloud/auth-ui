@@ -13,13 +13,13 @@ msgstr ""
 "Plural-Forms: \n"
 
 #. placeholder {0}: attempts.count
-#: app/routes/login/password.tsx:140
+#: app/routes/login/password.tsx:142
 msgid "{0, plural, one {# attempt remaining.} other {# attempts remaining.}}"
 msgstr "{0, plural, one {# attempt remaining.} other {# attempts remaining.}}"
 
 #. placeholder {0}: idp.name
 #. placeholder {0}: r.label
-#: app/routes/login/index.tsx:259
+#: app/routes/login/index.tsx:266
 #: app/routes/setup/mfa.tsx:164
 #: app/routes/signup/index.tsx:221
 msgid "{0}"
@@ -65,7 +65,7 @@ msgstr "Additional verification is required to continue."
 msgid "Already have an account?"
 msgstr "Already have an account?"
 
-#: app/routes/login/index.tsx:224
+#: app/routes/login/index.tsx:231
 msgid "An account with this email already exists — sign in to continue."
 msgstr "An account with this email already exists — sign in to continue."
 
@@ -126,8 +126,8 @@ msgid "Change your password"
 msgstr "Change your password"
 
 #: app/routes/password/reset.tsx:97
-#: app/routes/signup/method.tsx:212
-#: app/routes/signup/password.tsx:142
+#: app/routes/signup/method.tsx:214
+#: app/routes/signup/password.tsx:145
 msgid "Check your email"
 msgstr "Check your email"
 
@@ -147,7 +147,7 @@ msgstr "Choose how to sign in"
 msgid "Choose how you want to verify your identity."
 msgstr "Choose how you want to verify your identity."
 
-#: app/routes/login/index.tsx:220
+#: app/routes/login/index.tsx:227
 msgid "Choose your login method"
 msgstr "Choose your login method"
 
@@ -156,7 +156,7 @@ msgid "Confirm new password"
 msgstr "Confirm new password"
 
 #: app/routes/password/change.tsx:92
-#: app/routes/signup/password.tsx:181
+#: app/routes/signup/password.tsx:184
 msgid "Confirm password"
 msgstr "Confirm password"
 
@@ -165,7 +165,7 @@ msgid "Connected accounts"
 msgstr "Connected accounts"
 
 #: app/routes/device/index.tsx:72
-#: app/routes/login/index.tsx:333
+#: app/routes/login/index.tsx:355
 #: app/routes/signup/index.tsx:287
 msgid "Continue"
 msgstr "Continue"
@@ -174,7 +174,7 @@ msgstr "Continue"
 msgid "Continue with your provider"
 msgstr "Continue with your provider"
 
-#: app/routes/login/password.tsx:91
+#: app/routes/login/password.tsx:93
 msgid "Could not verify password"
 msgstr "Could not verify password"
 
@@ -186,8 +186,8 @@ msgstr "Couldn't sign in"
 msgid "Create a new account"
 msgstr "Create a new account"
 
-#: app/routes/login/index.tsx:364
-#: app/routes/signup/password.tsx:185
+#: app/routes/login/index.tsx:386
+#: app/routes/signup/password.tsx:188
 msgid "Create account"
 msgstr "Create account"
 
@@ -199,20 +199,20 @@ msgstr "Deny"
 msgid "Device code"
 msgstr "Device code"
 
-#: app/routes/login/index.tsx:175
-#: app/routes/login/index.tsx:303
+#: app/routes/login/index.tsx:182
+#: app/routes/login/index.tsx:320
 #: app/routes/signup/index.tsx:250
 #: app/routes/signup/index.tsx:273
 msgid "Email"
 msgstr "Email"
 
-#: app/routes/login/verify/email.tsx:143
+#: app/routes/login/verify/email.tsx:146
 msgid "Email code"
 msgstr "Email code"
 
-#: app/routes/login/index.tsx:342
+#: app/routes/login/index.tsx:364
 #: app/routes/login/method.tsx:117
-#: app/routes/signup/method.tsx:254
+#: app/routes/signup/method.tsx:256
 msgid "Email me a sign-in link"
 msgstr "Email me a sign-in link"
 
@@ -232,7 +232,7 @@ msgstr "Email OTP"
 msgid "Email sign-in isn't available — use your username."
 msgstr "Email sign-in isn't available — use your username."
 
-#: app/routes/login/index.tsx:174
+#: app/routes/login/index.tsx:181
 msgid "Email, phone, or username"
 msgstr "Email, phone, or username"
 
@@ -248,7 +248,7 @@ msgstr "Enable SMS one-time code"
 msgid "Enter the code shown on your device to authorize it."
 msgstr "Enter the code shown on your device to authorize it."
 
-#: app/routes/login/verify/email.tsx:127
+#: app/routes/login/verify/email.tsx:130
 msgid "Enter the one-time code sent to your email address."
 msgstr "Enter the one-time code sent to your email address."
 
@@ -264,12 +264,12 @@ msgstr "Enter the verification code sent to your email address."
 msgid "Enter your authenticator code"
 msgstr "Enter your authenticator code"
 
-#: app/routes/login/verify/email.tsx:126
+#: app/routes/login/verify/email.tsx:129
 msgid "Enter your email code"
 msgstr "Enter your email code"
 
-#: app/routes/login/password.tsx:111
-#: app/routes/login/password.tsx:125
+#: app/routes/login/password.tsx:113
+#: app/routes/login/password.tsx:127
 msgid "Enter your password"
 msgstr "Enter your password"
 
@@ -277,11 +277,11 @@ msgstr "Enter your password"
 msgid "Enter your SMS code"
 msgstr "Enter your SMS code"
 
-#: app/routes/signup/method.tsx:234
+#: app/routes/signup/method.tsx:236
 msgid "Finish creating your account"
 msgstr "Finish creating your account"
 
-#: app/routes/login/password.tsx:171
+#: app/routes/login/password.tsx:173
 msgid "Forgot password?"
 msgstr "Forgot password?"
 
@@ -293,7 +293,13 @@ msgstr "Get started"
 msgid "Incorrect credentials. Please try again."
 msgstr "Incorrect credentials. Please try again."
 
-#: app/routes/signup/complete.tsx:81
+#: app/routes/login/index.tsx:269
+#: app/routes/login/index.tsx:292
+#: app/routes/login/index.tsx:323
+msgid "Last used"
+msgstr "Last used"
+
+#: app/routes/signup/complete.tsx:87
 msgid "Link expired"
 msgstr "Link expired"
 
@@ -326,7 +332,7 @@ msgstr "No account was found and sign-up is not available."
 msgid "No signed-in accounts."
 msgstr "No signed-in accounts."
 
-#: app/routes/login/index.tsx:362
+#: app/routes/login/index.tsx:384
 msgid "Not registered?"
 msgstr "Not registered?"
 
@@ -338,7 +344,7 @@ msgstr "Not you?"
 msgid "Open your authenticator app and enter the 6-digit code."
 msgstr "Open your authenticator app and enter the 6-digit code."
 
-#: app/routes/login/index.tsx:285
+#: app/routes/login/index.tsx:302
 #: app/routes/signup/index.tsx:232
 msgid "or"
 msgstr "or"
@@ -347,14 +353,14 @@ msgstr "or"
 msgid "Or import this URI in your authenticator app"
 msgstr "Or import this URI in your authenticator app"
 
-#: app/routes/login/index.tsx:277
+#: app/routes/login/index.tsx:289
 #: app/routes/login/method.tsx:101
 #: app/routes/setup/mfa.tsx:40
 msgid "Passkey"
 msgstr "Passkey"
 
 #: app/routes/login/method.tsx:133
-#: app/routes/signup/password.tsx:178
+#: app/routes/signup/password.tsx:181
 #: app/routes/sso/ldap.tsx:80
 msgid "Password"
 msgstr "Password"
@@ -379,7 +385,7 @@ msgstr "Password must contain a symbol."
 msgid "Password must contain an uppercase letter."
 msgstr "Password must contain an uppercase letter."
 
-#: app/routes/login/index.tsx:177
+#: app/routes/login/index.tsx:184
 msgid "Phone"
 msgstr "Phone"
 
@@ -387,7 +393,7 @@ msgstr "Phone"
 msgid "Phone sign-in isn't available — use your email or username."
 msgstr "Phone sign-in isn't available — use your email or username."
 
-#: app/routes/login/password.tsx:159
+#: app/routes/login/password.tsx:161
 #: app/utils/errors/auth-error-messages.tsx:27
 msgid "Please check your input and try again."
 msgstr "Please check your input and try again."
@@ -457,8 +463,8 @@ msgstr "Service temporarily unavailable. Please try again."
 msgid "Session active"
 msgstr "Session active"
 
-#: app/routes/signup/method.tsx:290
-#: app/routes/signup/password.tsx:157
+#: app/routes/signup/method.tsx:292
+#: app/routes/signup/password.tsx:160
 msgid "Set a password"
 msgstr "Set a password"
 
@@ -491,13 +497,13 @@ msgstr "Set up security key"
 msgid "Set up SMS one-time code"
 msgstr "Set up SMS one-time code"
 
-#: app/routes/login/password.tsx:164
+#: app/routes/login/password.tsx:166
 #: app/routes/signup/index.tsx:310
 #: app/routes/sso/ldap.tsx:85
 msgid "Sign in"
 msgstr "Sign in"
 
-#: app/routes/login/password.tsx:153
+#: app/routes/login/password.tsx:155
 #: app/routes/logout/success.tsx:15
 msgid "Sign in again"
 msgstr "Sign in again"
@@ -517,7 +523,7 @@ msgstr "Sign in with LDAP"
 msgid "Sign out"
 msgstr "Sign out"
 
-#: app/routes/login/index.tsx:352
+#: app/routes/login/index.tsx:374
 msgid "Sign-in is currently unavailable for this account. Please contact your administrator."
 msgstr "Sign-in is currently unavailable for this account. Please contact your administrator."
 
@@ -549,7 +555,7 @@ msgstr "Something went wrong with <0>{provider}</0>."
 msgid "Something went wrong. Please try again."
 msgstr "Something went wrong. Please try again."
 
-#: app/routes/signup/complete.tsx:86
+#: app/routes/signup/complete.tsx:92
 msgid "Start over"
 msgstr "Start over"
 
@@ -589,7 +595,7 @@ msgstr "The sign-in link was incomplete or expired."
 msgid "This directory account can't be linked here yet. Sign in with your password instead."
 msgstr "This directory account can't be linked here yet. Sign in with your password instead."
 
-#: app/routes/signup/complete.tsx:82
+#: app/routes/signup/complete.tsx:88
 msgid "This sign-in link is invalid or has expired."
 msgstr "This sign-in link is invalid or has expired."
 
@@ -609,11 +615,11 @@ msgstr "Two-factor verification"
 msgid "Unlink"
 msgstr "Unlink"
 
-#: app/routes/signup/method.tsx:272
+#: app/routes/signup/method.tsx:274
 msgid "Use a passkey"
 msgstr "Use a passkey"
 
-#: app/routes/login/passkey.tsx:55
+#: app/routes/login/passkey.tsx:73
 msgid "Use your passkey to verify your identity."
 msgstr "Use your passkey to verify your identity."
 
@@ -621,7 +627,7 @@ msgstr "Use your passkey to verify your identity."
 msgid "Use your security key to verify your identity."
 msgstr "Use your security key to verify your identity."
 
-#: app/routes/login/index.tsx:178
+#: app/routes/login/index.tsx:185
 #: app/routes/sso/ldap.tsx:76
 msgid "Username"
 msgstr "Username"
@@ -635,7 +641,7 @@ msgid "Verification code"
 msgstr "Verification code"
 
 #: app/routes/login/verify/authenticator.tsx:116
-#: app/routes/login/verify/email.tsx:147
+#: app/routes/login/verify/email.tsx:150
 #: app/routes/login/verify/sms.tsx:119
 #: app/routes/verify/index.tsx:171
 msgid "Verify"
@@ -646,7 +652,7 @@ msgid "Verify and enable"
 msgstr "Verify and enable"
 
 #: app/components/webauthn-button/webauthn-button.tsx:163
-#: app/routes/login/passkey.tsx:54
+#: app/routes/login/passkey.tsx:72
 msgid "Verify with passkey"
 msgstr "Verify with passkey"
 
@@ -686,12 +692,12 @@ msgstr "We've sent a password reset link to <0>{0}</0>"
 
 #. placeholder {0}: (actionData as { email: string }).email
 #. placeholder {0}: actionData.email
-#: app/routes/signup/method.tsx:214
-#: app/routes/signup/password.tsx:144
+#: app/routes/signup/method.tsx:216
+#: app/routes/signup/password.tsx:147
 msgid "We've sent a verification link to <0>{0}</0>"
 msgstr "We've sent a verification link to <0>{0}</0>"
 
-#: app/routes/login/index.tsx:217
+#: app/routes/login/index.tsx:224
 msgid "Welcome"
 msgstr "Welcome"
 
@@ -723,7 +729,7 @@ msgstr "You may return to your device."
 msgid "You must be signed in to link an external account."
 msgstr "You must be signed in to link an external account."
 
-#: app/routes/signup/password.tsx:158
+#: app/routes/signup/password.tsx:161
 msgid "You'll need to set a password to complete your signup."
 msgstr "You'll need to set a password to complete your signup."
 
@@ -731,7 +737,7 @@ msgstr "You'll need to set a password to complete your signup."
 msgid "You've been signed out"
 msgstr "You've been signed out"
 
-#: app/routes/login/password.tsx:135
+#: app/routes/login/password.tsx:137
 msgid "Your account is temporarily locked after too many attempts."
 msgstr "Your account is temporarily locked after too many attempts."
 
@@ -751,6 +757,6 @@ msgstr "Your email is verified"
 msgid "Your password has expired. Please reset it to continue."
 msgstr "Your password has expired. Please reset it to continue."
 
-#: app/routes/login/password.tsx:151
+#: app/routes/login/password.tsx:153
 msgid "Your session has expired."
 msgstr "Your session has expired."

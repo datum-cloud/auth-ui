@@ -9,6 +9,7 @@ import {
   addSession,
   serializeSessions,
 } from '@/modules/auth/session/cookie';
+import { serializeLastUsedLogin } from '@/modules/auth/session/last-used-login';
 import { dispatchEmailChallenge, submitOtpCode } from '@/resources/otp';
 import { otpCodeClientSchema } from '@/resources/otp/otp.schema';
 import { type LoginLayoutData } from '@/routes/login/layout';
@@ -100,14 +101,16 @@ export async function action({ request }: ActionFunctionArgs) {
     const p = new URLSearchParams({ loginName, force: 'false', checkAfter: 'false' });
     if (organization) p.set('organization', organization);
     if (requestId) p.set('requestId', requestId);
-    return redirect(`/setup/passkey?${p.toString()}`, {
-      headers: { 'set-cookie': await serializeSessions(updatedSessions) },
-    });
+    const passkeyHeaders = new Headers();
+    passkeyHeaders.append('set-cookie', await serializeSessions(updatedSessions));
+    passkeyHeaders.append('set-cookie', await serializeLastUsedLogin('email'));
+    return redirect(`/setup/passkey?${p.toString()}`, { headers: passkeyHeaders });
   }
 
-  return redirect(result.target, {
-    headers: { 'set-cookie': await serializeSessions(updatedSessions) },
-  });
+  const emailHeaders = new Headers();
+  emailHeaders.append('set-cookie', await serializeSessions(updatedSessions));
+  emailHeaders.append('set-cookie', await serializeLastUsedLogin('email'));
+  return redirect(result.target, { headers: emailHeaders });
 }
 
 export default function VerifyEmail() {

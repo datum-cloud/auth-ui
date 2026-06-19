@@ -10,13 +10,34 @@
 //   • A ProviderError from retrieveIdpIntent redirects to /sso/:provider/error and logs
 //     idp.signin failure.
 //   • The ceremony user is resolved via getSession (NOT getUser(sessionId)) — CODE-MIN-05.
+//   • Success paths (sign-in, auto-link, auto-create) emit a last-used-login Set-Cookie
+//     with token idp:<idpId>. Non-success paths (link-needs-auth, error) emit none.
 import type { FakeAuthProvider } from '@/modules/auth/providers/fake/fake-provider';
 import { getAuthProvider } from '@/modules/auth/select.server';
 import { sessionsCookie } from '@/modules/auth/session/cookie';
+import { lastUsedLoginCookie } from '@/modules/auth/session/last-used-login';
 import { ProviderError } from '@/modules/auth/types';
 import type { IdpIntentResult } from '@/modules/auth/types';
 import { processIdpCallback, outcomeToResponse } from '@/resources/sso';
 import { describe, it, expect, vi, afterEach } from 'vitest';
+
+/** Parse the last-used-login token from a set-cookie header value, or null if absent. */
+async function parseLastUsedCookie(setCookieHeader: string | null): Promise<string | null> {
+  if (!setCookieHeader) return null;
+  // The header may contain multiple cookies joined by ', '. Find the one for last-used-login.
+  const cookies = setCookieHeader.split(', ');
+  for (const cookie of cookies) {
+    if (cookie.startsWith('last-used-login=')) {
+      // Re-parse via the real cookie implementation to verify signature + decode value.
+      const fakeReq = new Request('http://localhost', {
+        headers: { cookie: cookie.split(';')[0] },
+      });
+      const val = await lastUsedLoginCookie.parse(fakeReq.headers.get('cookie'));
+      if (val !== null && val !== undefined) return val as string;
+    }
+  }
+  return null;
+}
 
 const BASE = 'http://localhost/id/sso';
 
@@ -307,6 +328,145 @@ describe('processIdpCallback — stale ceremony-session cookie resilience', () =
     expect(loc).not.toContain('request_expired');
     // auto-create path → signed-in or /authorize
     expect(loc === '/signed-in' || loc.startsWith('/authorize')).toBe(true);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// last-used-login cookie: written on success paths, absent on non-success paths
+// ---------------------------------------------------------------------------
+
+describe('processIdpCallback — last-used-login Set-Cookie', () => {
+  const IDP_ID = 'idp-g';
+
+  it('emits idp:<idpId> last-used-login cookie on the sign-in path', async () => {
+    // Arrange: seed an already-linked user so intent.userId is set → sign-in path.
+    const { FakeAuthProvider } = await import('@/modules/auth/providers/fake/fake-provider');
+    const provider = new FakeAuthProvider({
+      users: [{ id: 'u-signin', loginName: 'linked@idp.test', displayName: 'Linked User' }],
+    });
+    const { processIdpCallback, outcomeToResponse } = await import('@/resources/sso');
+
+    const SIGN_IN_INTENT: IdpIntentResult = {
+      userId: 'u-signin',
+      information: { idpId: IDP_ID, idpUserId: 'g-linked', idpUserName: 'linked@idp.test' },
+      draft: null,
+    };
+
+    const request = new Request(
+      'https://auth.localtest.me/sso/google/callback?id=intent-si&token=tok-si'
+    );
+    const outcome = await processIdpCallback(provider, request, 'google', {
+      retrieveIdpIntent: async () => SIGN_IN_INTENT,
+      onAuthEvent: () => {},
+    });
+    const res = outcomeToResponse(outcome) as Response;
+
+    expect(res.status).toBe(302);
+    const lastUsed = await parseLastUsedCookie(res.headers.get('set-cookie'));
+    expect(lastUsed).toBe(`idp:${IDP_ID}`);
+  });
+
+  it('emits idp:<idpId> last-used-login cookie on the auto-link path', async () => {
+    const { FakeAuthProvider } = await import('@/modules/auth/providers/fake/fake-provider');
+    const provider = new FakeAuthProvider({
+      users: [{ id: 'u-autolink', loginName: 'you@gmail.com', displayName: 'You User' }],
+      // no password → auto-link path
+    });
+    const { processIdpCallback, outcomeToResponse } = await import('@/resources/sso');
+
+    const AUTOLINK_INTENT: IdpIntentResult = {
+      userId: null,
+      information: { idpId: IDP_ID, idpUserId: 'g-al', idpUserName: 'you@gmail.com' },
+      draft: { email: 'you@gmail.com', firstName: 'You', lastName: 'User', emailVerified: true },
+    };
+
+    const request = new Request(
+      'https://auth.localtest.me/sso/google/callback?id=intent-al&token=tok-al'
+    );
+    const outcome = await processIdpCallback(provider, request, 'google', {
+      retrieveIdpIntent: async () => AUTOLINK_INTENT,
+      onAuthEvent: () => {},
+    });
+    const res = outcomeToResponse(outcome) as Response;
+
+    expect(res.status).toBe(302);
+    const loc = res.headers.get('location') ?? '';
+    expect(loc === '/signed-in' || loc.startsWith('/authorize')).toBe(true);
+    const lastUsed = await parseLastUsedCookie(res.headers.get('set-cookie'));
+    expect(lastUsed).toBe(`idp:${IDP_ID}`);
+  });
+
+  it('emits idp:<idpId> last-used-login cookie on the auto-create path', async () => {
+    const { FakeAuthProvider } = await import('@/modules/auth/providers/fake/fake-provider');
+    // Empty store → auto-create path.
+    const provider = new FakeAuthProvider({});
+    const { processIdpCallback, outcomeToResponse } = await import('@/resources/sso');
+
+    const AUTOCREATE_INTENT: IdpIntentResult = {
+      userId: null,
+      information: { idpId: IDP_ID, idpUserId: 'g-new', idpUserName: 'newbie@idp.test' },
+      draft: { email: 'newbie@idp.test', firstName: 'New', lastName: 'Bie', emailVerified: true },
+    };
+
+    const request = new Request(
+      'https://auth.localtest.me/sso/google/callback?id=intent-ac&token=tok-ac'
+    );
+    const outcome = await processIdpCallback(provider, request, 'google', {
+      retrieveIdpIntent: async () => AUTOCREATE_INTENT,
+      onAuthEvent: () => {},
+    });
+    const res = outcomeToResponse(outcome) as Response;
+
+    expect(res.status).toBe(302);
+    const loc = res.headers.get('location') ?? '';
+    expect(loc === '/signed-in' || loc.startsWith('/authorize')).toBe(true);
+    const lastUsed = await parseLastUsedCookie(res.headers.get('set-cookie'));
+    expect(lastUsed).toBe(`idp:${IDP_ID}`);
+  });
+
+  it('does NOT emit a last-used-login cookie on the link-needs-auth path', async () => {
+    const { FakeAuthProvider } = await import('@/modules/auth/providers/fake/fake-provider');
+    const provider = new FakeAuthProvider({
+      users: [{ id: 'u-lna', loginName: 'you@gmail.com', displayName: 'You User' }],
+      authMethods: { 'u-lna': ['password'] }, // has a password → link-needs-auth
+    });
+    const { processIdpCallback, outcomeToResponse } = await import('@/resources/sso');
+
+    const LNA_INTENT: IdpIntentResult = {
+      userId: null,
+      information: { idpId: IDP_ID, idpUserId: 'g-lna', idpUserName: 'you@gmail.com' },
+      draft: { email: 'you@gmail.com', firstName: 'You', lastName: 'User', emailVerified: true },
+    };
+
+    const request = new Request(
+      'https://auth.localtest.me/sso/google/callback?id=intent-lna&token=tok-lna'
+    );
+    const outcome = await processIdpCallback(provider, request, 'google', {
+      retrieveIdpIntent: async () => LNA_INTENT,
+      onAuthEvent: () => {},
+    });
+    const res = outcomeToResponse(outcome) as Response;
+
+    // link-needs-auth → redirect to /login with notice, no session cookie, no last-used cookie.
+    expect(res.status).toBe(302);
+    const loc = res.headers.get('location') ?? '';
+    expect(loc).toContain('notice=link-existing');
+    const lastUsed = await parseLastUsedCookie(res.headers.get('set-cookie'));
+    expect(lastUsed).toBeNull();
+  });
+
+  it('does NOT emit a last-used-login cookie on the provider-error path', async () => {
+    const res = (await runCallback({
+      provider: 'google',
+      query: { id: 'intent-err', token: 'tok-err' },
+      retrieveIdpIntent: () => Promise.reject(new ProviderError('UNAVAILABLE', 'down')),
+      onAuthEvent: () => {},
+    })) as Response;
+
+    expect(res.status).toBe(302);
+    expect(res.headers.get('location')).toContain('/sso/google/error');
+    const lastUsed = await parseLastUsedCookie(res.headers.get('set-cookie'));
+    expect(lastUsed).toBeNull();
   });
 });
 

@@ -10,7 +10,7 @@
  * Returns the set-cookie header value and the redirect target URL so the caller
  * can perform the redirect with the cookie in one response.
  */
-import type { AuthProvider } from '@/modules/auth/auth-provider';
+import type { AuthProvider, SessionOpts } from '@/modules/auth/auth-provider';
 import { addSession, readSessions, serializeSessions } from '@/modules/auth/session/cookie';
 
 export interface SignInWithIdpIntentOpts {
@@ -29,6 +29,7 @@ export interface SignInWithIdpIntentOpts {
    * where the username is already available at the call site).
    */
   fallbackLoginName?: string;
+  userAgent?: SessionOpts['userAgent'];
 }
 
 export interface SignInWithIdpIntentResult {
@@ -43,11 +44,19 @@ export async function signInWithIdpIntent(
   request: Request,
   opts: SignInWithIdpIntentOpts
 ): Promise<SignInWithIdpIntentResult> {
-  const { idpIntentId, idpIntentToken, userId, requestId, organization, fallbackLoginName } = opts;
+  const {
+    idpIntentId,
+    idpIntentToken,
+    userId,
+    requestId,
+    organization,
+    fallbackLoginName,
+    userAgent,
+  } = opts;
 
   const session = await provider.createSession(
     { idpIntent: { idpIntentId, idpIntentToken } },
-    { requestId, orgId: organization, userId }
+    { requestId, orgId: organization, userId, userAgent }
   );
 
   const user = await provider.getUser(userId);

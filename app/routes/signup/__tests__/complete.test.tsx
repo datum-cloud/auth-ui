@@ -70,6 +70,12 @@ function setCookieOf(res: unknown): string | null {
   return null;
 }
 
+/** Collect all Set-Cookie values from a Response (node fetch merges them with ', '). */
+function allSetCookiesOf(res: unknown): string[] {
+  const raw = setCookieOf(res) ?? '';
+  return raw ? raw.split(', ') : [];
+}
+
 // ─── Setup ───────────────────────────────────────────────────────────────────
 
 beforeEach(() => {
@@ -97,7 +103,10 @@ describe('signup/complete — success path', () => {
     expect(statusOf(res)).toBe(302);
     const location = locationOf(res) ?? '';
     expect(location).toMatch(/^\/setup\/passkey/);
-    expect(setCookieOf(res)).toBeTruthy();
+    // Must emit the sessions cookie AND the last-used-login=email badge.
+    const cookies = allSetCookiesOf(res);
+    expect(cookies.some((c) => c.startsWith('sessions='))).toBe(true);
+    expect(cookies.some((c) => c.startsWith('last-used-login='))).toBe(true);
   });
 
   it('threads loginName and userId into the /setup/passkey redirect URL', async () => {
