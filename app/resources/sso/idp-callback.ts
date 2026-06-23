@@ -8,6 +8,13 @@ export interface IdpCallbackInput {
   // Same-email user resolved server-side (findUser + listAuthMethods) ONLY on the register
   // path. Optional so already-linked / link-ceremony callers need not compute it.
   existingAccount?: { userId: string; hasPassword: boolean } | null;
+  // POSTURE B2 (755-J2): owning Datum user of the IdP email, resolved server-side via
+  // provider.findUser(intent.draft.email) ONLY for the link+fresh-identity case
+  // (link === true && intent.userId == null). `null` ⇒ no Datum account owns that email.
+  // Used to prove the fresh IdP identity's email belongs to the SESSION user before we link
+  // it — never trusted from the client. Optional so the already-linked link path and the
+  // register path need not compute it.
+  linkEmailOwnerUserId?: string | null;
 }
 
 export type IdpDecision =
@@ -29,12 +36,46 @@ export function decideIdpCallback({
   sessionUserId,
   creationAllowed,
   existingAccount,
+  linkEmailOwnerUserId,
 }: IdpCallbackInput): IdpDecision {
-  // Linking ceremony: the active session user MUST equal the intent user (security boundary).
+  // ── Linking ceremony (?link=true) ──────────────────────────────────────────────
+  //
+  // SECURITY POSTURE B2 (755-J2). The link target is ALWAYS the active session user — an
+  // identity is only ever linked into the account whose ceremony cookie we just resolved
+  // server-side. We never trust a client-supplied userId. There are two shapes:
+  //
+  //   1. ALREADY-MAPPED identity (intent.userId present). Zitadel already maps this IdP
+  //      identity to a Datum user. Require sessionUserId === intent.userId — re-linking an
+  //      identity that belongs to someone else is access-denied. (Unchanged boundary.)
+  //
+  //   2. FRESH identity (intent.userId == null). Zitadel has no mapping yet — the original
+  //      bug: this aborted with context-missing because the link target was read from the
+  //      (empty) intent.userId. Now we fall back to the SESSION user, but ONLY link when the
+  //      IdP itself vouches for the email AND the Datum account that already owns that email
+  //      IS the session user. This blocks linking an attacker-controlled IdP identity whose
+  //      email is unverified, or whose verified email belongs to a DIFFERENT Datum account
+  //      (account-takeover via a borrowed/lookalike IdP identity).
   if (link) {
-    if (!intent.userId) return { kind: 'error', reason: 'context-missing' };
-    if (sessionUserId !== intent.userId) return { kind: 'error', reason: 'access-denied' };
-    return { kind: 'link', userId: intent.userId, link: toLink(intent) };
+    // Shape 1: already mapped — equality boundary, no email proof needed.
+    if (intent.userId) {
+      if (sessionUserId !== intent.userId) return { kind: 'error', reason: 'access-denied' };
+      return { kind: 'link', userId: intent.userId, link: toLink(intent) };
+    }
+
+    // Shape 2: fresh identity → fall back to the session user.
+    // No session at all ⇒ we have no link target and no equality to assert.
+    if (!sessionUserId) return { kind: 'error', reason: 'context-missing' };
+
+    // The IdP must have verified the email — an unverified email is not proof of ownership.
+    // A fresh identity with no/unverified email can never satisfy the owner check below.
+    if (!intent.draft?.emailVerified) return { kind: 'error', reason: 'access-denied' };
+
+    // The verified IdP email must already belong to the SESSION user. If a DIFFERENT Datum
+    // account owns it (or — defensively — no resolved owner), linking would let the session
+    // user absorb an identity tied to someone else's email → access-denied.
+    if (linkEmailOwnerUserId !== sessionUserId) return { kind: 'error', reason: 'access-denied' };
+
+    return { kind: 'link', userId: sessionUserId, link: toLink(intent) };
   }
 
   // Existing + linked → sign in.

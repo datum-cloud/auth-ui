@@ -136,7 +136,7 @@ describe('renderSamlPostForm', () => {
 // AUTH_PROVIDER=fake (vitest.config.ts) → providerForRequest returns the seeded fake singleton.
 // Its samlRequests seed: sr-1 → redirect binding; sr-post → post binding.
 //
-// CODE-MAJ-09: samlPostHandler now calls provider.getSession() to detect stale sessions
+// samlPostHandler now calls provider.getSession() to detect stale sessions
 // before generating a SAML assertion. The fake's sessions map must have 's1' seeded for
 // happy-path tests; the stale-session test overrides via setSessionResult.
 
@@ -215,7 +215,7 @@ describe('samlPostHandler', () => {
     expect(res.status).toBe(500);
   });
 
-  // ── CODE-MAJ-09: protocol-validate redirect-binding URL ────────────────────
+  // ── protocol-validate redirect-binding URL ─────────────────────────────────
 
   it('rejects a non-http(s) SAML redirect-binding URL', async () => {
     const res = await runSamlPost({
@@ -226,7 +226,7 @@ describe('samlPostHandler', () => {
     expect([400, 500]).toContain(res.status);
   });
 
-  // ── CODE-MAJ-09: stale-session self-heal ──────────────────────────────────
+  // ── stale-session self-heal ───────────────────────────────────────────────
 
   it('dead (stale-cookie) session → redirects to /id/login instead of serving a SAML assertion', async () => {
     // beforeEach seeds 's1' as alive; override here to script it as confirmed dead (null).

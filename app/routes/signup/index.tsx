@@ -1,20 +1,24 @@
 import { SubmitButton } from '@/components/auth-form/auth-form';
+import { AuthFormFields } from '@/components/auth-form/auth-form-fields';
 import { FormError } from '@/components/form-error/form-error';
-import { useActionErrorToast } from '@/hooks/use-action-error-toast';
+import { useAuthActionError } from '@/hooks/use-auth-action-error';
 import SplitLayout from '@/layouts/split.layout';
 import { MaxMindTracker, readMaxMindTrackingToken } from '@/modules/fraud/maxmind-tracker';
 import { startIdpIntent } from '@/resources/login';
 import { loginIdpSchema } from '@/resources/login/login.schema';
-import { parseNameFromEmail } from '@/resources/signup/parse-name';
+import {
+  decideAfterSignupIdentifier,
+  decideSignupIdpIntent,
+} from '@/resources/signup/signup-decision';
 import { resolveSignupView } from '@/resources/signup/signup-view';
 import { signupIdentifierSchema } from '@/resources/signup/signup.schema';
-import { trustedAppOrigin } from '@/server/app-origin.server';
+import { paths } from '@/routes/paths';
 import { providerForRequest } from '@/server/auth-context.server';
 import { getCsrfToken, assertCsrf } from '@/server/csrf';
+import { trustedAppOrigin } from '@/server/infra/app-origin.server';
+import { env } from '@/server/infra/env.server';
 import { assetUrl } from '@/utils/asset-url';
-import { env } from '@/utils/env/env.server';
 import { actionError } from '@/utils/errors/auth-error';
-import { useAuthErrorMessage } from '@/utils/errors/auth-error-messages';
 import { Button } from '@datum-cloud/datum-ui/button';
 import { Form } from '@datum-cloud/datum-ui/form';
 import { Icon } from '@datum-cloud/datum-ui/icons';
@@ -101,8 +105,14 @@ export async function action({ request }: ActionFunctionArgs) {
         requestId,
         organization,
       });
-      if (!result.ok) return data({ error: result.error }, { status: 502 });
-      return redirect(result.authUrl);
+      // The pure decider maps the service result onto the Decision union.
+      const decision = decideSignupIdpIntent(result);
+      switch (decision.kind) {
+        case 'redirect':
+          return redirect(decision.path);
+        case 'error':
+          return data({ error: decision.error }, { status: 502 });
+      }
     } catch (err) {
       return actionError(err);
     }
@@ -113,14 +123,20 @@ export async function action({ request }: ActionFunctionArgs) {
   if (!parsed.success) return data({ error: 'INVALID_INPUT' as const }, { status: 400 });
 
   const { email, organization, requestId, deviceTrackingToken } = parsed.data;
-  const { firstName, lastName } = parseNameFromEmail(email);
-
-  const params = new URLSearchParams({ loginName: email, firstName, lastName });
-  if (organization) params.set('organization', organization);
-  if (requestId) params.set('requestId', requestId);
-  if (deviceTrackingToken) params.set('deviceTrackingToken', deviceTrackingToken);
-
-  return redirect(`/signup/method?${params.toString()}`);
+  const decision = decideAfterSignupIdentifier({
+    email,
+    organization,
+    requestId,
+    deviceTrackingToken,
+  });
+  // The identifier branch only ever produces a redirect (parseNameFromEmail can't fail);
+  // switch exhaustively so a future error variant can't silently fall through.
+  switch (decision.kind) {
+    case 'redirect':
+      return redirect(paths.signup.method(decision.params));
+    case 'error':
+      return data({ error: decision.error }, { status: 400 });
+  }
 }
 
 export default function Signup() {
@@ -152,9 +168,9 @@ export default function Signup() {
     return () => window.clearInterval(handle);
   }, [maxmindAccountId]);
 
-  const getErrorMessage = useAuthErrorMessage();
-  const errorMessage = getErrorMessage((actionData as { error?: string } | undefined)?.error);
-  useActionErrorToast(errorMessage);
+  // The action error surfaces INLINE via <FormError> (this replaces
+  // the per-route toast); useAuthActionError owns the narrow→resolve pipeline.
+  const errorMessage = useAuthActionError(actionData);
 
   const submittingIdpId =
     navigation.state !== 'idle' && navigation.formData?.get('intent') === 'idp'
@@ -192,13 +208,13 @@ export default function Signup() {
               <div className="flex flex-col gap-3">
                 {idps.map((idp) => (
                   <RRForm key={idp.id} method="post">
-                    <input type="hidden" name="csrf" value={csrfToken} />
+                    <AuthFormFields
+                      csrf={csrfToken}
+                      requestId={requestId}
+                      organization={organization}
+                    />
                     <input type="hidden" name="intent" value="idp" />
                     <input type="hidden" name="idpId" value={idp.id} />
-                    {requestId ? <input type="hidden" name="requestId" value={requestId} /> : null}
-                    {organization ? (
-                      <input type="hidden" name="organization" value={organization} />
-                    ) : null}
                     <Button
                       size="large"
                       className="h-13 gap-3"
@@ -257,17 +273,19 @@ export default function Signup() {
                     defaultValues={{ email: prefill.email }}
                     isSubmitting={navigation.state === 'submitting'}
                     className="flex w-full flex-col gap-4">
-                    <input type="hidden" name="csrf" value={csrfToken} />
+                    <AuthFormFields
+                      csrf={csrfToken}
+                      requestId={requestId}
+                      organization={organization}
+                    />
+                    {/* deviceTrackingToken is populated client-side via ref (MaxMind mirror),
+                        so it stays a route-local ref'd input outside the AuthFormFields cluster. */}
                     <input
                       type="hidden"
                       name="deviceTrackingToken"
                       ref={deviceTokenRef}
                       defaultValue=""
                     />
-                    {organization ? (
-                      <input type="hidden" name="organization" value={organization} />
-                    ) : null}
-                    {requestId ? <input type="hidden" name="requestId" value={requestId} /> : null}
                     <Form.Field
                       name="email"
                       label={t`Email`}
@@ -300,13 +318,7 @@ export default function Signup() {
         <div className="border-border my-8 flex-grow border-t" />
         <p className="text-foreground/80 text-center text-sm">
           <Trans>Already have an account?</Trans>{' '}
-          <Link
-            to={
-              organization || requestId
-                ? `/login?${new URLSearchParams({ ...(requestId ? { requestId } : {}), ...(organization ? { organization } : {}) }).toString()}`
-                : '/login'
-            }
-            className="underline">
+          <Link to={paths.login.index({ requestId, organization })} className="underline">
             <Trans>Sign in</Trans>
           </Link>
         </p>

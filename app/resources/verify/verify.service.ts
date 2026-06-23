@@ -49,7 +49,7 @@ export interface DispatchEmailCodeInput {
 }
 
 /**
- * CODE-MAJ-08: enumeration-/flood-safe email-code dispatch.
+ * Enumeration-/flood-safe email-code dispatch.
  *
  * An unauthenticated GET with ?send=true&userId=<anyone> was previously a code-flood /
  * enumeration vector — any attacker could trigger email sends to arbitrary accounts.

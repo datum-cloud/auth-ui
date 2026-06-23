@@ -1,6 +1,6 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
 import { TrackOnMount } from '@/modules/analytics/fathom';
-import { Button } from '@datum-cloud/datum-ui/button';
+import { LinkButton } from '@datum-cloud/datum-ui/button';
 import { Trans } from '@lingui/react/macro';
 import {
   data,
@@ -30,11 +30,11 @@ export default function VerifySuccess() {
         </Trans>
       }>
       <TrackOnMount event="email_verified" />
-      <Button theme="link" type="quaternary" asChild>
-        <Link to="/login">
-          <Trans>Back</Trans>
-        </Link>
-      </Button>
+      {/* LinkButton (renders a single styled <a>) — NOT Button asChild, which
+          emits <button><a> (nested-interactive axe violation in the prod build). */}
+      <LinkButton theme="link" type="quaternary" as={Link} href="/login">
+        <Trans>Back</Trans>
+      </LinkButton>
     </AuthCard>
   );
 }

@@ -1,8 +1,7 @@
-import { AuthCard } from '@/components/auth-card/auth-card';
+import { AuthCeremony } from '@/components/auth-ceremony/auth-ceremony';
 import { SubmitButton } from '@/components/auth-form/auth-form';
-import { BackLink } from '@/components/back-link/back-link';
+import { AuthFormFields } from '@/components/auth-form/auth-form-fields';
 import { FormError } from '@/components/form-error/form-error';
-import { IdentityBadge } from '@/components/identity-badge/identity-badge';
 // ADAPTATION (plan-drift fix): readSessions/serializeSessions live in @/modules/auth/session/cookie
 // (which re-exports them from session.ts) — the canonical one-stop import for route-layer session I/O.
 import { readSessions, serializeSessions } from '@/modules/auth/session/cookie';
@@ -10,7 +9,7 @@ import { serializeLastUsedLogin } from '@/modules/auth/session/last-used-login';
 import { verifyLoginPassword } from '@/resources/login';
 import { attemptsRemaining } from '@/resources/login/login-view';
 import { loginPasswordSchema, loginPasswordClientSchema } from '@/resources/login/login.schema';
-import { type LoginLayoutData } from '@/routes/login/layout';
+import { paths } from '@/routes/paths';
 import { providerForRequest } from '@/server/auth-context.server';
 import { getCsrfToken, assertCsrf } from '@/server/csrf';
 import { Form } from '@datum-cloud/datum-ui/form';
@@ -80,7 +79,12 @@ export async function action({ request }: ActionFunctionArgs) {
 
 export default function Password() {
   const { csrfToken, hidePasswordReset } = useLoaderData<typeof loader>();
-  const { loginName, requestId, organization } = useRouteLoaderData('login') as LoginLayoutData;
+  // RR7 infers the parent-layout loader return through the generic — the `as` cast is gone.
+  // The `?? { loginName: '' }` only satisfies the structurally-possible-undefined branch; these
+  // routes always render under the `login` layout, so it is never taken at runtime.
+  const { loginName, requestId, organization } = useRouteLoaderData<
+    typeof import('@/routes/login/layout').loader
+  >('login') ?? { loginName: '' };
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
   const { t } = useLingui();
@@ -104,79 +108,79 @@ export default function Password() {
       ? attemptsRemaining(serverError.failedAttempts, serverError.maxAttempts)
       : null;
 
-  const extra = new URLSearchParams();
-  if (requestId) extra.set('requestId', requestId);
-  if (organization) extra.set('organization', organization);
-  const resetHref = extra.toString() ? `/password/reset?${extra.toString()}` : '/password/reset';
+  // paths.password.reset emits the identical query string (requestId, then
+  // organization — undefined values skipped, no trailing "?" when both absent).
+  const resetHref = paths.password.reset({ requestId, organization });
 
   return (
-    <AuthCard title={<Trans>Enter your password</Trans>}>
-      <div className="flex flex-col items-baseline justify-center gap-4">
-        <IdentityBadge loginName={loginName} requestId={requestId} organization={organization} />
-        <Form.Root
-          schema={loginPasswordClientSchema}
-          formComponent={RRForm}
-          method="POST"
-          defaultValues={{ password: '' }}
-          isSubmitting={navigation.state === 'submitting'}
-          className="flex w-full flex-col gap-4">
-          <input type="hidden" name="csrf" value={csrfToken} />
-          <input type="hidden" name="loginName" value={loginName} />
-          {requestId ? <input type="hidden" name="requestId" value={requestId} /> : null}
-          {organization ? <input type="hidden" name="organization" value={organization} /> : null}
-          <Form.Field name="password" label={t`Enter your password`} required>
-            <Form.Input type="password" autoComplete="current-password" autoFocus />
-          </Form.Field>
+    <AuthCeremony
+      title={<Trans>Enter your password</Trans>}
+      loginName={loginName}
+      requestId={requestId}
+      organization={organization}>
+      <Form.Root
+        schema={loginPasswordClientSchema}
+        formComponent={RRForm}
+        method="POST"
+        defaultValues={{ password: '' }}
+        isSubmitting={navigation.state === 'submitting'}
+        className="flex w-full flex-col gap-4">
+        <AuthFormFields
+          csrf={csrfToken}
+          loginName={loginName}
+          requestId={requestId}
+          organization={organization}
+        />
+        <Form.Field name="password" label={t`Enter your password`} required>
+          <Form.Input type="password" autoComplete="current-password" autoFocus />
+        </Form.Field>
 
-          {serverError?.kind === 'INVALID_CREDENTIALS' && (
-            <FormError>
-              {serverError.message}
-              {attempts?.kind === 'locked' ? (
-                <>
-                  {' '}
-                  <Trans>Your account is temporarily locked after too many attempts.</Trans>
-                </>
-              ) : attempts?.kind === 'remaining' ? (
-                <>
-                  {' '}
-                  <Plural
-                    value={attempts.count}
-                    one="# attempt remaining."
-                    other="# attempts remaining."
-                  />
-                </>
-              ) : null}
-            </FormError>
-          )}
-          {serverError?.kind === 'SESSION_EXPIRED' && (
-            <FormError>
-              <Trans>Your session has expired.</Trans>{' '}
-              <Link to="/login" className="underline">
-                <Trans>Sign in again</Trans>
-              </Link>
-            </FormError>
-          )}
-          {serverError?.kind === 'INVALID_INPUT' && (
-            <FormError>
-              <Trans>Please check your input and try again.</Trans>
-            </FormError>
-          )}
-
-          <SubmitButton>
-            <Trans>Sign in</Trans>
-          </SubmitButton>
-        </Form.Root>
-
-        {!hidePasswordReset ? (
-          <p className="mt-4 text-center text-sm">
-            <Link to={resetHref} className="text-gray-600 underline">
-              <Trans>Forgot password?</Trans>
+        {serverError?.kind === 'INVALID_CREDENTIALS' && (
+          <FormError>
+            {serverError.message}
+            {attempts?.kind === 'locked' ? (
+              <>
+                {' '}
+                <Trans>Your account is temporarily locked after too many attempts.</Trans>
+              </>
+            ) : attempts?.kind === 'remaining' ? (
+              <>
+                {' '}
+                <Plural
+                  value={attempts.count}
+                  one="# attempt remaining."
+                  other="# attempts remaining."
+                />
+              </>
+            ) : null}
+          </FormError>
+        )}
+        {serverError?.kind === 'SESSION_EXPIRED' && (
+          <FormError>
+            <Trans>Your session has expired.</Trans>{' '}
+            <Link to={paths.login.index()} className="underline">
+              <Trans>Sign in again</Trans>
             </Link>
-          </p>
-        ) : null}
+          </FormError>
+        )}
+        {serverError?.kind === 'INVALID_INPUT' && (
+          <FormError>
+            <Trans>Please check your input and try again.</Trans>
+          </FormError>
+        )}
 
-        <BackLink />
-      </div>
-    </AuthCard>
+        <SubmitButton>
+          <Trans>Sign in</Trans>
+        </SubmitButton>
+      </Form.Root>
+
+      {!hidePasswordReset ? (
+        <p className="mt-4 text-center text-sm">
+          <Link to={resetHref} className="text-muted-foreground underline">
+            <Trans>Forgot password?</Trans>
+          </Link>
+        </p>
+      ) : null}
+    </AuthCeremony>
   );
 }

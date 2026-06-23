@@ -9,9 +9,13 @@ import type {
   IdpIntentResult,
   IdpLink,
   LdapIntent,
+  OtpEmailChallenge,
+  PasswordComplexity,
   ProviderCapabilities,
   IdProvider,
   SamlResponse,
+  U2FCreationOptions,
+  WebAuthnCreationOptions,
 } from './types';
 
 // Phase 0 surface: a documented password-only subset of the canonical INDEX §A
@@ -32,14 +36,13 @@ export interface SessionChecks {
   challenges?: {
     webAuthN?: { domain: string; userVerificationRequirement: 'required' | 'discouraged' };
     /**
-     * `true` requests the email-OTP code with the provider's default link. Pass an object
-     * with `urlTemplate` (built by flows/otp-email-url-template.ts) to override the emailed
-     * link so it lands on OUR /id/login/verify/email route instead of the provider's default
-     * /ui/v2/login/otp/email page. The mapper sets proto OTPEmail.SendCode.url_template from it.
-     * Pass `{ returnCode: true }` to request a return-code challenge — the OTP code is NOT
-     * emailed; instead it is returned on the session under Session.challenges.otpEmailCode.
+     * The email-OTP challenge as a discriminated union (see `OtpEmailChallenge`).
+     *   { kind: 'send' }                        → provider default emailed link.
+     *   { kind: 'send-template'; urlTemplate }  → override the emailed link with OUR /verify route.
+     *   { kind: 'return-code' }                 → code returned in-band on Session.challenges.otpEmailCode.
+     * The mapper (`toChallengeRequest`) switches on `kind` to build proto OTPEmail delivery.
      */
-    otpEmail?: boolean | { urlTemplate?: string } | { returnCode: true };
+    otpEmail?: OtpEmailChallenge;
     otpSms?: boolean;
   };
 }
@@ -109,9 +112,11 @@ export interface AuthProvider {
   // settings
   getLoginSettings(orgId?: string): Promise<LoginSettings>;
   getBranding(orgId?: string): Promise<BrandingTheme>;
-  getPasswordComplexity(orgId?: string): Promise<unknown>;
+  // Tightened from Promise<unknown> — mappers already produce PasswordComplexity;
+  // undefined when the provider omits the password-complexity settings block.
+  getPasswordComplexity(orgId?: string): Promise<PasswordComplexity | undefined>;
   getActiveIdPs(orgId?: string): Promise<IdProvider[]>; // P4
-  getLegalSupport(orgId?: string): Promise<unknown>;
+  // getLegalSupport removed — it had zero callers (dead port method).
 
   // users
   findUser(identifier: string, orgId?: string): Promise<User | null>;
@@ -156,24 +161,27 @@ export interface AuthProvider {
     idpId: string,
     urls: { success: string; failure: string }
   ): Promise<{ authUrl?: string; formData?: unknown }>; // P4
-  // CODE-MIN-03: tightened from Promise<unknown> — mappers already produce IdpIntentResult.
+  // Tightened from Promise<unknown> — mappers already produce IdpIntentResult.
   retrieveIdpIntent(idpIntentId: string, token: string): Promise<IdpIntentResult>; // P4
-  // CODE-MIN-03: tightened from Promise<unknown[]> — both implementations return IdpLink[].
+  // Tightened from Promise<unknown[]> — both implementations return IdpLink[].
   listIdpLinks(userId: string): Promise<IdpLink[]>; // P4
-  // CODE-MIN-03: tightened from unknown — the link shape is always IdpLink.
+  // Tightened from unknown — the link shape is always IdpLink.
   addIdpLink(userId: string, link: IdpLink): Promise<void>; // P4
   removeIdpLink(userId: string, idpId: string, linkedUserId: string): Promise<void>; // P4
 
   // webauthn (passkey + u2f) ─ (P5)
   passkeyRegisterLink(userId: string): Promise<{ code: string }>; // P5
-  registerPasskey(userId: string, code: string, domain: string): Promise<unknown>; // P5 — returns raw credential creation options; adapter narrows, routes treat as opaque
+  // Tightened from Promise<unknown> — the adapter narrows the raw provider response into
+  // WebAuthnCreationOptions; routes treat the inner publicKey value as opaque.
+  registerPasskey(userId: string, code: string, domain: string): Promise<WebAuthnCreationOptions>; // P5
   verifyPasskey(
     userId: string,
     passkeyId: string,
     cred: unknown,
     passkeyName?: string
   ): Promise<void>; // P5
-  registerU2F(userId: string, domain: string): Promise<unknown>; // P5 — returns raw credential creation options; adapter narrows, routes treat as opaque
+  // Tightened from Promise<unknown> — see registerPasskey (U2F analogue).
+  registerU2F(userId: string, domain: string): Promise<U2FCreationOptions>; // P5
   verifyU2F(userId: string, cred: unknown): Promise<void>; // P5
 
   // otp/totp ─ (P5)

@@ -48,10 +48,10 @@ export function byId(list: SessionEntry[], id: string): SessionEntry | undefined
   return list.find((s) => s.id === id);
 }
 
-// CODE-MIN-21: an entry kept by listSessions purely because its expirationTs is empty (SAML /
+// An entry kept by listSessions purely because its expirationTs is empty (SAML /
 // Session-API sessions with no declared lifetime) has NO client-side liveness signal — the BFF
 // MUST re-verify it against the provider before acting on it. This predicate makes that policy
-// explicit and testable; the SAML-post handler's getSession self-heal (CODE-MAJ-09) honours it.
+// explicit and testable; the SAML-post handler's getSession self-heal honours it.
 export function needsLivenessCheck(entry: SessionEntry): boolean {
   return entry.expirationTs === '';
 }

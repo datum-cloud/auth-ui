@@ -1,10 +1,10 @@
 import { type RouteConfig, index, route } from '@react-router/dev/routes';
 
-// Routes are grouped by domain: every sub-folder with 2+ route files gets its own
-// layout.tsx level (login/verify and sso/:provider therefore nest). URL paths are
-// IDENTICAL to the flat form — only the module tree changed. The `login` layout sets
-// an explicit { id } so its children can read the shared URL context it hoists via
-// useRouteLoaderData('login'); the other layouts are Outlet-only passthroughs.
+// Routes are grouped by domain. The `login` and `signup` layouts are KEPT with an
+// explicit { id } so their children can read the shared URL context they hoist via
+// useRouteLoaderData('login'|'signup'). The 8 Outlet-only passthrough layouts were
+// collapsed: their path prefixes are inlined into each child entry below, so
+// URL paths remain IDENTICAL to the prior nested form — only the module tree changed.
 export default [
   index('routes/_index.tsx'),
 
@@ -18,11 +18,9 @@ export default [
     route('mfa', 'routes/login/mfa.tsx'),
     route('passkey', 'routes/login/passkey.tsx'),
     route('security-key', 'routes/login/security-key.tsx'),
-    route('verify', 'routes/login/verify/layout.tsx', [
-      route('email', 'routes/login/verify/email.tsx'),
-      route('sms', 'routes/login/verify/sms.tsx'),
-      route('authenticator', 'routes/login/verify/authenticator.tsx'),
-    ]),
+    route('verify/email', 'routes/login/verify/email.tsx'),
+    route('verify/sms', 'routes/login/verify/sms.tsx'),
+    route('verify/authenticator', 'routes/login/verify/authenticator.tsx'),
   ]),
 
   route('signup', 'routes/signup/layout.tsx', { id: 'signup' }, [
@@ -32,48 +30,40 @@ export default [
     route('complete', 'routes/signup/complete.tsx'),
   ]),
 
-  route('password', 'routes/password/layout.tsx', [
-    route('reset', 'routes/password/reset.tsx'),
-    route('new', 'routes/password/new.tsx'),
-    route('change', 'routes/password/change.tsx'),
-  ]),
+  // password group — layout collapsed; prefix inlined per child.
+  route('password/reset', 'routes/password/reset.tsx'),
+  route('password/new', 'routes/password/new.tsx'),
+  route('password/change', 'routes/password/change.tsx'),
 
-  route('setup', 'routes/setup/layout.tsx', [
-    route('passkey', 'routes/setup/passkey.tsx'),
-    route('security-key', 'routes/setup/security-key.tsx'),
-    route('authenticator', 'routes/setup/authenticator.tsx'),
-    route('email', 'routes/setup/email.tsx'),
-    route('sms', 'routes/setup/sms.tsx'),
-    route('mfa', 'routes/setup/mfa.tsx'),
-  ]),
+  // setup group — layout collapsed; prefix inlined per child.
+  route('setup/passkey', 'routes/setup/passkey.tsx'),
+  route('setup/security-key', 'routes/setup/security-key.tsx'),
+  route('setup/authenticator', 'routes/setup/authenticator.tsx'),
+  route('setup/email', 'routes/setup/email.tsx'),
+  route('setup/sms', 'routes/setup/sms.tsx'),
+  route('setup/mfa', 'routes/setup/mfa.tsx'),
 
-  route('sso', 'routes/sso/layout.tsx', [
-    index('routes/sso/index.tsx'),
-    route('link', 'routes/sso/link.tsx'),
-    // P6 Task 9: LDAP credential-entry route.
-    route('ldap', 'routes/sso/ldap.tsx'),
-    route(':provider', 'routes/sso/provider/layout.tsx', [
-      route('callback', 'routes/sso/provider/callback.tsx'),
-      route('error', 'routes/sso/provider/error.tsx'),
-    ]),
-  ]),
+  // sso group — sso + provider layouts collapsed; prefixes inlined.
+  route('sso', 'routes/sso/index.tsx'),
+  route('sso/link', 'routes/sso/link.tsx'),
+  // P6 Task 9: LDAP credential-entry route.
+  route('sso/ldap', 'routes/sso/ldap.tsx'),
+  route('sso/:provider/callback', 'routes/sso/provider/callback.tsx'),
+  route('sso/:provider/error', 'routes/sso/provider/error.tsx'),
 
-  route('device', 'routes/device/layout.tsx', [
-    // P6 Task 6: device authorization grant — user-code entry screen.
-    index('routes/device/index.tsx'),
-    // P6 Task 7: device/authorize — consent (authorize / deny).
-    route('authorize', 'routes/device/authorize.tsx'),
-  ]),
+  // device group — layout collapsed; prefix inlined per child.
+  // P6 Task 6: device authorization grant — user-code entry screen.
+  route('device', 'routes/device/index.tsx'),
+  // P6 Task 7: device/authorize — consent (authorize / deny).
+  route('device/authorize', 'routes/device/authorize.tsx'),
 
-  route('verify', 'routes/verify/layout.tsx', [
-    index('routes/verify/index.tsx'),
-    route('success', 'routes/verify/success.tsx'),
-  ]),
+  // verify group — layout collapsed; prefix inlined per child.
+  route('verify', 'routes/verify/index.tsx'),
+  route('verify/success', 'routes/verify/success.tsx'),
 
-  route('logout', 'routes/logout/layout.tsx', [
-    index('routes/logout/index.tsx'),
-    route('success', 'routes/logout/success.tsx'),
-  ]),
+  // logout group — layout collapsed; prefix inlined per child.
+  route('logout', 'routes/logout/index.tsx'),
+  route('logout/success', 'routes/logout/success.tsx'),
 
   // Flat standalone routes.
   route('accounts', 'routes/accounts.tsx'),

@@ -26,7 +26,7 @@ afterEach(() => vi.unstubAllGlobals());
 
 const PK = { challenge: 'YQ', allowCredentials: [] };
 
-describe('marshalAssertion cancel handling (CODE-MIN-08)', () => {
+describe('marshalAssertion cancel handling', () => {
   it('throws a clear cancellation error when credentials.get resolves null', async () => {
     vi.stubGlobal('window', { PublicKeyCredential: function () {} });
     vi.stubGlobal('navigator', { credentials: { get: () => Promise.resolve(null) } });

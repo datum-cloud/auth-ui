@@ -2,7 +2,7 @@
  * Timing helpers for enumeration-safe flows.
  *
  * constantTimeNoop: used in password-reset to execute a comparable-cost code path for
- * known and unknown accounts. CODE-MIN-17: a single-tick yield (setTimeout(0)) left the
+ * known and unknown accounts. A single-tick yield (setTimeout(0)) left the
  * known/unknown branches distinguishable by latency. We now wait a fixed floor delay that
  * approximates the provider round-trip, closing the timing oracle. The sleep is injectable
  * so unit tests stay deterministic.

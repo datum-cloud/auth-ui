@@ -1,6 +1,12 @@
+// P7 observability: initialise client Sentry FIRST (env-gated no-op without
+// VITE_SENTRY_DSN) so the SDK — and its allowlist scrubber — is active
+// before hydration captures anything browser-side.
+import { initClientSentry } from '@/sentry.client';
 import { startTransition, StrictMode } from 'react';
 import { hydrateRoot } from 'react-dom/client';
 import { HydratedRouter } from 'react-router/dom';
+
+initClientSentry();
 
 // With the per-request Lingui i18n instance pattern (locale + messages come from
 // the root loader's serialized data), there is no need to pre-activate a global

@@ -1,3 +1,4 @@
+import { ThemeToggle } from '@/components/theme-toggle/theme-toggle';
 import type { BrandingTheme } from '@/modules/auth/types';
 import { assetUrl } from '@/utils/asset-url';
 import { Avatar, AvatarFallback, AvatarImage } from '@datum-cloud/datum-ui/avatar';
@@ -19,7 +20,7 @@ export default function SplitLayout({
     <div className="grid min-h-svh lg:grid-cols-2">
       {/* Left panel is the login form.*/}
       <div className="dark:bg-background relative flex min-h-screen w-full flex-col bg-white p-3 sm:p-4 md:px-[41px] md:py-8">
-        <div className="justify-flex-start flex items-center">
+        <div className="flex items-center justify-between">
           <Link to="/">
             {branding?.logoUrl ? (
               <img src={branding.logoUrl} alt="" aria-hidden="true" className="h-6 w-auto" />
@@ -27,6 +28,7 @@ export default function SplitLayout({
               <Logo.Flat aria-label="Datum" className="h-6 w-auto" tone="brand" />
             )}
           </Link>
+          <ThemeToggle />
         </div>
         <main className="flex w-full flex-1 items-center justify-center">
           <div className="w-full max-w-[400px]">{children}</div>
@@ -75,20 +77,30 @@ export default function SplitLayout({
         <div className="flex w-full flex-1 items-center justify-center">
           <div className="relative flex w-full max-w-[400px] flex-col gap-6">
             <div className="absolute -top-36 -left-24 z-0 max-w-[115px]">
+              {/* 755-M3: intrinsic 232×290 raster line-art. width/height pin the aspect ratio so
+                  the absolutely-positioned panel reserves space and never shifts layout (CLS).
+                  object-contain keeps the line-art crisp/uncropped while it scales down into the
+                  115px box. TODO(design): replace with a vector (SVG) or AVIF source — a designer
+                  asset is still needed; this raster is the only source that currently exists. */}
               <img
-                src={assetUrl('/images/illustration-2.png')}
+                src={assetUrl('/images/illustration-2.svg')}
                 alt=""
                 aria-hidden="true"
-                className="size-auto w-full object-cover"
+                width={232}
+                height={290}
+                className="size-auto w-full object-contain"
               />
             </div>
 
-            <div className="stretch leading-6 text-[#67717C]">
+            <div className="text-muted-foreground stretch leading-6">
               <Trans>
                 Using Datum requires setting up a billing account, but to help you explore without
                 cost, we add{' '}
-                <span className="text-foreground bg-[#e6f59f] px-0.5 font-semibold">$50 USD</span>{' '}
-                in credit on signup.
+                {/* 755-M4: the lime credit chip (aurora-moss #e6f59f) is a fixed brand accent that
+                    stays light in BOTH themes, so it pins dark text (midnight-fjord) explicitly —
+                    text-foreground would flip to light on dark and become unreadable on lime. */}
+                <span className="bg-[#e6f59f] px-0.5 font-semibold text-[#0c1d31]">$50 USD</span> in
+                credit on signup.
               </Trans>
               <span className="block h-4" />
               <Trans>
@@ -108,28 +120,52 @@ export default function SplitLayout({
 
             <div className="flex flex-col">
               <Avatar className="mb-2 size-10 rounded-lg">
-                <AvatarImage alt="Zac Smith" src={assetUrl('/images/zac-avatar.png')} />
+                {/* 755-M3: 80×80 source rendered into a 40px (size-10) slot — the existing source is
+                    already 2× DPR. The 2x density descriptor declares that intent so retina screens
+                    render the avatar crisply; width/height reserve the 40px box (CLS). */}
+                <AvatarImage
+                  alt="Zac Smith"
+                  src={assetUrl('/images/zac-avatar.png')}
+                  srcSet={`${assetUrl('/images/zac-avatar.png')} 2x`}
+                  width={40}
+                  height={40}
+                />
                 <AvatarFallback>ZS</AvatarFallback>
               </Avatar>
-              <span className="leading-4 text-[#67717C]">Zac Smith</span>
-              <span className="text-xs text-[#595F65]">Co-founder and CEO</span>
+              <span className="text-muted-foreground leading-4">Zac Smith</span>
+              {/* 755-M3: full-opacity --muted-foreground (not /80). At 12px the /80 alpha composites
+                  to ≈3.8:1 on the cream panel (fails WCAG AA); full opacity clears ≈6:1 in light and
+                  keeps dark mode's own muted token. */}
+              <span className="text-muted-foreground text-xs">Co-founder and CEO</span>
             </div>
 
+            {/* 755-M3: 95×38 signature raster at ~1× in a 96px-wide slot. width/height pin the box
+                (CLS) and object-contain keeps the strokes crisp without stretching. TODO(design): a
+                vector (SVG) signature is still needed — only this low-res raster currently exists. */}
             <img
               src={assetUrl('/images/zac-sign.png')}
               alt=""
               aria-hidden="true"
-              className="h-[38px] w-24"
+              width={95}
+              height={38}
+              className="h-[38px] w-24 object-contain"
             />
           </div>
         </div>
 
         <div className="absolute right-0 bottom-0 z-0 max-w-[500px] md:max-w-[800px]">
+          {/* 755-M3: intrinsic 707×155 raster line-art stretched into a fluid box up to 800px wide,
+              so it currently upscales (soft). width/height pin the aspect ratio for CLS; object-contain
+              avoids the crop/extra blur object-cover introduced. TODO(design): replace with a vector
+              (SVG) or higher-res AVIF source — a designer asset is still needed to render crisply at
+              the 800px display width; the 707px raster is the only source that exists today. */}
           <img
-            src={assetUrl('/images/illustration-1.png')}
+            src={assetUrl('/images/illustration-1.svg')}
             alt=""
             aria-hidden="true"
-            className="size-auto w-full object-cover"
+            width={707}
+            height={155}
+            className="size-auto w-full object-contain"
           />
         </div>
       </aside>

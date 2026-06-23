@@ -53,7 +53,7 @@ export const httpMetrics: MiddlewareHandler = async (c, next) => {
   }
 };
 
-// CCD-9 — Audit actorRef pseudonymization. Audit logs must never carry a raw loginName or
+// Audit actorRef pseudonymization. Audit logs must never carry a raw loginName or
 // email. Callers pass hashActor(loginName) at the identifier stage and the resolved userId
 // once available. Truncated SHA-256 (first 16 hex chars) is collision-safe for audit
 // correlation and non-reversible. Empty input → '' (no actor identified yet).
@@ -65,10 +65,11 @@ export function hashActor(loginName: string): string {
 // Injectable logger keeps the helper deterministic and unit-testable (default = console.log).
 type LogSink = (line: string) => void;
 
-// CODE-MIN-22: ONE named default audit sink. Structured audit lines are compliance-relevant;
+// ONE named default audit sink. Structured audit lines are compliance-relevant;
 // centralising the default here means a deployment that needs to redirect audit output (e.g. to
 // a file or a dedicated stream when stdout capture is unreliable) changes exactly one place,
 // instead of an implicit console.log buried in a default parameter at every call site.
+// eslint-disable-next-line no-console -- intentional audit log sink (the only allowed console site)
 export const auditSink: LogSink = (line) => console.log(line);
 
 // Structured audit log + metric. Flow actions (Phases 1–5) call this.

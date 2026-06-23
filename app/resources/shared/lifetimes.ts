@@ -6,8 +6,10 @@ export function isFactorFresh(
   nowMs: number,
   lifetimeMs: number | undefined
 ): boolean {
+  // verifiedAt is `Date | null` — a real Date, never the empty-string third state the
+  // old `string | null` permitted. The NaN guard still defends against an Invalid Date.
   if (!f?.verifiedAt) return false;
-  const verifiedMs = Date.parse(f.verifiedAt);
+  const verifiedMs = f.verifiedAt.getTime();
   if (Number.isNaN(verifiedMs)) return false;
   if (!lifetimeMs) return true; // undefined or 0 ⇒ never expires
   return nowMs - verifiedMs <= lifetimeMs;

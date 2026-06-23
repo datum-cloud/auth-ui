@@ -1,3 +1,4 @@
+import { FormError } from '../form-error/form-error';
 import {
   createAttestation,
   marshalAssertion,
@@ -133,18 +134,18 @@ export function WebAuthnButton({
   return (
     <div className="flex flex-col gap-2">
       {error === 'webauthn-unsupported' ? (
-        <p role="alert" className="text-sm text-red-700">
+        <FormError>
           <Trans>Your browser does not support passkeys. Please use a supported browser.</Trans>
-        </p>
+        </FormError>
       ) : error === 'webauthn-failed' ? (
-        <p role="alert" className="text-sm text-red-700">
+        <FormError>
           {mode === 'attestation' ? (
-            // CODE-MIN-30: enrollment (attestation) failure — distinct from verification.
+            // Enrollment (attestation) failure — distinct from verification.
             <Trans>We couldn't set up your passkey. Please try again.</Trans>
           ) : (
             <Trans>The passkey verification failed. Please try again.</Trans>
           )}
-        </p>
+        </FormError>
       ) : null}
       <Button
         size="large"

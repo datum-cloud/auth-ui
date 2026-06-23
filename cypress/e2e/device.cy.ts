@@ -56,10 +56,22 @@ describe('Device code entry — unknown code', () => {
   it('shows a not-found error for an unrecognised code', () => {
     cy.visit('/id/device');
 
+    // Settle React's post-hydration regeneration BEFORE typing. Cypress always injects a <script>
+    // into <head>, which React 19's strict head reconciler flags as a mismatch and recovers by
+    // regenerating the tree on the first event — detaching the userCode input mid-type ("subject
+    // is no longer attached to the DOM"). settleHydration() spends a sacrificial click to force
+    // that regeneration up front, then waits for the root effect marker, so the input we type into
+    // is the live, stable node. (Test 1's login round-trip masks this by giving hydration time;
+    // this fresh-visit test must force it explicitly.)
+    cy.settleHydration();
+
     cy.get('input[name="userCode"]').clear().type('XXXX-XXXX');
     cy.contains('button[type="submit"]', /continue/i).click();
 
-    cy.contains(/code not found/i).should('be.visible');
+    // The /device action returns { error: 'not_found' } (device.service.ts), now mapped to a
+    // distinct inline message "That device code was not found…" (auth-error-messages.tsx) instead
+    // of the generic fallback. Rendered inline via <FormError role="alert"> (no toast).
+    cy.contains(/device code was not found/i).should('be.visible');
     checkA11y(); // error render is a distinct DOM state — axe it too
   });
 });

@@ -1,7 +1,7 @@
 // app/resources/signup/__tests__/signup.service.test.ts
 //
 // Pass 2: migrated from routes/signup/__tests__/signup.test.ts. The original asserted
-// the CODE-MIN-04 register-and-link behavior at the route action boundary; here we
+// the register-and-link behavior at the route action boundary; here we
 // assert the identical behavior directly against the extracted service function,
 // using the fake provider exactly as the original did.
 import { FakeAuthProvider } from '@/modules/auth/providers/fake/fake-provider';
@@ -119,8 +119,8 @@ describe('registerPasskeyFirst — userAgent forwarded to createSession', () => 
   });
 });
 
-describe('signup register-and-link path (CODE-MIN-04)', () => {
-  it('register-and-link calls addIdpLink once and does not pass idpLink to register (CODE-MIN-04)', async () => {
+describe('signup register-and-link path', () => {
+  it('register-and-link calls addIdpLink once and does not pass idpLink to register', async () => {
     const fake = getAuthProvider({ AUTH_PROVIDER: 'fake' }) as FakeAuthProvider;
 
     const registerCalls: unknown[] = [];

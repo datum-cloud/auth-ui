@@ -1,11 +1,11 @@
-import { AuthCard } from '@/components/auth-card/auth-card';
+import { AuthCeremony } from '@/components/auth-ceremony/auth-ceremony';
 import { SubmitButton } from '@/components/auth-form/auth-form';
-import { useActionErrorToast } from '@/hooks/use-action-error-toast';
+import { AuthFormFields } from '@/components/auth-form/auth-form-fields';
+import { useAuthActionError } from '@/hooks/use-auth-action-error';
 import { submitLdapCredentials, outcomeToResponse, type LdapActionData } from '@/resources/sso';
 import { ldapClientSchema } from '@/resources/sso/sso.schema';
 import { providerForRequest } from '@/server/auth-context.server';
 import { getCsrfToken, assertCsrf } from '@/server/csrf';
-import { useAuthErrorMessage } from '@/utils/errors/auth-error-messages';
 import { Form } from '@datum-cloud/datum-ui/form';
 import { Trans, useLingui } from '@lingui/react/macro';
 import {
@@ -57,21 +57,20 @@ export default function SsoLdap() {
   const navigation = useNavigation();
   const { t } = useLingui();
 
-  const getErrorMessage = useAuthErrorMessage();
-  useActionErrorToast(getErrorMessage((actionData as { error?: string } | undefined)?.error));
+  // Action error is surfaced INLINE through AuthCeremony (toast → inline FormError).
+  const errorMessage = useAuthActionError(actionData);
 
   return (
-    <AuthCard title={<Trans>Sign in with LDAP</Trans>}>
+    <AuthCeremony title={<Trans>Sign in with LDAP</Trans>} error={errorMessage}>
       <Form.Root
         schema={ldapClientSchema}
         formComponent={RRForm}
         method="POST"
         isSubmitting={navigation.state === 'submitting'}
         className="flex w-full flex-col gap-4">
-        <input type="hidden" name="csrf" value={csrfToken} />
+        {/* idpId is route-specific (not part of the shared identity cluster) → kept raw. */}
+        <AuthFormFields csrf={csrfToken} requestId={requestId} organization={organization} />
         <input type="hidden" name="idpId" value={idpId} />
-        {requestId ? <input type="hidden" name="requestId" value={requestId} /> : null}
-        {organization ? <input type="hidden" name="organization" value={organization} /> : null}
 
         <Form.Field name="username" label={t`Username`} required>
           <Form.Input autoFocus autoComplete="username" />
@@ -85,6 +84,6 @@ export default function SsoLdap() {
           <Trans>Sign in</Trans>
         </SubmitButton>
       </Form.Root>
-    </AuthCard>
+    </AuthCeremony>
   );
 }

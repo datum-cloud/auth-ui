@@ -17,7 +17,7 @@ export function FormError({ children, className }: FormErrorProps) {
     <p
       role="alert"
       aria-live="assertive"
-      className={['text-sm text-red-700', className].filter(Boolean).join(' ')}>
+      className={['text-destructive text-sm', className].filter(Boolean).join(' ')}>
       {children}
     </p>
   );

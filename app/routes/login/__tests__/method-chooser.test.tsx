@@ -13,8 +13,8 @@ import { describe, it, expect, vi } from 'vitest';
 
 // Enable email delivery so otp_email is treated as an available primary method
 // in both the /login/method loader and decideAfterIdentifier.
-vi.mock('@/utils/env/env.server', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/utils/env/env.server')>();
+vi.mock('@/server/infra/env.server', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/server/infra/env.server')>();
   return { ...actual, env: { ...actual.env, AUTH_EMAIL_DELIVERY_ENABLED: true } };
 });
 
@@ -83,7 +83,10 @@ describe('login action — intent=email-link', () => {
     expect(res.headers.get('set-cookie')).toBeTruthy();
   });
 
-  it('unknown user → 404 with USER_NOT_FOUND', async () => {
+  it('unknown user → USER_NOT_FOUND as a 200 inline error (F1: no console-erroring 404)', async () => {
+    // F1: an unknown identifier is a HANDLED, inline-rendered outcome, so the action returns it as
+    // normal action data with NO status override (effective HTTP 200) — not a 404 the RR
+    // single-fetch console-errors on. statusOf returns undefined when status is unset (200 default).
     const { token, cookie } = await mintCsrf();
     const req = postRequest(
       '/id/login',
@@ -93,7 +96,7 @@ describe('login action — intent=email-link', () => {
 
     const res = await loginAction(actionArgs(req));
 
-    expect(statusOf(res)).toBe(404);
+    expect(statusOf(res)).toBeUndefined();
     expect((await bodyOf(res))?.error).toBe('USER_NOT_FOUND');
   });
 });
@@ -129,6 +132,16 @@ describe('/login/method loader', () => {
     expect(methods).toContain('password');
     expect(methods).toContain('otp_email');
     expect(methods.length).toBe(2);
+  });
+
+  // The method chooser is a branded screen — the loader threads getBranding through
+  // so SplitLayout can render the org logo, mirroring /login and /signup.
+  it('returns branding for the org (method chooser is branded)', async () => {
+    const url = `${ORIGIN}/id/login/method?loginName=mfa2-user%40acme.test`;
+    const res = await methodLoader(loaderArgs(url));
+
+    expect(res).not.toBeInstanceOf(Response);
+    expect(res).toHaveProperty('branding');
   });
 
   it('unknown user → redirect to /login', async () => {

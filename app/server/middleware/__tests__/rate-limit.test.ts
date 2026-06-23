@@ -433,7 +433,7 @@ describe('accountsRateLimit middleware', () => {
 });
 
 // ---------------------------------------------------------------------------
-// verifyEmailSendRateLimit — covers GET /id/verify?send=true (CODE-MAJ-08).
+// verifyEmailSendRateLimit — covers GET /id/verify?send=true.
 // ---------------------------------------------------------------------------
 function buildVerifyApp() {
   const app = new Hono();
@@ -442,7 +442,7 @@ function buildVerifyApp() {
   return app;
 }
 
-describe('verifyEmailSendRateLimit middleware (CODE-MAJ-08)', () => {
+describe('verifyEmailSendRateLimit middleware', () => {
   let app: ReturnType<typeof buildVerifyApp>;
   let nowMs: number;
 

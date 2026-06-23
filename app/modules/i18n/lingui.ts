@@ -1,7 +1,7 @@
 import { setupI18n } from '@lingui/core';
 import type { Messages } from '@lingui/core';
 
-// CODE-MAJ-11: 'es' catalog was byte-identical to 'en' (no real translations). Removed so
+// The 'es' catalog was byte-identical to 'en' (no real translations). Removed so
 // detection never selects it and users fall back to English explicitly rather than silently
 // receiving English-labelled-as-Spanish.
 export const SUPPORTED_LOCALES = ['en'] as const;

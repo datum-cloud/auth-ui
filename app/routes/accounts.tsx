@@ -1,16 +1,17 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
-import { useActionErrorToast } from '@/hooks/use-action-error-toast';
+import { FormError } from '@/components/form-error/form-error';
+import { useAuthActionError } from '@/hooks/use-auth-action-error';
 import {
   listAccounts,
   resolveAccountAction,
   accountActionOutcomeToResponse,
 } from '@/resources/session';
+import { paths } from '@/routes/paths';
 import { providerForRequest } from '@/server/auth-context.server';
 import { getCsrfToken, assertCsrf } from '@/server/csrf';
-import { useAuthErrorMessage } from '@/utils/errors/auth-error-messages';
-import { Button } from '@datum-cloud/datum-ui/button';
+import { Badge } from '@datum-cloud/datum-ui/badge';
+import { Button, LinkButton } from '@datum-cloud/datum-ui/button';
 import { Icon } from '@datum-cloud/datum-ui/icons';
-import { Tooltip } from '@datum-cloud/datum-ui/tooltip';
 import { Trans } from '@lingui/react/macro';
 import { ArrowLeftRight, Trash2 } from 'lucide-react';
 import {
@@ -56,8 +57,9 @@ export default function AccountPicker() {
   const { csrfToken, accounts } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
 
-  const getErrorMessage = useAuthErrorMessage();
-  useActionErrorToast(getErrorMessage((actionData as { error?: string } | undefined)?.error));
+  // Inline-only error surface: the action error renders in a <FormError> (role="alert")
+  // banner near the top of the accounts content — no toast.
+  const errorMessage = useAuthActionError(actionData);
 
   return (
     <AuthCard
@@ -65,89 +67,87 @@ export default function AccountPicker() {
       description={<Trans>Select an account to continue or add a new one.</Trans>}
       className="max-w-[450px]">
       <div className="flex flex-col gap-3">
+        <FormError>{errorMessage}</FormError>
         {accounts.length === 0 ? (
           <div className="flex flex-col items-center gap-4 py-4">
             <p className="text-muted-foreground text-center text-sm">
               <Trans>No signed-in accounts.</Trans>
             </p>
-            {/* Plain styled Link: this Button API (semi-style type/theme props) has no
-                Slot-based asChild — Button asChild renders <button><a>, an axe
-                nested-interactive violation. */}
-            <Button theme="link" type="quaternary" asChild>
-              <Link to="/login">
-                <Trans>Add an account</Trans>
-              </Link>
-            </Button>
+            {/* LinkButton (single styled <a>) — NOT Button asChild, which emits
+                <button><a> (nested-interactive axe violation in the prod build). */}
+            <LinkButton theme="link" type="quaternary" as={Link} href={paths.login.index()}>
+              <Trans>Add an account</Trans>
+            </LinkButton>
           </div>
         ) : (
           <>
+            {/* Each row is itself the SWITCH target: the row-level <button type=submit> wraps
+                the account info. The remove control is a SEPARATE sibling form — never nested
+                inside the switch button — so there are no nested interactives (the prod a11y
+                build rejects <button><button>/<button><a>). */}
             {accounts.map((account) => (
-              <div
-                key={account.sessionId}
-                className="flex items-center justify-between gap-3 rounded-lg border p-3">
-                <div className="flex min-w-0 flex-col">
-                  <span className="truncate text-sm font-medium">
-                    {account.displayName ?? account.loginName}
-                  </span>
-                  <span
-                    className={`mt-0.5 text-xs ${account.isActive ? 'text-muted-foreground' : 'text-destructive/80'}`}>
-                    {account.isActive ? (
-                      <Trans>Session active</Trans>
-                    ) : (
-                      <Trans>Needs re-authentication</Trans>
-                    )}
-                  </span>
-                </div>
+              <div key={account.sessionId} className="flex items-stretch gap-2 rounded-lg border">
+                {/* Switch form: the whole account-info area is the submit control. */}
+                <RRForm method="POST" className="min-w-0 flex-1">
+                  <input type="hidden" name="csrf" value={csrfToken} />
+                  <input type="hidden" name="intent" value="switch" />
+                  <input type="hidden" name="sessionId" value={account.sessionId} />
+                  <button
+                    type="submit"
+                    className="hover:bg-muted/50 focus-visible:ring-ring flex w-full items-center gap-2 rounded-l-lg p-3 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none">
+                    <ArrowLeftRight
+                      className="text-muted-foreground size-4 shrink-0"
+                      aria-hidden="true"
+                    />
+                    <span className="flex min-w-0 flex-col">
+                      <span className="flex min-w-0 items-center gap-2">
+                        <span className="truncate text-sm font-medium">
+                          {account.displayName ?? account.loginName}
+                        </span>
+                        {account.idpName ? (
+                          <Badge type="quaternary" theme="light" className="shrink-0 text-xs">
+                            {account.idpName}
+                          </Badge>
+                        ) : null}
+                      </span>
+                      <span
+                        className={`mt-0.5 text-xs ${account.isActive ? 'text-muted-foreground' : 'text-destructive/80'}`}>
+                        {account.isActive ? (
+                          <Trans>Session active</Trans>
+                        ) : (
+                          <Trans>Needs re-authentication</Trans>
+                        )}
+                      </span>
+                    </span>
+                  </button>
+                </RRForm>
 
-                <div className="flex shrink-0 items-center gap-3">
-                  {/* Switch form */}
-                  <RRForm method="POST" className="flex items-center">
-                    <input type="hidden" name="csrf" value={csrfToken} />
-                    <input type="hidden" name="intent" value="switch" />
-                    <input type="hidden" name="sessionId" value={account.sessionId} />
-                    <Button
-                      size="xs"
-                      theme="link"
-                      type="quaternary"
-                      htmlType="submit"
-                      className="text-foreground/80 p-0"
-                      asChild>
-                      <Tooltip message={<Trans>Switch</Trans>}>
-                        <Icon icon={ArrowLeftRight} size={16} />
-                      </Tooltip>
-                    </Button>
-                  </RRForm>
-
-                  {/* Remove form */}
-                  <RRForm method="POST" className="flex items-center">
-                    <input type="hidden" name="csrf" value={csrfToken} />
-                    <input type="hidden" name="intent" value="remove" />
-                    <input type="hidden" name="sessionId" value={account.sessionId} />
-                    <Button
-                      size="xs"
-                      theme="link"
-                      type="danger"
-                      htmlType="submit"
-                      className="text-destructive p-0"
-                      asChild>
-                      <Tooltip message={<Trans>Remove</Trans>}>
-                        <Icon icon={Trash2} size={16} />
-                      </Tooltip>
-                    </Button>
-                  </RRForm>
-                </div>
+                {/* Remove form — sibling, NOT nested in the switch button. */}
+                <RRForm method="POST" className="flex shrink-0 items-center pr-2">
+                  <input type="hidden" name="csrf" value={csrfToken} />
+                  <input type="hidden" name="intent" value="remove" />
+                  <input type="hidden" name="sessionId" value={account.sessionId} />
+                  <Button
+                    size="xs"
+                    theme="link"
+                    type="danger"
+                    htmlType="submit"
+                    className="text-destructive p-0"
+                    aria-label="Remove account">
+                    <Icon icon={Trash2} size={16} />
+                  </Button>
+                </RRForm>
               </div>
             ))}
 
-            <Button
+            <LinkButton
               theme="link"
               type="quaternary"
               className="text-muted-foreground text-sm"
-              asChild>
-              <Link to="/login">
-                <Trans>Add another account</Trans>
-              </Link>
-            </Button>
+              as={Link}
+              href={paths.login.index()}>
+              <Trans>Add another account</Trans>
+            </LinkButton>
           </>
         )}
       </div>

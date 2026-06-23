@@ -2,6 +2,7 @@
   "name": "auth-ui",
   "version": "0.0.1",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "build": "react-router build",
@@ -19,7 +20,11 @@
     "test:e2e": "start-server-and-test 'bun run dev' http-get://localhost:3000/healthz 'bunx cypress run'",
     "test:e2e:fast": "bun run build && AUTH_PROVIDER=fake start-server-and-test 'bun run start' http-get://localhost:3000/healthz 'bunx cypress run --spec cypress/e2e/core-signin.cy.ts'",
     "test:acceptance": "bunx cypress run --spec acceptance/core-signin.acceptance.cy.ts",
-    "size": "size-limit"
+    "size": "size-limit",
+    "lint:boundaries": "depcruise app --config .dependency-cruiser.cjs",
+    "lint:cycles": "madge --circular --extensions ts,tsx app",
+    "test:coverage": "vitest run --coverage",
+    "test:visual": "playwright test -c playwright.visual.config.ts"
   },
   "dependencies": {
     "@conform-to/react": "1.19.3",
@@ -35,18 +40,18 @@
     "@oslojs/encoding": "^1.1.0",
     "@react-router/node": "^7.12.0",
     "@sentry/react-router": "^10.58.0",
-    "@tanstack/react-query": "^5.80.3",
-    "@tanstack/react-virtual": "^3.14.2",
     "@zitadel/client": "1.3.1",
     "@zitadel/proto": "1.3.1",
     "date-fns": "^4.4.0",
     "date-fns-tz": "^3.2.0",
     "fathom-client": "^3.7.2",
     "hono": "4.12.25",
+    "ioredis": "^5.11.1",
     "isbot": "^5.1.27",
     "js-yaml": "^4.2.0",
     "lucide-react": "^1.0.0",
     "prom-client": "^15.1.3",
+    "qrcode.react": "^4.2.0",
     "react": "^19.2.3",
     "react-day-picker": "^10.0.1",
     "react-dom": "^19.2.3",
@@ -61,12 +66,27 @@
     "@opentelemetry/core": "2.8.0",
     "@opentelemetry/resources": "2.8.0"
   },
+  "size-limit": [
+    {
+      "name": "first-load JS (gzip)",
+      "path": [
+        "build/client/assets/entry.client-*.js",
+        "build/client/assets/root-*.js",
+        "build/client/assets/chunk-*.js",
+        "build/client/assets/form-*.js",
+        "build/client/assets/schemas-*.js"
+      ],
+      "limit": "300 KB",
+      "gzip": true
+    }
+  ],
   "devDependencies": {
     "@eslint/js": "^10.0.1",
     "@lingui/cli": "^6.0.0",
     "@lingui/vite-plugin": "^6.0.0",
+    "@playwright/test": "^1.61.0",
     "@react-router/dev": "^7.12.0",
-    "@size-limit/preset-app": "^12.1.0",
+    "@size-limit/file": "^12.1.0",
     "@tailwindcss/vite": "^4.1.6",
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^16.3.0",
@@ -74,12 +94,15 @@
     "@types/bun": "^1.2.13",
     "@types/react": "^19.1.3",
     "@types/react-dom": "^19.1.3",
+    "@vitest/coverage-v8": "^4.1.9",
     "axe-core": "^4.12.1",
     "cypress": "^15.0.0",
     "cypress-axe": "^1.7.0",
+    "dependency-cruiser": "^17.4.3",
     "eslint": "^10.0.0",
     "happy-dom": "^20.0.7",
     "lefthook": "^2.1.6",
+    "madge": "^8.0.0",
     "playwright": "^1.60.0",
     "prettier": "^3.8.3",
     "prettier-plugin-tailwindcss": "^0.8.0",

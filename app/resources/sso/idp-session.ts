@@ -12,21 +12,81 @@
  */
 import type { AuthProvider, SessionOpts } from '@/modules/auth/auth-provider';
 import { addSession, readSessions, serializeSessions } from '@/modules/auth/session/cookie';
+import type { Session, User } from '@/modules/auth/types';
+
+// ── Request-scoped provider-read cache ─────────────────────────────
+//
+// The SSO callback/link path issues several read-only RPCs (getUser, getSession,
+// getLoginSettings, findUser). Without coordination a single request can re-issue an
+// OVERLAPPING lookup (e.g. the same userId resolved twice across decision branches),
+// each a network round-trip to Zitadel. This memoizes those reads for the lifetime of
+// ONE Request and no longer.
+//
+// SECURITY / CONCURRENCY: the cache is keyed by the `Request` object via a module-level
+// WeakMap, so it is STRICTLY request-scoped — a different request is a different key and
+// gets a fresh cache; the entry is garbage-collected with the request. It never bleeds
+// across requests, so two concurrent users can never read each other's lookups. Only
+// read-only lookups are cached (never createSession / addIdpLink / register / mutations).
+// We cache the in-flight Promise (not just the resolved value) so two parallel awaits of
+// the same key still collapse to one RPC.
+
+interface RequestScopedProviderReads {
+  getUser(id: string): Promise<User | null>;
+  getSession(id: string, token: string): Promise<Session | null>;
+}
+
+type ReadCache = Map<string, Promise<unknown>>;
+const requestReadCaches = new WeakMap<Request, ReadCache>();
+
+function cacheFor(request: Request): ReadCache {
+  let cache = requestReadCaches.get(request);
+  if (!cache) {
+    cache = new Map();
+    requestReadCaches.set(request, cache);
+  }
+  return cache;
+}
+
+/**
+ * Returns a memoized facade over the provider's read-only lookups, scoped to a single
+ * `request`. Repeated lookups with identical arguments within that request collapse to
+ * one underlying RPC (behavior-preserving: same resolved value). The cache is discarded
+ * with the request — never shared across requests.
+ */
+export function requestScopedProviderReads(
+  provider: AuthProvider,
+  request: Request
+): RequestScopedProviderReads {
+  const cache = cacheFor(request);
+  const memo = <T>(key: string, load: () => Promise<T>): Promise<T> => {
+    const existing = cache.get(key) as Promise<T> | undefined;
+    if (existing) return existing;
+    const pending = load();
+    cache.set(key, pending as Promise<unknown>);
+    return pending;
+  };
+  return {
+    getUser: (id) => memo(`getUser:${id}`, () => provider.getUser(id)),
+    getSession: (id, token) =>
+      memo(`getSession:${id}:${token}`, () => provider.getSession(id, token)),
+  };
+}
 
 export interface SignInWithIdpIntentOpts {
   /** The resolved intent id (from startLdapIntent or the callback query param). */
   idpIntentId: string;
   /** The intent token. */
   idpIntentToken: string;
-  /** Zitadel user id — used for getUser lookup + session creation metadata. */
+  /** Zitadel user id — session creation metadata (createSession `userId`). */
   userId: string;
   /** OIDC/device requestId; when present the redirect goes to /authorize. */
   requestId?: string;
   /** Org id forwarded to createSession. */
   organization?: string;
   /**
-   * Fallback loginName when getUser returns null (e.g. LDAP credential entry
-   * where the username is already available at the call site).
+   * The loginName written to the session cookie (display/last-used hint). The callback
+   * passes the IdP-vouched `idpUserName`; LDAP passes the entered username. This is now
+   * the sole source — the redundant getUser lookup it used to fall back from is gone.
    */
   fallbackLoginName?: string;
   userAgent?: SessionOpts['userAgent'];
@@ -59,8 +119,12 @@ export async function signInWithIdpIntent(
     { requestId, orgId: organization, userId, userAgent }
   );
 
-  const user = await provider.getUser(userId);
-  const loginName = user?.loginName ?? fallbackLoginName ?? '';
+  // The post-create getUser(userId) lookup is elided. The only value it read was
+  // `loginName`, and every caller already supplies it via `fallbackLoginName` — the callback
+  // passes `intent.information.idpUserName` (the IdP-vouched login name) and LDAP passes the
+  // entered username. The cookie's loginName is a display/last-used hint, so this is
+  // behavior-identical while saving one RPC per sign-in.
+  const loginName = fallbackLoginName ?? '';
 
   const entries = await readSessions(request);
   const next = addSession(entries, {

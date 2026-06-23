@@ -140,13 +140,13 @@ describe('getCsrfToken / assertCsrf', () => {
     expect(new CSRFError('missing_token_in_cookie', 'test')).toBeInstanceOf(Error);
   });
 
-  // ── 6. Non-CSRFError rethrow (runtime execution) — CODE-MIN-32 ────────────
+  // ── 6. Non-CSRFError rethrow (runtime execution) ──────────────────────────
   //
   // The seam `assertCsrfWith` lets the test inject a verifier that throws a
   // plain Error (not a CSRFError). This exercises the `throw err` branch at
   // runtime so a regression that converts it to a 403 would be caught.
 
-  it('rethrows a non-CSRFError unchanged (does not convert to 403) — CODE-MIN-32', async () => {
+  it('rethrows a non-CSRFError unchanged (does not convert to 403)', async () => {
     const boom = new Error('not a csrf error');
     const req = new Request('http://localhost/id/login');
     const fd = new FormData();

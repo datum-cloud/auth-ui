@@ -3,7 +3,8 @@ import type { AuthMethod, Factors, LoginSettings } from '@/modules/auth/types';
 import { describe, it, expect } from 'vitest';
 
 const T0 = Date.parse('2026-01-01T00:00:00.000Z');
-const fresh = '2026-01-01T00:00:00.000Z';
+const fresh = '2026-01-01T00:00:00.000Z'; // ISO — mfaInitSkippedAt stays a string
+const freshDate = new Date(fresh); // factor verifiedAt is now Date | null
 const settings = (over: Partial<LoginSettings> = {}): LoginSettings => ({
   allowPassword: true,
   allowRegister: true,
@@ -20,12 +21,13 @@ const base = (over: Partial<MfaRoutingInput> = {}): MfaRoutingInput => ({
   loginName: 'a@acme.test',
   userVerified: false,
   mfaInitSkippedAt: null,
+  context: { role: 'mfa' }, // nextMfaStep always runs in the mfa role
   ...over,
 });
 
 describe('nextMfaStep', () => {
   it('done when a passwordless passkey is user-verified and fresh', () => {
-    const factors: Factors = { passkey: { verifiedAt: fresh } };
+    const factors: Factors = { passkey: { verifiedAt: freshDate } };
     expect(
       nextMfaStep(
         base({
@@ -38,20 +40,20 @@ describe('nextMfaStep', () => {
   });
 
   it('NOT done when passkey fresh but NOT user-verified (falls through to enrolled-method routing)', () => {
-    const factors: Factors = { passkey: { verifiedAt: fresh } };
+    const factors: Factors = { passkey: { verifiedAt: freshDate } };
     const r = nextMfaStep(base({ factors, userVerified: false, enrolledMethods: ['totp'] }));
     expect(r).toMatchObject({ kind: 'route', path: '/login/verify/authenticator' });
   });
 
   it('done when a second factor (totp) is already fresh', () => {
-    const factors: Factors = { totp: { verifiedAt: fresh } };
+    const factors: Factors = { totp: { verifiedAt: freshDate } };
     expect(
       nextMfaStep(base({ factors, settings: settings({ secondFactorCheckLifetimeMs: 1000 }) }))
     ).toEqual({ kind: 'done' });
   });
 
   it('NOT done when the only fresh second factor is stale', () => {
-    const factors: Factors = { totp: { verifiedAt: fresh } };
+    const factors: Factors = { totp: { verifiedAt: freshDate } };
     const r = nextMfaStep(
       base({
         factors,
@@ -187,6 +189,48 @@ describe('nextMfaStep', () => {
     const r = nextMfaStep(
       base({ enrolledMethods: ['otp_email'], settings: settings({ secondFactors: [] }) })
     );
+    expect(r).toMatchObject({ kind: 'route', path: '/login/verify/email' });
+  });
+
+  // ── 755-M10: suppressMfaSetupNudge (account-switch) ──────────────────────────
+
+  it('suppresses ONLY the step-6 skippable nudge when suppressMfaSetupNudge is set (→ done)', () => {
+    // Same input that re-prompts on a fresh login (skip window set, never skipped, no factors),
+    // but with the switch-context flag → done instead of /setup/mfa?force=false.
+    const r = nextMfaStep(
+      base({
+        settings: settings({ mfaInitSkipLifetimeMs: 10_000 }),
+        mfaInitSkippedAt: null,
+        suppressMfaSetupNudge: true,
+      })
+    );
+    expect(r).toEqual({ kind: 'done' });
+  });
+
+  it('still routes to FORCED setup (step 5) even when suppressMfaSetupNudge is set', () => {
+    // forceMfa is a REAL requirement (step 5) — the switch suppression must NOT skip it.
+    const r = nextMfaStep(
+      base({ settings: settings({ forceMfa: true }), suppressMfaSetupNudge: true })
+    );
+    expect(r).toMatchObject({
+      kind: 'route',
+      path: '/setup/mfa',
+      params: { force: 'true', checkAfter: 'true' },
+    });
+  });
+
+  it('still routes to a real challenge (steps 1–4) even when suppressMfaSetupNudge is set', () => {
+    // A single enrolled, unverified 2nd factor is a real challenge — suppression must not skip it.
+    const r = nextMfaStep(base({ enrolledMethods: ['totp'], suppressMfaSetupNudge: true }));
+    expect(r).toMatchObject({ kind: 'route', path: '/login/verify/authenticator' });
+  });
+
+  // ── FlowContext is threaded as the mfa role (behavior-neutral) ──────────
+  it('routes otp_email as a SECOND FACTOR (mfa role) to /login/verify/email — same target, typed role', () => {
+    // otp_email lives in BOTH PrimaryAuthMethod and SecondFactorMethod; here the mfa-role
+    // context pins it as a second factor. Target is identical to the primary-role route, but
+    // the role is explicit at the type boundary rather than inferred from a sentinel param.
+    const r = nextMfaStep(base({ context: { role: 'mfa' }, enrolledMethods: ['otp_email'] }));
     expect(r).toMatchObject({ kind: 'route', path: '/login/verify/email' });
   });
 });

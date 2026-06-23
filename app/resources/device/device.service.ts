@@ -17,7 +17,9 @@ import type { AuthProvider } from '@/modules/auth/auth-provider';
 import { readSessions, mostRecent, type SessionEntry } from '@/modules/auth/session/cookie';
 import { ProviderError } from '@/modules/auth/types';
 import { deviceDecision } from '@/resources/device/device-decision';
+import { paths } from '@/routes/paths';
 import { logAuthEvent, hashActor } from '@/server/observability';
+import type { AppError } from '@/shared/errors/app-error';
 import { data, redirect } from 'react-router';
 import { z } from 'zod';
 
@@ -103,38 +105,94 @@ export interface DeviceConsent {
 }
 
 /**
+ * The device-consent loader carries its STALE-code failure as a typed AppError value —
+ * routed through the shared spine so the route can render a TAILORED recovery page (an
+ * in-component "Code expired" + "Enter a new code" → /device affordance) instead of falling
+ * through to the generic root ErrorBoundary.
+ *
+ * `recovery: 'device'` tags the AppError so the route distinguishes this device-code recovery
+ * from any other spine error. The 404 status is pinned explicitly (NOT via appErrorStatus) and
+ * is byte-frozen. The neutral `code` reaches the component; no provider/proto string or user
+ * code is carried in the value.
+ *
+ * NOTE (contextless redirect half): the MISSING / contextless user_code case no longer uses
+ * this error shape — there is nothing to recover, so the loader 302-redirects to /device's
+ * code-entry screen (see `LoadDeviceConsentOutcome`'s `redirect` kind). Only the stale/tampered
+ * code keeps this tailored 404 recovery page.
+ */
+export interface DeviceConsentError extends AppError {
+  recovery: 'device';
+}
+
+export type LoadDeviceConsentOutcome =
+  | { kind: 'consent'; consent: DeviceConsent }
+  // Contextless / missing user_code → redirect to the /device code-entry screen.
+  | { kind: 'redirect'; location: string }
+  | { kind: 'error'; error: DeviceConsentError };
+
+/** Stale / tampered user_code — the existing friendly 404 is preserved explicitly. */
+function staleCodeError(): DeviceConsentError {
+  return {
+    code: 'INVALID_INPUT',
+    status: 404,
+    messageKey: 'error.invalid_input',
+    recovery: 'device',
+  };
+}
+
+/**
  * Resolve the /device/authorize loader business logic: require ?user_code=, resolve the device
- * auth, and shape the consent payload. Throws a `data(...)` Response for the two friendly error
- * paths (missing user_code → 400; stale/tampered code → 404) exactly as the route did, so the
- * route loader stays a thin parse → service → respond.
+ * auth, and shape the consent payload. Returns a typed `LoadDeviceConsentOutcome`:
+ *   - `consent` on success;
+ *   - `redirect` to /device when ?user_code= is MISSING / contextless (redirect
+ *     half) — there is no code to recover, so the user is bounced to the code-entry screen;
+ *   - `error` (spine `AppError` tagged `recovery: 'device'`, byte-frozen 404) when the code is
+ *     STALE / tampered, so the route renders the tailored "Code expired" recovery card.
+ * The route translates the outcome via the thin parse → service → respond shells. An UNEXPECTED
+ * provider failure still throws — those legitimately fall through to the ErrorBoundary.
  */
 export async function loadDeviceConsent(
   provider: AuthProvider,
   request: Request
-): Promise<DeviceConsent> {
+): Promise<LoadDeviceConsentOutcome> {
   const url = new URL(request.url);
   const userCode = url.searchParams.get('user_code');
   if (!userCode) {
-    throw data('missing user_code', { status: 400 });
+    // Contextless bare GET — nothing to recover. Send the user to the code-entry screen.
+    // 302 ∈ url-resolution.cy.ts okStatuses for /id/device/authorize; the gate follows to /device h1.
+    return { kind: 'redirect', location: paths.device.index() };
   }
 
   let req;
   try {
     req = await provider.getDeviceAuth(userCode);
   } catch (error) {
-    // stale deep-link / tampered user_code — friendly 404 instead of a raw error boundary
+    // stale deep-link / tampered user_code — tailored recovery instead of a raw error boundary
     if (error instanceof ProviderError && error.code === 'NOT_FOUND') {
-      throw data('device_auth_not_found', { status: 404 });
+      return { kind: 'error', error: staleCodeError() };
     }
     throw error;
   }
 
   return {
-    appName: req.appName ?? '',
-    scope: req.scope,
-    deviceAuthId: req.id,
-    requestId: `device_${userCode}`,
+    kind: 'consent',
+    consent: {
+      appName: req.appName ?? '',
+      scope: req.scope,
+      deviceAuthId: req.id,
+      requestId: `device_${userCode}`,
+    },
   };
+}
+
+/**
+ * Turn a `LoadDeviceConsentOutcome` error into the `data(...)` Response the /device/authorize
+ * loader returns on the missing/stale-code paths — carrying the spine AppError in the body and
+ * the pinned HTTP status (400 / 404). The success case is shaped by the route (it appends the
+ * CSRF token + headers), so only the error case is centralized here.
+ */
+export function deviceConsentErrorToResponse(error: DeviceConsentError) {
+  return data({ error }, { status: error.status });
 }
 
 // ── /device/authorize action (consent decision) ──────────────────────────────────

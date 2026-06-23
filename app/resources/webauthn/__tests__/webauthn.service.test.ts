@@ -62,11 +62,11 @@ function runRequestPasskeyAttestation(provider: FakeAuthProvider, loginName = 'a
 }
 
 // ---------------------------------------------------------------------------
-// Task 9 — CODE-MIN-29: log challenge error reason + hash actor
+// Log challenge error reason + hash actor
 // ---------------------------------------------------------------------------
 
-describe('requestPasskeyAttestation — challenge failure audit (CODE-MIN-29)', () => {
-  it('logs a reason and a hashed actor when the challenge fails (CODE-MIN-29)', async () => {
+describe('requestPasskeyAttestation — challenge failure audit', () => {
+  it('logs a reason and a hashed actor when the challenge fails', async () => {
     // Arrange: fake provider's passkeyRegisterLink rejects.
     const fake = getAuthProvider({ AUTH_PROVIDER: 'fake' }) as FakeAuthProvider;
     vi.spyOn(fake, 'passkeyRegisterLink').mockRejectedValue(new Error('zitadel down'));
@@ -83,17 +83,17 @@ describe('requestPasskeyAttestation — challenge failure audit (CODE-MIN-29)', 
 
     const fields = failureCall?.[2] as Record<string, unknown> | undefined;
 
-    // a non-ProviderError failure maps to the typed 'UNKNOWN' code (CODE-MIN-29).
+    // a non-ProviderError failure maps to the typed 'UNKNOWN' code.
     expect(fields?.code).toBe('UNKNOWN');
 
-    // raw loginName must NOT appear in the fields (CCD-9).
+    // raw loginName must NOT appear in the fields.
     expect(fields?.loginName).toBeUndefined();
 
     // actor must be a hashed string.
     expect(typeof fields?.actor).toBe('string');
   });
 
-  it('logs the typed ProviderError code and surfaces challengeFailed in the result (CODE-MIN-29)', async () => {
+  it('logs the typed ProviderError code and surfaces challengeFailed in the result', async () => {
     // Arrange: fake provider's passkeyRegisterLink rejects with a typed ProviderError.
     const fake = getAuthProvider({ AUTH_PROVIDER: 'fake' }) as FakeAuthProvider;
     vi.spyOn(fake, 'passkeyRegisterLink').mockRejectedValue(
@@ -121,11 +121,11 @@ describe('requestPasskeyAttestation — challenge failure audit (CODE-MIN-29)', 
     expect(fields?.code).toBe('UNAVAILABLE');
     expect(fields?.factor).toBe('passkey');
     expect(fields?.actor).toBe(hashActor('alice@acme.test'));
-    // raw loginName must NOT appear (CCD-9).
+    // raw loginName must NOT appear.
     expect(fields?.loginName).toBeUndefined();
   });
 
-  it("uses 'UNKNOWN' code for a non-ProviderError challenge failure (CODE-MIN-29)", async () => {
+  it("uses 'UNKNOWN' code for a non-ProviderError challenge failure", async () => {
     const fake = getAuthProvider({ AUTH_PROVIDER: 'fake' }) as FakeAuthProvider;
     vi.spyOn(fake, 'passkeyRegisterLink').mockRejectedValue(new Error('boom'));
 

@@ -1,21 +1,21 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
+import { AuthCeremony } from '@/components/auth-ceremony/auth-ceremony';
 import { SubmitButton } from '@/components/auth-form/auth-form';
-import { BackLink } from '@/components/back-link/back-link';
-import { useActionErrorToast } from '@/hooks/use-action-error-toast';
+import { AuthFormFields } from '@/components/auth-form/auth-form-fields';
+import { useAuthActionError } from '@/hooks/use-auth-action-error';
 import { TrackOnMount } from '@/modules/analytics/fathom';
 import { readSessions, serializeSessions } from '@/modules/auth/session/cookie';
 import { MaxMindTracker, readMaxMindTrackingToken } from '@/modules/fraud/maxmind-tracker';
 import { genericCheckYourEmail } from '@/resources/schemas/check-your-email.schema';
 import { registerWithPassword } from '@/resources/signup';
 import { signupPasswordSchema } from '@/resources/signup/signup.schema';
-import { trustedAppOrigin } from '@/server/app-origin.server';
 import { providerForRequest } from '@/server/auth-context.server';
 import { getCsrfToken, assertCsrf } from '@/server/csrf';
 import { requireEmailVerification } from '@/server/env';
+import { trustedAppOrigin } from '@/server/infra/app-origin.server';
+import { env } from '@/server/infra/env.server';
 import { userAgentFromRequest } from '@/server/user-agent';
-import { env } from '@/utils/env/env.server';
 import { actionError } from '@/utils/errors/auth-error';
-import { useAuthErrorMessage } from '@/utils/errors/auth-error-messages';
 import { Form } from '@datum-cloud/datum-ui/form';
 import { Trans, useLingui } from '@lingui/react/macro';
 import { useEffect, useRef } from 'react';
@@ -135,9 +135,9 @@ export default function SignupPassword() {
   const navigation = useNavigation();
   const { t } = useLingui();
 
-  const getErrorMessage = useAuthErrorMessage();
-  const errorMessage = getErrorMessage((actionData as { error?: string } | undefined)?.error);
-  useActionErrorToast(errorMessage);
+  // The action error surfaces INLINE through <AuthCeremony error> (this
+  // replaces the per-route toast).
+  const errorMessage = useAuthActionError(actionData);
 
   if (actionData && 'sent' in actionData) {
     return (
@@ -156,9 +156,10 @@ export default function SignupPassword() {
   return (
     <>
       <MaxMindTracker accountId={maxmindAccountId} />
-      <AuthCard
+      <AuthCeremony
         title={<Trans>Set a password</Trans>}
-        description={<Trans>You'll need to set a password to complete your signup.</Trans>}>
+        description={<Trans>You'll need to set a password to complete your signup.</Trans>}
+        error={errorMessage}>
         <Form.Root
           schema={signupPasswordSchema}
           formComponent={RRForm}
@@ -166,12 +167,14 @@ export default function SignupPassword() {
           defaultValues={{ password: '', confirm: '' }}
           isSubmitting={navigation.state === 'submitting'}
           className="flex w-full flex-col gap-4">
-          <input type="hidden" name="csrf" value={csrfToken} />
-          <input type="hidden" name="loginName" value={loginName} />
+          <AuthFormFields
+            csrf={csrfToken}
+            loginName={loginName}
+            requestId={requestId}
+            organization={organization}
+          />
           <input type="hidden" name="firstName" value={firstName} />
           <input type="hidden" name="lastName" value={lastName} />
-          {organization ? <input type="hidden" name="organization" value={organization} /> : null}
-          {requestId ? <input type="hidden" name="requestId" value={requestId} /> : null}
           <input
             type="hidden"
             name="deviceTrackingToken"
@@ -188,11 +191,7 @@ export default function SignupPassword() {
             <Trans>Create account</Trans>
           </SubmitButton>
         </Form.Root>
-
-        <div className="mt-4">
-          <BackLink />
-        </div>
-      </AuthCard>
+      </AuthCeremony>
     </>
   );
 }

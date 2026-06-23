@@ -101,7 +101,7 @@ describe('login action — strict phone rejection per disableLoginWithPhone poli
     const res = await runAction(req);
 
     // Phone check is bypassed → the input flows to resolveIdentifier, which fails to find a
-    // matching account (404 USER_NOT_FOUND) rather than the phone-disabled error.
+    // matching account (USER_NOT_FOUND, a 200 inline error — F1) rather than the phone-disabled error.
     const error = (await bodyOf(res))?.error;
     expect(error).not.toBe('PHONE_LOGIN_DISABLED');
     spy.mockRestore();

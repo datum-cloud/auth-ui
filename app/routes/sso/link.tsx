@@ -1,8 +1,9 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
 import type { IdProvider } from '@/modules/auth/types';
 import { resolveSsoLink, type SsoLinkSignInRequired } from '@/resources/sso';
+import { paths } from '@/routes/paths';
 import { providerForRequest } from '@/server/auth-context.server';
-import { Button } from '@datum-cloud/datum-ui/button';
+import { Button, LinkButton } from '@datum-cloud/datum-ui/button';
 import { Trans } from '@lingui/react/macro';
 import { redirect, useLoaderData, type LoaderFunctionArgs } from 'react-router';
 import type { MetaFunction } from 'react-router';
@@ -31,7 +32,10 @@ type LoaderData = SsoLinkSignInRequired;
 export default function SsoLinkPage() {
   const { providers, returnTo } = useLoaderData<LoaderData>();
 
-  const loginHref = `/login?returnTo=${encodeURIComponent(returnTo)}`;
+  // Base path via the typed registry; the returnTo query stays hand-built with
+  // encodeURIComponent so the emitted URL is BYTE-IDENTICAL (URLSearchParams would encode a
+  // space as "+" instead of "%20").
+  const loginHref = `${paths.login.index()}?returnTo=${encodeURIComponent(returnTo)}`;
 
   return (
     <AuthCard
@@ -46,7 +50,7 @@ export default function SsoLinkPage() {
             <ul className="flex flex-col gap-2">
               {providers.map((idp: IdProvider) => (
                 <li key={idp.id}>
-                  <form method="get" action="/login">
+                  <form method="get" action={paths.login.index()}>
                     <input type="hidden" name="returnTo" value={returnTo} />
                     <Button type="primary" theme="solid" htmlType="submit" block>
                       {idp.name}
@@ -58,11 +62,11 @@ export default function SsoLinkPage() {
           </section>
         ) : null}
 
-        <Button theme="link" type="quaternary" asChild>
-          <Link to={loginHref}>
-            <Trans>Back</Trans>
-          </Link>
-        </Button>
+        {/* LinkButton (single styled <a>) — NOT Button asChild, which emits
+            <button><a> (nested-interactive axe violation in the prod build). */}
+        <LinkButton theme="link" type="quaternary" as={Link} href={loginHref}>
+          <Trans>Back</Trans>
+        </LinkButton>
       </div>
     </AuthCard>
   );

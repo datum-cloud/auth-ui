@@ -28,8 +28,8 @@ import { describe, it, expect, vi } from 'vitest';
 // trustedAppOrigin reads env.PUBLIC_ORIGIN at call time; pin it to the trusted proxy
 // origin so the assertion is meaningful (distinct from the spoofed request host).
 // vi.mock is hoisted to the top of the file by vitest before any imports resolve.
-vi.mock('@/utils/env/env.server', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/utils/env/env.server')>();
+vi.mock('@/server/infra/env.server', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/server/infra/env.server')>();
   return {
     ...actual,
     env: { ...actual.env, PUBLIC_ORIGIN: 'https://auth.localtest.me:30000' },

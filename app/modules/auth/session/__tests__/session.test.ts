@@ -127,7 +127,7 @@ describe('byLoginName', () => {
   });
 });
 
-describe('needsLivenessCheck (CODE-MIN-21)', () => {
+describe('needsLivenessCheck', () => {
   const base = { id: 's', token: 't', loginName: 'a', creationTs: '0', changeTs: '0' };
   it('flags an entry with an empty expirationTs (unknown expiry → must verify with provider)', () => {
     expect(needsLivenessCheck({ ...base, expirationTs: '' })).toBe(true);

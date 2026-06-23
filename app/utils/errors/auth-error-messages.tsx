@@ -35,6 +35,13 @@ export function useAuthErrorMessage() {
         return t`This sign-in provider is currently unavailable. Please try again later.`;
       case 'NOT_FOUND':
         return t`We couldn't find what you were looking for. Please try again.`;
+      // Device-code lookup (resources/device/device.service.ts) emits lowercase outcome codes.
+      // Without these cases they fell through to the generic "Something went wrong", masking the
+      // real reason on the /device screen. Distinct, accurate inline messages (FormError/role=alert).
+      case 'not_found':
+        return t`That device code was not found. Check the code on your device and try again.`;
+      case 'invalid_code':
+        return t`That device code isn't valid. Check the code on your device and try again.`;
       case 'MFA_REQUIRED':
         return t`Additional verification is required to continue.`;
       case 'RATE_LIMITED':
@@ -45,6 +52,12 @@ export function useAuthErrorMessage() {
         return t`The request timed out. Please try again.`;
       case 'PASSWORD_EXPIRED':
         return t`Your password has expired. Please reset it to continue.`;
+      case 'SESSION_EXPIRED':
+        return t`Your session has expired.`;
+      case 'NO_SUPPORTED_METHOD':
+        return t`No sign-in method is available for this account.`;
+      case 'PASSWORD_NOT_ALLOWED':
+        return t`Password sign-in isn't available for this account.`;
       case 'ALREADY_DONE':
         return t`That's already been done.`;
       case undefined:

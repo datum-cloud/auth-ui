@@ -11,8 +11,8 @@ import { getAuthProvider } from '@/modules/auth/select.server';
 import { dispatchEmailChallenge, submitOtpCode, type OtpSessionEntry } from '@/resources/otp';
 import { describe, it, expect, vi } from 'vitest';
 
-vi.mock('@/utils/env/env.server', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/utils/env/env.server')>();
+vi.mock('@/server/infra/env.server', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/server/infra/env.server')>();
   return {
     ...actual,
     env: { ...actual.env, PUBLIC_ORIGIN: 'https://auth.datum.net', SESSION_SECRET: 'test-secret' },
@@ -61,9 +61,9 @@ describe('dispatchEmailChallenge — OTP-email LINK fix (Bug A)', () => {
 
     expect(calls).toHaveLength(1);
     const challenge = calls[0].challenges?.otpEmail;
-    // not bare `true` any more — it carries the template
-    expect(challenge).not.toBe(true);
-    const urlTemplate = (challenge as { urlTemplate?: string }).urlTemplate;
+    // Discriminated union — a send-template challenge carries the urlTemplate.
+    expect(challenge).toMatchObject({ kind: 'send-template' });
+    const urlTemplate = challenge?.kind === 'send-template' ? challenge.urlTemplate : undefined;
     expect(urlTemplate).toContain('https://auth.datum.net/id/login/verify/email?');
     expect(urlTemplate).toContain('code={{.Code}}');
     expect(urlTemplate).toContain(`loginName=${encodeURIComponent(LOGIN_NAME)}`);
@@ -83,7 +83,7 @@ describe('submitOtpCode email — 8-digit code (Bug B)', () => {
     vi.spyOn(fake, 'updateSession').mockImplementation(async (_id, _token, checks) => {
       // Cast targets the VERIFY-path field `SessionChecks.otpEmail: string` (the submitted code
       // we want to capture) — distinct from the CHALLENGE-path `SessionChecks.challenges.otpEmail`
-      // (boolean | { urlTemplate?: string }), which lives on the same parent type.
+      // (the OtpEmailChallenge discriminated union), which lives on the same parent type.
       if (typeof (checks as { otpEmail?: string }).otpEmail === 'string') {
         otpCalls.push((checks as { otpEmail: string }).otpEmail);
       }

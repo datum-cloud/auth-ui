@@ -55,7 +55,7 @@ export type AuthorizeOutcome =
 // ── pure helpers ──────────────────────────────────────────────────────────────
 
 /**
- * Normalize all three request kinds into one prefixed requestId (CCD-7 / BLK-02):
+ * Normalize all three request kinds into one prefixed requestId:
  *   ?authRequest=<id>  → oidc_<id>   (implemented in Phase 1)
  *   ?samlRequest=<id>  → saml_<id>   (branch implemented in Phase 5)
  *   ?requestId=<id>    → carried through verbatim (threaded back by the ceremony)
@@ -73,7 +73,7 @@ export function normalizeRequestId(url: URL): string | undefined {
 }
 
 /**
- * Open-redirect guard / validator: accept oidc_ | saml_ | device_ (CCD-7). Anything else is
+ * Open-redirect guard / validator: accept oidc_ | saml_ | device_. Anything else is
  * rejected before use — only ever follow Zitadel-issued requests.
  */
 export function isAllowedRequestId(requestId: string | undefined): requestId is string {
@@ -190,7 +190,7 @@ async function runCallback(
       id: entry.id,
       token: entry.token,
     });
-    // ADAPTATION (audit events §C(f)): emit success event after createCallback.
+    // Emit the success audit event after createCallback.
     logAuthEvent('oidc_callback', 'success', { requestId: rawId, sessionId: entry.id });
     return { kind: 'redirect', location: callbackUrl };
   } catch (err) {
@@ -274,7 +274,7 @@ async function resolveOidc(
     authRequest = await provider.getAuthRequest('oidc', rawId);
   } catch (error) {
     const code = error instanceof ProviderError ? error.code : undefined;
-    // ADAPTATION (audit events §C(f)): log resolution failure before redirecting.
+    // Log the resolution failure audit event before redirecting.
     logAuthEvent('authrequest_resolve', 'failure', { requestId: rawId, code });
     return { kind: 'error-redirect', code: providerErrorCode(code) };
   }

@@ -1,6 +1,6 @@
 import { checkA11y } from '../support/a11y';
 
-// axe / WCAG 2.2 AA per-screen gate (INDEX §C, CCD-5)
+// axe / WCAG 2.2 AA per-screen gate
 
 // Screens not on a happy-path journey above — render-only axe coverage.
 describe('Phase 2 standalone screens — a11y', () => {

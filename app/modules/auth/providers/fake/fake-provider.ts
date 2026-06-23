@@ -14,11 +14,14 @@ import type {
   IdpLink,
   LdapIntent,
   LoginSettings,
+  PasswordComplexity,
   ProviderCapabilities,
   ProviderErrorCode,
   SamlResponse,
   Session,
+  U2FCreationOptions,
   User,
+  WebAuthnCreationOptions,
 } from '@/modules/auth/types';
 import { ProviderError } from '@/modules/auth/types';
 
@@ -31,8 +34,10 @@ import { ProviderError } from '@/modules/auth/types';
 type FakeOutcomeScript = { mode: 'null' } | { mode: 'throw'; code: ProviderErrorCode };
 
 export const FIXED_NOW = '2026-01-01T00:00:00.000Z'; // deterministic for tests (no Date.now())
+// Factor verifiedAt is `Date | null`. A frozen Date keeps the fake deterministic.
+const FIXED_NOW_DATE = new Date(FIXED_NOW);
 const FAR_FUTURE = '2099-01-01T00:00:00.000Z'; // fake sessions never expire (a past expiresAt would trip expiry checks)
-// BLK-06 note: base settings keep mfaInitSkipLifetimeMs at 0 (skip-prompt branch
+// Base settings keep mfaInitSkipLifetimeMs at 0 (skip-prompt branch
 // disabled) — a non-zero default would route EVERY no-2nd-factor login to /setup/mfa
 // and break the non-MFA specs. Specs that need the skip-prompt branch seed a
 // per-org override via settingsByOrg. Avoid finite windows against FIXED_NOW
@@ -100,7 +105,7 @@ export class FakeAuthProvider implements AuthProvider {
   private settingsByOrg: Record<string, Partial<LoginSettings>>; // P5: per-org overrides
   private orgDomains: Record<string, string>; // P2 domain discovery: email domain → orgId
   private enrolled = new Map<string, Set<AuthMethod>>(); // P5: dynamically enrolled methods (merged with seeded authMethods)
-  private mfaSkippedAt = new Map<string, string>(); // P5: userId → ISO timestamp of last skip (BLK-06)
+  private mfaSkippedAt = new Map<string, string>(); // P5: userId → ISO timestamp of last skip
   private issuedOtpEmailCodes = new Map<string, string>(); // sessionId → returnCode issued for that session
   private deviceAuthSeeds: DeviceAuthSeed[]; // P6
   private samlRequestSeeds: SamlRequestSeed[]; // P6
@@ -123,7 +128,7 @@ export class FakeAuthProvider implements AuthProvider {
     this.users = seed.users ?? [];
     // e2e fixture: each SEEDED user gets a deterministic pending email code (`email-<id>`),
     // so the verify-and-advance journey works without the `?send=true` dispatch — which is
-    // now session-gated server-side (CODE-MAJ-08) and a no-op for an unauthenticated visit.
+    // now session-gated server-side and a no-op for an unauthenticated visit.
     // Registered users (via register()) get their code set there instead; this only covers
     // the constructor seed.
     for (const u of this.users) this.emailCodes.set(u.id, `email-${u.id}`);
@@ -171,13 +176,17 @@ export class FakeAuthProvider implements AuthProvider {
     return { primaryColor: '#5469d4', hideLoginNameSuffix: false };
   }
 
-  async getPasswordComplexity(_orgId?: string): Promise<unknown> {
-    return { minLength: 8, requiresUpper: false, requiresNumber: false, requiresSymbol: false };
+  async getPasswordComplexity(_orgId?: string): Promise<PasswordComplexity | undefined> {
+    return {
+      minLength: 8,
+      requiresUppercase: false,
+      requiresLowercase: false,
+      requiresNumber: false,
+      requiresSymbol: false,
+    };
   }
 
-  async getLegalSupport(_orgId?: string): Promise<unknown> {
-    return { tosLink: '', privacyLink: '', supportEmail: 'support@acme.test' };
-  }
+  // getLegalSupport removed from the port (zero callers) — dropped here too.
 
   async getActiveIdPs(_orgId?: string): Promise<IdProvider[]> {
     return this.idps;
@@ -310,8 +319,8 @@ export class FakeAuthProvider implements AuthProvider {
       // later phase starts calling createSession({ password }) as a real check.
       // P4: merge factors so a prior password factor survives an idpIntent createSession.
       factors: {
-        password: { verifiedAt: checks.password ? FIXED_NOW : null },
-        idpIntent: { verifiedAt: checks.idpIntent ? FIXED_NOW : null },
+        password: { verifiedAt: checks.password ? FIXED_NOW_DATE : null },
+        idpIntent: { verifiedAt: checks.idpIntent ? FIXED_NOW_DATE : null },
       },
       expiresAt: FAR_FUTURE, // far-future so fake sessions never trip expiry checks (MERGE RULE 1)
       changedAt: FIXED_NOW,
@@ -356,7 +365,7 @@ export class FakeAuthProvider implements AuthProvider {
         ...updated,
         factors: {
           ...updated.factors,
-          password: { verifiedAt: FIXED_NOW },
+          password: { verifiedAt: FIXED_NOW_DATE },
         },
       };
     }
@@ -365,7 +374,7 @@ export class FakeAuthProvider implements AuthProvider {
     if (checks.totp !== undefined) {
       updated = {
         ...updated,
-        factors: { ...updated.factors, totp: { verifiedAt: FIXED_NOW } },
+        factors: { ...updated.factors, totp: { verifiedAt: FIXED_NOW_DATE } },
       };
     }
 
@@ -386,7 +395,7 @@ export class FakeAuthProvider implements AuthProvider {
         }
         updated = {
           ...updated,
-          factors: { ...updated.factors, otpEmail: { verifiedAt: FIXED_NOW } },
+          factors: { ...updated.factors, otpEmail: { verifiedAt: FIXED_NOW_DATE } },
         };
       }
     }
@@ -397,18 +406,18 @@ export class FakeAuthProvider implements AuthProvider {
       } else {
         updated = {
           ...updated,
-          factors: { ...updated.factors, otpSms: { verifiedAt: FIXED_NOW } },
+          factors: { ...updated.factors, otpSms: { verifiedAt: FIXED_NOW_DATE } },
         };
       }
     }
 
     if (checks.webAuthN !== undefined) {
-      // webAuthN assertion sets the passkey factor verified + userVerified=true (MAJ-15)
+      // webAuthN assertion sets the passkey factor verified + userVerified=true
       updated = {
         ...updated,
         factors: {
           ...updated.factors,
-          passkey: { verifiedAt: FIXED_NOW, userVerified: true },
+          passkey: { verifiedAt: FIXED_NOW_DATE, userVerified: true },
         },
       };
     }
@@ -430,21 +439,17 @@ export class FakeAuthProvider implements AuthProvider {
           },
         };
       }
-      // otpEmail may be bare `true` (default link), an object carrying urlTemplate, or
-      // { returnCode: true } (code returned in-band, not emailed — used by passwordless signup flow).
-      if (checks.challenges.otpEmail) {
-        const isReturnCode =
-          typeof checks.challenges.otpEmail === 'object' &&
-          'returnCode' in checks.challenges.otpEmail &&
-          checks.challenges.otpEmail.returnCode === true;
-        if (isReturnCode) {
+      // otpEmail is the OtpEmailChallenge discriminated union. 'return-code' returns the
+      // code in-band (not emailed — used by the passwordless signup flow); 'send'/'send-template'
+      // request an emailed code (no in-band code surfaced).
+      const otpEmailChallenge = checks.challenges.otpEmail;
+      if (otpEmailChallenge) {
+        if (otpEmailChallenge.kind === 'return-code') {
           const code = '123456';
           this.issuedOtpEmailCodes.set(id, code);
-          challengeResult.otpEmail = {};
           challengeResult.otpEmailCode = code;
-        } else {
-          challengeResult.otpEmail = {};
         }
+        // 'send' / 'send-template' emit no in-band code; the fake has nothing further to surface.
       }
       if (checks.challenges.otpSms === true) {
         challengeResult.otpSms = {};
@@ -475,7 +480,7 @@ export class FakeAuthProvider implements AuthProvider {
   }
 
   async retrieveIdpIntent(idpIntentId: string, _token: string): Promise<IdpIntentResult> {
-    // CODE-MIN-03: return the neutral type; callers no longer need to cast.
+    // Return the neutral type; callers no longer need to cast.
     // The seed map stores IdpIntentResult directly; null is cast to satisfy the contract
     // (a missing intent is a caller error — real adapter would throw NOT_FOUND).
     return (this.idpIntents[idpIntentId] ?? null) as IdpIntentResult;
@@ -486,7 +491,7 @@ export class FakeAuthProvider implements AuthProvider {
   }
 
   async addIdpLink(userId: string, link: IdpLink): Promise<void> {
-    // CODE-MIN-03: link is now typed IdpLink directly — no cast needed.
+    // Link is now typed IdpLink directly — no cast needed.
     const list = this.idpLinks.get(userId) ?? [];
     // upsert by idpId — replace any existing link for the same IdP
     this.idpLinks.set(userId, [...list.filter((x) => x.idpId !== link.idpId), link]);
@@ -516,7 +521,7 @@ export class FakeAuthProvider implements AuthProvider {
     _userId: string,
     _code: string,
     _domain: string
-  ): Promise<{ passkeyId: string; publicKeyCredentialCreationOptions: unknown }> {
+  ): Promise<WebAuthnCreationOptions> {
     // code not validated in fake; real adapter enforces it
     return {
       passkeyId: `pk-${++this.seq}`,
@@ -533,10 +538,7 @@ export class FakeAuthProvider implements AuthProvider {
     this.enroll(userId, 'passkey');
   }
 
-  async registerU2F(
-    _userId: string,
-    _domain: string
-  ): Promise<{ u2fId: string; publicKeyCredentialCreationOptions: unknown }> {
+  async registerU2F(_userId: string, _domain: string): Promise<U2FCreationOptions> {
     return {
       u2fId: `u2f-${++this.seq}`,
       publicKeyCredentialCreationOptions: { publicKey: {} },
@@ -655,7 +657,7 @@ export class FakeAuthProvider implements AuthProvider {
       id: entry.id,
       token: entry.token,
       user: entry.user,
-      factors: { password: { verifiedAt: FIXED_NOW } },
+      factors: { password: { verifiedAt: FIXED_NOW_DATE } },
       expiresAt: FAR_FUTURE,
       changedAt: FIXED_NOW,
     });

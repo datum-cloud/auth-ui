@@ -52,7 +52,7 @@ function errorRedirectPath(code: AuthErrorCode): string {
   return `/id/error?${params}`;
 }
 
-// CODE-MAJ-09 / CODE-MIN-14: shared protocol guard — both redirect and POST bindings go through
+// Shared protocol guard — both redirect and POST bindings go through
 // this. The ACS url comes from the adapter, not from the client, but a malformed or hostile
 // adapter value (javascript:, relative path, data:) must never reach the browser. Throws on
 // failure; callers map the throw to an error response. Exported for unit testing.
@@ -91,7 +91,7 @@ export async function samlPostHandler(c: Context): Promise<Response> {
 
   const provider = providerForRequest(c.req.raw);
 
-  // CODE-MAJ-09: stale-session self-heal — mirror authorize.tsx's healIfSessionDead.
+  // Stale-session self-heal — mirror authorize.tsx's healIfSessionDead.
   // After RP-initiated logout the sessions cookie can outlive the Zitadel session; a dead
   // {id, token} must never produce an assertion. Re-prompt /login if the session is gone.
   // Only NOT_FOUND / PERMISSION_DENIED are treated as definitively dead (same DEAD_SESSION_CODES
@@ -151,7 +151,7 @@ export async function samlPostHandler(c: Context): Promise<Response> {
 
   const bound = resolveSamlBinding(samlRes);
 
-  // CODE-MAJ-09: protocol-validate the ACS url before BOTH bindings (redirect and POST).
+  // Protocol-validate the ACS url before BOTH bindings (redirect and POST).
   // assertHttpUrl throws on non-http(s) protocols (javascript:, data:, relative paths, etc.).
   // Map a thrown error to a 400 so the caller can detect invalid-url vs a normal SAML error.
   try {

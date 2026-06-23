@@ -91,7 +91,7 @@ export interface SignupIdpLinkInput {
  * logical step (route/flow level, not an AuthProvider method). IdP users are
  * passwordless — they skip the /signup/password path.
  *
- * CODE-MIN-04: link explicitly via addIdpLink — RegisterInput.idpLink is a dead
+ * Link explicitly via addIdpLink — RegisterInput.idpLink is a dead
  * field no provider reads, so passing it to register() was a confusing no-op.
  * addIdpLink is the single, real link path.
  */
@@ -528,7 +528,8 @@ export async function completeEmailLinkSignup(
   // Step 3b: request a returnCode challenge — the OTP code lands on the returned session,
   // NOT in the user's inbox, so we can complete the factor in the next call.
   const challenged = await provider.updateSession(session.id, session.token, {
-    challenges: { otpEmail: { returnCode: true } },
+    // Discriminated email-OTP challenge — return-code delivery (code rides back in-band).
+    challenges: { otpEmail: { kind: 'return-code' } },
   });
   const otpCode = challenged.challenges?.otpEmailCode ?? '';
 

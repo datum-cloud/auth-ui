@@ -27,10 +27,12 @@ import {
   type SessionEntry,
 } from '@/modules/auth/session/cookie';
 import type { Session, AuthMethod, LoginSettings } from '@/modules/auth/types';
+import { ProviderError } from '@/modules/auth/types';
+import { deviceDecision } from '@/resources/device';
 import { postLoginDestinationWithSource } from '@/resources/login/post-login-destination';
 import { nextStepWithParams } from '@/resources/shared/next-step-params';
+import { env } from '@/server/infra/env.server';
 import { logAuthEvent, hashActor } from '@/server/observability';
-import { env } from '@/utils/env/env.server';
 import { data, redirect } from 'react-router';
 import { z } from 'zod';
 
@@ -43,7 +45,14 @@ import { z } from 'zod';
  */
 export type SignedInOutcome =
   | { kind: 'redirect'; location: string }
-  | { kind: 'page'; loginName: string | null };
+  // `deviceComplete` marks the post-login device-grant auto-authorization terminal page:
+  // the consent was completed automatically (no second manual Authorize click — restores the
+  // OLD `completeDeviceAuthorization` behavior), so the route renders the "you can close this
+  // window and return to your device" message instead of the standard sign-out form.
+  | { kind: 'page'; loginName: string | null; deviceComplete?: boolean }
+  // The device grant failed to auto-authorize after login (provider rejected the
+  // authorizeDevice call). Inline-only error surface — the route renders a tailored card.
+  | { kind: 'device-error' };
 
 /**
  * Config the /signed-in loader needs from the route (env values are owned by the route's
@@ -75,12 +84,11 @@ export async function resolveSignedIn(
   config: SignedInConfig
 ): Promise<SignedInOutcome> {
   const requestId = new URL(request.url).searchParams.get('requestId');
-  if (
-    requestId &&
-    (requestId.startsWith('oidc_') ||
-      requestId.startsWith('saml_') ||
-      requestId.startsWith('device_'))
-  ) {
+
+  // OIDC/SAML ceremonies still hand back to /authorize to finish the protocol callback
+  // (createCallback → client ?code=). The device grant is DIFFERENT: it auto-completes here
+  // (see resolveDeviceCompletion) instead of bouncing back to a second consent screen.
+  if (requestId && (requestId.startsWith('oidc_') || requestId.startsWith('saml_'))) {
     return { kind: 'redirect', location: `/authorize?requestId=${encodeURIComponent(requestId)}` };
   }
 
@@ -88,10 +96,19 @@ export async function resolveSignedIn(
   const recent = mostRecent(list);
   if (!recent) return { kind: 'redirect', location: '/login' };
 
+  // 755-M8: post-login device-grant AUTO-COMPLETE. The OLD signedin page completed the grant
+  // automatically (completeDeviceAuthorization) — no second manual Authorize click. The rebuild
+  // regressed to bouncing device_ back to /authorize → /device/authorize (a redundant consent
+  // screen). Restore the auto-complete: with an active session present, authorize the grant
+  // directly and land on the terminal "return to your device" page.
+  if (requestId && requestId.startsWith('device_')) {
+    return resolveDeviceCompletion(provider, requestId, recent);
+  }
+
   type Settings = Awaited<ReturnType<typeof provider.getLoginSettings>>;
   const [settings, isAdmin] = await Promise.all([
     provider.getLoginSettings(recent.organization).catch((err) => {
-      // CODE-MAJ-05: surface transient backend failure in the audit trail; behavior
+      // Surface transient backend failure in the audit trail; behavior
       // (graceful degradation to env/none) is unchanged.
       logAuthEvent('post_login_settings', 'failure', {
         reason: err instanceof Error ? err.message : String(err),
@@ -121,6 +138,49 @@ export async function resolveSignedIn(
   return { kind: 'page', loginName: recent.loginName ?? null };
 }
 
+/**
+ * 755-M8: complete a device authorization grant automatically after login.
+ *
+ * Mirrors the OLD `completeDeviceAuthorization` flow: the user code is the stable handle threaded
+ * through the login ceremony as `device_<userCode>` (the adapter returns a fresh opaque
+ * deviceAuth.id per getDeviceAuth call). Re-resolve the device auth by user code, authorize it
+ * against the just-established session, and land on the terminal "return to your device" page —
+ * so the user never sees a second manual Authorize click.
+ *
+ * Failures (NOT_FOUND/expired code, provider outage) resolve to a typed `device-error` outcome
+ * the route renders as an inline recovery card. Best-effort throughout: an unexpected non-provider
+ * error is also caught and surfaced inline rather than bubbling to the root ErrorBoundary.
+ */
+async function resolveDeviceCompletion(
+  provider: AuthProvider,
+  requestId: string,
+  recent: SessionEntry
+): Promise<SignedInOutcome> {
+  const userCode = requestId.slice('device_'.length);
+
+  try {
+    const deviceAuth = await provider.getDeviceAuth(userCode);
+    await provider.authorizeDevice(
+      deviceAuth.id,
+      deviceDecision({ decision: 'authorize', session: { id: recent.id, token: recent.token } })
+    );
+  } catch (err) {
+    logAuthEvent('device_authorize', 'failure', {
+      requestId,
+      actor: hashActor(recent.loginName),
+      reason: err instanceof ProviderError ? err.code : 'UNKNOWN',
+    });
+    return { kind: 'device-error' };
+  }
+
+  logAuthEvent('device_authorize', 'success', {
+    requestId,
+    actor: hashActor(recent.loginName),
+  });
+
+  return { kind: 'page', loginName: recent.loginName ?? null, deviceComplete: true };
+}
+
 // ─── /accounts — session listing + enrichment ────────────────────────────────
 
 export interface EnrichedAccount {
@@ -131,6 +191,10 @@ export interface EnrichedAccount {
   /** path === '/signed-in' means the session is fully active */
   nextPath: string;
   isActive: boolean;
+  // 755-M9/M6: optional IdP indicator for the row badge. Populated by the SSO link↔provider
+  // join (755-M6); until that lands these stay undefined and the row simply renders no badge.
+  idpName?: string;
+  idpType?: string;
 }
 
 /** Shared fallback when a getLoginSettings call fails */
@@ -152,7 +216,11 @@ export const DEFAULT_LOGIN_SETTINGS = {
 async function resolveNextPath(
   provider: AuthProvider,
   session: Session,
-  entry: { loginName: string; organization?: string; requestId?: string }
+  entry: { loginName: string; organization?: string; requestId?: string },
+  // 755-M10: account-SWITCH passes this so the resolved destination is the continuation
+  // (/signed-in) and the step-6 skippable MFA-setup nudge is suppressed. Real forced MFA
+  // (settings.forceMfa) and real challenges still route normally.
+  opts: { suppressMfaSetupNudge?: boolean } = {}
 ): Promise<string> {
   const userId = session.user?.id ?? '';
 
@@ -174,6 +242,7 @@ async function resolveNextPath(
     mfaInitSkippedAt: session.user?.mfaInitSkippedAt ?? null,
     requestId: entry.requestId,
     organization: entry.organization,
+    suppressMfaSetupNudge: opts.suppressMfaSetupNudge,
   });
 }
 
@@ -218,10 +287,29 @@ export async function listAccounts(
     })
   );
 
+  // Dedupe the enrolled-methods N+1. The per-session enrichment below needs the
+  // user's enrolled auth methods, but multiple live cookie entries can resolve to the SAME
+  // userId (an org session + a default-org session for one account, or duplicate entries).
+  // Issuing one `listAuthMethods` PER SESSION was a redundant N+1; instead build a per-request
+  // Map<userId, methods> keyed by the DISTINCT userIds present across the resolved provider
+  // sessions and issue exactly one `listAuthMethods` per userId. Failures degrade per-user to
+  // an empty method list (unchanged from the prior per-session catch). Behavior-identical —
+  // the only change is fewer RPCs for the same enrichment output.
+  const distinctUserIds = new Set<string>();
+  for (const entry of liveSessions) {
+    const userId = providerMap.get(entry.id)?.user?.id;
+    if (userId) distinctUserIds.add(userId);
+  }
+  const authMethodsMap = new Map<string, AuthMethod[]>();
+  await Promise.all(
+    [...distinctUserIds].map(async (userId) => {
+      const methods = await provider.listAuthMethods(userId).catch(() => [] as AuthMethod[]);
+      authMethodsMap.set(userId, methods);
+    })
+  );
+
   // For each live cookie entry, build an EnrichedAccount. Per-session failures are tolerated
   // gracefully (renders needs-re-auth card).
-  //
-  console.log(liveSessions);
   return Promise.all(
     liveSessions.map(async (entry): Promise<EnrichedAccount> => {
       const pSession = providerMap.get(entry.id);
@@ -241,9 +329,12 @@ export async function listAccounts(
       const userId = pSession.user?.id ?? '';
       const loginSettings = settingsMap.get(entry.organization) ?? DEFAULT_LOGIN_SETTINGS;
 
-      const enrolledMethods = await (userId
-        ? provider.listAuthMethods(userId).catch(() => [] as AuthMethod[])
-        : Promise.resolve([] as AuthMethod[]));
+      // Read enrolled methods from the per-request map (one RPC per distinct userId
+      // above) instead of re-issuing a call here. A userId absent from the map (e.g. no
+      // resolved user) yields the same empty-list default as before.
+      const enrolledMethods = userId
+        ? (authMethodsMap.get(userId) ?? ([] as AuthMethod[]))
+        : ([] as AuthMethod[]);
 
       const userVerified = pSession.factors.passkey?.userVerified ?? false;
 
@@ -328,7 +419,11 @@ export async function switchAccount(
     }
 
     userId = freshSession.user?.id ?? entry.loginName;
-    nextPath = await resolveNextPath(provider, freshSession, entry);
+    // 755-M10: on switch, resolve to the continuation/signed-in destination and suppress
+    // ONLY the step-6 skippable MFA-setup nudge. Forced MFA + real challenges still route.
+    nextPath = await resolveNextPath(provider, freshSession, entry, {
+      suppressMfaSetupNudge: true,
+    });
   } catch {
     logAuthEvent('account_switch', 'failure', { sessionId });
     return { kind: 'error', error: 'PROVIDER_ERROR', status: 500 };
@@ -462,7 +557,7 @@ export function validatePostLogoutRedirect(
  * sign-out MUST always succeed because the cookie is the UI's source of truth), removes only that
  * entry from the cookie, then resolves the post-logout destination.
  *
- * CODE-MAJ-10 guard: when residual sessions remain after the single-session removal, redirect to
+ * Residual-session guard: when residual sessions remain after the single-session removal, redirect to
  * /accounts (forces explicit account selection) instead of /logout/success — otherwise
  * authorize.tsx could silently reuse mostRecent() of the residuals and re-sign-in the user with
  * no interaction. When no residual sessions remain, /logout/success is correct.

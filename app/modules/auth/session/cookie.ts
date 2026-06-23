@@ -8,8 +8,8 @@ import {
   byLoginName,
   type SessionEntry,
 } from './session';
+import { env } from '@/server/infra/env.server';
 import { logAuthEvent } from '@/server/observability';
-import { env } from '@/utils/env/env.server';
 import { createCookie } from 'react-router';
 import { z } from 'zod';
 

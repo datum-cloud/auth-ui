@@ -1,7 +1,7 @@
 import { webauthnAssertionSchema } from '../webauthn-verify';
 import { describe, it, expect } from 'vitest';
 
-describe('webauthnAssertionSchema (CODE-MIN-11)', () => {
+describe('webauthnAssertionSchema', () => {
   it('validates the four-field assertion form', () => {
     const ok = webauthnAssertionSchema.safeParse({ credential: 'x', loginName: 'a@b.c' });
     expect(ok.success).toBe(true);

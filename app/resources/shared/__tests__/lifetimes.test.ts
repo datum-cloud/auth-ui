@@ -8,7 +8,9 @@ import type { Factors } from '@/modules/auth/types';
 import { describe, it, expect } from 'vitest';
 
 const T0 = Date.parse('2026-01-01T00:00:00.000Z');
-const at = (iso: string | null) => ({ verifiedAt: iso });
+// verifiedAt is `Date | null`. 'not-a-date' yields an Invalid Date (getTime() ⇒ NaN),
+// which isFactorFresh treats as not fresh.
+const at = (iso: string | null) => ({ verifiedAt: iso === null ? null : new Date(iso) });
 
 describe('isFactorFresh', () => {
   it('is false when verifiedAt is null', () => {

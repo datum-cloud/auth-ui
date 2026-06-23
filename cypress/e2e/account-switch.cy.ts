@@ -1,4 +1,5 @@
 import { checkA11y } from '../support/a11y';
+import { loginAndGetSession } from '../support/session';
 
 /**
  * P5 Task 14 — two sessions → /accounts → switch
@@ -10,62 +11,12 @@ import { checkA11y } from '../support/a11y';
  * Dedicated seed users are used so the account-switch spec does not share session
  * state with any enrollment spec (the fake is a singleton across the full suite run).
  *
- * Interaction style: cy.request for session setup (native POST, no hydration needed),
- * then cy.visit for the /accounts screen, then native form.submit() for the switch.
- * Pattern copied from setup-otp.cy.ts loginAndGetSession helper.
+ * Interaction style: the shared support/session loginAndGetSession plants each session
+ * via React-Router's single-fetch `.data` endpoint (a native bare POST /id/login 405s
+ * against the SSR build — see support/session.ts), then cy.visit for the /accounts
+ * screen, then native form.submit() for the switch. Both sessions accumulate in the
+ * shared Cypress cookie jar so the /accounts visit carries both in the `sessions` cookie.
  */
-
-const FAKE_PASSWORD = 'hunter2';
-
-/**
- * Decode HTML entities in attribute values (React SSR escapes & → &amp; etc.).
- * Required before round-tripping a CSRF token extracted from SSR HTML.
- */
-function extractCsrf(html: string): string {
-  const raw = /name="csrf" value="([^"]+)"/.exec(html)?.[1] ?? '';
-  return raw
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#x27;|&#39;/g, "'");
-}
-
-/**
- * Drives identifier → password via cy.request (no browser UI).
- * Both set-cookie responses accumulate in the shared Cypress cookie jar so
- * subsequent cy.visits will carry both sessions in the `sessions` cookie.
- */
-function loginAndGetSession(loginName: string) {
-  cy.request('/id/login').then((resp) => {
-    const csrf = extractCsrf(resp.body as string);
-    cy.request({
-      method: 'POST',
-      url: '/id/login',
-      form: true,
-      body: { csrf, loginName },
-      followRedirect: false,
-    }).then((post) => {
-      const target = String(post.headers.location ?? '');
-      if (target.includes('/login/password')) {
-        // The redirect may be absolute or relative; normalise to a path the server handles.
-        const pwPageUrl = target.startsWith('http')
-          ? target
-          : `/id${target.startsWith('/id') ? target.slice(3) : target}`;
-        cy.request(pwPageUrl).then((pwPage) => {
-          const pwCsrf = extractCsrf(pwPage.body as string) || csrf;
-          cy.request({
-            method: 'POST',
-            url: target,
-            form: true,
-            body: { csrf: pwCsrf, loginName, password: FAKE_PASSWORD },
-            followRedirect: false,
-          });
-        });
-      }
-    });
-  });
-}
 
 describe('account switcher — two sessions', () => {
   it('shows two account cards, switches to the second, lands on /signed-in', () => {
@@ -76,22 +27,27 @@ describe('account switcher — two sessions', () => {
     // Visit /accounts — both sessions should now appear.
     cy.visit('/id/accounts');
 
-    // Accessibility check on the account picker screen (CCD-5).
+    // Accessibility check on the account picker screen.
     checkA11y();
 
     // Assert two account cards are rendered.
     cy.get('[class*="rounded-lg border"]').should('have.length.gte', 2);
 
-    // The second account card's Switch button switches to switch-b.
-    // Both accounts are fully active (nextStep → /signed-in for password-only users).
-    // Click the Switch button on the card for switch-b (second in list order).
-    cy.contains('switch-b@acme.test')
+    // The M9 row renders the account's DISPLAY NAME (account.displayName ?? loginName); the seed
+    // gives switch-b@acme.test displayName "Switch User B" (select.server.ts), so that — not the
+    // email — is the visible text. Find switch-b's row by its display name and click its switch
+    // control. Per the M9 fix the row's whole info area IS a <button type=submit intent=switch>
+    // (the remove form is a separate sibling button), and the switch form precedes the remove
+    // form in DOM order, so .first() targets the switch submit.
+    cy.contains('Switch User B')
       .closest('[class*="rounded-lg border"]')
       .within(() => {
         cy.get('button[type="submit"]').first().click();
       });
 
-    // Switching a fully-active session redirects to /signed-in.
+    // Switching a fully-active (password-only, no-MFA) session lands on /signed-in — the M10 fix:
+    // switch suppresses the skippable MFA-setup nudge and resolves the continuation destination,
+    // so it must NOT bounce to /setup/mfa.
     cy.location('pathname').should('eq', '/id/signed-in');
   });
 });

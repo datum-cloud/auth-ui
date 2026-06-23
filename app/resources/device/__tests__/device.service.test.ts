@@ -27,6 +27,7 @@ import {
   lookupDeviceCode,
   lookupOutcomeToResponse,
   loadDeviceConsent,
+  deviceConsentErrorToResponse,
   resolveDeviceDecision,
   decisionOutcomeToResponse,
 } from '@/resources/device';
@@ -120,23 +121,38 @@ describe('loadDeviceConsent (/device/authorize loader)', () => {
     // The real Zitadel adapter returns a different opaque id per getDeviceAuth call;
     // only the user code can be re-resolved when the login ceremony hands back.
     const req = new Request('http://localhost/id/device/authorize?user_code=WDJB-MJHT');
-    const consent = await loadDeviceConsent(fakeProvider(), req);
-    expect(consent.requestId).toBe('device_WDJB-MJHT');
-    expect(consent.deviceAuthId).toBe('dev-1');
+    const outcome = await loadDeviceConsent(fakeProvider(), req);
+    expect(outcome.kind).toBe('consent');
+    const consent = outcome.kind === 'consent' ? outcome.consent : null;
+    expect(consent?.requestId).toBe('device_WDJB-MJHT');
+    expect(consent?.deviceAuthId).toBe('dev-1');
   });
 
-  it('missing user_code → throws data(400)', async () => {
+  it('missing user_code → 302 redirect to /device (contextless redirect half)', async () => {
     const req = new Request('http://localhost/id/device/authorize');
-    await expect(loadDeviceConsent(fakeProvider(), req)).rejects.toMatchObject({
-      init: { status: 400 },
-    });
+    const outcome = await loadDeviceConsent(fakeProvider(), req);
+
+    // A contextless GET (no user_code) has nothing to recover — the service now returns
+    // a `redirect` outcome to /device's code-entry screen instead of the 400 recovery error.
+    // The route translates this to a 302; 302 ∈ url-resolution.cy.ts okStatuses, so the gate
+    // follows it to /device's h1.
+    expect(outcome.kind).toBe('redirect');
+    const location = outcome.kind === 'redirect' ? outcome.location : null;
+    expect(location).toBe('/device');
   });
 
-  it('unknown user_code → throws friendly data(404)', async () => {
+  it('unknown user_code → recovery error; toResponse keeps the existing friendly 404', async () => {
     const req = new Request('http://localhost/id/device/authorize?user_code=NOPE');
-    await expect(loadDeviceConsent(fakeProvider(), req)).rejects.toMatchObject({
-      init: { status: 404 },
-    });
+    const outcome = await loadDeviceConsent(fakeProvider(), req);
+
+    expect(outcome.kind).toBe('error');
+    const error = outcome.kind === 'error' ? outcome.error : null;
+    expect(error?.recovery).toBe('device');
+    expect(error?.status).toBe(404);
+
+    const res = deviceConsentErrorToResponse(error!);
+    const asData = res as { init?: { status?: number } };
+    expect(asData.init?.status).toBe(404);
   });
 });
 
@@ -148,7 +164,7 @@ describe('resolveDeviceDecision (/device/authorize action)', () => {
     const outcome = await resolveDeviceDecision(
       fakeProvider(),
       req,
-      // CODE-MIN-33: use the dedicated dev-authorize id so this mutating test does not interfere
+      // Use the dedicated dev-authorize id so this mutating test does not interfere
       // with dev-1 (used by the loader test for read-only resolution assertions).
       formData({
         decision: 'authorize',
@@ -171,7 +187,7 @@ describe('resolveDeviceDecision (/device/authorize action)', () => {
     expect(fakeProvider().isDeviceAuthorized('dev-authorize')).toBe(true);
   });
 
-  it('a dedicated authorize-only device id isolates state from other tests (CODE-MIN-33)', async () => {
+  it('a dedicated authorize-only device id isolates state from other tests', async () => {
     // The isolation contract: the authorize test uses dev-authorize, NOT dev-1, so dev-1 remains
     // unauthorized even after the authorize test mutates the singleton. This test is
     // order-independent: it performs its own authorize on dev-authorize and then asserts dev-1

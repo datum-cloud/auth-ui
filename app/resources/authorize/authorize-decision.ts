@@ -1,5 +1,14 @@
 import type { AuthRequest } from '@/modules/auth/types';
-import type { Decision } from '@/resources/login/login-decision';
+
+// Local decision shape for the authorize flow. Was imported from login-decision; decoupled
+// so login's Decision can become the typed redirect/error union without breaking the
+// authorize sentinels ('callback'/'error'/'/signup'/'/accounts'/'/login'). Authorize's own
+// migration onto a typed model happens later. Behavior here is unchanged.
+interface AuthorizeDecision {
+  target: string;
+  params?: Record<string, string>;
+  error?: string;
+}
 
 const ORG_SCOPE = /urn:zitadel:iam:org:id:([0-9]+)/;
 
@@ -22,7 +31,7 @@ export function decideAuthorize({
   authRequest,
   hasSessions,
   validSessionId,
-}: AuthorizeInput): Decision {
+}: AuthorizeInput): AuthorizeDecision {
   const org = deriveOrganizationFromScopes(authRequest.scopes);
   const baseParams = org ? { organization: org } : undefined;
 

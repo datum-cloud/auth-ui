@@ -18,8 +18,8 @@ import { sessionsCookie } from '@/modules/auth/session/cookie';
 import { loader } from '@/routes/login/verify/email';
 import { describe, it, expect, vi } from 'vitest';
 
-vi.mock('@/utils/env/env.server', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/utils/env/env.server')>();
+vi.mock('@/server/infra/env.server', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/server/infra/env.server')>();
   return {
     ...actual,
     env: { ...actual.env, PUBLIC_ORIGIN: 'https://auth.datum.net', SESSION_SECRET: 'test-secret' },

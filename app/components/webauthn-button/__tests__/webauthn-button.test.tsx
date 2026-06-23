@@ -38,7 +38,7 @@ function renderBtn(mode: 'assertion' | 'attestation') {
   );
 }
 
-describe('WebAuthnButton failure copy (CODE-MIN-30)', () => {
+describe('WebAuthnButton failure copy', () => {
   it('attestation failure does not reuse the verification wording', async () => {
     renderBtn('attestation');
     const btn = await screen.findByRole('button');

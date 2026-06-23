@@ -8,7 +8,15 @@ export {
   completeEmailLinkSignup,
   postRegisterStep,
 } from './signup.service';
-export { registerSchema, registerClientSchema, signupPasswordSchema, signupIdentifierSchema, signupMethodSchema } from './signup.schema';
+export {
+  registerSchema,
+  registerClientSchema,
+  signupPasswordSchema,
+  signupIdentifierSchema,
+  signupMethodSchema,
+} from './signup.schema';
+export { decideSignupIdpIntent, decideAfterSignupIdentifier } from './signup-decision';
+export type { SignupIdpIntentResult, AfterSignupIdentifierInput } from './signup-decision';
 export type {
   SignupRedirectResult,
   SignupSentWithSessionResult,

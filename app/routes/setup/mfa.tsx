@@ -1,14 +1,15 @@
-import { AuthCard } from '@/components/auth-card/auth-card';
-import { useActionErrorToast } from '@/hooks/use-action-error-toast';
+import { AuthCeremony } from '@/components/auth-ceremony/auth-ceremony';
+import { AuthFormFields } from '@/components/auth-form/auth-form-fields';
+import { useAuthActionRecovery } from '@/hooks/use-auth-action-recovery';
 import { readSessions } from '@/modules/auth/session/cookie';
 import type { ProviderCapabilities } from '@/modules/auth/types';
 import { resolveMfaSetup, recordMfaSetupSkip } from '@/resources/mfa';
 import { setupSkipSchema } from '@/resources/mfa/mfa.schema';
+import { paths } from '@/routes/paths';
 import { providerForRequest } from '@/server/auth-context.server';
 import { getCsrfToken, assertCsrf } from '@/server/csrf';
 import { assetUrl } from '@/utils/asset-url';
-import { useAuthErrorMessage } from '@/utils/errors/auth-error-messages';
-import { Button } from '@datum-cloud/datum-ui/button';
+import { Button, LinkButton } from '@datum-cloud/datum-ui/button';
 import { Icon } from '@datum-cloud/datum-ui/icons';
 import { cn } from '@datum-cloud/datum-ui/utils';
 import { Trans } from '@lingui/react/macro';
@@ -27,44 +28,55 @@ import { Form as RRForm, Link } from 'react-router';
 export const meta: MetaFunction = () => [{ title: 'Set up multi-factor authentication' }];
 
 /**
- * Maps each capability flag to its /setup/* route segment and display label.
+ * Maps each capability flag to its /setup/* typed path builder and display label.
  * Adding a capability without providing a label here is a compile error — the
- * label field is required on every entry.
+ * label field is required on every entry. The `path` builder threads the shared
+ * query string and emits the byte-identical /setup/<seg> URL.
  */
 const CAPABILITY_ROUTES: Array<{
   key: keyof ProviderCapabilities;
-  path: string;
+  path: (qs: string) => string;
   label: React.ReactNode;
   icon: React.ReactNode;
 }> = [
-  { key: 'passkey', path: 'passkey', label: <Trans>Passkey</Trans>, icon: <Icon icon={UserKey} /> },
+  {
+    key: 'passkey',
+    path: (qs) => `${paths.setup.passkey()}?${qs}`,
+    label: <Trans>Passkey</Trans>,
+    icon: <Icon icon={UserKey} />,
+  },
   {
     key: 'u2f',
-    path: 'security-key',
+    path: (qs) => `${paths.setup.securityKey()}?${qs}`,
     label: <Trans>Security key</Trans>,
     icon: <Icon icon={KeyRound} size={16} />,
   },
   {
     key: 'totpOtp',
-    path: 'authenticator',
+    path: (qs) => `${paths.setup.authenticator()}?${qs}`,
     label: <Trans>Authenticator app</Trans>,
+    // Decorative icon: the link's accessible name comes from its visible "Authenticator app"
+    // text, so the img MUST be alt="" + aria-hidden — otherwise a screen reader announces the
+    // name twice ("Authenticator app Authenticator app"). The Icon-based rows are already
+    // decorative SVGs with no accessible name, so only this <img> needed fixing. (F4)
     icon: (
       <img
         src={assetUrl('/images/idps/totp.png')}
-        alt="Authenticator app"
+        alt=""
+        aria-hidden="true"
         className="size-4 object-contain"
       />
     ),
   },
   {
     key: 'emailOtp',
-    path: 'email',
+    path: (qs) => `${paths.setup.email()}?${qs}`,
     label: <Trans>Email OTP</Trans>,
     icon: <Icon icon={Mail} size={16} />,
   },
   {
     key: 'smsOtp',
-    path: 'sms',
+    path: (qs) => `${paths.setup.sms()}?${qs}`,
     label: <Trans>SMS OTP</Trans>,
     icon: <Icon icon={MessageSquareMore} size={16} />,
   },
@@ -123,9 +135,9 @@ export default function SetupMfa() {
     useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
 
-  const getErrorMessage = useAuthErrorMessage();
-  const errorMessage = getErrorMessage((actionData as { error?: string } | undefined)?.error);
-  useActionErrorToast(errorMessage);
+  // Resolve the inline message + a recovery <Link> for recoverable codes
+  // (SESSION_EXPIRED → "Sign in again").
+  const { message: errorMessage, recovery } = useAuthActionRecovery(actionData);
 
   // Build query params that thread through to each enrollment screen.
   const sharedParams = new URLSearchParams({ loginName });
@@ -142,51 +154,59 @@ export default function SetupMfa() {
   const offerableRoutes = CAPABILITY_ROUTES.filter((r) => offerableKeySet.has(r.key));
 
   return (
-    <AuthCard
+    <AuthCeremony
       title={<Trans>Set up multi-factor authentication</Trans>}
       description={
         <Trans>Add an extra layer of security to your account by setting up a second factor.</Trans>
-      }>
-      <div className="flex w-full flex-col gap-4">
-        <div className="flex flex-col gap-3">
-          {offerableRoutes.map((r) => (
-            <Button
-              size="large"
-              className="h-13 gap-3"
-              type="quaternary"
-              theme="outline"
-              block
-              htmlType="submit"
-              iconPosition="left"
-              icon={r.icon}
-              asChild>
-              <Link to={`/setup/${r.path}?${qs}`}>
-                <Trans>{r.label}</Trans>
-              </Link>
-            </Button>
-          ))}
-        </div>
-
-        {force !== 'true' ? (
-          <RRForm method="POST">
-            <input type="hidden" name="csrf" value={csrfToken} />
-            <input type="hidden" name="loginName" value={loginName} />
-            {requestId ? <input type="hidden" name="requestId" value={requestId} /> : null}
-            {organization ? <input type="hidden" name="organization" value={organization} /> : null}
-            {force ? <input type="hidden" name="force" value={force} /> : null}
-            {checkAfter ? <input type="hidden" name="checkAfter" value={checkAfter} /> : null}
-            <Button
-              className={cn(offerableRoutes.length > 0 && 'mt-3')}
-              type="quaternary"
-              theme="link"
-              block
-              asChild
-              htmlType="submit">
-              <Trans>Skip for now</Trans>
-            </Button>
-          </RRForm>
-        ) : null}
+      }
+      error={errorMessage}
+      recovery={recovery}
+      loginName={loginName}
+      requestId={requestId}
+      organization={organization}>
+      <div className="flex w-full flex-col gap-3">
+        {/* LinkButton (single styled <a>) — NOT Button asChild, which emits
+            <button><a> (nested-interactive axe violation in the prod build). These
+            are navigation links to each enroll route, not form submits. */}
+        {offerableRoutes.map((r) => (
+          <LinkButton
+            key={r.key}
+            size="large"
+            className="h-13 gap-3"
+            type="quaternary"
+            theme="outline"
+            block
+            iconPosition="left"
+            icon={r.icon}
+            as={Link}
+            href={r.path(qs)}>
+            <Trans>{r.label}</Trans>
+          </LinkButton>
+        ))}
       </div>
-    </AuthCard>
+
+      {force !== 'true' ? (
+        <RRForm method="POST" className="w-full">
+          <AuthFormFields
+            csrf={csrfToken}
+            loginName={loginName}
+            requestId={requestId}
+            organization={organization}
+          />
+          {force ? <input type="hidden" name="force" value={force} /> : null}
+          {checkAfter ? <input type="hidden" name="checkAfter" value={checkAfter} /> : null}
+          {/* Real form submit — no asChild (the child is text, not an element to
+              clone; asChild here was a no-op that risked a Slot child-count error). */}
+          <Button
+            className={cn(offerableRoutes.length > 0 && 'mt-3')}
+            type="quaternary"
+            theme="link"
+            block
+            htmlType="submit">
+            <Trans>Skip for now</Trans>
+          </Button>
+        </RRForm>
+      ) : null}
+    </AuthCeremony>
   );
 }

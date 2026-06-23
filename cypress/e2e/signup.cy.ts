@@ -1,6 +1,6 @@
 import { checkA11y } from '../support/a11y';
 
-// axe / WCAG 2.2 AA per-screen gate (INDEX §C, CCD-5)
+// axe / WCAG 2.2 AA per-screen gate
 
 // The signup-password action is enumeration-safe: it renders the SAME generic
 // "check your email" terminal for a new email and a duplicate one (it never
@@ -29,7 +29,7 @@ describe('signup → check your email', () => {
 describe('verify email → success', () => {
   it('issues a code on load and verifies it', () => {
     // The seeded user u1 has a deterministic pending code (`email-u1`) set at fake
-    // construction. NOTE: ?send=true is now session-gated server-side (CODE-MAJ-08) and a
+    // construction. NOTE: ?send=true is now session-gated server-side and a
     // no-op for this unauthenticated visit — we rely on the seeded code, not a fresh send.
     cy.visit('/id/verify?userId=u1&send=true&loginName=alice@acme.test');
     checkA11y(); // /verify

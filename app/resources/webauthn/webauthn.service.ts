@@ -34,7 +34,7 @@ interface NextStepFromSessionInput {
 }
 
 /**
- * MAJ-15: passkey.userVerified drives the passwordless-shortcut in nextStep → /signed-in.
+ * passkey.userVerified drives the passwordless-shortcut in nextStep → /signed-in.
  * Centralises the identical next-step derivation shared by verify + setup actions.
  */
 function nextStepFromSession({
@@ -293,7 +293,7 @@ export type PasskeyAttestationResult = AttestationLoaderRedirect | PasskeyAttest
  * Guard: active session + resolvable user required → redirect('/login') otherwise.
  * Steps 1–2: get a registration link, then fetch attestation options. On failure
  * (provider unreachable, token expired, etc.) degrade gracefully: log a TYPED audit
- * code with a PSEUDONYMIZED actor (CODE-MIN-29 / CCD-9), surface challengeFailed=true,
+ * code with a PSEUDONYMIZED actor, surface challengeFailed=true,
  * and leave publicKey null.
  *
  * Returns the RAW publicKeyCredentialCreationOptions; the route unwraps the inner
@@ -314,15 +314,13 @@ export async function requestPasskeyAttestation(
   let challengeFailed = false;
   try {
     const { code } = await provider.passkeyRegisterLink(userId);
+    // registerPasskey returns WebAuthnCreationOptions — no boundary cast needed.
     const { passkeyId: id, publicKeyCredentialCreationOptions: options } =
-      (await provider.registerPasskey(userId, code, domain)) as {
-        passkeyId: string;
-        publicKeyCredentialCreationOptions: unknown;
-      };
+      await provider.registerPasskey(userId, code, domain);
     passkeyId = id;
     publicKeyCredentialCreationOptions = options;
   } catch (err) {
-    // CODE-MIN-29: don't discard the cause — log a typed code and a pseudonymized actor (CCD-9).
+    // Don't discard the cause — log a typed code and a pseudonymized actor.
     logAuthEvent('mfa_enroll_challenge', 'failure', {
       actor: hashActor(loginName),
       factor: 'passkey',
@@ -372,13 +370,11 @@ export async function requestU2FAttestation(
   let u2fId: string | null = null;
   let publicKeyCredentialCreationOptions: unknown = null;
   try {
-    const { u2fId: id, publicKeyCredentialCreationOptions: options } = (await provider.registerU2F(
+    // registerU2F returns U2FCreationOptions — no boundary cast needed.
+    const { u2fId: id, publicKeyCredentialCreationOptions: options } = await provider.registerU2F(
       userId,
       domain
-    )) as {
-      u2fId: string;
-      publicKeyCredentialCreationOptions: unknown;
-    };
+    );
     u2fId = id;
     publicKeyCredentialCreationOptions = options;
   } catch {

@@ -1,4 +1,10 @@
-import type { AuthMethod, Factors, LoginSettings } from '@/modules/auth/types';
+import type {
+  AuthMethod,
+  Factors,
+  FlowContext,
+  LoginSettings,
+  SecondFactorMethod,
+} from '@/modules/auth/types';
 import { passwordlessPasskeyFresh, secondFactorFresh } from '@/resources/shared/lifetimes';
 
 export interface MfaRoutingInput {
@@ -9,8 +15,17 @@ export interface MfaRoutingInput {
   loginName: string;
   userVerified: boolean; // session.factors.passkey was user-verified
   mfaInitSkippedAt: string | null; // ISO or null (from neutral User)
+  // nextMfaStep is by definition the MFA flow. The role is threaded explicitly so the
+  // 'mfa' meaning of an `otp_email` second factor is pinned at the type boundary (a 'primary'
+  // context is a compile error here) instead of inferred from a sentinel param. Behavior-neutral.
+  context: Extract<FlowContext, { role: 'mfa' }>;
   requestId?: string;
   organization?: string;
+  // 755-M10: when true, suppress ONLY the step-6 skippable MFA-setup nudge (return `done`
+  // instead of `/setup/mfa?force=false`). Set on account-SWITCH, where re-firing the
+  // enroll-now prompt is a regression. Steps 1–5 are unaffected: real challenges
+  // (steps 1–4) and FORCED setup (step 5, settings.forceMfa) still route normally.
+  suppressMfaSetupNudge?: boolean;
 }
 
 export type MfaRoutingResult =
@@ -20,8 +35,16 @@ export type MfaRoutingResult =
 // Note: AuthMethod uses snake_case ('otp_email') while Factors keys use camelCase ('otpEmail') —
 // separate concerns; do not conflate. The allow-list below intentionally excludes
 // password/passkey/idp (and any future AuthMethod) from the 2nd-factor count.
-export const SECOND_FACTOR_METHODS = ['totp', 'otp_email', 'otp_sms', 'u2f'] as const;
-export type SecondFactorMethod = (typeof SECOND_FACTOR_METHODS)[number];
+// SecondFactorMethod is now the canonical type in modules/auth/types.ts (the other
+// half of the otp_email dual-role). The runtime allow-list stays here (routing concern) and is
+// pinned to that type via `satisfies` so the two can never drift; re-exported for back-compat.
+export const SECOND_FACTOR_METHODS = [
+  'totp',
+  'otp_email',
+  'otp_sms',
+  'u2f',
+] as const satisfies readonly SecondFactorMethod[];
+export type { SecondFactorMethod };
 
 export const USE_SCREEN: Record<SecondFactorMethod, string> = {
   totp: '/login/verify/authenticator',
@@ -99,6 +122,13 @@ export function nextMfaStep(input: MfaRoutingInput): MfaRoutingResult {
   }
 
   // 6. Skippable setup prompt, gated by the skip lifetime.
+  // 755-M10: on account-switch the caller suppresses this nudge — switching to an
+  // already-signed-in account must NOT re-fire the enroll-now prompt. Forced setup
+  // (step 5 above) and real challenges (steps 1–4) have already been handled, so this
+  // early `done` only skips the optional nudge, never a real requirement.
+  if (input.suppressMfaSetupNudge) {
+    return { kind: 'done' };
+  }
   const skipMs = settings.mfaInitSkipLifetimeMs;
   if (skipMs) {
     const skippedAt = input.mfaInitSkippedAt ? Date.parse(input.mfaInitSkippedAt) : NaN;

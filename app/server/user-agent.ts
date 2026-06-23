@@ -9,7 +9,7 @@
 //
 // IP extraction reuses the same last-hop XFF strategy as rate-limit.ts:
 //   xff.split(',').at(-1)?.trim()
-// This is the single source of truth for proxy trust (CODE-MAJ-13 constraint).
+// This is the single source of truth for proxy trust.
 
 export interface ZitadelUserAgent {
   fingerprintId?: string;
@@ -20,12 +20,11 @@ export interface ZitadelUserAgent {
 
 // ── Internal UA description builder ─────────────────────────────────────────
 //
-// Mirrors the old getUserAgent() shape:
-//   `${browserDescription}, ${deviceDescription}, ${engineDescription}, ${osDescription}`
-//
-// Each segment is built as the old code built it:
-//   `${name ? `${name},` : ''} ${version ? `${version},` : ''} `
-// Empty segments still produce whitespace — this preserves the old format exactly.
+// Emits a clean, deterministic description from the parsed parts. The OLD
+// getUserAgent() format interpolated empty segments, producing dangling commas
+// and stray whitespace (`"Chrome, 124,  ,  Blink, 537.36,  macOS, 10.15, "`).
+// 755-M1: instead, build only the segments that have content and join them with
+// a single separator so the rendered Active-Sessions row reads cleanly.
 
 interface UAParts {
   browserName: string;
@@ -159,19 +158,20 @@ function parseUA(ua: string): UAParts {
 }
 
 /**
- * Builds the description string matching the old getUserAgent() format:
- *   `${browserDescription}, ${deviceDescription}, ${engineDescription}, ${osDescription}`
- *
- * Each sub-description follows the original pattern:
- *   `${name ? `${name},` : ''} ${version ? `${version},` : ''} `
+ * 755-M1 (revised — byte-match the OLD auth-ui): reproduce the OLD `lib/fingerprint.ts`
+ * `description` shape so cloud-portal's session gateway (which parsed the OLD payload to populate
+ * the Active-Sessions browser/OS columns) behaves identically. The OLD emitted four comma-joined
+ * `"name, version, "` groups in browser/device/engine/OS order, with EMPTY segments preserved.
+ * The cleaner `" · "` form regressed the portal's OS column (FINDINGS Run-4 / FIX-REGISTER 755-M1).
+ * NOTE: the field the gateway actually parses is the raw `header['user-agent']` values (also
+ * restored to the OLD comma-split in `userAgentFromRequest`); this description is matched for parity.
  */
 function buildDescription(p: UAParts): string {
-  const browserDescription = `${p.browserName ? `${p.browserName},` : ''} ${p.browserVersion ? `${p.browserVersion},` : ''} `;
-  const deviceDescription = `${p.deviceType ? `${p.deviceType},` : ''} ${p.deviceVendor ? `${p.deviceVendor},` : ''} ${p.deviceModel ? `${p.deviceModel},` : ''} `;
-  const engineDescription = `${p.engineName ? `${p.engineName},` : ''} ${p.engineVersion ? `${p.engineVersion},` : ''} `;
-  const osDescription = `${p.osName ? `${p.osName},` : ''} ${p.osVersion ? `${p.osVersion},` : ''} `;
-
-  return `${browserDescription}, ${deviceDescription}, ${engineDescription}, ${osDescription}`;
+  const browser = `${p.browserName ? `${p.browserName},` : ''} ${p.browserVersion ? `${p.browserVersion},` : ''} `;
+  const device = `${p.deviceType ? `${p.deviceType},` : ''} ${p.deviceVendor ? `${p.deviceVendor},` : ''} ${p.deviceModel ? `${p.deviceModel},` : ''} `;
+  const engine = `${p.engineName ? `${p.engineName},` : ''} ${p.engineVersion ? `${p.engineVersion},` : ''} `;
+  const os = `${p.osName ? `${p.osName},` : ''} ${p.osVersion ? `${p.osVersion},` : ''} `;
+  return `${browser}, ${device}, ${engine}, ${os}`;
 }
 
 // ── Public API ───────────────────────────────────────────────────────────────
@@ -204,14 +204,13 @@ export function userAgentFromRequest(request: Request, fingerprintId?: string): 
   // UA header → header shape + description
   const ua = request.headers.get('user-agent');
   if (ua) {
-    result.header = { 'user-agent': { values: [ua] } };
+    // 755-M1: byte-match the OLD payload. The OLD lib/fingerprint.ts sent the raw UA
+    // comma-SPLIT (`userAgentHeader.split(',')`), and cloud-portal's session gateway parses
+    // THIS field (not `description`) into the Active-Sessions browser/OS columns. The rebuild's
+    // single-value `[ua]` shape regressed that column — restore the comma-split.
+    result.header = { 'user-agent': { values: ua.split(',') } };
 
-    const parts = parseUA(ua);
-    const description = buildDescription(parts);
-    // Only attach description if it contains something beyond whitespace/commas.
-    if (description.replace(/[\s,]/g, '').length > 0) {
-      result.description = description;
-    }
+    result.description = buildDescription(parseUA(ua));
   }
 
   return result;

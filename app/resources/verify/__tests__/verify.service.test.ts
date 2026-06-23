@@ -8,7 +8,7 @@
 // it to the service; here we pass the resolved {id, token} in directly (no HTTP/cookie
 // ceremony), which is exactly what the route does after readSessions → mostRecent.
 //
-// CODE-MAJ-08: the loader previously sent an email code for ANY userId on an
+// The loader previously sent an email code for ANY userId on an
 // unauthenticated GET — a code-flood / enumeration vector. The fix gates the send on
 // an active session whose provider-resolved user matches the userId query param.
 import { FakeAuthProvider } from '@/modules/auth/providers/fake/fake-provider';
@@ -23,7 +23,7 @@ function fakeProvider(): FakeAuthProvider {
   return getAuthProvider({ AUTH_PROVIDER: 'fake' }) as FakeAuthProvider;
 }
 
-describe('dispatchEmailCode — session-ownership gate on ?send=true (CODE-MAJ-08)', () => {
+describe('dispatchEmailCode — session-ownership gate on ?send=true', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
   });

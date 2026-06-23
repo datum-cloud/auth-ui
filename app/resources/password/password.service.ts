@@ -82,7 +82,7 @@ export type SubmitNewPasswordResult =
 /**
  * Parse + dispatch a "set new password" submission.
  *
- * The CODE-MIN-24 requestId allowlist lives in `newPasswordSchema`, so a tampered
+ * The requestId allowlist lives in `newPasswordSchema`, so a tampered
  * mid-ceremony requestId is rejected here at the boundary (→ INVALID_INPUT) and can
  * never forward into /authorize.
  *

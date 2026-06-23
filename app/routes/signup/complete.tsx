@@ -13,9 +13,10 @@ import { readSessions, serializeSessions } from '@/modules/auth/session/cookie';
 import { serializeLastUsedLogin } from '@/modules/auth/session/last-used-login';
 import { ProviderError } from '@/modules/auth/types';
 import { completeEmailLinkSignup } from '@/resources/signup';
+import { paths } from '@/routes/paths';
 import { providerForRequest } from '@/server/auth-context.server';
 import { userAgentFromRequest } from '@/server/user-agent';
-import { Button } from '@datum-cloud/datum-ui/button';
+import { LinkButton } from '@datum-cloud/datum-ui/button';
 import { Trans } from '@lingui/react/macro';
 import {
   data,
@@ -87,11 +88,11 @@ export default function SignupComplete() {
         title={<Trans>Link expired</Trans>}
         description={<Trans>This sign-in link is invalid or has expired.</Trans>}>
         <div className="flex flex-col gap-4 text-center">
-          <Button theme="link" type="quaternary" block asChild>
-            <Link to="/signup">
-              <Trans>Start over</Trans>
-            </Link>
-          </Button>
+          {/* LinkButton (single styled <a>) — NOT Button asChild, which emits
+              <button><a> (nested-interactive axe violation in the prod build). */}
+          <LinkButton theme="link" type="quaternary" block as={Link} href={paths.signup.index()}>
+            <Trans>Start over</Trans>
+          </LinkButton>
         </div>
       </AuthCard>
     );

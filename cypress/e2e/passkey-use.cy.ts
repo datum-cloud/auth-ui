@@ -22,7 +22,7 @@ describe('Passkey verify (/login/passkey)', () => {
       .should('not.be.disabled')
       .click();
 
-    // The fake provider marks passkey factor verified + userVerified=true (MAJ-15),
+    // The fake provider marks passkey factor verified + userVerified=true,
     // so nextStep returns /signed-in deterministically.
     cy.location('pathname').should('eq', '/id/signed-in');
   });

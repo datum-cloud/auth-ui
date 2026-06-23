@@ -5,9 +5,9 @@
 // CSRF + sessions cookie, these call chooseMfaMethod directly against the fake provider
 // singleton with an in-memory SessionEntry list and plain form entries.
 //
-// Task 8 — CODE-MIN-28: a findUser failure during the best-effort audit-userId lookup must be
+// A findUser failure during the best-effort audit-userId lookup must be
 // surfaced (a failure audit line), must NOT abort routing (the success routing event still
-// fires), and must NOT leak the raw loginName (CCD-9 — only the hashed actor).
+// fires), and must NOT leak the raw loginName (only the hashed actor).
 import { FakeAuthProvider } from '@/modules/auth/providers/fake/fake-provider';
 import { getAuthProvider } from '@/modules/auth/select.server';
 import type { SessionEntry } from '@/modules/auth/session/cookie';
@@ -63,7 +63,7 @@ async function runChoose(
   );
 }
 
-describe('chooseMfaMethod — findUser failure audit (CODE-MIN-28)', () => {
+describe('chooseMfaMethod — findUser failure audit', () => {
   it('emits an mfa_method_chosen failure audit line when findUser throws', async () => {
     // Arrange: make the fake provider's findUser reject.
     const fake = fakeProvider();
@@ -93,7 +93,7 @@ describe('chooseMfaMethod — findUser failure audit (CODE-MIN-28)', () => {
     expect(successCall).toBeDefined();
   });
 
-  it('does NOT put raw loginName in the failure audit fields (CCD-9)', async () => {
+  it('does NOT put raw loginName in the failure audit fields', async () => {
     const fake = fakeProvider();
     vi.spyOn(fake, 'findUser').mockRejectedValue(new Error('boom'));
 

@@ -24,7 +24,8 @@ export interface OtpEmailUrlTemplateInput {
 
 /**
  * Builds the OTPEmail `url_template` passed to the challenge-request seam
- * (SessionChecks.challenges.otpEmail.urlTemplate → proto OTPEmail.SendCode.url_template).
+ * (SessionChecks.challenges.otpEmail = { kind: 'send-template'; urlTemplate } → proto
+ * OTPEmail.SendCode.url_template).
  * Zitadel substitutes the RAW placeholders {{.Code}}, {{.UserID}}, {{.SessionID}} when it
  * sends the email-OTP mail, so the link lands on OUR /id/login/verify/email route instead
  * of the provider's default /ui/v2/login/otp/email page.

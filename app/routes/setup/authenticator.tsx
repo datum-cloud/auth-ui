@@ -1,15 +1,18 @@
-import { AuthCard } from '@/components/auth-card/auth-card';
+import { AuthCeremony } from '@/components/auth-ceremony/auth-ceremony';
+import { OtpCodeField } from '@/components/auth-ceremony/otp-code-field';
 import { SubmitButton } from '@/components/auth-form/auth-form';
-import { useActionErrorToast } from '@/hooks/use-action-error-toast';
+import { AuthFormFields } from '@/components/auth-form/auth-form-fields';
+import { useAuthActionRecovery } from '@/hooks/use-auth-action-recovery';
 import { readSessions, byLoginName } from '@/modules/auth/session/cookie';
 import { setupSkipSchema } from '@/resources/mfa/mfa.schema';
 import { enrollTotp } from '@/resources/otp';
 import { otpCodeClientSchema } from '@/resources/otp/otp.schema';
+import { paths } from '@/routes/paths';
 import { providerForRequest } from '@/server/auth-context.server';
 import { getCsrfToken, assertCsrf } from '@/server/csrf';
-import { useAuthErrorMessage } from '@/utils/errors/auth-error-messages';
 import { Form } from '@datum-cloud/datum-ui/form';
 import { Trans, useLingui } from '@lingui/react/macro';
+import { QRCodeSVG } from 'qrcode.react';
 import {
   data,
   redirect,
@@ -34,12 +37,12 @@ export async function loader({ request }: LoaderFunctionArgs) {
   // Guard: require an active session for this loginName (mirror login.verify.authenticator.tsx).
   const sessions = await readSessions(request);
   const entry = byLoginName(sessions, loginName, organization);
-  if (!entry) return redirect('/login');
+  if (!entry) return redirect(paths.login.index());
 
   // Resolve userId via findUser — SessionEntry carries no userId field (mirror login.mfa.tsx).
   const provider = providerForRequest(request);
   const user = await provider.findUser(loginName, organization);
-  if (!user) return redirect('/login');
+  if (!user) return redirect(paths.login.index());
 
   // Register TOTP: returns deterministic { uri, secret } in fake; real adapter generates a new key.
   const { uri, secret } = await provider.registerTotp(user.id);
@@ -83,65 +86,85 @@ export default function SetupAuthenticator() {
   const navigation = useNavigation();
   const { t } = useLingui();
 
-  const getErrorMessage = useAuthErrorMessage();
-  const errorMessage = getErrorMessage((actionData as { error?: string } | undefined)?.error);
-  useActionErrorToast(errorMessage);
+  // Inline message + a recovery <Link> for recoverable codes (SESSION_EXPIRED → "Sign in again").
+  const { message: errorMessage, recovery } = useAuthActionRecovery(actionData);
 
   return (
-    <AuthCard
+    <AuthCeremony
       title={<Trans>Set up authenticator app</Trans>}
       description={
         <Trans>
           Scan the QR code below with your authenticator app, then enter the 6-digit code to confirm
           enrollment.
         </Trans>
-      }>
-      <div className="flex w-full flex-col gap-4">
-        {/* Manual entry fallback — the otpauth URI and the raw secret.
-            NOTE: A rendered QR image would improve UX here. The `qrcode` package
-            is not yet in this project's dependency tree; adding it is deferred to a
-            follow-up task. The otpauth URI below is scannable by camera apps and
-            authenticator apps that accept manual URI import. */}
-        <div className="bg-muted flex flex-col gap-2 rounded-md p-4 text-sm">
-          <p className="font-medium">
-            <Trans>Manual setup key</Trans>
-          </p>
-          <code
-            data-testid="totp-secret"
-            className="font-mono text-base tracking-widest break-all select-all">
-            {secret}
-          </code>
-          <p className="mt-2 font-medium">
-            <Trans>Or import this URI in your authenticator app</Trans>
-          </p>
-          <code
-            data-testid="totp-uri"
-            className="text-foreground font-mono text-xs break-all select-all">
-            {uri}
-          </code>
-        </div>
-
-        <Form.Root
-          schema={otpCodeClientSchema}
-          formComponent={RRForm}
-          method="POST"
-          defaultValues={{ code: '' }}
-          isSubmitting={navigation.state === 'submitting'}
-          className="flex w-full flex-col gap-4">
-          <input type="hidden" name="csrf" value={csrfToken} />
-          <input type="hidden" name="loginName" value={loginName} />
-          {requestId ? <input type="hidden" name="requestId" value={requestId} /> : null}
-          {organization ? <input type="hidden" name="organization" value={organization} /> : null}
-          {force ? <input type="hidden" name="force" value={force} /> : null}
-          {checkAfter ? <input type="hidden" name="checkAfter" value={checkAfter} /> : null}
-          <Form.Field name="code" label={t`Authenticator code`} required>
-            <Form.Input inputMode="numeric" autoComplete="one-time-code" autoFocus />
-          </Form.Field>
-          <SubmitButton>
-            <Trans>Verify and enable</Trans>
-          </SubmitButton>
-        </Form.Root>
+      }
+      error={errorMessage}
+      recovery={recovery}
+      loginName={loginName}
+      requestId={requestId}
+      organization={organization}>
+      {/* Scannable QR of the otpauth URI. Rendered ABOVE the manual-key
+          fallback (kept for authenticators that accept manual URI/secret import, or when
+          the camera isn't available). Explicit dimensions avoid layout shift; the white
+          frame preserves the quiet-zone contrast scanners need. */}
+      <div className="flex w-full justify-center">
+        {/* 755-M4: bg-white below is intentional in BOTH themes — a TOTP QR needs a light quiet
+            zone for reliable camera scanning; it must NOT flip to a dark surface. */}
+        <QRCodeSVG
+          data-testid="totp-qr"
+          value={uri}
+          size={180}
+          width={180}
+          height={180}
+          marginSize={2}
+          className="rounded-md bg-white p-3"
+          title={t`Authenticator QR code`}
+          aria-label={t`Authenticator QR code`}
+        />
       </div>
-    </AuthCard>
+
+      {/* Manual entry fallback — the otpauth URI and the raw secret. Kept for
+          authenticators that accept manual URI/secret import, or when the camera
+          is unavailable. */}
+      <div className="bg-muted flex w-full flex-col gap-2 rounded-md p-4 text-sm">
+        <p className="font-medium">
+          <Trans>Manual setup key</Trans>
+        </p>
+        <code
+          data-testid="totp-secret"
+          className="font-mono text-base tracking-widest break-all select-all">
+          {secret}
+        </code>
+        <p className="mt-2 font-medium">
+          <Trans>Or import this URI in your authenticator app</Trans>
+        </p>
+        <code
+          data-testid="totp-uri"
+          className="text-foreground font-mono text-xs break-all select-all">
+          {uri}
+        </code>
+      </div>
+
+      <Form.Root
+        schema={otpCodeClientSchema}
+        formComponent={RRForm}
+        method="POST"
+        defaultValues={{ code: '' }}
+        isSubmitting={navigation.state === 'submitting'}
+        className="flex w-full flex-col gap-4">
+        <AuthFormFields
+          csrf={csrfToken}
+          loginName={loginName}
+          requestId={requestId}
+          organization={organization}
+        />
+        {force ? <input type="hidden" name="force" value={force} /> : null}
+        {checkAfter ? <input type="hidden" name="checkAfter" value={checkAfter} /> : null}
+        <OtpCodeField label={t`Authenticator code`} />
+        <SubmitButton>
+          <Trans>Verify and enable</Trans>
+        </SubmitButton>
+      </Form.Root>
+    </AuthCeremony>
   );
 }

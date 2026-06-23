@@ -4,7 +4,7 @@
  * We import `_envSchema` directly so we can call `.safeParse` with arbitrary
  * inputs without touching `process.env` or triggering module-load side-effects.
  */
-import { _envSchema } from '@/utils/env/env.server';
+import { _envSchema } from '@/server/infra/env.server';
 import { describe, it, expect } from 'vitest';
 
 const BASE = {

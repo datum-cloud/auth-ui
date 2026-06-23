@@ -1,7 +1,7 @@
 import { toRequestUrl } from './session';
 import { describe, it, expect } from 'vitest';
 
-describe('toRequestUrl (CODE-MIN-35)', () => {
+describe('toRequestUrl', () => {
   it('passes absolute URLs through unchanged', () => {
     expect(toRequestUrl('https://x.test/id/login/password')).toBe(
       'https://x.test/id/login/password'

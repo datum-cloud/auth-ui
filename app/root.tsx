@@ -8,15 +8,14 @@ import { AuthCard } from '@/components/auth-card/auth-card';
 import { FathomAnalytics, resolveFathomSiteId } from '@/modules/analytics/fathom';
 import { loadMessages } from '@/modules/i18n/lingui';
 import { detectLocale } from '@/modules/i18n/lingui.server';
-import { env } from '@/utils/env/env.server';
+import { env } from '@/server/infra/env.server';
 import { authErrorMessage } from '@/utils/errors/auth-error';
 import { ConformAdapter } from '@datum-cloud/datum-ui/form/adapters/conform';
 import { ThemeProvider, ThemeScript } from '@datum-cloud/datum-ui/theme';
 import { Toaster } from '@datum-cloud/datum-ui/toast';
 import { setupI18n } from '@lingui/core';
 import { I18nProvider } from '@lingui/react';
-import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useMemo } from 'react';
 import {
   Links,
   Meta,
@@ -81,7 +80,11 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
         <Meta />
         <Links />
-        <ThemeScript nonce={data?.cspNonce} attribute="class" defaultTheme="light" />
+        {/* 755-M4: must mirror the <ThemeProvider> props below exactly so the pre-hydration
+            class on <html> matches React's first render (no FOUC, no hydration mismatch).
+            enableSystem + defaultTheme="system" → a fresh visitor follows prefers-color-scheme;
+            the persisted ThemeToggle choice (localStorage) overrides it on return visits. */}
+        <ThemeScript nonce={data?.cspNonce} attribute="class" defaultTheme="system" enableSystem />
       </head>
       <body>
         {children}
@@ -109,34 +112,20 @@ export default function App() {
     [locale, messages]
   );
 
-  // QueryClient inside component state — prevents shared server-side cache across users.
-  const [queryClient] = useState(
-    () =>
-      new QueryClient({
-        defaultOptions: { queries: { staleTime: 60_000, refetchOnWindowFocus: false } },
-      })
-  );
-
   return (
-    <ThemeProvider
-      attribute="class"
-      defaultTheme="light"
-      enableSystem={false}
-      disableTransitionOnChange>
-      <QueryClientProvider client={queryClient}>
-        <I18nProvider i18n={i18nInstance}>
-          <ConformAdapter>
-            <FathomAnalytics siteId={fathomSiteId} />
-            <Outlet />
-            <Toaster position="top-right" />
-          </ConformAdapter>
-        </I18nProvider>
-      </QueryClientProvider>
+    <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+      <I18nProvider i18n={i18nInstance}>
+        <ConformAdapter>
+          <FathomAnalytics siteId={fathomSiteId} />
+          <Outlet />
+          <Toaster position="top-right" />
+        </ConformAdapter>
+      </I18nProvider>
     </ThemeProvider>
   );
 }
 
-// CCD-10 / CODE-MAJ-06: pure presentational view — unit-testable without router context.
+// Pure presentational view — unit-testable without router context.
 // Always shows the generic fallback from authErrorMessage(undefined); raw error text is
 // NEVER reflected into the DOM (no branching on error contents).
 export function ErrorView() {
@@ -144,7 +133,7 @@ export function ErrorView() {
   return <AuthCard title={title} description={body} />;
 }
 
-// CCD-10 / CODE-MAJ-06: app-wide error boundary. Every route inherits this when a loader,
+// App-wide error boundary. Every route inherits this when a loader,
 // action, or render throws — replacing React Router's unstyled default with the branded
 // AuthCard and a FIXED, non-leaking message.
 export function ErrorBoundary() {

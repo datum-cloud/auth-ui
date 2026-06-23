@@ -42,6 +42,12 @@ describe('login form submits when hydrated (RHF-adapter regression)', () => {
 
     checkA11y(); // hydrated /login still renders accessibly
 
+    // IdP-first UX: the identifier field is hidden behind an "Email" reveal button (see
+    // entry.client.tsx + routes/login/index.tsx). Click it first to mount the loginName input —
+    // mirrors core-signin.cy.ts. (Pre-IdP-first this field was visible on load; the reveal is the
+    // current behavior.) The hydration regression this spec guards is unaffected by the reveal.
+    cy.contains('button', 'Email').click();
+
     // Type into the (now React-controlled) identifier field and click the real
     // Continue button — the exact interaction the RHF adapter used to swallow.
     cy.get('input[name="loginName"]').type('alice@acme.test');

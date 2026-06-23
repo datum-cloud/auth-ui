@@ -26,7 +26,8 @@
  * entry.server.tsx instead — that achieves the same effect of initialising the SDK
  * before any application code runs in the module graph.
  */
-import { env } from '@/utils/env/env.server';
+import { env } from '@/server/infra/env.server';
+import { beforeSend, beforeSendTransaction } from '@/server/sentry-scrub';
 import * as Sentry from '@sentry/react-router';
 
 export const isSentryEnabled: boolean = Boolean(env.SENTRY_DSN);
@@ -38,6 +39,11 @@ if (isSentryEnabled) {
     // Keep integrations minimal — no source-map upload here (that belongs in the
     // Vite build plugin which requires SENTRY_AUTH_TOKEN; skipped until cutover).
     environment: env.NODE_ENV,
+    // Egress neutrality: ALLOWLIST scrubber — every event/transaction is
+    // reduced to safe fields before it leaves the process. Raw provider/proto
+    // detail + PII stay in the server log keyed by traceId (see sentry-scrub.ts).
+    beforeSend,
+    beforeSendTransaction,
   });
 }
 

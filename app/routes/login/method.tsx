@@ -1,9 +1,9 @@
 import SplitLayout from '@/layouts/split.layout';
 import { decideAfterIdentifier } from '@/resources/login/login-decision';
-import { type LoginLayoutData } from '@/routes/login/layout';
+import { paths } from '@/routes/paths';
 import { providerForRequest } from '@/server/auth-context.server';
-import { env } from '@/utils/env/env.server';
-import { Button } from '@datum-cloud/datum-ui/button';
+import { env } from '@/server/infra/env.server';
+import { LinkButton } from '@datum-cloud/datum-ui/button';
 import { Icon } from '@datum-cloud/datum-ui/icons';
 import { Trans } from '@lingui/react/macro';
 import { Key, Lock, Mail, UserCircle } from 'lucide-react';
@@ -26,14 +26,17 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const requestId = url.searchParams.get('requestId') ?? undefined;
   const organization = url.searchParams.get('organization') ?? undefined;
 
-  if (!loginName) return redirect('/login');
+  if (!loginName) return redirect(paths.login.index());
 
   const user = await provider.findUser(loginName, organization);
-  if (!user) return redirect('/login');
+  if (!user) return redirect(paths.login.index());
 
-  const [methods, settings] = await Promise.all([
+  // The method chooser is a branded screen — thread getBranding through so SplitLayout
+  // renders the org logo, mirroring /login and /signup. Fetched in parallel with the rest.
+  const [methods, settings, branding] = await Promise.all([
     provider.listAuthMethods(user.id),
     provider.getLoginSettings(organization),
+    provider.getBranding(organization),
   ]);
 
   // Compute available primary sign-in methods using the same policy gates as
@@ -47,36 +50,40 @@ export async function loader({ request }: LoaderFunctionArgs) {
   if (methods.includes('otp_email') && env.AUTH_EMAIL_DELIVERY_ENABLED) available.push('otp_email');
 
   // Defensive: if for some reason < 2 methods are available, run decideAfterIdentifier
-  // and redirect to the single target (or error).
+  // and redirect to the single target (or /error). Consume the Decision union by
+  // `kind` — 'redirect' → its path, 'error' → /error.
   if (available.length < 2) {
     const decision = decideAfterIdentifier({
       methods,
       settings,
       emailDeliveryEnabled: env.AUTH_EMAIL_DELIVERY_ENABLED,
+      context: { role: 'primary' }, // post-identifier decision is the primary flow
     });
     const params = new URLSearchParams({ loginName });
     if (requestId) params.set('requestId', requestId);
     if (organization) params.set('organization', organization);
-    return redirect(`${decision.target}?${params.toString()}`);
+    const target = decision.kind === 'redirect' ? decision.path : paths.error();
+    return redirect(`${target}?${params.toString()}`);
   }
 
-  return { loginName, requestId, organization, methods: available };
+  return { loginName, requestId, organization, methods: available, branding };
 }
 
 export default function LoginMethod() {
-  const { methods } = useLoaderData<typeof loader>();
-  const { loginName, requestId, organization } = useRouteLoaderData('login') as LoginLayoutData;
+  const { methods, branding } = useLoaderData<typeof loader>();
+  // RR7 infers the parent-layout loader return through the generic — the `as` cast is gone.
+  // The `?? { loginName: '' }` only satisfies the structurally-possible-undefined branch; these
+  // routes always render under the `login` layout, so it is never taken at runtime.
+  const { loginName, requestId, organization } = useRouteLoaderData<
+    typeof import('@/routes/login/layout').loader
+  >('login') ?? { loginName: '' };
 
-  function buildParams(extra?: Record<string, string>): string {
-    const p = new URLSearchParams({ loginName });
-    if (requestId) p.set('requestId', requestId);
-    if (organization) p.set('organization', organization);
-    if (extra) Object.entries(extra).forEach(([k, v]) => p.set(k, v));
-    return p.toString();
-  }
+  // Typed paths.* emit the identical query string buildParams produced
+  // (loginName, then requestId, then organization — undefined values are skipped).
+  const query = { loginName, requestId, organization };
 
   return (
-    <SplitLayout>
+    <SplitLayout branding={branding}>
       <div className="mb-8 flex flex-col gap-3">
         <h1 className="text-foreground text-2xl leading-6 font-semibold">
           <Trans>Choose how to sign in</Trans>
@@ -87,68 +94,66 @@ export default function LoginMethod() {
       </div>
 
       <div className="flex flex-col gap-3">
+        {/* LinkButton (single styled <a>) — NOT Button asChild, which emits
+            <button><a> (nested-interactive axe violation in the prod build). */}
         {methods.includes('passkey') ? (
-          <Button
+          <LinkButton
             size="large"
             className="h-13 gap-3"
             type="quaternary"
             theme="outline"
             block
-            asChild
+            as={Link}
+            href={paths.login.passkey(query)}
             iconPosition="left"
             icon={<Icon icon={Key} />}>
-            <Link to={`/login/passkey?${buildParams()}`}>
-              <Trans>Passkey</Trans>
-            </Link>
-          </Button>
+            <Trans>Passkey</Trans>
+          </LinkButton>
         ) : null}
 
         {methods.includes('otp_email') ? (
-          <Button
+          <LinkButton
             size="large"
             className="h-13 gap-3"
             type="quaternary"
             theme="outline"
             block
-            asChild
+            as={Link}
+            href={paths.login.verify.email(query)}
             iconPosition="left"
             icon={<Icon icon={Mail} />}>
-            <Link to={`/login/verify/email?${buildParams()}`}>
-              <Trans>Email me a sign-in link</Trans>
-            </Link>
-          </Button>
+            <Trans>Email me a sign-in link</Trans>
+          </LinkButton>
         ) : null}
 
         {methods.includes('password') ? (
-          <Button
+          <LinkButton
             size="large"
             className="h-13 gap-3"
             type="quaternary"
             theme="outline"
             block
-            asChild
+            as={Link}
+            href={paths.login.password(query)}
             iconPosition="left"
             icon={<Icon icon={Lock} />}>
-            <Link to={`/login/password?${buildParams()}`}>
-              <Trans>Password</Trans>
-            </Link>
-          </Button>
+            <Trans>Password</Trans>
+          </LinkButton>
         ) : null}
 
         {methods.includes('idp') ? (
-          <Button
+          <LinkButton
             size="large"
             className="h-13 gap-3"
             type="quaternary"
             theme="outline"
             block
-            asChild
+            as={Link}
+            href={paths.sso.index(query)}
             iconPosition="left"
             icon={<Icon icon={UserCircle} />}>
-            <Link to={`/sso?${buildParams()}`}>
-              <Trans>Continue with your provider</Trans>
-            </Link>
-          </Button>
+            <Trans>Continue with your provider</Trans>
+          </LinkButton>
         ) : null}
       </div>
     </SplitLayout>

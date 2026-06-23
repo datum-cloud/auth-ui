@@ -18,6 +18,9 @@ export interface NextStepParams {
   mfaInitSkippedAt?: string | null;
   requestId?: string;
   organization?: string;
+  // 755-M10: forwarded to nextStep → nextMfaStep to suppress ONLY the step-6 skippable
+  // MFA-setup nudge on account-switch. Forced setup + real challenges are unaffected.
+  suppressMfaSetupNudge?: boolean;
 }
 
 export function nextStepWithParams(input: NextStepParams): string {
@@ -30,22 +33,28 @@ export function nextStepWithParams(input: NextStepParams): string {
     mfaInitSkippedAt: input.mfaInitSkippedAt,
     requestId: input.requestId,
     organization: input.organization,
+    suppressMfaSetupNudge: input.suppressMfaSetupNudge,
     nowMs: Date.now(),
   });
 
-  const params = new URLSearchParams();
+  // nextStep ALREADY bakes the ceremony params (loginName/requestId/organization) into the
+  // target's query — so we must MERGE into that existing query (set() dedupes), not blindly
+  // append with `&`, which produced a duplicated `loginName=…&loginName=…` (F3). Splitting on
+  // the first '?' preserves any MFA-specific params (force/checkAfter) nextStep already set.
+  const qIndex = target.indexOf('?');
+  const base = qIndex === -1 ? target : target.slice(0, qIndex);
+  const params = new URLSearchParams(qIndex === -1 ? '' : target.slice(qIndex + 1));
+
   if (input.loginName) params.set('loginName', input.loginName);
-  // CODE-MIN-13: only thread a requestId that matches the Zitadel-issued prefix allowlist
-  // (oidc_/saml_/device_). A malformed value is treated as absent rather than reflected.
+  // Only thread a requestId that matches the Zitadel-issued prefix allowlist
+  // (oidc_/saml_/device_). A malformed value is treated as absent rather than reflected
+  // (and dropped from any value nextStep may have already set).
   if (input.requestId && REQUEST_ID_PATTERN.test(input.requestId)) {
     params.set('requestId', input.requestId);
+  } else {
+    params.delete('requestId');
   }
   if (input.organization) params.set('organization', input.organization);
   const qs = params.toString();
-  if (!qs) return target;
-
-  // target may already contain MFA-specific params (e.g. force=true&checkAfter=true)
-  // from nextStep; append ceremony params with & rather than ?.
-  const sep = target.includes('?') ? '&' : '?';
-  return `${target}${sep}${qs}`;
+  return qs ? `${base}?${qs}` : base;
 }

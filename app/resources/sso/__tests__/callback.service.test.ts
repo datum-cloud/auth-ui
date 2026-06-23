@@ -3,13 +3,13 @@
 //
 // node env: happy-dom enforces Fetch spec rules that forbid setting the Cookie header.
 //
-// Tests the processIdpCallback service (CODE-MAJ-04, CODE-MIN-05) — the BUSINESS logic
+// Tests the processIdpCallback service — the BUSINESS logic
 // extracted from the /sso/:provider/callback loader. We drive the service directly with
 // DI stubs + an event collector (no module-level mocking of logAuthEvent) and translate
 // the typed outcome via outcomeToResponse, identical to what the route returns:
 //   • A ProviderError from retrieveIdpIntent redirects to /sso/:provider/error and logs
 //     idp.signin failure.
-//   • The ceremony user is resolved via getSession (NOT getUser(sessionId)) — CODE-MIN-05.
+//   • The ceremony user is resolved via getSession (NOT getUser(sessionId)).
 //   • Success paths (sign-in, auto-link, auto-create) emit a last-used-login Set-Cookie
 //     with token idp:<idpId>. Non-success paths (link-needs-auth, error) emit none.
 import type { FakeAuthProvider } from '@/modules/auth/providers/fake/fake-provider';
@@ -44,7 +44,7 @@ const BASE = 'http://localhost/id/sso';
 interface RunCallbackOpts {
   provider: string;
   query: Record<string, string>;
-  // CODE-MIN-03: tightened to match the narrowed CallbackLoaderDeps.retrieveIdpIntent signature.
+  // Tightened to match the narrowed CallbackLoaderDeps.retrieveIdpIntent signature.
   retrieveIdpIntent: (id: string, token: string) => Promise<IdpIntentResult>;
   onAuthEvent: (event: string, outcome: string) => void;
   /** Optional signed sessions cookie value to plant on the request. */
@@ -83,7 +83,7 @@ const REGISTER_INTENT: IdpIntentResult = {
 
 afterEach(() => vi.restoreAllMocks());
 
-describe('processIdpCallback — provider error handling (CODE-MAJ-04)', () => {
+describe('processIdpCallback — provider error handling', () => {
   it('redirects to the SSO error page and logs idp.signin failure when retrieveIdpIntent throws', async () => {
     const events: Array<{ event: string; outcome: string }> = [];
     const res = (await runCallback({
@@ -471,10 +471,90 @@ describe('processIdpCallback — last-used-login Set-Cookie', () => {
 });
 
 // ---------------------------------------------------------------------------
-// CODE-MIN-05: resolve ceremony user via getSession, NOT getUser(sessionId)
+// 755-J1: link/auto-link failure reason mapping
+//
+// When addIdpLink throws ProviderError('ALREADY_EXISTS') the IdP identity is already linked to a
+// DIFFERENT Datum account. The catch block must surface the DISTINCT reason
+// 'identity-linked-elsewhere' (reusing the access-denied copy) instead of collapsing into the
+// generic providerErrorCode → 'signin_failed'. Any OTHER ProviderError still maps through
+// providerErrorCode so the special-case is narrow.
 // ---------------------------------------------------------------------------
 
-describe('processIdpCallback — session-user resolution (CODE-MIN-05)', () => {
+describe('processIdpCallback — 755-J1 link failure reason mapping', () => {
+  // A passwordless same-email user + IdP-verified email drives the auto-link branch, whose catch
+  // block carries the same ALREADY_EXISTS special-case as the plain link branch.
+  const AUTOLINK_INTENT: IdpIntentResult = {
+    userId: null,
+    information: { idpId: 'idp-g', idpUserId: 'g-al', idpUserName: 'you@gmail.com' },
+    draft: { email: 'you@gmail.com', firstName: 'You', lastName: 'User', emailVerified: true },
+  };
+
+  it('maps ALREADY_EXISTS to reason=identity-linked-elsewhere (not signin_failed)', async () => {
+    const { FakeAuthProvider } = await import('@/modules/auth/providers/fake/fake-provider');
+    const provider = new FakeAuthProvider({
+      users: [{ id: 'u1', loginName: 'you@gmail.com', displayName: 'You User' }],
+      // no password → auto-link decision
+    });
+    // The identity is already linked elsewhere → addIdpLink rejects with ALREADY_EXISTS.
+    vi.spyOn(provider, 'addIdpLink').mockRejectedValue(
+      new ProviderError('ALREADY_EXISTS', 'identity already linked to another user')
+    );
+    const events: Array<{ event: string; outcome: string }> = [];
+
+    const request = new Request(
+      'https://auth.localtest.me/sso/google/callback?id=intent-1&token=tok-1'
+    );
+    const outcome = await processIdpCallback(provider, request, 'google', {
+      retrieveIdpIntent: async () => AUTOLINK_INTENT,
+      onAuthEvent: (event, outcome) => events.push({ event, outcome }),
+    });
+    const res = outcomeToResponse(outcome) as Response;
+
+    expect(res.status).toBe(302);
+    const loc = res.headers.get('location') ?? '';
+    expect(loc).toContain('/sso/google/error');
+    expect(loc).toContain('reason=identity-linked-elsewhere');
+    // Must NOT collapse into the generic signin_failed copy.
+    expect(loc).not.toContain('reason=signin_failed');
+    // The failure is still audited as an idp.link failure.
+    expect(events).toContainEqual({ event: 'idp.link', outcome: 'failure' });
+    // No session cookie on the failure path.
+    const cookie = res.headers.get('set-cookie') ?? '';
+    expect(cookie).not.toContain('sess-');
+  });
+
+  it('maps a non-ALREADY_EXISTS link ProviderError through providerErrorCode (signin_failed)', async () => {
+    const { FakeAuthProvider } = await import('@/modules/auth/providers/fake/fake-provider');
+    const provider = new FakeAuthProvider({
+      users: [{ id: 'u1', loginName: 'you@gmail.com', displayName: 'You User' }],
+    });
+    // A generic provider failure (e.g. precondition) → generic reason, NOT the J1 special-case.
+    vi.spyOn(provider, 'addIdpLink').mockRejectedValue(
+      new ProviderError('FAILED_PRECONDITION', 'link rejected')
+    );
+
+    const request = new Request(
+      'https://auth.localtest.me/sso/google/callback?id=intent-1&token=tok-1'
+    );
+    const outcome = await processIdpCallback(provider, request, 'google', {
+      retrieveIdpIntent: async () => AUTOLINK_INTENT,
+      onAuthEvent: () => {},
+    });
+    const res = outcomeToResponse(outcome) as Response;
+
+    expect(res.status).toBe(302);
+    const loc = res.headers.get('location') ?? '';
+    expect(loc).toContain('/sso/google/error');
+    expect(loc).toContain('reason=signin_failed');
+    expect(loc).not.toContain('identity-linked-elsewhere');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Resolve ceremony user via getSession, NOT getUser(sessionId)
+// ---------------------------------------------------------------------------
+
+describe('processIdpCallback — session-user resolution', () => {
   it('resolves the ceremony user via getSession, not getUser(sessionId)', async () => {
     // Arrange: plant a sessions cookie so mostRecent(entries) returns { id:'s1', token:'t1' }.
     const cookieHeader = await sessionsCookie.serialize([

@@ -57,7 +57,7 @@ export async function marshalAssertion(
       id: base64UrlToBuffer(c.id),
     })),
   };
-  // CODE-MIN-08: navigator.credentials.get resolves null on user cancel; cast + deref without
+  // navigator.credentials.get resolves null on user cancel; cast + deref without
   // a null check would throw an opaque TypeError. Throw a named error instead.
   // Cast pk through unknown: the spread rebuilds a valid options shape but TypeScript cannot
   // verify that all required DOM fields (e.g. allowCredentials[].type) are present.
@@ -96,7 +96,7 @@ export async function createAttestation(
       id: base64UrlToBuffer(c.id),
     })),
   };
-  // CODE-MIN-08: navigator.credentials.create resolves null on user cancel; null-guard here
+  // navigator.credentials.create resolves null on user cancel; null-guard here
   // instead of letting the next line throw an opaque TypeError.
   // Cast pk through unknown: the spread rebuilds a valid options shape but TypeScript cannot
   // verify all required DOM fields (rp, pubKeyCredParams, etc.) are present on the spread.

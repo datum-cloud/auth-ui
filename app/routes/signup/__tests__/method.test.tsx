@@ -15,8 +15,8 @@ import { getCsrfToken } from '@/server/csrf';
 import { describe, it, expect, vi } from 'vitest';
 
 // ─── env stub ────────────────────────────────────────────────────────────────
-vi.mock('@/utils/env/env.server', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/utils/env/env.server')>();
+vi.mock('@/server/infra/env.server', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/server/infra/env.server')>();
   return {
     ...actual,
     env: { ...actual.env, MAXMIND_ACCOUNT_ID: '', AUTH_EMAIL_DELIVERY_ENABLED: true },

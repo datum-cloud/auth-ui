@@ -1,45 +1,55 @@
-// ⚠️ CODE-MAJ-13 — SINGLE-REPLICA CONSTRAINT. This limiter holds state in an in-process Map,
-// so counters are PER-REPLICA. At replicas > 1 the effective limit is (configured limit ×
-// replica count) and an attacker's requests may scatter across pods. Until a shared Redis
-// store is wired (tracked: REDIS-RATELIMIT follow-up), auth endpoints MUST run replicas: 1
-// (or use sticky sessions). Do not scale this Deployment horizontally without the Redis fix.
-import { logAuthEvent } from '@/server/observability';
+// ⚠️ SINGLE-REPLICA OPERATIONAL GUARD.
+// By DEFAULT this limiter holds state in an in-process Map (the `InMemoryRateLimitStore`
+// adapter), so counters are PER-REPLICA. At replicas > 1 the effective limit is (configured
+// limit × replica count) and an attacker's requests may scatter across pods. Until the shared
+// store is PROVISIONED — set `RATE_LIMIT_REDIS_URL` to a reachable redis:// / rediss:// endpoint
+// to select the `RedisRateLimitStore` sliding-window adapter — auth endpoints MUST run
+// `replicas: 1` (or use sticky sessions). Do not scale this Deployment horizontally without the
+// shared store. The store seam is pluggable (see rate-limit-store.ts); the DEFAULT (env unset)
+// path is byte-identical to the original embedded Map, so CI / the fitness gate need no Redis.
+import { InMemoryRateLimitStore } from '@/server/middleware/rate-limit-store';
+import { logAuthEvent, hashActor } from '@/server/observability';
 import type { MiddlewareHandler } from 'hono';
 
 export interface RateLimitResult {
   allowed: boolean;
   retryAfterMs: number;
 }
-interface Bucket {
-  count: number;
-  windowStart: number;
-}
 
+/**
+ * Synchronous fixed-window limiter used by every auth middleware below. The COUNTING is
+ * delegated to a pluggable `RateLimitStore`; the default (and the only synchronous) adapter is
+ * the in-process `InMemoryRateLimitStore`, preserving the original observable behavior exactly.
+ * A store may be injected for tests or for a future shared-store wiring (see rate-limit-store.ts
+ * + `selectRateLimitStore`). The shared Redis adapter is async, so swapping it into this sync
+ * path is intentionally a follow-up; the seam exists here and is unit-tested today.
+ */
 export class RateLimiter {
-  private buckets = new Map<string, Bucket>();
-  constructor(private opts: { limit: number; windowMs: number }) {}
+  private store: InMemoryRateLimitStore;
+
+  constructor(
+    private opts: { limit: number; windowMs: number },
+    store: InMemoryRateLimitStore = new InMemoryRateLimitStore()
+  ) {
+    this.store = store;
+  }
 
   check(key: string, nowMs: number): RateLimitResult {
-    // Fix 3: sweep expired buckets when the Map exceeds 10k entries to bound memory usage.
-    if (this.buckets.size > 10_000) {
-      for (const [k, b] of this.buckets) {
-        if (nowMs - b.windowStart >= this.opts.windowMs) this.buckets.delete(k);
-      }
-    }
-    const b = this.buckets.get(key);
-    if (!b || nowMs - b.windowStart >= this.opts.windowMs) {
-      this.buckets.set(key, { count: 1, windowStart: nowMs });
+    // The default in-memory adapter is synchronous; cast is safe for the only adapter wired
+    // into this sync path. An async (Redis) store would be selected via selectRateLimitStore
+    // in an async middleware variant, not here.
+    const { count, resetAt } = this.store.incr(key, this.opts.windowMs, nowMs) as {
+      count: number;
+      resetAt: number;
+    };
+    if (count <= this.opts.limit) {
       return { allowed: true, retryAfterMs: 0 };
     }
-    if (b.count < this.opts.limit) {
-      b.count += 1;
-      return { allowed: true, retryAfterMs: 0 };
-    }
-    return { allowed: false, retryAfterMs: this.opts.windowMs - (nowMs - b.windowStart) };
+    return { allowed: false, retryAfterMs: Math.max(0, resetAt - nowMs) };
   }
 }
 
-// CODE-MAJ-08: One shared limiter for GET /id/verify?send=true (email-code dispatch).
+// One shared limiter for GET /id/verify?send=true (email-code dispatch).
 // The session-ownership gate (verify.tsx) already ensures only the owning user can trigger
 // a send, but rate-limiting the GET path adds a defence-in-depth layer that bounds the
 // worst-case email throughput from a single IP even before the ownership check.
@@ -120,7 +130,7 @@ export const loginPasswordRateLimit: MiddlewareHandler = async (c, next) => {
   const { allowed, retryAfterMs } = passwordLimiter.check(`${ip}|${loginName}`, Date.now());
   if (!allowed) {
     // Fix 5: emit audit event on 429 before responding.
-    logAuthEvent('rate_limit', 'failure', { ip, loginName });
+    logAuthEvent('rate_limit', 'failure', { ip, actor: hashActor(loginName) });
     return c.json(
       { error: 'RATE_LIMITED', message: 'Too many attempts. Please try again later.' },
       429,
@@ -154,7 +164,7 @@ export const signupRateLimit: MiddlewareHandler = async (c, next) => {
   if (!allowed) {
     logAuthEvent('rate_limit', 'failure', {
       ip,
-      loginName: loginName || undefined,
+      actor: loginName ? hashActor(loginName) : undefined,
       path: pathname,
     });
     return c.json(

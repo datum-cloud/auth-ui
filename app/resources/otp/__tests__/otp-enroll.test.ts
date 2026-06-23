@@ -22,7 +22,7 @@ async function cookieFor(loginName: string) {
   return (await sessionsCookie.serialize([entry])).split(';')[0];
 }
 
-describe('otp-enroll loader (CODE-MIN-12)', () => {
+describe('otp-enroll loader', () => {
   it('does not throw on a tampered force= query param', async () => {
     const cookie = await cookieFor('alice@acme.test');
     const req = new Request(

@@ -1,5 +1,7 @@
 import { SubmitButton } from '@/components/auth-form/auth-form';
-import { useActionErrorToast } from '@/hooks/use-action-error-toast';
+import { AuthFormFields } from '@/components/auth-form/auth-form-fields';
+import { FormError } from '@/components/form-error/form-error';
+import { useAuthActionError } from '@/hooks/use-auth-action-error';
 import SplitLayout from '@/layouts/split.layout';
 // ADAPTATION (plan-drift fix): readSessions + serializeSessions live in @/modules/auth/session/cookie.
 // The locked plan block incorrectly listed them as coming from @/modules/auth/session/session
@@ -14,14 +16,13 @@ import {
   isPhoneLike,
   makeLoginIdentifierClientSchema,
 } from '@/resources/login/login.schema';
-import { type LoginLayoutData } from '@/routes/login/layout';
-import { trustedAppOrigin } from '@/server/app-origin.server';
+import { paths } from '@/routes/paths';
 import { providerForRequest } from '@/server/auth-context.server';
 import { getCsrfToken, assertCsrf } from '@/server/csrf';
+import { trustedAppOrigin } from '@/server/infra/app-origin.server';
+import { env } from '@/server/infra/env.server';
 import { userAgentFromRequest } from '@/server/user-agent';
 import { assetUrl } from '@/utils/asset-url';
-import { env } from '@/utils/env/env.server';
-import { useAuthErrorMessage } from '@/utils/errors/auth-error-messages';
 import { Badge } from '@datum-cloud/datum-ui/badge';
 import { Button, LinkButton } from '@datum-cloud/datum-ui/button';
 import { Form } from '@datum-cloud/datum-ui/form';
@@ -55,7 +56,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   // Bridge raw login-v2 protocol entries (?authRequest=/?samlRequest=) to /authorize.
   // The post-identifier ?requestId= return never re-triggers this (no loop).
   if (shouldBridgeToAuthorize(url.searchParams)) {
-    return redirect(`/authorize${url.search}`);
+    return redirect(`${paths.authorize()}${url.search}`);
   }
 
   const organization = url.searchParams.get('organization') ?? undefined;
@@ -123,11 +124,17 @@ export async function action({ request }: ActionFunctionArgs) {
       userAgent: userAgentFromRequest(request),
     });
     if (!result.ok) {
-      const status = result.error === 'EMAIL_LOGIN_DISABLED' ? 400 : 404;
-      return data({ error: result.error }, { status });
+      // EMAIL_LOGIN_DISABLED is a true client-input rejection (400). USER_NOT_FOUND is a
+      // HANDLED, inline-rendered outcome — return it as normal action data with a 200 so the
+      // RR single-fetch (/login.data?index) does NOT surface a 404 the browser console-errors
+      // on. The inline <FormError> still renders from `data.error`. (F1)
+      if (result.error === 'EMAIL_LOGIN_DISABLED') {
+        return data({ error: result.error }, { status: 400 });
+      }
+      return data({ error: result.error });
     }
     const verifyParams = new URLSearchParams(result.params);
-    return redirect(`/login/verify/email?${verifyParams.toString()}`, {
+    return redirect(`${paths.login.verify.email()}?${verifyParams.toString()}`, {
       headers: { 'set-cookie': await serializeSessions(result.sessions) },
     });
   }
@@ -150,10 +157,19 @@ export async function action({ request }: ActionFunctionArgs) {
     organization,
     emailDeliveryEnabled: env.AUTH_EMAIL_DELIVERY_ENABLED,
     userAgent: userAgentFromRequest(request),
+    // Thread the settings already fetched above (for the phone gate)
+    // so resolveIdentifier skips its inner re-fetch on the known-user happy path.
+    settings,
   });
   if (!result.ok) {
-    const status = result.error === 'EMAIL_LOGIN_DISABLED' ? 400 : 404;
-    return data({ error: result.error }, { status });
+    // EMAIL_LOGIN_DISABLED is a true client-input rejection (400). USER_NOT_FOUND is a
+    // HANDLED, inline-rendered outcome — return it as normal action data with a 200 so the
+    // RR single-fetch (/login.data?index) does NOT surface a 404 the browser console-errors
+    // on. The inline <FormError> still renders from `data.error`. (F1)
+    if (result.error === 'EMAIL_LOGIN_DISABLED') {
+      return data({ error: result.error }, { status: 400 });
+    }
+    return data({ error: result.error });
   }
 
   return redirect(`${result.target}?${result.params}`, {
@@ -164,14 +180,22 @@ export async function action({ request }: ActionFunctionArgs) {
 export default function Login() {
   const { csrfToken, idps, settings, branding, emailDeliveryEnabled, notice, lastUsedLogin } =
     useLoaderData<typeof loader>();
-  const { loginName, requestId, organization } = useRouteLoaderData('login') as LoginLayoutData;
+  // RR7 infers the parent-layout loader return through the generic — the `as` cast is gone.
+  // The `?? { loginName: '' }` only satisfies the structurally-possible-undefined branch; these
+  // routes always render under the `login` layout, so it is never taken at runtime.
+  const { loginName, requestId, organization } = useRouteLoaderData<
+    typeof import('@/routes/login/layout').loader
+  >('login') ?? { loginName: '' };
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
   const { t } = useLingui();
 
-  const getErrorMessage = useAuthErrorMessage();
-  const errorMessage = getErrorMessage((actionData as { error?: string } | undefined)?.error);
-  useActionErrorToast(errorMessage);
+  // The action error surfaces INLINE through <FormError> (this replaces the per-route
+  // toast). /login renders in the visual harness, so this is the intended re-baseline
+  // (toast → inline). AuthCeremony is NOT used here:
+  // /login is the full SplitLayout welcome page (multi-method chooser), not an AuthCard
+  // ceremony screen, so we mount the same inline FormError surface AuthCeremony owns.
+  const errorMessage = useAuthActionError(actionData);
 
   const view = resolveLoginView(settings, idps, emailDeliveryEnabled);
 
@@ -199,21 +223,19 @@ export default function Login() {
   const identifierSubmitting =
     navigation.state === 'submitting' && navigation.formData?.get('intent') !== 'idp';
 
-  const extra = new URLSearchParams();
-  if (requestId) extra.set('requestId', requestId);
-  if (organization) extra.set('organization', organization);
-  const signupHref = extra.toString() ? `/signup?${extra.toString()}` : '/signup';
+  // Typed paths.* emit the identical query string the hand-built URLSearchParams
+  // produced (insertion order requestId → organization; undefined values skipped).
+  const signupHref = paths.signup.index({ requestId, organization });
 
   // Passkey-first prompt (P2): link to the existing /login/passkey webauthn flow,
   // carrying any known loginName + the ceremony context. /login/passkey redirects
   // back gracefully when there is no resolvable session, so this is safe cold too.
-  const passkeyParams = new URLSearchParams();
-  if (loginName) passkeyParams.set('loginName', loginName);
-  if (requestId) passkeyParams.set('requestId', requestId);
-  if (organization) passkeyParams.set('organization', organization);
-  const passkeyHref = passkeyParams.toString()
-    ? `/login/passkey?${passkeyParams.toString()}`
-    : '/login/passkey';
+  // Empty loginName ('') is skipped (treated as absent) to preserve the prior URL.
+  const passkeyHref = paths.login.passkey({
+    loginName: loginName || undefined,
+    requestId,
+    organization,
+  });
 
   const [showEmailField, setShowEmailField] = useState(false);
 
@@ -227,23 +249,22 @@ export default function Login() {
           <Trans>Choose your login method</Trans>
         </p>
         {notice === 'link-existing' ? (
-          <p role="status" className="text-foreground/80 mb-4 text-sm">
+          <p role="status" className="text-destructive mb-4 text-sm">
             <Trans>An account with this email already exists — sign in to continue.</Trans>
           </p>
         ) : null}
+        {/* Inline action-error surface (role="alert" + aria-live) — replaces the
+            per-route toast. Renders nothing when there is no error. */}
+        <FormError>{errorMessage}</FormError>
       </div>
 
       {view.showIdpButtons ? (
         <div className="flex flex-col gap-3">
           {idps.map((idp) => (
             <RRForm key={idp.id} method="post">
-              <input type="hidden" name="csrf" value={csrfToken} />
+              <AuthFormFields csrf={csrfToken} requestId={requestId} organization={organization} />
               <input type="hidden" name="intent" value="idp" />
               <input type="hidden" name="idpId" value={idp.id} />
-              {requestId ? <input type="hidden" name="requestId" value={requestId} /> : null}
-              {organization ? (
-                <input type="hidden" name="organization" value={organization} />
-              ) : null}
               <Button
                 size="large"
                 className="relative h-13 gap-3"
@@ -268,7 +289,7 @@ export default function Login() {
                   <Badge
                     type="primary"
                     theme="solid"
-                    className="absolute -top-3.5 -right-5 rounded-lg text-xs text-white">
+                    className="absolute -top-3.5 -right-5 rounded-lg text-xs text-white dark:text-[#0c1d31]">
                     <Trans>Last used</Trans>
                   </Badge>
                 ) : null}
@@ -294,7 +315,7 @@ export default function Login() {
             <Badge
               type="primary"
               theme="solid"
-              className="absolute -top-3.5 -right-5 rounded-lg text-xs text-white">
+              className="absolute -top-3.5 -right-5 rounded-lg text-xs text-white dark:text-[#0c1d31]">
               <Trans>Last used</Trans>
             </Badge>
           ) : null}
@@ -328,7 +349,7 @@ export default function Login() {
                 <Badge
                   type="primary"
                   theme="solid"
-                  className="absolute -top-3.5 -right-5 rounded-lg text-xs text-white">
+                  className="absolute -top-3.5 -right-5 rounded-lg text-xs text-white dark:text-[#0c1d31]">
                   <Trans>Last used</Trans>
                 </Badge>
               ) : null}
@@ -341,11 +362,7 @@ export default function Login() {
               defaultValues={{ loginName: loginName ?? '' }}
               isSubmitting={navigation.state === 'submitting'}
               className="flex w-full flex-col gap-4">
-              <input type="hidden" name="csrf" value={csrfToken} />
-              {requestId ? <input type="hidden" name="requestId" value={requestId} /> : null}
-              {organization ? (
-                <input type="hidden" name="organization" value={organization} />
-              ) : null}
+              <AuthFormFields csrf={csrfToken} requestId={requestId} organization={organization} />
               <Form.Field
                 name="loginName"
                 label={identifierLabel}

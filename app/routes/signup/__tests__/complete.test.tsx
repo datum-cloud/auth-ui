@@ -17,8 +17,8 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 
 // ─── env stub ────────────────────────────────────────────────────────────────
 // Silence MaxMind (not relevant here) and point AUTH_PROVIDER at the fake.
-vi.mock('@/utils/env/env.server', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/utils/env/env.server')>();
+vi.mock('@/server/infra/env.server', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/server/infra/env.server')>();
   return { ...actual, env: { ...actual.env, MAXMIND_ACCOUNT_ID: '' } };
 });
 

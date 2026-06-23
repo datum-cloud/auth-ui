@@ -1,13 +1,13 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
 import { SubmitButton } from '@/components/auth-form/auth-form';
-import { useActionErrorToast } from '@/hooks/use-action-error-toast';
+import { FormError } from '@/components/form-error/form-error';
+import { useAuthActionError } from '@/hooks/use-auth-action-error';
 import { readSessions, mostRecent } from '@/modules/auth/session/cookie';
 import { dispatchEmailCode, resendEmailCode, submitEmailCode } from '@/resources/verify';
 import { verifyCodeSchema, verifyCodeClientSchema } from '@/resources/verify/verify.schema';
-import { trustedAppOrigin } from '@/server/app-origin.server';
 import { providerForRequest } from '@/server/auth-context.server';
 import { getCsrfToken, assertCsrf } from '@/server/csrf';
-import { useAuthErrorMessage } from '@/utils/errors/auth-error-messages';
+import { trustedAppOrigin } from '@/server/infra/app-origin.server';
 import { Button } from '@datum-cloud/datum-ui/button';
 import { Form } from '@datum-cloud/datum-ui/form';
 import { Trans, useLingui } from '@lingui/react/macro';
@@ -38,7 +38,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const headers: Record<string, string> = {};
   if (setCookie !== null) headers['set-cookie'] = setCookie;
 
-  // CODE-MAJ-08: the email-code dispatch is gated on session ownership inside the
+  // The email-code dispatch is gated on session ownership inside the
   // service. Resolve the active session from the SIGNED cookie here and hand it in;
   // the service calls getSession to verify it owns `userId` before dispatching.
   if (send === 'true' && userId) {
@@ -127,8 +127,9 @@ export default function Verify() {
   const navigation = useNavigation();
   const { t } = useLingui();
 
-  const getErrorMessage = useAuthErrorMessage();
-  useActionErrorToast(getErrorMessage((actionData as { error?: string } | undefined)?.error));
+  // Inline-only error surface: the action error renders in a <FormError> (role="alert")
+  // inside the verify form — no toast.
+  const errorMessage = useAuthActionError(actionData);
 
   return (
     <AuthCard
@@ -167,6 +168,7 @@ export default function Verify() {
                 <Trans>Your email is already verified. You can sign in.</Trans>
               </p>
             )}
+          <FormError>{errorMessage}</FormError>
           <SubmitButton>
             <Trans>Verify</Trans>
           </SubmitButton>

@@ -1,12 +1,13 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
 import { SubmitButton } from '@/components/auth-form/auth-form';
-import { useActionErrorToast } from '@/hooks/use-action-error-toast';
+import { BackLink } from '@/components/back-link/back-link';
+import { FormError } from '@/components/form-error/form-error';
+import { useAuthActionError } from '@/hooks/use-auth-action-error';
 import { submitNewPassword } from '@/resources/password';
 import { newPasswordClientSchema } from '@/resources/password/password.schema';
 import { providerForRequest } from '@/server/auth-context.server';
 import { getCsrfToken, assertCsrf } from '@/server/csrf';
 import { actionError } from '@/utils/errors/auth-error';
-import { useAuthErrorMessage } from '@/utils/errors/auth-error-messages';
 import { Form } from '@datum-cloud/datum-ui/form';
 import { Trans, useLingui } from '@lingui/react/macro';
 import {
@@ -45,7 +46,7 @@ export async function action({ request }: ActionFunctionArgs) {
   const form = await request.formData();
   await assertCsrf(request, form);
 
-  // The service parses (incl. the CODE-MIN-24 requestId allowlist), calls the provider,
+  // The service parses (incl. the requestId allowlist), calls the provider,
   // and maps ProviderError → typed errors. The route only wires the result to a
   // redirect (success) or a 400 data() error (the render reads `error`).
   try {
@@ -63,9 +64,9 @@ export default function PasswordNew() {
   const navigation = useNavigation();
   const { t } = useLingui();
 
-  const getErrorMessage = useAuthErrorMessage();
-  const errorMessage = getErrorMessage((actionData as { error?: string } | undefined)?.error);
-  useActionErrorToast(errorMessage);
+  // Inline-only error surface: the action error renders in a <FormError> (role="alert")
+  // inside the form — no toast.
+  const errorMessage = useAuthActionError(actionData);
 
   return (
     <AuthCard title={<Trans>Choose a new password</Trans>}>
@@ -87,10 +88,14 @@ export default function PasswordNew() {
         <Form.Field name="confirm" label={t`Confirm new password`} required>
           <Form.Input type="password" autoComplete="new-password" />
         </Form.Field>
+        <FormError>{errorMessage}</FormError>
         <SubmitButton>
           <Trans>Set password</Trans>
         </SubmitButton>
       </Form.Root>
+
+      {/* Back control → /login/password (previous-step.ts maps this path). */}
+      <BackLink />
     </AuthCard>
   );
 }

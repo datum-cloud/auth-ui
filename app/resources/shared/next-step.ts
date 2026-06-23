@@ -14,6 +14,9 @@ export interface NextStepInput {
   mfaInitSkippedAt?: string | null;
   requestId?: string;
   organization?: string;
+  // 755-M10: threaded from account-switch to suppress ONLY the step-6 skippable
+  // MFA-setup nudge. Real challenges + forced setup are unaffected.
+  suppressMfaSetupNudge?: boolean;
 }
 
 export function nextStep(input: NextStepInput): string {
@@ -32,13 +35,15 @@ export function nextStep(input: NextStepInput): string {
     loginName: input.loginName ?? '',
     userVerified: input.userVerified ?? false,
     mfaInitSkippedAt: input.mfaInitSkippedAt ?? null,
+    context: { role: 'mfa' }, // nextMfaStep is the mfa flow
     requestId: input.requestId,
     organization: input.organization,
+    suppressMfaSetupNudge: input.suppressMfaSetupNudge,
   });
 
   if (mfa.kind === 'done') return '/signed-in';
 
-  // CODE-MIN-10: nextStep owns MFA-routing params (force/checkAfter); ceremony params
+  // nextStep owns MFA-routing params (force/checkAfter); ceremony params
   // (loginName/requestId/organization) are normally appended by nextStepWithParams, but a
   // DIRECT caller of nextStep must not silently lose them. So: start from the MFA params,
   // then add back any ceremony param that was passed into nextStep. The bridge passing them

@@ -1,5 +1,24 @@
 export type AuthMethod = 'password' | 'passkey' | 'idp' | 'totp' | 'otp_email' | 'otp_sms' | 'u2f';
 
+/**
+ * The two role-scoped projections of `AuthMethod`. `otp_email` lives in BOTH
+ * deliberately — it is a first-class PRIMARY sign-in method (decideAfterIdentifier) AND a
+ * second factor (nextMfaStep). The role decides which screen a given `otp_email` routes to
+ * (/login/verify/email is shared, but the surrounding flow differs), so it must be expressed
+ * structurally rather than inferred from a sentinel query param.
+ */
+export type PrimaryAuthMethod = 'password' | 'passkey' | 'idp' | 'otp_email';
+export type SecondFactorMethod = 'totp' | 'otp_email' | 'otp_sms' | 'u2f';
+
+/**
+ * The flow a routing/decision call is running inside, threaded explicitly so call sites
+ * pass a typed role instead of inferring 'primary' vs 'mfa' from sentinel query params.
+ * Behavior-neutral: `decideAfterIdentifier` is always `{ role: 'primary' }` and `nextMfaStep`
+ * is always `{ role: 'mfa' }` — the discriminant pins the role at the type boundary (a primary
+ * decision can never be fed an mfa context, and vice versa) without changing any target.
+ */
+export type FlowContext = { role: 'primary' } | { role: 'mfa' };
+
 export interface BrandingTheme {
   logoUrl?: string;
   darkLogoUrl?: string;
@@ -8,6 +27,50 @@ export interface BrandingTheme {
   fontUrl?: string;
   hideLoginNameSuffix?: boolean;
 }
+
+/**
+ * The coerced password-complexity policy (mirror of `toPasswordComplexity`'s return).
+ * `getPasswordComplexity` returns `this | undefined` — undefined when the provider omits the
+ * settings block. minLength is coerced from the proto uint64 (bigint) to a JSON-safe number.
+ */
+export interface PasswordComplexity {
+  minLength: number;
+  requiresUppercase: boolean;
+  requiresLowercase: boolean;
+  requiresNumber: boolean;
+  requiresSymbol: boolean;
+}
+
+/**
+ * The neutral attestation-challenge struct returned by `registerPasskey` / `registerU2F`.
+ * `publicKey*CreationOptions` is the raw WebAuthn `publicKey` envelope (a `PublicKeyCredentialCreationOptions`
+ * JSON object); routes treat its inner value as opaque (`unknown`) and pass it to the browser
+ * WebAuthn API. The named struct removes the unsound `as { ... }` cast at the service boundary.
+ */
+export interface WebAuthnCreationOptions {
+  passkeyId: string;
+  publicKeyCredentialCreationOptions: { publicKey: unknown };
+}
+
+/** U2F (security-key) analogue of `WebAuthnCreationOptions` (the id field is `u2fId`). */
+export interface U2FCreationOptions {
+  u2fId: string;
+  publicKeyCredentialCreationOptions: { publicKey: unknown };
+}
+
+/**
+ * The email-OTP challenge request, as a discriminated union on `kind`.
+ *   'send'          → request the code with the provider's DEFAULT emailed link.
+ *   'send-template' → request the code, overriding the emailed link with `urlTemplate` (built by
+ *                     flows/otp-email-url-template.ts) so it lands on OUR /id/login/verify/email
+ *                     route instead of the provider's /ui/v2/login/otp/email page.
+ *   'return-code'   → the code is NOT emailed; it is returned on the session under
+ *                     `SessionChallenges.otpEmailCode` so callers can complete the factor in-band.
+ */
+export type OtpEmailChallenge =
+  | { kind: 'send' }
+  | { kind: 'send-template'; urlTemplate: string }
+  | { kind: 'return-code' };
 
 // OIDC (Phase 1) — SAML fields added in Phase 5.
 export interface AuthRequest {
@@ -20,7 +83,11 @@ export interface AuthRequest {
 }
 
 export interface FactorState {
-  verifiedAt: string | null; // ISO timestamp; '' is NOT valid — mappers must normalize empty → null (flows treat '' as unverified)
+  // A Date is never falsy/empty — mappers normalize an absent/malformed proto
+  // Timestamp to `null` (flows treat null as unverified). This eliminates the prior
+  // `string | null` where the empty string '' was a structurally-valid-but-semantically
+  // invalid third state the freshness check had to defend against.
+  verifiedAt: Date | null;
   userVerified?: boolean; // from the webauthn factor; drives the passwordless-passkey MFA-satisfied rule  // P4
 }
 export interface Factors {
@@ -37,7 +104,7 @@ export interface User {
   loginName: string;
   displayName?: string;
   orgId?: string;
-  mfaInitSkippedAt?: string | null; // BLK-06 — last forced-MFA-setup skip (ISO timestamp); written via setMfaInitSkipped  // P5
+  mfaInitSkippedAt?: string | null; // last forced-MFA-setup skip (ISO timestamp); written via setMfaInitSkipped  // P5
 }
 
 export interface SessionChallenges {
@@ -45,8 +112,10 @@ export interface SessionChallenges {
     publicKeyCredentialRequestOptions?: unknown; // assertion (login)
     publicKeyCredentialCreationOptions?: unknown; // attestation (register)
   };
-  otpEmail?: unknown;
-  /** Present when the otpEmail challenge was requested with { returnCode: true }; carries the OTP code returned server-side instead of emailing it. */
+  // The redundant `otpEmail?: unknown` was removed. The proto otpEmail field is
+  // only ever the returned OTP code (returnCode delivery), which is surfaced through the
+  // typed `otpEmailCode` below — no caller read the untyped `otpEmail` duplicate.
+  /** Present when the otpEmail challenge was requested with `{ kind: 'return-code' }`; carries the OTP code returned server-side instead of emailing it. */
   otpEmailCode?: string;
   otpSms?: unknown;
 }
@@ -83,7 +152,7 @@ export interface LoginSettings {
   passwordCheckLifetimeMs?: number;
   secondFactorCheckLifetimeMs?: number;
   multiFactorCheckLifetimeMs?: number;
-  mfaInitSkipLifetimeMs?: number; // BLK-06 — skip window (adapter converts Duration→Ms)  // P5
+  mfaInitSkipLifetimeMs?: number; // skip window (adapter converts Duration→Ms)  // P5
   /** Zitadel login policy default redirect URI (settings.v2). Empty/unset → undefined. */
   defaultRedirectUri?: string;
   /**

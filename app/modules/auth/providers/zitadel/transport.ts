@@ -37,7 +37,7 @@ export function resolveServiceUrl(headers: Headers, env: TransportEnv): string {
   throw new Error('Zitadel service URL could not be determined');
 }
 
-// CODE-MIN-01 / CODE-MIN-19: bound the caches and key on a token FINGERPRINT, never the raw
+// Bound the caches and key on a token FINGERPRINT, never the raw
 // token. Fingerprinting means a rotated token misses the cache (no stale-client reuse); the
 // hard cap means per-session-token churn (changePasswordWithSession) can't leak memory.
 const CACHE_MAX = 256;

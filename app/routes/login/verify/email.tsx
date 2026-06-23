@@ -1,158 +1,100 @@
-import { AuthCard } from '@/components/auth-card/auth-card';
+import { AuthCeremony } from '@/components/auth-ceremony/auth-ceremony';
+import { OtpCodeField } from '@/components/auth-ceremony/otp-code-field';
 import { SubmitButton } from '@/components/auth-form/auth-form';
-import { BackLink } from '@/components/back-link/back-link';
-import { IdentityBadge } from '@/components/identity-badge/identity-badge';
-import { useActionErrorToast } from '@/hooks/use-action-error-toast';
+import { AuthFormFields } from '@/components/auth-form/auth-form-fields';
+import { useAuthActionRecovery } from '@/hooks/use-auth-action-recovery';
 import {
-  readSessions,
-  byLoginName,
-  addSession,
-  serializeSessions,
-} from '@/modules/auth/session/cookie';
-import { serializeLastUsedLogin } from '@/modules/auth/session/last-used-login';
-import { dispatchEmailChallenge, submitOtpCode } from '@/resources/otp';
+  createOtpVerifyHandlers,
+  type OtpVerifyActionData,
+  type OtpVerifyLoaderData,
+} from '@/resources/otp';
 import { otpCodeClientSchema } from '@/resources/otp/otp.schema';
-import { type LoginLayoutData } from '@/routes/login/layout';
-import { trustedAppOrigin } from '@/server/app-origin.server';
-import { providerForRequest } from '@/server/auth-context.server';
-import { getCsrfToken, assertCsrf } from '@/server/csrf';
-import { useAuthErrorMessage } from '@/utils/errors/auth-error-messages';
+import { paths } from '@/routes/paths';
 import { Form } from '@datum-cloud/datum-ui/form';
 import { Trans, useLingui } from '@lingui/react/macro';
 import {
-  data,
-  redirect,
   useActionData,
   useLoaderData,
   useNavigation,
   useRouteLoaderData,
-  type ActionFunctionArgs,
-  type LoaderFunctionArgs,
   type MetaFunction,
 } from 'react-router';
 import { Form as RRForm } from 'react-router';
 
 export const meta: MetaFunction = () => [{ title: 'Enter your email code' }];
 
-export async function loader({ request }: LoaderFunctionArgs) {
-  const url = new URL(request.url);
-  const loginName = url.searchParams.get('loginName') ?? '';
-  const requestId = url.searchParams.get('requestId') ?? undefined;
-  const organization = url.searchParams.get('organization') ?? undefined;
-  // Pre-fill the code when the user arrives via the emailed OTP link
-  // (/id/login/verify/email?code=…&loginName=…). Typed-in codes (no query param) keep ''.
-  const code = url.searchParams.get('code') ?? '';
-
-  // Guard: require an active session for this loginName.
-  const sessions = await readSessions(request);
-  const entry = byLoginName(sessions, loginName, organization);
-  if (!entry) return redirect('/login');
-
-  // Trigger the email code send via the challenges seam (P5), but ONLY on first arrival.
-  // When the user follows the emailed link (code present) the code is already in hand — a
-  // re-send would rotate/invalidate it. So suppress the duplicate challenge in the link path.
-  if (!code) {
-    await dispatchEmailChallenge(providerForRequest(request), entry, {
-      origin: trustedAppOrigin(request),
-      loginName,
-      requestId,
-      organization,
-    });
-  }
-
-  const [csrfToken, setCookie] = await getCsrfToken(request);
-  const headers: Record<string, string> = {};
-  if (setCookie !== null) headers['set-cookie'] = setCookie;
-
-  const next = url.searchParams.get('next') ?? undefined;
-
-  return data({ csrfToken, code, next }, { headers });
-}
-
-export async function action({ request }: ActionFunctionArgs) {
-  const provider = providerForRequest(request);
-  const form = await request.formData();
-  await assertCsrf(request, form);
-
-  const formEntries = Object.fromEntries(form);
-  const organization = (formEntries.organization as string) || undefined;
-  const loginName = (formEntries.loginName as string) ?? '';
-  const requestId = (formEntries.requestId as string) || undefined;
-  const nextParam = String(formEntries.next ?? '');
-
-  const sessions = await readSessions(request);
-  const entry = byLoginName(sessions, loginName, organization);
-
-  const result = await submitOtpCode(provider, 'email', formEntries, entry ?? undefined);
-  if (!result.ok) {
-    const status = result.error === 'INVALID_CREDENTIALS' ? 401 : 400;
-    return data({ error: result.error }, { status });
-  }
-
-  // Write back the (potentially rotated) session token.
-  const updatedSessions = addSession(sessions, {
-    ...entry!,
-    token: result.session.token,
-    changeTs: result.session.changedAt,
-    expirationTs: result.session.expiresAt,
-  });
-
-  if (nextParam === 'passkey') {
-    const p = new URLSearchParams({ loginName, force: 'false', checkAfter: 'false' });
-    if (organization) p.set('organization', organization);
-    if (requestId) p.set('requestId', requestId);
-    const passkeyHeaders = new Headers();
-    passkeyHeaders.append('set-cookie', await serializeSessions(updatedSessions));
-    passkeyHeaders.append('set-cookie', await serializeLastUsedLogin('email'));
-    return redirect(`/setup/passkey?${p.toString()}`, { headers: passkeyHeaders });
-  }
-
-  const emailHeaders = new Headers();
-  emailHeaders.append('set-cookie', await serializeSessions(updatedSessions));
-  emailHeaders.append('set-cookie', await serializeLastUsedLogin('email'));
-  return redirect(result.target, { headers: emailHeaders });
-}
+// loader + action come from the shared OTP verify factory. email config: send the email
+// challenge (suppressed on the ?code link path), support next=passkey, and record last-used='email'.
+// Non-destructured exports: RR7's client build strips `loader`/`action` and cannot remove a
+// destructured `export const { loader, action } = …` (matches the enroll-factory routes).
+const handlers = createOtpVerifyHandlers({
+  channel: 'email',
+  suppressChallengeOnCode: true,
+  nextParamHandling: 'passkey-redirect',
+  writeLastUsedLogin: 'email',
+  verifyPath: paths.login.verify.email(),
+});
+export const loader = handlers.loader;
+export const action = handlers.action;
 
 export default function VerifyEmail() {
-  const { csrfToken, code, next } = useLoaderData<typeof loader>();
-  const { loginName, requestId, organization } = useRouteLoaderData('login') as LoginLayoutData;
-  const actionData = useActionData<typeof action>();
+  const { csrfToken, code, next } = useLoaderData() as OtpVerifyLoaderData;
+  // RR7 infers the parent-layout loader return through the generic — the `as` cast is gone.
+  // The `?? { loginName: '' }` only satisfies the structurally-possible-undefined branch; these
+  // routes always render under the `login` layout, so it is never taken at runtime.
+  const { loginName, requestId, organization } = useRouteLoaderData<
+    typeof import('@/routes/login/layout').loader
+  >('login') ?? { loginName: '' };
+  const actionData = useActionData() as OtpVerifyActionData | undefined;
   const navigation = useNavigation();
   const { t } = useLingui();
 
-  const getErrorMessage = useAuthErrorMessage();
-  const errorMessage = getErrorMessage((actionData as { error?: string } | undefined)?.error);
-  useActionErrorToast(errorMessage);
+  // Shared error pipeline; the message surfaces inline through AuthCeremony,
+  // plus an inline recovery <Link> for recoverable codes (e.g. SESSION_EXPIRED → "Sign in again").
+  const { message: errorMessage, recovery } = useAuthActionRecovery(actionData);
 
   return (
-    <AuthCard
+    <AuthCeremony
       title={<Trans>Enter your email code</Trans>}
-      description={<Trans>Enter the one-time code sent to your email address.</Trans>}>
-      <div className="flex flex-col items-baseline justify-center gap-4">
-        <IdentityBadge loginName={loginName} requestId={requestId} organization={organization} />
+      description={<Trans>Enter the one-time code sent to your email address.</Trans>}
+      error={errorMessage}
+      recovery={recovery}
+      loginName={loginName}
+      requestId={requestId}
+      organization={organization}>
+      <Form.Root
+        schema={otpCodeClientSchema}
+        formComponent={RRForm}
+        method="POST"
+        defaultValues={{ code }}
+        isSubmitting={navigation.state === 'submitting'}
+        className="flex w-full flex-col gap-4">
+        <AuthFormFields
+          csrf={csrfToken}
+          loginName={loginName}
+          requestId={requestId}
+          organization={organization}
+          next={next ? next : undefined}
+        />
+        <OtpCodeField label={t`Email code`} />
+        <SubmitButton>
+          <Trans>Verify</Trans>
+        </SubmitButton>
+      </Form.Root>
 
-        <Form.Root
-          schema={otpCodeClientSchema}
-          formComponent={RRForm}
-          method="POST"
-          defaultValues={{ code }}
-          isSubmitting={navigation.state === 'submitting'}
-          className="flex w-full flex-col gap-4">
-          <input type="hidden" name="csrf" value={csrfToken} />
-          <input type="hidden" name="loginName" value={loginName} />
-          {requestId ? <input type="hidden" name="requestId" value={requestId} /> : null}
-          {organization ? <input type="hidden" name="organization" value={organization} /> : null}
-          {next ? <input type="hidden" name="next" value={next} /> : null}
-          <Form.Field name="code" label={t`Email code`} required>
-            <Form.Input inputMode="numeric" autoComplete="one-time-code" autoFocus />
-          </Form.Field>
-          <SubmitButton>
-            <Trans>Verify</Trans>
-          </SubmitButton>
-        </Form.Root>
-
-        <BackLink />
-      </div>
-    </AuthCard>
+      {/* Resend re-sends the code (the loader re-dispatches after this POST redirects back). */}
+      <RRForm method="POST" className="w-full">
+        <AuthFormFields
+          csrf={csrfToken}
+          loginName={loginName}
+          requestId={requestId}
+          organization={organization}
+        />
+        <input type="hidden" name="intent" value="resend" />
+        <button type="submit" className="text-sm underline">
+          <Trans>Resend code</Trans>
+        </button>
+      </RRForm>
+    </AuthCeremony>
   );
 }

@@ -43,4 +43,10 @@ describe('last-used-login cookie', () => {
     const parsed = await lastUsedLoginCookie.parse(cookieHeader);
     expect(parsed).toBe(token);
   });
+
+  it('scopes the last-used-login cookie to /id', async () => {
+    const setCookie = await serializeLastUsedLogin('email');
+    expect(setCookie).toContain('Path=/id');
+    expect(setCookie).not.toMatch(/Path=\/(;|$)/); // not the bare-root path
+  });
 });

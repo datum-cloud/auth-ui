@@ -1,8 +1,8 @@
-// CCD-8 — Network-timeout policy. One place for every outbound deadline used by the
+// Network-timeout policy. One place for every outbound deadline used by the
 // Zitadel adapter, so timeouts are named, discoverable, and tunable in a single edit.
 //
 // These bound REQUEST-HANDLER latency: a hung Zitadel instance must never stall an
-// auth route indefinitely (availability / DoS — see CODE-MAJ-01).
+// auth route indefinitely (availability / DoS protection).
 //
 // Promotion note: if per-environment tuning is ever needed, lift these into
 // app/utils/env.server.ts as optional, defaulted numbers and pass them through ZitadelOpts.

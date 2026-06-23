@@ -38,6 +38,19 @@ export type {
   WebAuthnVerifyActionData,
 } from './webauthn-verify';
 
+// Shared enrollment-ceremony route handler factory (used by the setup routes).
+export {
+  createWebAuthnEnrollHandlers,
+  unwrapPublicKey,
+  PASSKEY_ENROLL_CONFIG,
+  U2F_ENROLL_CONFIG,
+} from './webauthn-enroll';
+export type {
+  WebAuthnEnrollConfig,
+  WebAuthnEnrollLoaderData,
+  WebAuthnEnrollActionData,
+} from './webauthn-enroll';
+
 // Browser-side WebAuthn marshalling helpers (relocated in Pass 1).
 export {
   base64UrlToBuffer,

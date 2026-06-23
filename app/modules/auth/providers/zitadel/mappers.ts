@@ -11,6 +11,7 @@ import {
   type IdpLink,
   type IdpUserDraft,
   type LoginSettings,
+  type PasswordComplexity,
   type ProviderErrorCode,
   type SamlResponse,
   type Session,
@@ -69,7 +70,7 @@ export function normalizeError(error: unknown): ProviderError {
   } else if (numCode === 9 && /verified|already/i.test(msg)) {
     code = 'ALREADY_DONE';
   } else if (numCode === 9) {
-    // CODE-MIN-02: a FailedPrecondition that isn't "already/verified" is still a distinct,
+    // A FailedPrecondition that isn't "already/verified" is still a distinct,
     // meaningful state (e.g. precondition not met) — don't collapse it into UNKNOWN.
     code = 'FAILED_PRECONDITION';
   } else {
@@ -124,7 +125,7 @@ export function toAuthRequest(proto: {
 }
 
 // Converts a proto Timestamp (or ISO string) to an ISO string, or null if absent.
-// Used to map User.mfaInitSkippedAt (BLK-06 / P5).
+// Used to map User.mfaInitSkippedAt (P5).
 export function mfaInitSkippedToIso(val: unknown): string | null {
   if (!val) return null;
   if (typeof val === 'string') return val;
@@ -181,7 +182,7 @@ export function toSession(
   },
   token: string
 ): Session {
-  // CODE-MAJ-12: never let a malformed proto Timestamp throw out of the mapper into the
+  // Never let a malformed proto Timestamp throw out of the mapper into the
   // loader — mirror the mfaInitSkippedToIso guard and degrade to '' (treated as "unset").
   const tsToIso = (val: unknown): string => {
     if (typeof val === 'string') return val;
@@ -191,11 +192,22 @@ export function toSession(
       return '';
     }
   };
-  const v = (x?: { verifiedAt?: unknown }) => (x?.verifiedAt ? tsToIso(x.verifiedAt) : null);
-  // Map the webauthn/otp challenge bag back onto the returned Session (CCD-2).
+  // Factor verifiedAt is now `Date | null`. Parse the proto Timestamp (or ISO string)
+  // into a real Date; an absent or malformed value normalizes to null (treated as unverified).
+  const tsToDate = (val: unknown): Date | null => {
+    try {
+      const d = typeof val === 'string' ? new Date(val) : timestampDate(val as Timestamp);
+      return Number.isNaN(d.getTime()) ? null : d;
+    } catch {
+      return null;
+    }
+  };
+  const v = (x?: { verifiedAt?: unknown }): Date | null =>
+    x?.verifiedAt ? tsToDate(x.verifiedAt) : null;
+  // Map the webauthn/otp challenge bag back onto the returned Session.
   // updateSession populates Session.challenges when checks request a webauthn/otp challenge;
   // the route reads it to drive the browser ceremony. No 4th `challenges` arg anywhere.
-  const challenges = proto.challenges
+  const challenges: SessionChallenges | undefined = proto.challenges
     ? {
         webAuthN: proto.challenges.webAuthN
           ? {
@@ -205,7 +217,11 @@ export function toSession(
                 proto.challenges.webAuthN.publicKeyCredentialCreationOptions,
             }
           : undefined,
-        otpEmail: proto.challenges.otpEmail,
+        // proto otpEmail is the returned code (returnCode delivery); surface it through
+        // the typed otpEmailCode only when it is a non-empty string.
+        ...(typeof proto.challenges.otpEmail === 'string' && proto.challenges.otpEmail.length > 0
+          ? { otpEmailCode: proto.challenges.otpEmail }
+          : {}),
         otpSms: proto.challenges.otpSms,
       }
     : undefined;
@@ -221,13 +237,13 @@ export function toSession(
       : undefined,
     factors: {
       password: { verifiedAt: v(proto.factors?.password) },
-      // passkey factor carries userVerified, which drives the passwordless-passkey MFA-satisfied rule (CCD-2 / MAJ-15)
+      // passkey factor carries userVerified, which drives the passwordless-passkey MFA-satisfied rule
       passkey: {
         verifiedAt: v(proto.factors?.webAuthN),
         userVerified: Boolean(proto.factors?.webAuthN?.userVerified),
       },
       idpIntent: { verifiedAt: v(proto.factors?.intent) },
-      // CODE-BLK-01: real Zitadel populates these after an OTP/TOTP/U2F check; without
+      // Real Zitadel populates these after an OTP/TOTP/U2F check; without
       // mapping them, mfa-routing.secondFactorFresh never sees a completed second factor.
       totp: { verifiedAt: v(proto.factors?.totp) },
       otpSms: { verifiedAt: v(proto.factors?.otpSms) },
@@ -264,8 +280,8 @@ export function toSessionChallenges(proto: {
 }): SessionChallenges {
   // proto.otpEmail is a string when Zitadel returns the code (returnCode delivery); it is
   // a non-empty string only for the returnCode case — for sendCode the field is absent/null.
-  // We populate both otpEmail (existing field, unknown) and the new otpEmailCode (string) so
-  // callers that already read otpEmail keep working while new callers can use otpEmailCode.
+  // Surface it ONLY through the typed `otpEmailCode` (the redundant untyped `otpEmail`
+  // duplicate has been removed from SessionChallenges).
   return {
     ...(proto.webAuthN != null
       ? {
@@ -274,7 +290,7 @@ export function toSessionChallenges(proto: {
           },
         }
       : {}),
-    ...(proto.otpEmail != null ? { otpEmail: proto.otpEmail, otpEmailCode: proto.otpEmail } : {}),
+    ...(proto.otpEmail != null ? { otpEmailCode: proto.otpEmail } : {}),
     ...(proto.otpSms != null ? { otpSms: proto.otpSms } : {}),
   };
 }
@@ -359,7 +375,7 @@ export function toLoginSettings(proto: Record<string, unknown>): LoginSettings {
     passwordCheckLifetimeMs: durationToMs(proto.passwordCheckLifetime),
     secondFactorCheckLifetimeMs: durationToMs(proto.secondFactorCheckLifetime),
     multiFactorCheckLifetimeMs: durationToMs(proto.multiFactorCheckLifetime),
-    mfaInitSkipLifetimeMs: durationToMs(proto.mfaInitSkipLifetime), // P5 — BLK-06
+    mfaInitSkipLifetimeMs: durationToMs(proto.mfaInitSkipLifetime), // P5
     defaultRedirectUri:
       typeof proto.defaultRedirectUri === 'string' && proto.defaultRedirectUri.length > 0
         ? proto.defaultRedirectUri
@@ -382,13 +398,7 @@ export function toPasswordComplexity(settings: {
   requiresLowercase?: unknown;
   requiresNumber?: unknown;
   requiresSymbol?: unknown;
-}): {
-  minLength: number;
-  requiresUppercase: boolean;
-  requiresLowercase: boolean;
-  requiresNumber: boolean;
-  requiresSymbol: boolean;
-} {
+}): PasswordComplexity {
   return {
     minLength: settings.minLength !== undefined ? Number(settings.minLength) : 0,
     requiresUppercase: Boolean(settings.requiresUppercase),
@@ -564,7 +574,7 @@ export function toIdpLinkRequest(link: IdpLink): {
   };
 }
 
-// CODE-MIN-03: map a proto IDPLink response entry to the neutral IdpLink shape.
+// Map a proto IDPLink response entry to the neutral IdpLink shape.
 // This function was required by listIdpLinks in zitadel/index.ts to convert the proto
 // IDPLink fields (idpId, userId, userName) to the neutral IdpLink shape (idpId, idpUserId,
 // idpUserName). The spec's Step 1 noted "mappers already return the neutral types" for the
@@ -701,34 +711,34 @@ export function toChallengeRequest(challenges: NonNullable<SessionChecks['challe
     | { deliveryType: { case: 'sendCode'; value: { urlTemplate?: string } } }
     | { deliveryType: { case: 'returnCode'; value: Record<string, never> } };
 } {
-  // Four-way discriminant on the otpEmail challenge:
-  //   true              → sendCode with an empty value ({}) → provider default link
-  //   { urlTemplate }   → sendCode, carrying the template so Zitadel mails OUR link
-  //   { returnCode: true } → returnCode delivery — code is NOT emailed; it is returned on
-  //                          the SetSession response and surfaces on Session.challenges.otpEmailCode
-  //   else (false/undefined) → no otpEmail challenge requested (undefined)
+  // Discriminated union on `kind` (no runtime four-way value discriminant).
+  //   'send'          → sendCode with an empty value ({}) → provider default link
+  //   'send-template' → sendCode, carrying the template so Zitadel mails OUR link
+  //   'return-code'   → returnCode delivery — code is NOT emailed; it is returned on the
+  //                     SetSession response and surfaces on Session.challenges.otpEmailCode
+  // A missing `kind` is a compile error (the switch is exhaustive); an absent challenge → undefined.
   const otpEmail = challenges.otpEmail;
   type OtpEmailProto =
     | { deliveryType: { case: 'sendCode'; value: { urlTemplate?: string } } }
     | { deliveryType: { case: 'returnCode'; value: Record<string, never> } }
     | undefined;
   const deriveOtpEmail = (): OtpEmailProto => {
-    if (otpEmail === true) {
-      return { deliveryType: { case: 'sendCode' as const, value: {} } };
-    }
-    if (otpEmail && typeof otpEmail === 'object') {
-      if ('returnCode' in otpEmail && (otpEmail as { returnCode: true }).returnCode === true) {
-        return { deliveryType: { case: 'returnCode' as const, value: {} } };
+    if (otpEmail === undefined) return undefined;
+    switch (otpEmail.kind) {
+      case 'send':
+        return { deliveryType: { case: 'sendCode', value: {} } };
+      case 'send-template':
+        return {
+          deliveryType: { case: 'sendCode', value: { urlTemplate: otpEmail.urlTemplate } },
+        };
+      case 'return-code':
+        return { deliveryType: { case: 'returnCode', value: {} } };
+      default: {
+        // Exhaustiveness guard: a new OtpEmailChallenge kind without a case here is a compile error.
+        const _exhaustive: never = otpEmail;
+        return _exhaustive;
       }
-      const template = (otpEmail as { urlTemplate?: string }).urlTemplate;
-      return {
-        deliveryType: {
-          case: 'sendCode' as const,
-          value: template ? { urlTemplate: template } : {},
-        },
-      };
     }
-    return undefined;
   };
   const otpEmailProto = deriveOtpEmail();
 

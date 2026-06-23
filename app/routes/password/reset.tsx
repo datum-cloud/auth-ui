@@ -1,17 +1,17 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
 import { SubmitButton } from '@/components/auth-form/auth-form';
 import { BackLink } from '@/components/back-link/back-link';
-import { useActionErrorToast } from '@/hooks/use-action-error-toast';
+import { FormError } from '@/components/form-error/form-error';
+import { useAuthActionError } from '@/hooks/use-auth-action-error';
 import { TrackOnMount } from '@/modules/analytics/fathom';
 import { requestPasswordReset } from '@/resources/password';
 import { resetRequestSchema, resetRequestClientSchema } from '@/resources/password/password.schema';
 import { genericCheckYourEmail } from '@/resources/schemas/check-your-email.schema';
-import { trustedAppOrigin } from '@/server/app-origin.server';
 import { providerForRequest } from '@/server/auth-context.server';
 import { getCsrfToken, assertCsrf } from '@/server/csrf';
-import { env } from '@/utils/env/env.server';
+import { trustedAppOrigin } from '@/server/infra/app-origin.server';
+import { env } from '@/server/infra/env.server';
 import { actionError } from '@/utils/errors/auth-error';
-import { useAuthErrorMessage } from '@/utils/errors/auth-error-messages';
 import { Form } from '@datum-cloud/datum-ui/form';
 import { Trans, useLingui } from '@lingui/react/macro';
 import {
@@ -86,9 +86,9 @@ export default function PasswordReset() {
   const navigation = useNavigation();
   const { t } = useLingui();
 
-  const getErrorMessage = useAuthErrorMessage();
-  const errorMessage = getErrorMessage((actionData as { error?: string } | undefined)?.error);
-  useActionErrorToast(errorMessage);
+  // Inline-only error surface: the action error renders in a <FormError> (role="alert")
+  // inside the form — no toast.
+  const errorMessage = useAuthActionError(actionData);
 
   // On success, swap out the form for the confirmation message
   if (actionData && 'sent' in actionData) {
@@ -125,6 +125,7 @@ export default function PasswordReset() {
             placeholder="email@example.com"
           />
         </Form.Field>
+        <FormError>{errorMessage}</FormError>
         <SubmitButton>
           <Trans>Send reset link</Trans>
         </SubmitButton>

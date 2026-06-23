@@ -25,11 +25,13 @@ function makeRequest(headers: Record<string, string> = {}): Request {
 describe('userAgentFromRequest', () => {
   // ── UA header ──────────────────────────────────────────────────────────────
 
-  it('maps user-agent header to header["user-agent"].values', () => {
+  it('maps user-agent header to header["user-agent"].values (OLD comma-split shape)', () => {
     const req = makeRequest({ 'user-agent': CHROME_UA });
     const result = userAgentFromRequest(req);
     expect(result.header).toBeDefined();
-    expect(result.header!['user-agent']).toEqual({ values: [CHROME_UA] });
+    // 755-M1: byte-match the OLD payload — the raw UA is comma-split (the field the
+    // cloud-portal session gateway parses), NOT a single-element array.
+    expect(result.header!['user-agent']).toEqual({ values: CHROME_UA.split(',') });
   });
 
   it('omits header field when user-agent is absent', () => {
@@ -90,6 +92,36 @@ describe('userAgentFromRequest', () => {
     expect(result.description).toMatch(/mac/i);
   });
 
+  // ── 755-M1: byte-match the OLD auth-ui payload (cloud-portal session gateway parses it) ──
+
+  it('description uses the OLD comma-group format with OS preserved (not the " · " cleanup)', () => {
+    const desc = userAgentFromRequest(makeRequest({ 'user-agent': CHROME_UA })).description!;
+    // OLD lib/fingerprint.ts: four comma-joined "name, version, " groups (browser/device/engine/OS),
+    // empty segments preserved. OS ("macOS, 10.15.7") MUST be present for the portal's OS column.
+    expect(desc).toContain('Chrome,');
+    expect(desc).toContain('Blink,');
+    expect(desc).toContain('macOS,');
+    expect(desc).toContain('10.15.7,');
+    expect(desc).toMatch(/,/); // comma-separated (OLD shape)
+    expect(desc).not.toContain(' · '); // NOT the " · " cleanup that regressed the gateway
+  });
+
+  it('mobile UA includes the device + OS segments (OLD format)', () => {
+    const IPHONE_UA =
+      'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1';
+    const desc = userAgentFromRequest(makeRequest({ 'user-agent': IPHONE_UA })).description!;
+    expect(desc).toMatch(/Safari/);
+    expect(desc).toMatch(/iPhone/);
+    expect(desc).toMatch(/iOS, 17\.0/); // OLD format: "iOS, 17.0" (comma between name and version)
+  });
+
+  it('attaches a description whenever a user-agent header is present (OLD always emitted one)', () => {
+    // The OLD format always returns a (possibly empty-ish) string when a UA header is present.
+    const result = userAgentFromRequest(makeRequest({ 'user-agent': 'curl/8.4.0' }));
+    expect(result.description).toBeDefined();
+    expect(typeof result.description).toBe('string');
+  });
+
   it('omits description field when user-agent is absent', () => {
     const req = makeRequest({});
     const result = userAgentFromRequest(req);
@@ -121,7 +153,7 @@ describe('userAgentFromRequest', () => {
     expect(result).toMatchObject({
       fingerprintId: 'fp-xyz',
       ip: '203.0.113.99',
-      header: { 'user-agent': { values: [CHROME_UA] } },
+      header: { 'user-agent': { values: CHROME_UA.split(',') } },
     });
     expect(result.description).toBeDefined();
   });

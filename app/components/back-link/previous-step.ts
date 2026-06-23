@@ -9,6 +9,14 @@ const PREVIOUS_STEP: Array<[match: (p: string) => boolean, target: string]> = [
   [(p) => p.startsWith('/login/verify/'), '/login/mfa'],
   [(p) => p === '/signup/password', '/signup'],
   [(p) => p === '/password/reset', '/login/password'],
+  // Password-management screens previously had no Back control.
+  [(p) => p === '/password/new', '/login/password'],
+  [(p) => p === '/password/change', '/login/password'],
+  // The /setup/mfa chooser returns to /login/password (mirrors
+  // /login/mfa); each enrollment leaf is reached FROM the chooser, so Back goes
+  // there. Order matters — the exact /setup/mfa match precedes the leaf prefix.
+  [(p) => p === '/setup/mfa', '/login/password'],
+  [(p) => p.startsWith('/setup/'), '/setup/mfa'],
 ];
 
 export function previousStepFor(pathname: string): string | null {

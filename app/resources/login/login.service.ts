@@ -15,11 +15,13 @@
 import type { AuthProvider, SessionOpts } from '@/modules/auth/auth-provider';
 import { idpTypeToSlug } from '@/modules/auth/idp-slug';
 import { addSession, byLoginName, type SessionEntry } from '@/modules/auth/session/cookie';
+import type { LoginSettings } from '@/modules/auth/types';
 import { ProviderError } from '@/modules/auth/types';
 import { decideAfterIdentifier } from '@/resources/login/login-decision';
 import { isEmailLike } from '@/resources/login/login.schema';
 import { nextStepWithParams } from '@/resources/shared/next-step-params';
 import { idpReturnUrls } from '@/resources/sso/idp-return-urls';
+import { paths } from '@/routes/paths';
 import { logAuthEvent, hashActor } from '@/server/observability';
 
 // ── /login → /authorize protocol bridge ───────────────────────────────────────
@@ -88,6 +90,17 @@ export interface ResolveIdentifierInput {
   organization?: string;
   emailDeliveryEnabled: boolean;
   userAgent?: SessionOpts['userAgent'];
+  /**
+   * The login settings the caller has ALREADY fetched for
+   * `organization` (the /login route reads them for its phone-rejection gate just
+   * before calling here). When supplied, the inner happy-path re-fetch is skipped —
+   * fewer RPCs, identical result. OPTIONAL → existing callers are unchanged.
+   *
+   * Only reused when the resolved org still equals the caller's `organization`; if
+   * domain-discovery shifts `org` to a different org, these settings describe the
+   * wrong org and the inner read for the discovered org still runs.
+   */
+  settings?: LoginSettings;
 }
 
 export type ResolveIdentifierError = 'USER_NOT_FOUND' | 'EMAIL_LOGIN_DISABLED';
@@ -128,7 +141,14 @@ function emailDomain(loginName: string): string | null {
 export async function resolveIdentifier(
   provider: AuthProvider,
   list: SessionEntry[],
-  { loginName, requestId, organization, emailDeliveryEnabled, userAgent }: ResolveIdentifierInput
+  {
+    loginName,
+    requestId,
+    organization,
+    emailDeliveryEnabled,
+    userAgent,
+    settings: threadedSettings,
+  }: ResolveIdentifierInput
 ): Promise<ResolveIdentifierResult> {
   // allowDomainDiscovery (settings-gated, DEFAULT-OFF): when the caller pinned no org and the
   // BASE/instance policy enables discovery, map an email domain → org and thread it through the
@@ -209,8 +229,18 @@ export async function resolveIdentifier(
     { requestId, orgId: org, userId: user.id, userAgent }
   );
   const methods = await provider.listAuthMethods(user.id);
-  const settings = await provider.getLoginSettings(org);
-  const decision = decideAfterIdentifier({ methods, settings, emailDeliveryEnabled });
+  // Reuse the caller's already-fetched settings when they still
+  // describe the resolved org (org unchanged by discovery); otherwise re-fetch.
+  const settings =
+    threadedSettings && org === organization
+      ? threadedSettings
+      : await provider.getLoginSettings(org);
+  const decision = decideAfterIdentifier({
+    methods,
+    settings,
+    emailDeliveryEnabled,
+    context: { role: 'primary' }, // post-identifier decision is the primary flow
+  });
 
   // Persist the ceremony session into the (to-be-serialized) cookie list.
   const sessions = addSession(list, {
@@ -227,9 +257,20 @@ export async function resolveIdentifier(
   const params = new URLSearchParams({ loginName: user.loginName });
   if (requestId) params.set('requestId', requestId);
   if (org) params.set('organization', org);
-  Object.entries(decision.params ?? {}).forEach(([k, v]) => params.set(k, v));
 
-  return { ok: true, target: decision.target, params, sessions };
+  // Consume the Decision union by `kind` exhaustively (the compat shims are gone).
+  // 'redirect' → thread any decision params onto the ceremony query and target d.path;
+  // 'error'    → the post-identifier policy errors (PASSWORD_NOT_ALLOWED / NO_SUPPORTED_METHOD)
+  //              route to /error, byte-identical to the old decisionTarget()='/error' leg
+  //              (the error variant carried no params, and today's error legs never did either).
+  switch (decision.kind) {
+    case 'redirect': {
+      Object.entries(decision.params ?? {}).forEach(([k, v]) => params.set(k, v));
+      return { ok: true, target: decision.path, params, sessions };
+    }
+    case 'error':
+      return { ok: true, target: paths.error(), params, sessions };
+  }
 }
 
 // ── password flow ───────────────────────────────────────────────────────────────
@@ -342,7 +383,12 @@ export async function verifyLoginPassword(
 
   // /authorize finalization carve-out (see doc above).
   const isSignedIn = targetUrl === '/signed-in' || targetUrl.startsWith('/signed-in?');
-  if (isSignedIn && requestId) {
+  // 755-M8: a `device_` requestId must NOT take the /authorize carve-out. It has to reach
+  // `/signed-in?requestId=device_…`, where resolveSignedIn auto-completes the device grant
+  // (mirroring the OLD app's /signedin → completeDeviceAuthorization), so `datumctl login`
+  // finishes WITHOUT a second manual Authorize click. Only oidc_/saml_ go through /authorize.
+  const isDeviceFlow = requestId?.startsWith('device_') ?? false;
+  if (isSignedIn && requestId && !isDeviceFlow) {
     const authorizeParams = new URLSearchParams({ requestId, sessionId: session.id });
     return { ok: true, target: `/authorize?${authorizeParams.toString()}`, sessions };
   }

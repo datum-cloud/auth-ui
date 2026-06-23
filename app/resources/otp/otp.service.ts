@@ -77,7 +77,8 @@ export async function dispatchEmailChallenge(
   try {
     const urlTemplate = otpEmailUrlTemplate({ origin, loginName, requestId, organization });
     await provider.updateSession(entry.id, entry.token, {
-      challenges: { otpEmail: { urlTemplate } },
+      // Discriminated email-OTP challenge — override the emailed link with OUR /verify route.
+      challenges: { otpEmail: { kind: 'send-template', urlTemplate } },
     });
   } catch {
     logAuthEvent('mfa_otp_challenge', 'failure', { loginName, channel: 'email' });

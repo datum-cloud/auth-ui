@@ -19,8 +19,8 @@ import { getCsrfToken } from '@/server/csrf';
 import { describe, it, expect, vi } from 'vitest';
 
 // ─── env: stub MAXMIND_ACCOUNT_ID (env.server is a server-only module) ─────────
-vi.mock('@/utils/env/env.server', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/utils/env/env.server')>();
+vi.mock('@/server/infra/env.server', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/server/infra/env.server')>();
   return { ...actual, env: { ...actual.env, MAXMIND_ACCOUNT_ID: '' } };
 });
 
@@ -68,7 +68,7 @@ async function bodyOf(res: unknown): Promise<Record<string, unknown> | null> {
       return null;
     }
   }
-  return ((res as { data?: Record<string, unknown> }).data) ?? null;
+  return (res as { data?: Record<string, unknown> }).data ?? null;
 }
 
 function locationOf(res: unknown): string | null {

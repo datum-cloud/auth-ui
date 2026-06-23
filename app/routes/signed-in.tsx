@@ -3,7 +3,7 @@ import { TrackOnMount } from '@/modules/analytics/fathom';
 import { resolveSignedIn } from '@/resources/session';
 import { providerForRequest } from '@/server/auth-context.server';
 import { getCsrfToken } from '@/server/csrf';
-import { env } from '@/utils/env/env.server';
+import { env } from '@/server/infra/env.server';
 import { Button } from '@datum-cloud/datum-ui/button';
 import { Trans } from '@lingui/react/macro';
 import { data, redirect, useLoaderData, type LoaderFunctionArgs } from 'react-router';
@@ -20,16 +20,61 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
   if (outcome.kind === 'redirect') return redirect(outcome.location);
 
+  // 755-M8: the post-login device-grant auto-authorization FAILED — render a tailored
+  // recovery card (no sign-out form / no CSRF needed for this terminal state).
+  if (outcome.kind === 'device-error') {
+    return data({ deviceError: true } as const);
+  }
+
   // Terminal "You are signed in" page — mint a CSRF token for the sign-out form.
   const [csrfToken, setCookie] = await getCsrfToken(request);
   // DEVIATION (getCsrfToken null-guard): only set 'set-cookie' when non-null (same pattern as login.tsx).
   const headers: Record<string, string> = {};
   if (setCookie !== null) headers['set-cookie'] = setCookie;
-  return data({ loginName: outcome.loginName, csrfToken }, { headers });
+  return data(
+    { loginName: outcome.loginName, csrfToken, deviceComplete: outcome.deviceComplete ?? false },
+    { headers }
+  );
 }
 
 export default function SignedIn() {
-  const { loginName, csrfToken } = useLoaderData<typeof loader>();
+  const loaderData = useLoaderData<typeof loader>();
+
+  // 755-M8: device auto-authorization failed — tailored inline recovery (no sign-out form).
+  if ('deviceError' in loaderData) {
+    return (
+      <AuthCard
+        title={<Trans>Authorization failed</Trans>}
+        description={
+          <Trans>We could not complete the device authorization. Please try again.</Trans>
+        }
+      />
+    );
+  }
+
+  const { loginName, csrfToken, deviceComplete } = loaderData;
+
+  // 755-M8: device grant was auto-completed after login — restore the OLD behavior of landing
+  // on a "you can close this window" terminal page (no second Authorize click, no sign-out form).
+  if (deviceComplete) {
+    return (
+      <AuthCard
+        title={<Trans>Authorization complete</Trans>}
+        description={
+          loginName ? (
+            <Trans>
+              You are signed in as <strong>{loginName}</strong>
+            </Trans>
+          ) : null
+        }>
+        <TrackOnMount event="login_completed" />
+        <p className="text-center">
+          <Trans>You can now close this window and return to the device where you started.</Trans>
+        </p>
+      </AuthCard>
+    );
+  }
+
   return (
     <AuthCard
       title={<Trans>You are signed in</Trans>}

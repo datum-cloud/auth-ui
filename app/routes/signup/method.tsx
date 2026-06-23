@@ -1,5 +1,7 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
-import { useActionErrorToast } from '@/hooks/use-action-error-toast';
+import { AuthCeremony } from '@/components/auth-ceremony/auth-ceremony';
+import { AuthFormFields } from '@/components/auth-form/auth-form-fields';
+import { useAuthActionError } from '@/hooks/use-auth-action-error';
 import { readSessions, serializeSessions } from '@/modules/auth/session/cookie';
 import { genericCheckYourEmail } from '@/resources/schemas/check-your-email.schema';
 import {
@@ -9,14 +11,13 @@ import {
 } from '@/resources/signup';
 import { resolveSignupView } from '@/resources/signup/signup-view';
 import { signupMethodSchema } from '@/resources/signup/signup.schema';
-import { trustedAppOrigin } from '@/server/app-origin.server';
 import { providerForRequest } from '@/server/auth-context.server';
 import { getCsrfToken, assertCsrf } from '@/server/csrf';
 import { requireEmailVerification } from '@/server/env';
+import { trustedAppOrigin } from '@/server/infra/app-origin.server';
+import { env } from '@/server/infra/env.server';
 import { userAgentFromRequest } from '@/server/user-agent';
-import { env } from '@/utils/env/env.server';
 import { actionError } from '@/utils/errors/auth-error';
-import { useAuthErrorMessage } from '@/utils/errors/auth-error-messages';
 import { Button } from '@datum-cloud/datum-ui/button';
 import { Trans } from '@lingui/react/macro';
 import {
@@ -148,6 +149,10 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 // ── Shared hidden fields carried in every method form ──────────────────────────
+//
+// csrf + loginName/organization/requestId come from the shared <AuthFormFields>
+// cluster. firstName/lastName/deviceTrackingToken are method-specific extras carried
+// alongside it (AuthFormFields owns only the canonical identity set).
 
 interface HiddenContextProps {
   csrf: string;
@@ -170,12 +175,14 @@ function HiddenContext({
 }: HiddenContextProps) {
   return (
     <>
-      <input type="hidden" name="csrf" value={csrf} />
-      <input type="hidden" name="loginName" value={loginName} />
+      <AuthFormFields
+        csrf={csrf}
+        loginName={loginName}
+        requestId={requestId}
+        organization={organization}
+      />
       <input type="hidden" name="firstName" value={firstName} />
       <input type="hidden" name="lastName" value={lastName} />
-      {organization ? <input type="hidden" name="organization" value={organization} /> : null}
-      {requestId ? <input type="hidden" name="requestId" value={requestId} /> : null}
       {deviceTrackingToken ? (
         <input type="hidden" name="deviceTrackingToken" value={deviceTrackingToken} />
       ) : null}
@@ -201,9 +208,9 @@ export default function SignupMethod() {
   const navigation = useNavigation();
   const submitting = navigation.state !== 'idle';
 
-  const getErrorMessage = useAuthErrorMessage();
-  const errorMessage = getErrorMessage((actionData as { error?: string } | undefined)?.error);
-  useActionErrorToast(errorMessage);
+  // The action error surfaces INLINE through <AuthCeremony error> (this
+  // replaces the per-route toast).
+  const errorMessage = useAuthActionError(actionData);
 
   // Enumeration-safe terminal: the email-link path (and an existing-email passkey/IdP
   // attempt) returns a generic "check your email" — render it here, otherwise the screen
@@ -232,13 +239,14 @@ export default function SignupMethod() {
   };
 
   return (
-    <AuthCard
+    <AuthCeremony
       title={<Trans>Finish creating your account</Trans>}
       description={
         <>
           {firstName} {lastName} · {loginName}
         </>
-      }>
+      }
+      error={errorMessage}>
       <div className="flex flex-col gap-3">
         {/* Email-link (passwordless) — always shown when email entry is allowed */}
         {view.showEmailLink ? (
@@ -294,6 +302,6 @@ export default function SignupMethod() {
           </RRForm>
         ) : null}
       </div>
-    </AuthCard>
+    </AuthCeremony>
   );
 }

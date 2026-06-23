@@ -26,7 +26,7 @@ import { z } from 'zod';
 
 // ── Shared credential Zod schema ────────────────────────────────────────────
 
-// CODE-MIN-11: renamed from credentialSchema to webauthnAssertionSchema to remove the name
+// Renamed from credentialSchema to webauthnAssertionSchema to remove the name
 // collision with the minimal { credential } shape in app/flows/mfa-schemas.ts. These are
 // legitimately different schemas; the name collision was confusing and drift-prone.
 export const webauthnAssertionSchema = z.object({

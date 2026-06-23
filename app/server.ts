@@ -1,4 +1,5 @@
 import { legacyRedirects } from './server/middleware/legacy-redirects';
+import { env } from '@/server/infra/env.server';
 import {
   loginPasswordRateLimit,
   signupRateLimit,
@@ -14,7 +15,6 @@ import { requestContext, type RequestContextEnv } from '@/server/middleware/requ
 import { appSecureHeaders, resolveFrameAncestors } from '@/server/middleware/secure-headers';
 import { registry, httpMetrics } from '@/server/observability';
 import { samlPostHandler } from '@/server/routes/saml-post';
-import { env } from '@/utils/env/env.server';
 import { serveStatic } from 'hono/bun';
 import { compress } from 'hono/compress';
 import { createHonoServer } from 'react-router-hono-server/bun';
@@ -135,7 +135,7 @@ export default await createHonoServer<RequestContextEnv>({
     // Covers POST /id/accounts (15/5min, ip-only).
     // Body-stream hazard: intent + sessionId are in the POST body — key is ip-only.
     app.use('/id/accounts', accountsRateLimit);
-    // CODE-MAJ-08: email-code dispatch rate-limit for GET /id/verify?send=true.
+    // Email-code dispatch rate-limit for GET /id/verify?send=true.
     // Defence-in-depth alongside the session-ownership gate in the verify.tsx loader.
     // Self-guards on GET + ?send=true; POST submits are unaffected. Key is ip-only.
     app.use('/id/verify', verifyEmailSendRateLimit);
@@ -144,7 +144,7 @@ export default await createHonoServer<RequestContextEnv>({
     app.get('/security', (c) =>
       c.text('Contact: security@datum.net\n', 200, { 'content-type': 'text/plain' })
     );
-    // CODE-MIN-20: /metrics is intentionally UNAUTHENTICATED. It is only reachable cluster-internally
+    // /metrics is intentionally UNAUTHENTICATED. It is only reachable cluster-internally
     // — the gateway/HTTPRoute does not expose this path externally (see ops config). Do NOT add
     // app-level auth here without a corresponding gateway-policy decision; scraping breaks otherwise.
     app.get('/metrics', async (c) =>

@@ -35,11 +35,18 @@ import { describe, it, expect } from 'vitest';
 
 const ROUTES_DIR = join(__dirname, '../../../routes');
 const RESOURCES_DIR = join(__dirname, '../../../resources');
+const MIDDLEWARE_DIR = join(__dirname, '../../middleware');
 
 // Shared action factories formerly under routes/_shared/, now distributed into
 // the resources/ layer. Keyed by their original basename so the delegation and
 // registry checks below keep working against the new locations.
-const SHARED_FACTORY_PATHS: Record<string, string> = {
+//
+// A value may be a single file path or an array of file paths. The array form
+// is used when a domain's audited logic was decomposed into several cohesive
+// sibling modules (sso.service.ts is now a thin barrel re-export — the
+// logAuthEvent calls live in the cohesive modules it composes), so the
+// delegation + registry checks must scan every module that holds a call site.
+const SHARED_FACTORY_PATHS: Record<string, string | string[]> = {
   'otp-enroll.ts': join(RESOURCES_DIR, 'otp/otp-enroll.ts'),
   'webauthn-verify.ts': join(RESOURCES_DIR, 'webauthn/webauthn-verify.ts'),
   // Pass 2: password routes delegate their action logic (incl. logAuthEvent) to the
@@ -95,9 +102,18 @@ const SHARED_FACTORY_PATHS: Record<string, string> = {
   // sso/provider/callback.tsx loader) delegate their business logic (incl. the idp_start /
   // idp.signin / idp.link / idp.link.denied / idp.link.start / idp.unlink / ldap_signin
   // logAuthEvent calls) to the sso domain service. The routes are now thin
-  // provider→service→outcomeToResponse translators. Registered here so the delegation +
-  // registry checks resolve those events at their new call site in resources/sso/sso.service.ts.
-  'sso.service.ts': join(RESOURCES_DIR, 'sso/sso.service.ts'),
+  // provider→service→outcomeToResponse translators. The decomposition split sso.service.ts into
+  // cohesive sibling modules (sso.service.ts is now a thin barrel re-export with no call sites);
+  // the logAuthEvent calls live in sso-action.ts (idp_start / idp.unlink), sso-callback.ts
+  // (idp.signin / idp.link / idp.link.denied), sso-link.ts (idp.link.start), and sso-ldap.ts
+  // (ldap_signin). All four are registered so the delegation + registry checks resolve the
+  // sso events at their new call sites.
+  'sso.service.ts': [
+    join(RESOURCES_DIR, 'sso/sso-action.ts'),
+    join(RESOURCES_DIR, 'sso/sso-callback.ts'),
+    join(RESOURCES_DIR, 'sso/sso-link.ts'),
+    join(RESOURCES_DIR, 'sso/sso-ldap.ts'),
+  ],
   // Pass 2: the login routes (login/index.tsx loader+action and login/password.tsx action)
   // delegate their business logic (incl. the identifier / idp_start / password_check
   // logAuthEvent calls) to the login domain service. The routes are now thin
@@ -150,8 +166,29 @@ function routeKey(filePath: string): string {
   return relative(ROUTES_DIR, filePath);
 }
 
+/** Non-route source files that also emit logAuthEvent (middleware + domain services). */
+function auditedNonRouteFiles(): string[] {
+  const out: string[] = [];
+  const walk = (dir: string, pick: (name: string) => boolean): void => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      if (entry.name === '__tests__') continue;
+      const full = join(dir, entry.name);
+      if (entry.isDirectory()) walk(full, pick);
+      else if (pick(entry.name)) out.push(full);
+    }
+  };
+  walk(MIDDLEWARE_DIR, (n) => n.endsWith('.ts') && !n.endsWith('.test.ts'));
+  walk(RESOURCES_DIR, (n) => n.endsWith('.service.ts') && !n.endsWith('.test.ts'));
+  return out;
+}
+
+/** Every file the PII guard must scan: routes + middleware + domain services. */
+function piiGuardFiles(): string[] {
+  return [...routeFiles(), ...auditedNonRouteFiles()];
+}
+
 function sharedFiles(): string[] {
-  return Object.values(SHARED_FACTORY_PATHS);
+  return Object.values(SHARED_FACTORY_PATHS).flat();
 }
 
 /** All text across routes/ and routes/_shared/ concatenated — for registry check. */
@@ -263,11 +300,12 @@ describe('Auth-event audit: route coverage', () => {
 
       const delegated = DELEGATED_TO_SHARED[key];
       if (delegated) {
-        // Must find logAuthEvent in the delegated _shared file(s).
+        // Must find logAuthEvent in the delegated _shared file(s). A mapping value may be a
+        // single path or an array of paths (a domain decomposed into sibling modules).
         const sharedCovered = delegated.some((sharedFile) => {
-          const sharedPath = SHARED_FACTORY_PATHS[sharedFile] ?? join(RESOURCES_DIR, sharedFile);
-          const sharedContent = readFile(sharedPath);
-          return sharedContent.includes('logAuthEvent(');
+          const mapped = SHARED_FACTORY_PATHS[sharedFile] ?? join(RESOURCES_DIR, sharedFile);
+          const paths = Array.isArray(mapped) ? mapped : [mapped];
+          return paths.some((p) => readFile(p).includes('logAuthEvent('));
         });
         expect(
           sharedCovered,
@@ -359,7 +397,7 @@ export const REQUIRED_EVENTS = [
   'rate_limit',
   // --- Session layer (P7 Task 8 Step 8 tamper guard, emitted by app/session/cookie.ts) ---
   'session_cookie',
-  // --- signed-in degraded-path audit (CODE-MAJ-05) ---
+  // --- signed-in degraded-path audit ---
   'post_login_settings',
   'post_login_admin_check',
 ] as const;
@@ -367,7 +405,7 @@ export const REQUIRED_EVENTS = [
 describe('Auth-event audit: event-name registry', () => {
   const all = allRouteText();
 
-  it('every REQUIRED_EVENTS name is actually emitted by a route (CODE-MIN-15)', () => {
+  it('every REQUIRED_EVENTS name is actually emitted by a route', () => {
     // Events excused from the literal-string-presence check because they are assembled
     // dynamically (e.g. passed as cfg values) or emitted outside the routes layer.
     // Keep this in sync with DYNAMIC_OR_EXTERNAL below.
@@ -395,7 +433,7 @@ describe('Auth-event audit: event-name registry', () => {
    * Each excused event must have a documented reason.
    */
   const DYNAMIC_OR_EXTERNAL: Record<string, string> = {
-    // CODE-MIN-15: WebAuthn audit event names are now aligned with the runtime values.
+    // WebAuthn audit event names are aligned with the runtime values.
     // cfg.auditEvent is set to 'mfa_passkey' / 'mfa_u2f' in login.passkey.tsx /
     // login.security-key.tsx and forwarded dynamically to logAuthEvent via the
     // _shared/webauthn-verify.ts factory — the string never sits directly at logAuthEvent(.
@@ -412,7 +450,7 @@ describe('Auth-event audit: event-name registry', () => {
     // VERIFY_CHANNELS config (logAuthEvent(cfg.successEvent, …) / logAuthEvent(cfg.failureEvent, …)).
     // The literal sits in the config object, not directly at the logAuthEvent( call — same dynamic
     // pattern as mfa_passkey / mfa_u2f above. Both names still appear as literals in the service
-    // file, so the CODE-MIN-15 "emitted anywhere" check still covers them.
+    // file, so the "emitted anywhere" check still covers them.
     mfa_otp:
       'emitted via cfg.successEvent/cfg.failureEvent = "mfa_otp" in otp.service.ts (dynamic)',
     mfa_totp:
@@ -455,14 +493,14 @@ describe('Auth-event audit: event-name registry', () => {
 });
 
 // ---------------------------------------------------------------------------
-// PII guard — CCD-9
+// PII guard
 // ---------------------------------------------------------------------------
 
 describe('Auth-event audit: PII guard', () => {
-  it('no logAuthEvent call passes a raw loginName or email field (CCD-9)', () => {
+  it('no logAuthEvent call passes a raw loginName or email field', () => {
     // ROUTE_FILES / readFileSync pattern already established earlier in this test file.
     const offenders: string[] = [];
-    for (const file of routeFiles()) {
+    for (const file of piiGuardFiles()) {
       const src = readFile(file);
       // any logAuthEvent(...) whose argument text contains a bare loginName: or email: object
       // key. hashActor(loginName) is fine — it's a call expression, not an object key.

@@ -1,11 +1,11 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
 import { SubmitButton } from '@/components/auth-form/auth-form';
-import { useActionErrorToast } from '@/hooks/use-action-error-toast';
+import { FormError } from '@/components/form-error/form-error';
+import { useAuthActionError } from '@/hooks/use-auth-action-error';
 import { lookupDeviceCode, lookupOutcomeToResponse } from '@/resources/device';
 import { codeSchema } from '@/resources/device/device.schema';
 import { providerForRequest } from '@/server/auth-context.server';
 import { getCsrfToken, assertCsrf } from '@/server/csrf';
-import { useAuthErrorMessage } from '@/utils/errors/auth-error-messages';
 import { Form } from '@datum-cloud/datum-ui/form';
 import { Trans, useLingui } from '@lingui/react/macro';
 import {
@@ -50,8 +50,9 @@ export default function Device() {
   const navigation = useNavigation();
   const { t } = useLingui();
 
-  const getErrorMessage = useAuthErrorMessage();
-  useActionErrorToast(getErrorMessage((actionData as { error?: string } | undefined)?.error));
+  // Inline-only error surface: the action error renders in a <FormError> (role="alert")
+  // inside the form — no toast.
+  const errorMessage = useAuthActionError(actionData);
 
   return (
     <AuthCard
@@ -68,6 +69,7 @@ export default function Device() {
         <Form.Field name="userCode" label={t`Device code`} required>
           <Form.Input placeholder={t`WDJB-MJHT`} autoFocus autoComplete="off" />
         </Form.Field>
+        <FormError>{errorMessage}</FormError>
         <SubmitButton>
           <Trans>Continue</Trans>
         </SubmitButton>

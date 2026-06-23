@@ -14,7 +14,7 @@
 // original route test minted CSRF only to satisfy the route's assertCsrf; the business logic
 // under test is unchanged.)
 //
-// Verifies CODE-MAJ-10: after single-session logout, residual cookie sessions are not silently
+// Verifies: after single-session logout, residual cookie sessions are not silently
 // reusable — the post-logout redirect goes to /accounts (not /logout/success) so the user must
 // explicitly choose a session rather than being re-authed silently.
 import { FakeAuthProvider } from '@/modules/auth/providers/fake/fake-provider';
@@ -66,7 +66,7 @@ async function requestWithSessions(sessions: SessionEntry[]): Promise<Request> {
   });
 }
 
-describe('performLogout — CODE-MAJ-10: explicit session scope', () => {
+describe('performLogout — explicit session scope', () => {
   it('after single-session logout, residual sessions are not silently reused on resume', async () => {
     // s1 is most-recent (active), s2 is residual — after logout, s2 remains in the cookie.
     // The redirect must NOT go to /logout/success (which lets /authorize silently reuse s2);

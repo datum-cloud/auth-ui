@@ -12,7 +12,7 @@ export type PostLoginSource = 'console' | 'zitadel' | 'env' | 'none';
 
 /**
  * Single source of truth for BOTH the destination and the audit `source` label, so the two
- * can never diverge (CODE-MAJ-15). Priority: admin console → Zitadel default → env default → none.
+ * can never diverge. Priority: admin console → Zitadel default → env default → none.
  */
 export function postLoginDestinationWithSource({
   isAdmin,

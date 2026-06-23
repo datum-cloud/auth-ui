@@ -1,3 +1,4 @@
+import { withPasswordMatch } from '@/resources/schemas/password-match';
 import { z } from 'zod';
 
 // NOTE: zod 4 ships z.email() as a top-level validator; z.string().email() still works
@@ -21,9 +22,11 @@ export const registerClientSchema = registerSchema.pick({
   lastName: true,
 });
 
-export const signupPasswordSchema = z
-  .object({ password: z.string().min(8), confirm: z.string().min(8) })
-  .refine((v) => v.password === v.confirm, { path: ['confirm'], message: 'Passwords must match' });
+// Composes the shared withPasswordMatch refinement — same field names (password/
+// confirm), same path, same "Passwords must match" copy the inline refinement emitted.
+export const signupPasswordSchema = withPasswordMatch(
+  z.object({ password: z.string().min(8), confirm: z.string().min(8) })
+);
 
 // Screen 1 (/signup): collect just the email identifier (name is parsed from it).
 export const signupIdentifierSchema = z.object({

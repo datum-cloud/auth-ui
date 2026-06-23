@@ -2,7 +2,7 @@ import { FakeAuthProvider } from '@/modules/auth/providers/fake/fake-provider';
 import { resolveIdentifier } from '@/resources/login';
 import { describe, it, expect } from 'vitest';
 
-// Task 11 — allowDomainDiscovery (settings-gated, default-off, both-branch).
+// allowDomainDiscovery (settings-gated, default-off, both-branch).
 //
 // DECISION ENCODED HERE (mirrors the implementation comment): whether discovery
 // runs is decided by the INSTANCE/BASE settings (`getLoginSettings(undefined)`),

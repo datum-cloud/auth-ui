@@ -1,6 +1,6 @@
 import { checkA11y } from '../support/a11y';
 
-// axe / WCAG 2.2 AA per-screen gate (INDEX §C, CCD-5)
+// axe / WCAG 2.2 AA per-screen gate
 
 // Deterministic fake codes: sendPasswordReset(u1) issues `reset-u1`.
 describe('password reset → new password', () => {

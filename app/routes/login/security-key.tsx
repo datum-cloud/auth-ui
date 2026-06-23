@@ -1,14 +1,12 @@
-import { AuthCard } from '@/components/auth-card/auth-card';
-import { BackLink } from '@/components/back-link/back-link';
-import { IdentityBadge } from '@/components/identity-badge/identity-badge';
+import { AuthCeremony } from '@/components/auth-ceremony/auth-ceremony';
+import { AuthFormFields } from '@/components/auth-form/auth-form-fields';
 import { WebAuthnButton } from '@/components/webauthn-button/webauthn-button';
-import { useActionErrorToast } from '@/hooks/use-action-error-toast';
+import { useAuthActionError } from '@/hooks/use-auth-action-error';
 import {
   createWebAuthnVerifyHandlers,
   type WebAuthnVerifyActionData,
   type WebAuthnVerifyLoaderData,
 } from '@/resources/webauthn/webauthn-verify';
-import { useAuthErrorMessage } from '@/utils/errors/auth-error-messages';
 import { Trans } from '@lingui/react/macro';
 import { useRef } from 'react';
 import { useActionData, useLoaderData, type MetaFunction } from 'react-router';
@@ -45,35 +43,34 @@ export default function LoginSecurityKey() {
       ? (publicKeyCredentialRequestOptions as { publicKey: unknown }).publicKey
       : publicKeyCredentialRequestOptions;
 
-  const getErrorMessage = useAuthErrorMessage();
-  const errorMessage = getErrorMessage((actionData as { error?: string } | undefined)?.error);
-  useActionErrorToast(errorMessage);
+  // Shared error pipeline; the message now surfaces inline through AuthCeremony.
+  const errorMessage = useAuthActionError(actionData);
 
   return (
-    <AuthCard
+    <AuthCeremony
       title={<Trans>Verify with security key</Trans>}
-      description={<Trans>Use your security key to verify your identity.</Trans>}>
-      <div className="flex flex-col items-baseline justify-center gap-4">
-        <IdentityBadge loginName={loginName} requestId={requestId} organization={organization} />
+      description={<Trans>Use your security key to verify your identity.</Trans>}
+      error={errorMessage}
+      loginName={loginName}
+      requestId={requestId}
+      organization={organization}>
+      {/* Hidden form that WebAuthnButton populates and submits. */}
+      <RRForm ref={formRef} method="POST" className="flex w-full flex-col gap-4">
+        <AuthFormFields
+          csrf={csrfToken}
+          loginName={loginName}
+          requestId={requestId}
+          organization={organization}
+        />
+        {/* credential is populated by WebAuthnButton before submit */}
+        <input type="hidden" name="credential" defaultValue="" />
 
-        {/* Hidden form that WebAuthnButton populates and submits. */}
-        <RRForm ref={formRef} method="POST" className="flex w-full flex-col gap-4">
-          <input type="hidden" name="csrf" value={csrfToken} />
-          <input type="hidden" name="loginName" value={loginName} />
-          {requestId ? <input type="hidden" name="requestId" value={requestId} /> : null}
-          {organization ? <input type="hidden" name="organization" value={organization} /> : null}
-          {/* credential is populated by WebAuthnButton before submit */}
-          <input type="hidden" name="credential" defaultValue="" />
-
-          <WebAuthnButton
-            publicKey={publicKey}
-            formRef={formRef}
-            label={<Trans>Verify with security key</Trans>}
-          />
-        </RRForm>
-
-        <BackLink />
-      </div>
-    </AuthCard>
+        <WebAuthnButton
+          publicKey={publicKey}
+          formRef={formRef}
+          label={<Trans>Verify with security key</Trans>}
+        />
+      </RRForm>
+    </AuthCeremony>
   );
 }

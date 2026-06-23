@@ -33,7 +33,7 @@ export function getTraceId(): string | undefined {
   return als.getStore()?.traceId;
 }
 
-// CODE-MIN-31: test seam so the auto-injection path (getTraceId reading THIS module's ALS) is
+// Test seam so the auto-injection path (getTraceId reading THIS module's ALS) is
 // exercised end-to-end. The middleware already runs the handler chain inside als.run({ traceId });
 // this wraps the identical store for unit tests without spinning up Hono.
 export function runWithTraceId<T>(traceId: string, fn: () => T): T {

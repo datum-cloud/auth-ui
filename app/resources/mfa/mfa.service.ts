@@ -125,8 +125,8 @@ export type ChooseMfaMethodResult =
  * failure).
  *
  * Best-effort userId for the audit log: a findUser failure must NOT abort routing,
- * but it must be observable (CODE-MIN-28) — emit a failure audit line keyed on the
- * HASHED actor (never the raw loginName, CCD-9) and continue. On success emit the
+ * but it must be observable — emit a failure audit line keyed on the
+ * HASHED actor (never the raw loginName) and continue. On success emit the
  * success routing event and return the matching use-screen target.
  */
 export async function chooseMfaMethod(
@@ -157,7 +157,7 @@ export async function chooseMfaMethod(
     const user = await provider.findUser(loginName, organization);
     userId = user?.id ?? '';
   } catch (err) {
-    // CODE-MIN-28: don't silently swallow a findUser failure — the userId is best-effort
+    // Don't silently swallow a findUser failure — the userId is best-effort
     // for the audit log, but the failure itself must be observable. Routing continues.
     logAuthEvent('mfa_method_chosen', 'failure', {
       actor: hashActor(loginName),

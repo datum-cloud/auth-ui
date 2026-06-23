@@ -1,9 +1,9 @@
-import { AuthCard } from '@/components/auth-card/auth-card';
-import { BackLink } from '@/components/back-link/back-link';
-import { IdentityBadge } from '@/components/identity-badge/identity-badge';
+import { AuthCeremony } from '@/components/auth-ceremony/auth-ceremony';
+import { AuthFormFields } from '@/components/auth-form/auth-form-fields';
+import { useAuthActionRecovery } from '@/hooks/use-auth-action-recovery';
 import { readSessions } from '@/modules/auth/session/cookie';
 import { resolveMfaPicker, chooseMfaMethod, type SecondFactorMethod } from '@/resources/mfa';
-import { type LoginLayoutData } from '@/routes/login/layout';
+import { paths } from '@/routes/paths';
 import { providerForRequest } from '@/server/auth-context.server';
 import { getCsrfToken, assertCsrf } from '@/server/csrf';
 import { assetUrl } from '@/utils/asset-url';
@@ -15,6 +15,7 @@ import type { ReactNode } from 'react';
 import {
   data,
   redirect,
+  useActionData,
   useLoaderData,
   useRouteLoaderData,
   type ActionFunctionArgs,
@@ -30,10 +31,14 @@ export const meta: MetaFunction = () => [{ title: 'Choose your verification meth
 const METHOD_LABELS: Record<SecondFactorMethod, { label: ReactNode; icon: ReactNode }> = {
   totp: {
     label: <Trans>Authenticator app</Trans>,
+    // Decorative icon: the accessible name comes from the visible "Authenticator app" label,
+    // so the img is alt="" + aria-hidden to avoid a doubled screen-reader announcement (F4,
+    // same defect as the /setup/mfa row). The other rows use decorative <Icon> SVGs already.
     icon: (
       <img
         src={assetUrl('/images/idps/totp.png')}
-        alt="Authenticator app"
+        alt=""
+        aria-hidden="true"
         className="size-4 object-contain"
       />
     ),
@@ -85,7 +90,7 @@ export async function action({ request }: ActionFunctionArgs) {
   const requestId = (form.get('requestId') as string | null) ?? undefined;
   const organization = (form.get('organization') as string | null) ?? undefined;
 
-  // Service does the session guard, schema parse, best-effort userId audit (CODE-MIN-28),
+  // Service does the session guard, schema parse, best-effort userId audit,
   // and routing-target computation. The route reads the cookie, validates CSRF, and wires
   // the result: a SESSION_EXPIRED error redirects to /login (legacy behavior), an
   // INVALID_INPUT error renders a 400, and success redirects to the use screen.
@@ -98,7 +103,7 @@ export async function action({ request }: ActionFunctionArgs) {
   });
 
   if (result.ok) return redirect(result.target);
-  if (result.error === 'SESSION_EXPIRED') return redirect('/login');
+  if (result.error === 'SESSION_EXPIRED') return redirect(paths.login.index());
   return data({ error: result.error }, { status: 400 });
 }
 
@@ -106,42 +111,51 @@ export async function action({ request }: ActionFunctionArgs) {
 
 export default function MfaPicker() {
   const { csrfToken, secondFactors } = useLoaderData<typeof loader>();
-  const { loginName, requestId, organization } = useRouteLoaderData('login') as LoginLayoutData;
+  // RR7 infers the parent-layout loader return through the generic — the `as` cast is gone.
+  // The `?? { loginName: '' }` only satisfies the structurally-possible-undefined branch; these
+  // routes always render under the `login` layout, so it is never taken at runtime.
+  const { loginName, requestId, organization } = useRouteLoaderData<
+    typeof import('@/routes/login/layout').loader
+  >('login') ?? { loginName: '' };
+  const actionData = useActionData<typeof action>();
+  // Shared error pipeline; the message surfaces inline through AuthCeremony,
+  // plus an inline recovery <Link> for recoverable codes (e.g. SESSION_EXPIRED → "Sign in again").
+  const { message: errorMessage, recovery } = useAuthActionRecovery(actionData);
 
   return (
-    <AuthCard
+    <AuthCeremony
       title={<Trans>Two-factor verification</Trans>}
-      description={<Trans>Choose how you want to verify your identity.</Trans>}>
-      <div className="flex flex-col items-baseline justify-center gap-4">
-        <IdentityBadge loginName={loginName} requestId={requestId} organization={organization} />
-        <div className="flex flex-col gap-3">
-          {secondFactors.map((method) => (
-            <RRForm key={method} method="POST">
-              <input type="hidden" name="csrf" value={csrfToken} />
-              <input type="hidden" name="loginName" value={loginName} />
-              <input type="hidden" name="method" value={method} />
-              {requestId ? <input type="hidden" name="requestId" value={requestId} /> : null}
-              {organization ? (
-                <input type="hidden" name="organization" value={organization} />
-              ) : null}
+      description={<Trans>Choose how you want to verify your identity.</Trans>}
+      error={errorMessage}
+      recovery={recovery}
+      loginName={loginName}
+      requestId={requestId}
+      organization={organization}>
+      <div className="flex flex-col gap-3">
+        {secondFactors.map((method) => (
+          <RRForm key={method} method="POST">
+            <AuthFormFields
+              csrf={csrfToken}
+              loginName={loginName}
+              requestId={requestId}
+              organization={organization}
+            />
+            <input type="hidden" name="method" value={method} />
 
-              <Button
-                size="large"
-                className="h-13 gap-3"
-                type="quaternary"
-                theme="outline"
-                block
-                htmlType="submit"
-                iconPosition="left"
-                icon={METHOD_LABELS[method].icon}>
-                {METHOD_LABELS[method].label}
-              </Button>
-            </RRForm>
-          ))}
-        </div>
-
-        <BackLink />
+            <Button
+              size="large"
+              className="h-13 gap-3"
+              type="quaternary"
+              theme="outline"
+              block
+              htmlType="submit"
+              iconPosition="left"
+              icon={METHOD_LABELS[method].icon}>
+              {METHOD_LABELS[method].label}
+            </Button>
+          </RRForm>
+        ))}
       </div>
-    </AuthCard>
+    </AuthCeremony>
   );
 }

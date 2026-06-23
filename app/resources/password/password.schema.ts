@@ -14,7 +14,7 @@ export const newPasswordSchema = z
     password: z.string().min(8),
     confirm: z.string().min(8),
     organization: z.string().optional(),
-    // CODE-MIN-24: reject a tampered mid-ceremony requestId at the boundary so it cannot
+    // Reject a tampered mid-ceremony requestId at the boundary so it cannot
     // forward into /authorize. Allowlist matches the Zitadel-issued prefixes.
     requestId: z.string().regex(REQUEST_ID_PATTERN).optional(),
   })

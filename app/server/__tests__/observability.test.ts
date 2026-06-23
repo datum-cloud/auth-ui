@@ -68,7 +68,7 @@ describe('logAuthEvent — AsyncLocalStorage traceId auto-injection', () => {
   // scope (as happens in real request handlers), the traceId is injected automatically
   // into the JSON log line without any call-site changes.
 
-  it('emits the module-level ALS traceId automatically (no explicit fields) — CODE-MIN-31', () => {
+  it('emits the module-level ALS traceId automatically (no explicit fields)', () => {
     const sink = vi.fn();
     const traceId = 'als-real-00000000-0000-4000-a000-000000000002';
     runWithTraceId(traceId, () => {
@@ -106,7 +106,7 @@ describe('getTraceId — AsyncLocalStorage accessor', () => {
   });
 });
 
-describe('audit sink default (CODE-MIN-22)', () => {
+describe('audit sink default', () => {
   it('exposes a single named default sink used by logAuthEvent', () => {
     expect(typeof auditSink).toBe('function');
   });

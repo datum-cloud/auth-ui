@@ -6,7 +6,19 @@ export default tseslint.config(
   {
     rules: {
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', varsIgnorePattern: '^_' }],
+      // SEC-3 / CQ-1 / PERF-8 — standing guard against stray console output in SSR source.
+      // Bare console.log/.debug/.info (debug noise) are forbidden; console.error/.warn stay
+      // allowed because they are real stderr diagnostics (the SSR streaming-error logging in
+      // app/entry.server.tsx). The single audited stdout sink — auditSink in
+      // app/server/observability.ts — carries an explicit eslint-disable. Tests are exempted below.
+      'no-console': ['error', { allow: ['error', 'warn'] }],
     },
+  },
+  {
+    // Static-analysis specs intentionally embed console.log('[excused] …') as fixture
+    // content; the no-console guard targets shipped SSR source, not test scaffolding.
+    files: ['**/__tests__/**', '**/*.test.{ts,tsx}'],
+    rules: { 'no-console': 'off' },
   },
   { ignores: ['build/', '.react-router/', 'app/modules/i18n/locales/'] },
 );

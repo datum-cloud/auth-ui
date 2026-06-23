@@ -1,13 +1,14 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
 import { SubmitButton } from '@/components/auth-form/auth-form';
-import { useActionErrorToast } from '@/hooks/use-action-error-toast';
+import { BackLink } from '@/components/back-link/back-link';
+import { FormError } from '@/components/form-error/form-error';
+import { useAuthActionError } from '@/hooks/use-auth-action-error';
 import { readSessions, mostRecent, byId } from '@/modules/auth/session/cookie';
 import { changePassword } from '@/resources/password';
 import { changePasswordClientSchema } from '@/resources/password/password.schema';
 import { providerForRequest } from '@/server/auth-context.server';
 import { getCsrfToken, assertCsrf } from '@/server/csrf';
 import { actionError } from '@/utils/errors/auth-error';
-import { useAuthErrorMessage } from '@/utils/errors/auth-error-messages';
 import { Form } from '@datum-cloud/datum-ui/form';
 import { Trans, useLingui } from '@lingui/react/macro';
 import {
@@ -69,9 +70,9 @@ export default function PasswordChange() {
   const navigation = useNavigation();
   const { t } = useLingui();
 
-  const getErrorMessage = useAuthErrorMessage();
-  const errorMessage = getErrorMessage((actionData as { error?: string } | undefined)?.error);
-  useActionErrorToast(errorMessage);
+  // Inline-only error surface: the action error renders in a <FormError> (role="alert")
+  // inside the form — no toast.
+  const errorMessage = useAuthActionError(actionData);
 
   return (
     <AuthCard title={<Trans>Change your password</Trans>}>
@@ -93,10 +94,14 @@ export default function PasswordChange() {
           <Form.Input type="password" autoComplete="new-password" />
         </Form.Field>
 
+        <FormError>{errorMessage}</FormError>
         <SubmitButton>
           <Trans>Change password</Trans>
         </SubmitButton>
       </Form.Root>
+
+      {/* Back control → /login/password (previous-step.ts maps this path). */}
+      <BackLink />
     </AuthCard>
   );
 }

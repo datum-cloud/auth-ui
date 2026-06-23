@@ -104,7 +104,7 @@ export function createOtpEnrollHandlers(cfg: OtpEnrollConfig) {
     const loginName = url.searchParams.get('loginName') ?? '';
     const requestId = url.searchParams.get('requestId') ?? undefined;
     const organization = url.searchParams.get('organization') ?? undefined;
-    // CODE-MIN-12: never throw a 500 on tampered query params. Both fields are optional —
+    // Never throw a 500 on tampered query params. Both fields are optional —
     // an invalid value degrades to undefined (no skip-force, no auto-checkAfter).
     const skip = setupSkipSchema.safeParse(Object.fromEntries(url.searchParams));
     const { force, checkAfter } = skip.success ? skip.data : {};

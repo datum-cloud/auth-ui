@@ -84,7 +84,7 @@ describe('requestPasswordReset — email-link origin (anti Host-header injection
   });
 });
 
-describe('submitNewPassword — requestId validation (CODE-MIN-24)', () => {
+describe('submitNewPassword — requestId validation', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
   });
@@ -100,7 +100,7 @@ describe('submitNewPassword — requestId validation (CODE-MIN-24)', () => {
     };
   }
 
-  it('does not forward a malformed requestId to /authorize (CODE-MIN-24)', async () => {
+  it('does not forward a malformed requestId to /authorize', async () => {
     const fake = fakeProvider();
     vi.spyOn(fake, 'setPasswordWithCode').mockResolvedValue(undefined as never);
 

@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 //
-// Tests for sso.$provider.error route component — CODE-MIN-06.
+// Tests for sso.$provider.error route component.
 //
 // sso.tsx redirects to /sso/ldap/error?reason=ldap-link-unsupported but the
 // REASONS map had no entry for that key, so the user always saw the generic
@@ -29,7 +29,7 @@ function renderError(reason: string) {
   );
 }
 
-describe('SsoError ldap-link-unsupported (CODE-MIN-06)', () => {
+describe('SsoError ldap-link-unsupported', () => {
   it('renders a specific message, not the generic fallback', async () => {
     renderError('ldap-link-unsupported');
     expect(await screen.findByText(/can't be linked|not supported|password/i)).toBeTruthy();

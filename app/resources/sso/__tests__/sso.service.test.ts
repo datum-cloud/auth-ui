@@ -7,18 +7,19 @@
 // keep node env so the FormData/Request plumbing matches the original harness.
 //
 // Covers:
-//   • CODE-MAJ-07 — start intent: a ProviderError from startIdpIntent returns a handled
+//   • Start intent: a ProviderError from startIdpIntent returns a handled
 //     outcome (redirect, never a 500) and emits a failure audit event via the DI seam.
-//   • CODE-MAJ-02 — IdP start: organization must be threaded into idpReturnUrls so the
+//   • IdP start: organization must be threaded into idpReturnUrls so the
 //     org-scoped login policy survives the IdP round-trip.
 import { FakeAuthProvider } from '@/modules/auth/providers/fake/fake-provider';
 import { getAuthProvider } from '@/modules/auth/select.server';
 import { ProviderError } from '@/modules/auth/types';
 import { runSsoAction, outcomeToResponse } from '@/resources/sso';
+import { _envSchema } from '@/server/infra/env.server';
 import { describe, it, expect, vi } from 'vitest';
 
-vi.mock('@/utils/env/env.server', async (importOriginal) => {
-  const actual = await importOriginal<typeof import('@/utils/env/env.server')>();
+vi.mock('@/server/infra/env.server', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/server/infra/env.server')>();
   return {
     ...actual,
     env: { ...actual.env, PUBLIC_ORIGIN: 'https://auth.localtest.me:30000' },
@@ -40,7 +41,29 @@ function ssoRequest(
   return { request, form };
 }
 
-describe('runSsoAction — provider error handling (CODE-MAJ-07)', () => {
+describe('ALLOW_IDP_UNLINK env parsing', () => {
+  // Minimal valid base env: SESSION_SECRET must be ≥32 chars (HMAC-SHA256 key).
+  const base = { SESSION_SECRET: 'x'.repeat(32) } as Record<string, string>;
+  const parseEnv = (raw: Record<string, string>) => _envSchema.parse(raw);
+
+  it("coerces the exact string 'true' to boolean true", () => {
+    expect(parseEnv({ ...base, ALLOW_IDP_UNLINK: 'true' }).ALLOW_IDP_UNLINK).toBe(true);
+  });
+
+  it("coerces 'false' to boolean false", () => {
+    expect(parseEnv({ ...base, ALLOW_IDP_UNLINK: 'false' }).ALLOW_IDP_UNLINK).toBe(false);
+  });
+
+  it("coerces '1' (not the literal 'true') to boolean false", () => {
+    expect(parseEnv({ ...base, ALLOW_IDP_UNLINK: '1' }).ALLOW_IDP_UNLINK).toBe(false);
+  });
+
+  it('defaults to boolean false when unset (fail-closed)', () => {
+    expect(parseEnv({ ...base }).ALLOW_IDP_UNLINK).toBe(false);
+  });
+});
+
+describe('runSsoAction — provider error handling', () => {
   it('start: provider error returns a handled response and logs failure (no 500)', async () => {
     const provider = getAuthProvider({ AUTH_PROVIDER: 'fake' });
     const events: Array<{ event: string; outcome: string }> = [];
@@ -57,7 +80,46 @@ describe('runSsoAction — provider error handling (CODE-MAJ-07)', () => {
   });
 });
 
-describe('runSsoAction — IdP start: organization must be threaded into idpReturnUrls (CODE-MAJ-02)', () => {
+describe('runSsoAction — start: provider slug is hardened against URL-injection chars', () => {
+  it('rejects a slug with disallowed characters (path traversal / encoded payload) with a 400', async () => {
+    const provider = getAuthProvider({ AUTH_PROVIDER: 'fake' });
+    const { request, form } = ssoRequest(BASE, {
+      intent: 'start',
+      provider: '../evil/../../callback',
+    });
+
+    const outcome = await runSsoAction(provider, request, form);
+    const res = outcomeToResponse(outcome) as Response;
+
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects a slug exceeding 64 chars', async () => {
+    const provider = getAuthProvider({ AUTH_PROVIDER: 'fake' });
+    const { request, form } = ssoRequest(BASE, {
+      intent: 'start',
+      provider: 'a'.repeat(65),
+    });
+
+    const outcome = await runSsoAction(provider, request, form);
+    const res = outcomeToResponse(outcome) as Response;
+
+    expect(res.status).toBe(400);
+  });
+
+  it('accepts a well-formed slug (regression guard for the regex)', async () => {
+    const provider = getAuthProvider({ AUTH_PROVIDER: 'fake' });
+    const { request, form } = ssoRequest(BASE, { intent: 'start', provider: 'google' });
+
+    const outcome = await runSsoAction(provider, request, form);
+    const res = outcomeToResponse(outcome) as Response;
+
+    // A valid slug does NOT short-circuit to the 400 Bad Request path.
+    expect(res.status).not.toBe(400);
+  });
+});
+
+describe('runSsoAction — IdP start: organization must be threaded into idpReturnUrls', () => {
   it('sso start threads organization into the IdP success return URL', async () => {
     // Arrange: spy on startIdpIntent to capture the urls argument.
     const fake = getAuthProvider({ AUTH_PROVIDER: 'fake' }) as FakeAuthProvider;

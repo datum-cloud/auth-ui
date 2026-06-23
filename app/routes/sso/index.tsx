@@ -1,4 +1,5 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
+import { AuthFormFields } from '@/components/auth-form/auth-form-fields';
 import type { IdProvider } from '@/modules/auth/types';
 import {
   resolveSsoManagement,
@@ -8,6 +9,7 @@ import {
 } from '@/resources/sso';
 import { providerForRequest } from '@/server/auth-context.server';
 import { getCsrfToken, assertCsrf } from '@/server/csrf';
+import { assetUrl } from '@/utils/asset-url';
 import { Button } from '@datum-cloud/datum-ui/button';
 import { Trans } from '@lingui/react/macro';
 import {
@@ -64,6 +66,49 @@ function slugify(name: string): string {
   return name.toLowerCase().replace(/\s+/g, '-');
 }
 
+// 755-M6: provider icon/name badge for a linked IdP. Ports the OLD linked-idp-list switch
+// (on the IdP type) to the rebuilt string-typed `type` ('GOOGLE' | 'GITHUB' | 'GITHUB_ES' | …
+// from toIdProvider). Resolution order: known-type SVG → provider logoUrl → name initials.
+// Non-interactive (plain <img>/<span>) so it never nests inside the row's unlink <button>.
+function IdpIcon({ type, name, logoUrl }: { type?: string; name?: string; logoUrl?: string }) {
+  const t = (type ?? '').toUpperCase();
+  if (t === 'GOOGLE') {
+    return (
+      <img
+        src={assetUrl(`/images/idps/google.png`)}
+        alt=""
+        aria-hidden
+        width={20}
+        height={20}
+        className="rounded"
+      />
+    );
+  }
+  if (t === 'GITHUB' || t === 'GITHUB_ES') {
+    return (
+      <img
+        src={assetUrl(`/images/idps/github.png`)}
+        alt=""
+        aria-hidden
+        width={20}
+        height={20}
+        className="rounded"
+      />
+    );
+  }
+  if (logoUrl) {
+    return <img src={logoUrl} alt="" aria-hidden width={20} height={20} className="rounded" />;
+  }
+  const initials = (name ?? '?').slice(0, 2).toUpperCase();
+  return (
+    <span
+      aria-hidden
+      className="bg-muted text-muted-foreground flex h-5 w-5 items-center justify-center rounded text-[10px] font-bold">
+      {initials}
+    </span>
+  );
+}
+
 // ---------------------------------------------------------------------------
 // Component
 // ---------------------------------------------------------------------------
@@ -89,11 +134,26 @@ export default function SsoPage() {
                 <li
                   key={`${link.idpId}-${link.idpUserId}`}
                   className="flex items-center justify-between gap-3">
-                  <span className="text-foreground text-sm">{link.idpUserName || link.idpId}</span>
+                  {/* 755-M6: provider icon + name badge (joined from the active-IdP list).
+                      Falls back to the bare IdP user name / id when the provider is no longer
+                      active. Icon is non-interactive — no nested-interactive a11y violation. */}
+                  <span className="flex min-w-0 items-center gap-2">
+                    <IdpIcon type={link.type} name={link.name} logoUrl={link.logoUrl} />
+                    <span className="flex min-w-0 flex-col">
+                      <span className="text-foreground truncate text-sm">
+                        {link.name || link.idpUserName || link.idpId}
+                      </span>
+                      {link.idpUserName && link.name ? (
+                        <span className="text-muted-foreground truncate text-xs">
+                          {link.idpUserName}
+                        </span>
+                      ) : null}
+                    </span>
+                  </span>
                   {allowUnlink ? (
                     // RRForm auto-adds ?index → POST reaches the sso index action.
                     <RRForm method="post">
-                      <input type="hidden" name="csrf" value={csrfToken} />
+                      <AuthFormFields csrf={csrfToken} />
                       <input type="hidden" name="intent" value="unlink" />
                       <input type="hidden" name="idpId" value={link.idpId} />
                       <input type="hidden" name="linkedUserId" value={link.idpUserId} />
@@ -119,7 +179,7 @@ export default function SsoPage() {
                 <li key={idp.id}>
                   {/* RRForm: auto-adds ?index → posts to the sso index action. */}
                   <RRForm method="post">
-                    <input type="hidden" name="csrf" value={csrfToken} />
+                    <AuthFormFields csrf={csrfToken} />
                     <input type="hidden" name="intent" value="start" />
                     <input type="hidden" name="provider" value={slugify(idp.name)} />
                     <input type="hidden" name="linkOnly" value="true" />
@@ -136,7 +196,7 @@ export default function SsoPage() {
         {/* Sign-out link → logout INDEX action; ?index disambiguates from the
             action-less logout/layout (native <form> won't add it like RR <Form> does). */}
         <form method="post" action="/id/logout?index">
-          <input type="hidden" name="csrf" value={csrfToken} />
+          <AuthFormFields csrf={csrfToken} />
           <Button type="secondary" theme="outline" htmlType="submit" block>
             <Trans>Sign out</Trans>
           </Button>

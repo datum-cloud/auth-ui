@@ -1,17 +1,20 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
-import { useActionErrorToast } from '@/hooks/use-action-error-toast';
+import { FormError } from '@/components/form-error/form-error';
+import { useAuthActionError } from '@/hooks/use-auth-action-error';
 import {
   decisionOutcomeToResponse,
+  deviceConsentErrorToResponse,
   loadDeviceConsent,
   resolveDeviceDecision,
 } from '@/resources/device';
+import { paths } from '@/routes/paths';
 import { providerForRequest } from '@/server/auth-context.server';
 import { getCsrfToken, assertCsrf } from '@/server/csrf';
-import { useAuthErrorMessage } from '@/utils/errors/auth-error-messages';
-import { Button } from '@datum-cloud/datum-ui/button';
+import { Button, LinkButton } from '@datum-cloud/datum-ui/button';
 import { Trans, useLingui } from '@lingui/react/macro';
 import {
   data,
+  redirect,
   useActionData,
   useLoaderData,
   useNavigation,
@@ -19,20 +22,30 @@ import {
   type LoaderFunctionArgs,
   type MetaFunction,
 } from 'react-router';
-import { Form as RRForm } from 'react-router';
+import { Form as RRForm, Link } from 'react-router';
 
 export const meta: MetaFunction = () => [{ title: 'Authorize device' }];
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const provider = providerForRequest(request);
-  // throws data(400|404) for the missing / stale user_code paths
-  const consent = await loadDeviceConsent(provider, request);
+  // A CONTEXTLESS / missing user_code bare GET 302-redirects to /device's
+  // code-entry screen (nothing to recover). A STALE / tampered code resolves to a spine AppError
+  // tagged recovery: 'device' — returned as loader data (byte-frozen 404) so the route can render
+  // the TAILORED "Code expired" recovery page below instead of falling through to the generic root
+  // ErrorBoundary. Unexpected provider failures still throw and reach the ErrorBoundary.
+  const outcome = await loadDeviceConsent(provider, request);
+  if (outcome.kind === 'redirect') {
+    return redirect(outcome.location);
+  }
+  if (outcome.kind === 'error') {
+    return deviceConsentErrorToResponse(outcome.error);
+  }
 
   const [csrfToken, setCookie] = await getCsrfToken(request);
   const headers: Record<string, string> = {};
   if (setCookie !== null) headers['set-cookie'] = setCookie;
 
-  return data({ csrfToken, ...consent }, { headers });
+  return data({ csrfToken, ...outcome.consent }, { headers });
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -51,8 +64,31 @@ export default function DeviceAuthorize() {
   const { t } = useLingui();
   const isSubmitting = navigation.state === 'submitting';
 
-  const getErrorMessage = useAuthErrorMessage();
-  useActionErrorToast(getErrorMessage((actionData as { error?: string } | undefined)?.error));
+  // Inline-only error surface for the deny/authorize ACTION error: it renders in a
+  // <FormError> (role="alert") inside the consent form below — no toast. (The LOADER
+  // missing/stale-code recovery is handled separately by the tailored card.)
+  const errorMessage = useAuthActionError(actionData);
+
+  // The loader returns a spine AppError tagged recovery: 'device' for the
+  // missing / stale user_code paths. Render a TAILORED in-component recovery — mirroring
+  // signup/complete's "Link expired" / "Start over" affordance — instead of the generic
+  // root ErrorBoundary. The "Enter a new code" link sends the user back to /device's
+  // code-entry screen (paths.device.index()).
+  if ('error' in loaderData) {
+    return (
+      <AuthCard
+        title={<Trans>Code expired</Trans>}
+        description={<Trans>This device code is invalid or has expired.</Trans>}>
+        <div className="flex flex-col gap-4 text-center">
+          {/* LinkButton (single styled <a>) — NOT Button asChild, which emits
+              <button><a> (nested-interactive axe violation in the prod build). */}
+          <LinkButton theme="link" type="quaternary" block as={Link} href={paths.device.index()}>
+            <Trans>Enter a new code</Trans>
+          </LinkButton>
+        </div>
+      </AuthCard>
+    );
+  }
 
   if (actionData && 'done' in actionData) {
     return (
@@ -67,39 +103,44 @@ export default function DeviceAuthorize() {
 
   return (
     <AuthCard title={<Trans>Authorize device</Trans>}>
-      {appName && (
-        <p>
-          <Trans>
-            <strong>{appName}</strong> is requesting access.
-          </Trans>
-        </p>
-      )}
-      {scope.length > 0 && (
-        <ul aria-label={t`Requested permissions`}>
-          {scope.map((s) => (
-            <li key={s}>{s}</li>
-          ))}
-        </ul>
-      )}
-      <RRForm method="post" className="flex w-full flex-col gap-4">
-        <input type="hidden" name="csrf" value={csrfToken} />
-        <input type="hidden" name="deviceAuthId" value={deviceAuthId} />
-        <input type="hidden" name="requestId" value={requestId} />
-        <div className="flex gap-2">
-          <Button htmlType="submit" name="decision" value="authorize" disabled={isSubmitting}>
-            <Trans>Authorize</Trans>
-          </Button>
-          <Button
-            htmlType="submit"
-            name="decision"
-            value="deny"
-            type="secondary"
-            theme="outline"
-            disabled={isSubmitting}>
-            <Trans>Deny</Trans>
-          </Button>
-        </div>
-      </RRForm>
+      <div className="flex flex-col gap-4">
+        {appName && (
+          <p>
+            <Trans>
+              <strong>{appName}</strong> is requesting access.
+            </Trans>
+          </p>
+        )}
+        {scope.length > 0 && (
+          <ul aria-label={t`Requested permissions`} className="flex flex-col gap-2">
+            {scope.map((s) => (
+              <li key={s} className="rounded-md border px-3 py-2 text-sm break-all">
+                {s}
+              </li>
+            ))}
+          </ul>
+        )}
+        <RRForm method="post" className="flex w-full flex-col gap-4">
+          <input type="hidden" name="csrf" value={csrfToken} />
+          <input type="hidden" name="deviceAuthId" value={deviceAuthId} />
+          <input type="hidden" name="requestId" value={requestId} />
+          <FormError>{errorMessage}</FormError>
+          <div className="flex gap-3 pt-2">
+            <Button htmlType="submit" name="decision" value="authorize" disabled={isSubmitting}>
+              <Trans>Authorize</Trans>
+            </Button>
+            <Button
+              htmlType="submit"
+              name="decision"
+              value="deny"
+              type="secondary"
+              theme="outline"
+              disabled={isSubmitting}>
+              <Trans>Deny</Trans>
+            </Button>
+          </div>
+        </RRForm>
+      </div>
     </AuthCard>
   );
 }

@@ -35,7 +35,7 @@ export function idpReturnUrls(
   slug: string,
   opts?: IdpReturnOpts
 ): { success: string; failure: string } {
-  const base = `${origin}${APP_BASENAME}/sso/${slug}`;
+  const base = `${origin}${APP_BASENAME}/sso/${encodeURIComponent(slug)}`;
   const query = new URLSearchParams();
   if (opts?.link) query.set('link', 'true');
   if (opts?.requestId) query.set('requestId', opts.requestId);

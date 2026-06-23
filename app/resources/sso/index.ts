@@ -1,8 +1,10 @@
 // Barrel for the sso domain. Routes and tests import from here.
 export {
   resolveSsoManagement,
+  joinLinkedIdps,
   runSsoAction,
   resolveSsoLink,
+  safeSameOriginReturnTo,
   submitLdapCredentials,
   processIdpCallback,
   outcomeToResponse,
@@ -20,6 +22,7 @@ export type {
   CallbackLoaderDeps,
   SsoManagementData,
   SsoManagementResult,
+  LinkedIdpView,
   SsoLinkResult,
   SsoLinkSignInRequired,
   LdapActionData,
@@ -31,7 +34,7 @@ export { decideIdpCallback } from './idp-callback';
 export type { IdpCallbackInput, IdpDecision } from './idp-callback';
 export { idpReturnUrls, APP_BASENAME } from './idp-return-urls';
 export type { IdpReturnOpts } from './idp-return-urls';
-export { signInWithIdpIntent } from './idp-session';
+export { signInWithIdpIntent, requestScopedProviderReads } from './idp-session';
 export type { SignInWithIdpIntentOpts, SignInWithIdpIntentResult } from './idp-session';
 export { resolveSamlBinding } from './saml-binding';
 export type { SamlBindingResult } from './saml-binding';

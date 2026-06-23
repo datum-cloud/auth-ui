@@ -58,5 +58,32 @@ describe('device_ requestId threading through the login ceremony', () => {
     if (!pwResult.ok) return;
     // The device_ requestId survives into the post-password redirect target.
     expect(pwResult.target).toContain(`requestId=${REQUEST_ID}`);
+    // 755-M8: a device_ requestId must reach /signed-in (where resolveSignedIn auto-completes
+    // the grant, mirroring the OLD app), NOT the /authorize finalization carve-out — that
+    // bounced `datumctl login` to a second consent screen. oidc_/saml_ still take /authorize.
+    expect(pwResult.target).toMatch(/^\/signed-in/);
+    expect(pwResult.target).not.toContain('/authorize');
+  });
+
+  it('755-M8: an oidc_ requestId STILL takes the /authorize finalization carve-out', async () => {
+    const fake = getAuthProvider({ AUTH_PROVIDER: 'fake' }) as FakeAuthProvider;
+    const oidcReq = 'oidc_V2_abc123';
+    const idResult = await resolveIdentifier(fake, [], {
+      loginName: 'alice@acme.test',
+      requestId: oidcReq,
+      emailDeliveryEnabled: true,
+    });
+    expect(idResult.ok).toBe(true);
+    if (!idResult.ok) return;
+    const pwResult = await verifyLoginPassword(fake, idResult.sessions, {
+      loginName: 'alice@acme.test',
+      password: 'hunter2',
+      requestId: oidcReq,
+    });
+    expect(pwResult.ok).toBe(true);
+    if (!pwResult.ok) return;
+    // Non-device requestIds keep the OIDC finalization hop to /authorize.
+    expect(pwResult.target).toMatch(/^\/authorize/);
+    expect(pwResult.target).toContain(`requestId=${oidcReq}`);
   });
 });

@@ -1,4 +1,5 @@
 import { cspDirectives, resolveFrameAncestors } from '@/server/middleware/secure-headers';
+import { NONCE } from 'hono/secure-headers';
 import { describe, it, expect } from 'vitest';
 
 describe('cspDirectives', () => {
@@ -24,6 +25,19 @@ describe('cspDirectives', () => {
   it('uses the provided frame-ancestors allowlist when configured', () => {
     const csp = cspDirectives(false, ["'self'", 'https://staging.example.com']);
     expect(csp.frameAncestors).toEqual(["'self'", 'https://staging.example.com']);
+  });
+});
+
+describe('CSP style-src hardening', () => {
+  it('production style-src uses the nonce and drops unsafe-inline', () => {
+    const prod = cspDirectives(false);
+    expect(prod.styleSrc).toContain(NONCE);
+    expect(prod.styleSrc).not.toContain("'unsafe-inline'");
+  });
+
+  it('dev style-src keeps unsafe-inline for HMR', () => {
+    const dev = cspDirectives(true);
+    expect(dev.styleSrc).toContain("'unsafe-inline'");
   });
 });
 

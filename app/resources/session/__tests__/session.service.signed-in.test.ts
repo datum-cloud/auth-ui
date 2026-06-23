@@ -94,16 +94,67 @@ describe('resolveSignedIn — protocol forward (regression)', () => {
     );
   });
 
-  it('forwards a device_ requestId to /authorize (return-to-consent)', async () => {
+  // NOTE: device_ no longer forwards to /authorize for a second consent screen. 755-M8 restores
+  // the OLD auto-complete behavior — see the dedicated "device-grant auto-complete" describe below.
+});
+
+describe('resolveSignedIn — device-grant auto-complete (755-M8)', () => {
+  let fake: FakeAuthProvider;
+  const logAuthEventMock = vi.mocked(logAuthEvent);
+
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    logAuthEventMock.mockReset();
+    // Seed the provider with a device auth keyed by the user code threaded as device_<code>,
+    // plus a live session so the post-login grant can be authorized against it.
+    fake = new FakeAuthProvider({
+      deviceAuths: [{ userCode: 'WDJB-MJHT', id: 'dev-1', appName: 'CLI', scope: ['openid'] }],
+    });
+    fake.seedLiveSession({ id: 's1', token: 't1' });
+  });
+
+  it('auto-authorizes the device grant and lands on the terminal page (no second consent)', async () => {
+    const cookieHeader = await mintSessionsCookie({ id: 's1', token: 't1' });
+    const outcome = await resolveSignedIn(
+      fake,
+      makeRequest('?requestId=device_WDJB-MJHT', cookieHeader),
+      makeConfig()
+    );
+
+    // Terminal "Authorization complete" page — NOT a redirect back to /authorize.
+    expect(outcome.kind).toBe('page');
+    expect(outcome.kind === 'page' ? outcome.deviceComplete : undefined).toBe(true);
+    expect(outcome.kind === 'page' ? outcome.loginName : undefined).toBe('alice@acme.test');
+    // The grant was actually authorized against the session.
+    expect(fake.isDeviceAuthorized('dev-1')).toBe(true);
+    // Audit trail records the auto-complete success.
+    const calls = logAuthEventMock.mock.calls.map(([event, result]) => ({ event, result }));
+    expect(calls).toContainEqual({ event: 'device_authorize', result: 'success' });
+  });
+
+  it('redirects to /login (not auto-complete) when no active session is present', async () => {
+    // No sessions cookie → no active session to authorize the grant.
     const outcome = await resolveSignedIn(
       fake,
       makeRequest('?requestId=device_WDJB-MJHT'),
       makeConfig()
     );
     expect(outcome.kind).toBe('redirect');
-    expect(outcome.kind === 'redirect' ? outcome.location : '').toContain(
-      '/authorize?requestId=device_WDJB-MJHT'
+    expect(outcome.kind === 'redirect' ? outcome.location : '').toBe('/login');
+    expect(fake.isDeviceAuthorized('dev-1')).toBe(false);
+  });
+
+  it('resolves to a device-error outcome when the grant cannot be authorized (stale code)', async () => {
+    const cookieHeader = await mintSessionsCookie({ id: 's1', token: 't1' });
+    // Unknown user code → getDeviceAuth throws NOT_FOUND → tailored inline recovery.
+    const outcome = await resolveSignedIn(
+      fake,
+      makeRequest('?requestId=device_UNKNOWN', cookieHeader),
+      makeConfig()
     );
+    expect(outcome.kind).toBe('device-error');
+    const calls = logAuthEventMock.mock.calls.map(([event, result]) => ({ event, result }));
+    expect(calls).toContainEqual({ event: 'device_authorize', result: 'failure' });
   });
 });
 
@@ -209,7 +260,7 @@ describe('resolveSignedIn — post-login destination routing', () => {
   });
 });
 
-describe('resolveSignedIn — audit event emission (CODE-MAJ-05)', () => {
+describe('resolveSignedIn — audit event emission', () => {
   let fake: FakeAuthProvider;
   const logAuthEventMock = vi.mocked(logAuthEvent);
 
