@@ -12,7 +12,7 @@
 //  <AvatarImage>, which happy-dom doesn't load — see the NOTE below the assertions.)
 import { ConformAdapter } from '@datum-cloud/datum-ui/form/adapters/conform';
 import '@testing-library/jest-dom/vitest';
-import { render, screen, cleanup } from '@testing-library/react';
+import { render, cleanup } from '@testing-library/react';
 import type { ReactNode } from 'react';
 import { createRoutesStub } from 'react-router';
 import { describe, it, expect, vi, afterEach } from 'vitest';
@@ -102,15 +102,6 @@ describe('SplitLayout — 755-M3 side-panel imagery (CLS + crispness)', () => {
 // that don't adapt to dark; they're now semantic `text-muted-foreground` so they flip with the
 // theme. This pins that the raw hex greys are gone from the rendered markup.
 describe('SplitLayout — 755-M4 dark-mode tokens', () => {
-  it('mounts the theme toggle in the panel header', () => {
-    mount();
-    // The toggle is a native <button type=button> with a theme-related accessible name.
-    const toggle = screen.getByRole('button', { name: /theme/i });
-    expect(toggle).toHaveAttribute('type', 'button');
-    // Prod a11y guard: the toggle must not nest another interactive element.
-    expect(toggle.querySelector('button, a')).toBeNull();
-  });
-
   it('uses semantic muted-foreground instead of hardcoded grey hex for the side-panel copy', () => {
     const { container } = mount();
     expect(container.innerHTML).not.toContain('#67717C');

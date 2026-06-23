@@ -21,3 +21,9 @@ pre-commit:
         CI: '1'
       run: bunx lingui extract --clean && bunx lingui compile --typescript && git add app/modules/i18n/locales/
       auto_add: true
+    unit:
+      # Runs the full vitest suite whenever any TS/TSX is staged so a broken test
+      # (e.g. an assertion left stale by a component change) can't be committed.
+      glob: '*.{ts,tsx}'
+      run: bun run test:unit
+      stage_fixed: false
