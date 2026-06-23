@@ -28,11 +28,17 @@ describe('cspDirectives', () => {
   });
 });
 
-describe('CSP style-src hardening', () => {
-  it('production style-src uses the nonce and drops unsafe-inline', () => {
+describe('CSP style-src policy', () => {
+  // style-src intentionally uses 'unsafe-inline' (no nonce) in dev AND prod: CSS-in-JS
+  // libraries (sonner toasts, Radix UI) inject <style> elements and element.style
+  // attributes that cannot carry a nonce, and per CSP3 a nonce in the directive disables
+  // 'unsafe-inline'. The real XSS defense — script-src nonce — is unaffected.
+  it('production style-src uses unsafe-inline and drops the nonce', () => {
     const prod = cspDirectives(false);
-    expect(prod.styleSrc).toContain(NONCE);
-    expect(prod.styleSrc).not.toContain("'unsafe-inline'");
+    expect(prod.styleSrc).toContain("'unsafe-inline'");
+    expect(prod.styleSrc).not.toContain(NONCE);
+    // script-src stays strict — the load-bearing invariant
+    expect(prod.scriptSrc).toContain(NONCE);
   });
 
   it('dev style-src keeps unsafe-inline for HMR', () => {

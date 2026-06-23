@@ -54,9 +54,13 @@ export function cspDirectives(isDev: boolean, frameAncestors: readonly string[] 
     scriptSrc: isDev
       ? ["'self'", "'unsafe-inline'", "'unsafe-eval'"]
       : ["'self'", NONCE, "'strict-dynamic'"],
-    // Production drops 'unsafe-inline' and uses the per-request nonce
-    // (mirrors scriptSrc); dev keeps 'unsafe-inline' for HMR-injected styles.
-    styleSrc: isDev ? ["'self'", "'unsafe-inline'"] : ["'self'", NONCE],
+    // style-src allows 'unsafe-inline' in dev AND prod. CSS-in-JS libraries (sonner
+    // toasts, Radix UI) inject <style> elements and write element.style attributes,
+    // which cannot carry a nonce. Per CSP3, a nonce/hash in a directive disables
+    // 'unsafe-inline' entirely — so the nonce is intentionally dropped here for
+    // 'unsafe-inline' to take effect. script-src stays strict (NONCE + 'strict-dynamic'),
+    // which is where XSS protection matters; style-based injection is low-risk.
+    styleSrc: ["'self'", "'unsafe-inline'"],
     imgSrc: ["'self'", 'data:', 'https:'],
     // Fathom analytics beacons POST to https://cdn.usefathom.com — without this
     // connect-src entry the browser blocks them. script-src needs no change:
