@@ -101,11 +101,11 @@ msgstr "Authorization complete"
 msgid "Authorization failed"
 msgstr "Authorization failed"
 
-#: app/routes/device/authorize.tsx:130
+#: app/routes/device/authorize.tsx:133
 msgid "Authorize"
 msgstr "Authorize"
 
-#: app/routes/device/authorize.tsx:100
+#: app/routes/device/authorize.tsx:101
 msgid "Authorize device"
 msgstr "Authorize device"
 
@@ -209,9 +209,13 @@ msgstr "Create a new account"
 msgid "Create account"
 msgstr "Create account"
 
-#: app/routes/device/authorize.tsx:140
+#: app/routes/device/authorize.tsx:143
 msgid "Deny"
 msgstr "Deny"
+
+#: app/routes/device/authorize.tsx:108
+msgid "Device authorization requested"
+msgstr "Device authorization requested"
 
 #: app/routes/device/index.tsx:69
 msgid "Device code"

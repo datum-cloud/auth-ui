@@ -97,15 +97,18 @@ export default function DeviceAuthorize() {
   const { csrfToken, appName, scope, deviceAuthId, requestId } = loaderData;
 
   return (
-    <AuthCard title={<Trans>Authorize device</Trans>}>
+    <AuthCard
+      title={<Trans>Authorize device</Trans>}
+      description={
+        appName ? (
+          <Trans>
+            <strong>{appName}</strong> is requesting access.
+          </Trans>
+        ) : (
+          <Trans>Device authorization requested</Trans>
+        )
+      }>
       <div className="flex flex-col gap-4">
-        {appName && (
-          <p>
-            <Trans>
-              <strong>{appName}</strong> is requesting access.
-            </Trans>
-          </p>
-        )}
         {scope.length > 0 && (
           <div className="flex flex-wrap items-center gap-3">
             {scope.map((s) => (
