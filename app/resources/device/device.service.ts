@@ -199,12 +199,16 @@ export function deviceConsentErrorToResponse(error: DeviceConsentError) {
 
 /**
  * Typed outcome of the /device/authorize action. The route turns it into a Response via
- * `decisionOutcomeToResponse`: a redirect to /login (unauthenticated authorize), a `data()`
- * success carrying the decision, or a `data()` error with the appropriate status.
+ * `decisionOutcomeToResponse`: a redirect to /login (unauthenticated authorize), a redirect to
+ * the terminal /device/complete screen (decision applied), or a `data()` error.
+ *
+ * The success path is a REDIRECT, not a `data()` payload: authorizeDevice LEGITIMATELY CONSUMES
+ * the device-auth request, so RR7's post-action auto-revalidation of this route's loader
+ * (getDeviceAuth) would NOT_FOUND and render a false "Code expired". Sending the decision to the
+ * terminal /device/complete route (which has NO getDeviceAuth loader) sidesteps that revalidation.
  */
 export type DeviceDecisionOutcome =
   | { kind: 'redirect'; location: string }
-  | { kind: 'done'; decision: 'authorize' | 'deny' }
   | { kind: 'error'; error: 'invalid_input'; status: 400 }
   | { kind: 'error'; error: 'provider_error'; status: 502 };
 
@@ -267,7 +271,10 @@ export async function resolveDeviceDecision(
     actor: entry?.loginName ? hashActor(entry.loginName) : undefined,
   });
 
-  return { kind: 'done', decision };
+  // Redirect to the terminal completion screen carrying the decision. authorizeDevice has
+  // consumed the device-auth request, so re-rendering THIS route (whose loader re-resolves
+  // getDeviceAuth) would NOT_FOUND; /device/complete carries the decision and never re-resolves.
+  return { kind: 'redirect', location: paths.device.complete({ decision }) };
 }
 
 /** Turn a DeviceDecisionOutcome into the Response the /device/authorize route returns. */
@@ -275,8 +282,6 @@ export function decisionOutcomeToResponse(outcome: DeviceDecisionOutcome) {
   switch (outcome.kind) {
     case 'redirect':
       return redirect(outcome.location);
-    case 'done':
-      return data({ done: outcome.decision });
     case 'error':
       return data({ error: outcome.error }, { status: outcome.status });
   }

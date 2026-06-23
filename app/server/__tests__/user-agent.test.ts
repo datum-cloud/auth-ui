@@ -97,13 +97,23 @@ describe('userAgentFromRequest', () => {
   it('description uses the OLD comma-group format with OS preserved (not the " · " cleanup)', () => {
     const desc = userAgentFromRequest(makeRequest({ 'user-agent': CHROME_UA })).description!;
     // OLD lib/fingerprint.ts: four comma-joined "name, version, " groups (browser/device/engine/OS),
-    // empty segments preserved. OS ("macOS, 10.15.7") MUST be present for the portal's OS column.
+    // empty segments preserved. OS ("Mac OS, 10.15.7") MUST be present for the portal's OS column.
     expect(desc).toContain('Chrome,');
     expect(desc).toContain('Blink,');
-    expect(desc).toContain('macOS,');
+    expect(desc).toContain('Mac OS,');
     expect(desc).toContain('10.15.7,');
     expect(desc).toMatch(/,/); // comma-separated (OLD shape)
     expect(desc).not.toContain(' · '); // NOT the " · " cleanup that regressed the gateway
+  });
+
+  it('emits the "Mac OS" OS token the cloud-portal gateway parses (NOT "macOS")', () => {
+    // Regression for the Active-Sessions OS-null bug: the OLD app's Next.js ua-parser
+    // emitted "Mac OS", and cloud-portal's session gateway extracts the OS field by
+    // matching that token in the comma-delimited description. The rebuild's "macOS"
+    // token failed that match, leaving the OS column null. Assert byte-parity here.
+    const desc = userAgentFromRequest(makeRequest({ 'user-agent': CHROME_UA })).description!;
+    expect(desc).toContain('Mac OS,');
+    expect(desc).not.toContain('macOS');
   });
 
   it('mobile UA includes the device + OS segments (OLD format)', () => {

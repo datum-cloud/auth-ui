@@ -84,6 +84,27 @@ describe('accounts loader', () => {
     expect(Array.isArray(accounts)).toBe(true);
     expect(accounts[0]?.loginName).toBe('a@b.test');
   });
+
+  it('threads an allowlisted ceremony requestId from the URL into loader data', async () => {
+    const req = new Request(`${ORIGIN}/accounts?requestId=oidc_V3-current&organization=org-a`);
+    const res = await loader(routeArgs(req));
+    const body = await bodyOf(res);
+    expect(body?.requestId).toBe('oidc_V3-current');
+  });
+
+  it('returns requestId: null when absent', async () => {
+    const req = new Request(`${ORIGIN}/accounts`);
+    const res = await loader(routeArgs(req));
+    const body = await bodyOf(res);
+    expect(body?.requestId).toBeNull();
+  });
+
+  it('drops a non-allowlisted requestId (returns null)', async () => {
+    const req = new Request(`${ORIGIN}/accounts?requestId=evil_payload`);
+    const res = await loader(routeArgs(req));
+    const body = await bodyOf(res);
+    expect(body?.requestId).toBeNull();
+  });
 });
 
 // ─── Action ───────────────────────────────────────────────────────────────────

@@ -159,7 +159,7 @@ describe('loadDeviceConsent (/device/authorize loader)', () => {
 // ── /device/authorize action → resolveDeviceDecision (from authorize.test.ts) ──────
 
 describe('resolveDeviceDecision (/device/authorize action)', () => {
-  it('authorize with a session → device is authorized; outcome is not a redirect', async () => {
+  it('authorize with a session → device is authorized; redirects to the terminal /device/complete', async () => {
     const req = await requestWithSession('http://localhost/id/device/authorize');
     const outcome = await resolveDeviceDecision(
       fakeProvider(),
@@ -173,14 +173,16 @@ describe('resolveDeviceDecision (/device/authorize action)', () => {
       })
     );
 
-    // Must NOT be a 302 redirect
-    expect(outcome.kind).toBe('done');
-    const res = decisionOutcomeToResponse(outcome);
-    expect(res instanceof Response && (res as Response).status === 302).toBe(false);
+    // Success is a 302 redirect to the TERMINAL completion screen carrying the decision —
+    // authorizeDevice consumed the device-auth request, so re-rendering this route's loader
+    // would NOT_FOUND; /device/complete has no getDeviceAuth loader.
+    expect(outcome.kind).toBe('redirect');
+    const location = outcome.kind === 'redirect' ? outcome.location : '';
+    expect(location).toBe('/device/complete?decision=authorize');
 
-    // Response should carry done: 'authorize'
-    const asData = res as { data?: { done?: string } };
-    expect(asData.data?.done).toBe('authorize');
+    const res = decisionOutcomeToResponse(outcome) as Response;
+    expect(res.status).toBe(302);
+    expect(res.headers.get('location')).toBe('/device/complete?decision=authorize');
 
     // The device should now be marked as authorized in the fake singleton.
     // dev-authorize is dedicated to this test — no other test mutates it.
@@ -211,7 +213,7 @@ describe('resolveDeviceDecision (/device/authorize action)', () => {
     expect(fake.isDeviceAuthorized('dev-1')).toBe(false);
   });
 
-  it('deny → device stays unauthorized; outcome is not a redirect', async () => {
+  it('deny → device stays unauthorized; redirects to the terminal /device/complete', async () => {
     const req = await requestWithSession('http://localhost/id/device/authorize');
     const outcome = await resolveDeviceDecision(
       fakeProvider(),
@@ -219,14 +221,14 @@ describe('resolveDeviceDecision (/device/authorize action)', () => {
       formData({ decision: 'deny', deviceAuthId: 'dev-deny', requestId: 'device_dev-deny' })
     );
 
-    // Must NOT be a 302 redirect
-    expect(outcome.kind).toBe('done');
-    const res = decisionOutcomeToResponse(outcome);
-    expect(res instanceof Response && (res as Response).status === 302).toBe(false);
+    // Deny also lands on the terminal completion screen, carrying decision=deny.
+    expect(outcome.kind).toBe('redirect');
+    const location = outcome.kind === 'redirect' ? outcome.location : '';
+    expect(location).toBe('/device/complete?decision=deny');
 
-    // Response should carry done: 'deny'
-    const asData = res as { data?: { done?: string } };
-    expect(asData.data?.done).toBe('deny');
+    const res = decisionOutcomeToResponse(outcome) as Response;
+    expect(res.status).toBe(302);
+    expect(res.headers.get('location')).toBe('/device/complete?decision=deny');
 
     // The device should NOT be authorized
     expect(fakeProvider().isDeviceAuthorized('dev-deny')).toBe(false);

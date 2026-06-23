@@ -90,15 +90,10 @@ export default function DeviceAuthorize() {
     );
   }
 
-  if (actionData && 'done' in actionData) {
-    return (
-      <AuthCard
-        title={<Trans>Authorization complete</Trans>}
-        description={<Trans>You may return to your device.</Trans>}
-      />
-    );
-  }
-
+  // No `actionData.done` success branch: the action now REDIRECTS to the terminal
+  // /device/complete screen on a successful decision (sidestepping RR7's post-action
+  // revalidation of this route's getDeviceAuth loader). actionData only ever carries an
+  // action ERROR here, surfaced inline via <FormError> below.
   const { csrfToken, appName, scope, deviceAuthId, requestId } = loaderData;
 
   return (

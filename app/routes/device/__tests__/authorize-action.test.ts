@@ -1,15 +1,13 @@
 // @vitest-environment node
 //
 // Action unit tests + uncovered loader branch for device/authorize.tsx.
-// Lines 44-57 (loader CSRF section after consent loads) and line 94 (the
-// `done` branch check) were uncovered.
+// Covers the loader CSRF section after consent loads and the action delegation.
 //
 // The loader redirect (302) and stale-code (404) paths are already covered by
 // authorize.recovery.loader.test.ts. This file covers:
 //   1. The loader happy path (consent data + CSRF set)
-//   2. The action (delegates decisionOutcomeToResponse)
-//   3. The `done` branch render (covered by the inline-action-error.test.tsx
-//      through actionData, but the action itself needs a node test)
+//   2. The action (delegates decisionOutcomeToResponse) — success is now a 302 redirect
+//      to the terminal /device/complete screen, NOT a data({ done }) payload.
 import { getCsrfToken } from '@/server/csrf';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
@@ -26,7 +24,8 @@ vi.mock('@/server/auth-context.server', () => ({
 // Stub loadDeviceConsent to return a consent payload (happy path for loader coverage)
 vi.mock('@/resources/device', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/resources/device')>();
-  const { data } = await vi.importActual<typeof import('react-router')>('react-router');
+  const { data, redirect } =
+    await vi.importActual<typeof import('react-router')>('react-router');
   return {
     ...actual,
     loadDeviceConsent: async () => ({
@@ -39,12 +38,13 @@ vi.mock('@/resources/device', async (importOriginal) => {
       },
     }),
     resolveDeviceDecision: async () => ({
-      kind: 'done' as const,
+      kind: 'redirect' as const,
+      location: '/device/complete?decision=authorize',
     }),
     decisionOutcomeToResponse: (outcome: unknown) => {
-      const o = outcome as { kind: string };
-      if (o.kind === 'done') {
-        return data({ done: true }, { status: 200 });
+      const o = outcome as { kind: string; location?: string };
+      if (o.kind === 'redirect') {
+        return redirect(o.location ?? '/device/complete');
       }
       return data({ error: 'FAILED_PRECONDITION' }, { status: 400 });
     },
@@ -98,7 +98,7 @@ describe('device/authorize action', () => {
     fakeProvider = {};
   });
 
-  it('returns done:true when resolveDeviceDecision resolves to done', async () => {
+  it('302-redirects to the terminal /device/complete when resolveDeviceDecision succeeds', async () => {
     const [token, cookie] = await getCsrfToken(new Request(`${ORIGIN}/device/authorize`));
     const cookieValue = cookie!.split(';')[0];
     const req = new Request(`${ORIGIN}/device/authorize`, {
@@ -112,8 +112,9 @@ describe('device/authorize action', () => {
       }).toString(),
     });
     const res = await action(routeArgs(req));
-    const body = await bodyOf(res);
-    expect(body?.done).toBe(true);
+    expect(res).toBeInstanceOf(Response);
+    expect((res as Response).status).toBe(302);
+    expect((res as Response).headers.get('location')).toBe('/device/complete?decision=authorize');
   });
 
   it('throws on CSRF mismatch (assertCsrf)', async () => {

@@ -94,7 +94,7 @@ function parseUA(ua: string): UAParts {
     const m = ua.match(/(?:iPhone OS|CPU OS) ([\d_]+)/i);
     parts.osVersion = m ? m[1].replace(/_/g, '.') : '';
   } else if (/Mac OS X/i.test(ua)) {
-    parts.osName = 'macOS';
+    parts.osName = 'Mac OS';
     const m = ua.match(/Mac OS X ([\d_.]+)/i);
     parts.osVersion = m ? m[1].replace(/_/g, '.') : '';
   } else if (/Linux/i.test(ua)) {

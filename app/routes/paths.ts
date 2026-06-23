@@ -58,6 +58,7 @@ export const paths = {
   device: {
     index: (q?: Query) => withQuery('/device', q),
     authorize: (q?: Query) => withQuery('/device/authorize', q),
+    complete: (q?: Query) => withQuery('/device/complete', q),
   },
   verify: {
     index: (q?: Query) => withQuery('/verify', q),

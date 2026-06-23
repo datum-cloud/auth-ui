@@ -1,6 +1,7 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
 import { FormError } from '@/components/form-error/form-error';
 import { useAuthActionError } from '@/hooks/use-auth-action-error';
+import { isAllowedRequestId } from '@/resources/authorize';
 import {
   listAccounts,
   resolveAccountAction,
@@ -33,11 +34,17 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const provider = providerForRequest(request);
   const accounts = await listAccounts(provider, request);
 
+  // Thread the CURRENT ceremony requestId (a mid-OIDC/SAML/device account switch reaches the
+  // picker at /accounts?requestId=…). Only an allowlisted (oidc_/saml_/device_) id is carried;
+  // anything else is treated as absent so a switch/remove never reflects an arbitrary value.
+  const candidate = new URL(request.url).searchParams.get('requestId') ?? undefined;
+  const requestId = isAllowedRequestId(candidate) ? candidate : null;
+
   const [csrfToken, setCookie] = await getCsrfToken(request);
   const headers: Record<string, string> = {};
   if (setCookie !== null) headers['set-cookie'] = setCookie;
 
-  return data({ csrfToken, accounts }, { headers });
+  return data({ csrfToken, accounts, requestId }, { headers });
 }
 
 // ─── Action ──────────────────────────────────────────────────────────────────
@@ -54,7 +61,7 @@ export async function action({ request }: ActionFunctionArgs) {
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function AccountPicker() {
-  const { csrfToken, accounts } = useLoaderData<typeof loader>();
+  const { csrfToken, accounts, requestId } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
 
   // Inline-only error surface: the action error renders in a <FormError> (role="alert")
@@ -92,6 +99,9 @@ export default function AccountPicker() {
                   <input type="hidden" name="csrf" value={csrfToken} />
                   <input type="hidden" name="intent" value="switch" />
                   <input type="hidden" name="sessionId" value={account.sessionId} />
+                  {/* Carries the CURRENT ceremony id so a mid-OIDC/SAML/device switch resolves
+                      back into the protocol callback instead of a terminal /signed-in page. */}
+                  {requestId ? <input type="hidden" name="requestId" value={requestId} /> : null}
                   <button
                     type="submit"
                     className="hover:bg-muted/50 focus-visible:ring-ring flex w-full items-center gap-2 rounded-l-lg p-3 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none">
@@ -127,6 +137,8 @@ export default function AccountPicker() {
                   <input type="hidden" name="csrf" value={csrfToken} />
                   <input type="hidden" name="intent" value="remove" />
                   <input type="hidden" name="sessionId" value={account.sessionId} />
+                  {/* Preserve the ceremony id on the post-remove redirect back to /accounts. */}
+                  {requestId ? <input type="hidden" name="requestId" value={requestId} /> : null}
                   <Button
                     size="xs"
                     theme="link"

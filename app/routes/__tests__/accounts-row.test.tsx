@@ -108,6 +108,41 @@ describe('accounts row — 755-M9 row-level switch target', () => {
     }
   });
 
+  it('threads the ceremony requestId into the switch form hidden input when present', () => {
+    const { container } = mountAccounts({
+      csrfToken: 'csrf-tok',
+      accounts: [account()],
+      requestId: 'oidc_V3-current',
+    });
+
+    const switchForm = container.querySelector(
+      'form:has(input[name="intent"][value="switch"])'
+    ) as HTMLFormElement | null;
+    expect(switchForm).not.toBeNull();
+    expect(switchForm!.querySelector('input[name="requestId"]')?.getAttribute('value')).toBe(
+      'oidc_V3-current'
+    );
+
+    // The REMOVE form must also carry the ceremony id so a mid-ceremony remove keeps the flow.
+    const removeForm = container.querySelector(
+      'form:has(input[name="intent"][value="remove"])'
+    ) as HTMLFormElement | null;
+    expect(removeForm).not.toBeNull();
+    expect(removeForm!.querySelector('input[name="requestId"]')?.getAttribute('value')).toBe(
+      'oidc_V3-current'
+    );
+  });
+
+  it('omits the requestId hidden input when no ceremony is active', () => {
+    const { container } = mountAccounts({
+      csrfToken: 'csrf-tok',
+      accounts: [account()],
+      requestId: null,
+    });
+
+    expect(container.querySelector('input[name="requestId"]')).toBeNull();
+  });
+
   it('renders an IdP badge when idpName is present', () => {
     mountAccounts({ csrfToken: 't', accounts: [account({ idpName: 'Google' })] });
     expect(screen.getByText('Google')).toBeInTheDocument();

@@ -56,6 +56,9 @@ export default [
   route('device', 'routes/device/index.tsx'),
   // P6 Task 7: device/authorize — consent (authorize / deny).
   route('device/authorize', 'routes/device/authorize.tsx'),
+  // Terminal completion screen — the post-decision landing with NO getDeviceAuth loader, so
+  // RR7's post-action revalidation never re-resolves the (legitimately consumed) device-auth request.
+  route('device/complete', 'routes/device/complete.tsx'),
 
   // verify group — layout collapsed; prefix inlined per child.
   route('verify', 'routes/verify/index.tsx'),

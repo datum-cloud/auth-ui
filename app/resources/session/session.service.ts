@@ -28,6 +28,7 @@ import {
 } from '@/modules/auth/session/cookie';
 import type { Session, AuthMethod, LoginSettings } from '@/modules/auth/types';
 import { ProviderError } from '@/modules/auth/types';
+import { isAllowedRequestId } from '@/resources/authorize';
 import { deviceDecision } from '@/resources/device';
 import { postLoginDestinationWithSource } from '@/resources/login/post-login-destination';
 import { nextStepWithParams } from '@/resources/shared/next-step-params';
@@ -220,7 +221,13 @@ async function resolveNextPath(
   // 755-M10: account-SWITCH passes this so the resolved destination is the continuation
   // (/signed-in) and the step-6 skippable MFA-setup nudge is suppressed. Real forced MFA
   // (settings.forceMfa) and real challenges still route normally.
-  opts: { suppressMfaSetupNudge?: boolean } = {}
+  //
+  // `requestId` is the CURRENT ceremony id threaded through the /accounts picker (e.g. a
+  // mid-OIDC account switch). When present AND allowlisted it overrides the STALE
+  // `entry.requestId` baked into the cookie session, so the resolved next path carries the
+  // live ceremony id (→ /signed-in?requestId=oidc_<current> → /authorize → client callback).
+  // Absent/non-allowlisted keeps the existing `entry.requestId` behavior (standalone switch).
+  opts: { suppressMfaSetupNudge?: boolean; requestId?: string } = {}
 ): Promise<string> {
   const userId = session.user?.id ?? '';
 
@@ -233,6 +240,8 @@ async function resolveNextPath(
 
   const userVerified = session.factors.passkey?.userVerified ?? false;
 
+  const requestId = isAllowedRequestId(opts.requestId) ? opts.requestId : entry.requestId;
+
   return nextStepWithParams({
     factors: session.factors,
     settings: loginSettings,
@@ -240,7 +249,7 @@ async function resolveNextPath(
     loginName: entry.loginName,
     userVerified,
     mfaInitSkippedAt: session.user?.mfaInitSkippedAt ?? null,
-    requestId: entry.requestId,
+    requestId,
     organization: entry.organization,
     suppressMfaSetupNudge: opts.suppressMfaSetupNudge,
   });
@@ -367,11 +376,18 @@ export async function listAccounts(
 export const switchSchema = z.object({
   intent: z.literal('switch'),
   sessionId: z.string().min(1),
+  // The CURRENT ceremony requestId threaded through the /accounts picker (empty/absent for a
+  // standalone switch). switchAccount forwards it to resolveNextPath, which only honors an
+  // allowlisted (oidc_/saml_/device_) value — empty string falls back to the entry's requestId.
+  requestId: z.string().optional(),
 });
 
 export const removeSchema = z.object({
   intent: z.literal('remove'),
   sessionId: z.string().min(1),
+  // Preserve the CURRENT ceremony requestId on the redirect back to /accounts so removing an
+  // account mid-ceremony doesn't drop it (only an allowlisted value is reflected onto the URL).
+  requestId: z.string().optional(),
 });
 
 export type AccountActionError =
@@ -403,7 +419,7 @@ export async function switchAccount(
   const parsed = switchSchema.safeParse(Object.fromEntries(form));
   if (!parsed.success) return { kind: 'error', error: 'INVALID_INPUT', status: 400 };
 
-  const { sessionId } = parsed.data;
+  const { sessionId, requestId } = parsed.data;
   const cookieSessions = await readSessions(request);
   const entry = byId(cookieSessions, sessionId);
   if (!entry) return { kind: 'error', error: 'NOT_FOUND', status: 404 };
@@ -421,8 +437,11 @@ export async function switchAccount(
     userId = freshSession.user?.id ?? entry.loginName;
     // 755-M10: on switch, resolve to the continuation/signed-in destination and suppress
     // ONLY the step-6 skippable MFA-setup nudge. Forced MFA + real challenges still route.
+    // `requestId` carries the CURRENT ceremony (a mid-OIDC/SAML/device switch) so the resolved
+    // path threads the live id back into the protocol callback instead of the stale cookie one.
     nextPath = await resolveNextPath(provider, freshSession, entry, {
       suppressMfaSetupNudge: true,
+      requestId,
     });
   } catch {
     logAuthEvent('account_switch', 'failure', { sessionId });
@@ -450,7 +469,7 @@ export async function removeAccount(
   const parsed = removeSchema.safeParse(Object.fromEntries(form));
   if (!parsed.success) return { kind: 'error', error: 'INVALID_INPUT', status: 400 };
 
-  const { sessionId } = parsed.data;
+  const { sessionId, requestId } = parsed.data;
   const cookieSessions = await readSessions(request);
   const entry = byId(cookieSessions, sessionId);
   if (!entry) {
@@ -473,7 +492,12 @@ export async function removeAccount(
   const updated = removeSession(cookieSessions, sessionId);
   logAuthEvent('account_remove', 'success', { sessionId, actor: hashActor(entry.loginName) });
 
-  return { kind: 'redirect', location: '/accounts', setCookie: await serializeSessions(updated) };
+  // Carry the live ceremony id back onto /accounts so a mid-ceremony remove keeps the flow.
+  const location = isAllowedRequestId(requestId)
+    ? `/accounts?requestId=${encodeURIComponent(requestId)}`
+    : '/accounts';
+
+  return { kind: 'redirect', location, setCookie: await serializeSessions(updated) };
 }
 
 /**

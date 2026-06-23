@@ -17,7 +17,7 @@
 import { FakeAuthProvider } from '@/modules/auth/providers/fake/fake-provider';
 import { sessionsCookie } from '@/modules/auth/session/cookie';
 import type { User } from '@/modules/auth/types';
-import { switchAccount } from '@/resources/session';
+import { removeAccount, switchAccount } from '@/resources/session';
 import { describe, it, expect } from 'vitest';
 
 const BASE_URL = 'http://localhost/id/accounts';
@@ -47,10 +47,19 @@ function makeRequest(cookie: string): Request {
   return new Request(BASE_URL, { headers: { cookie: cookie.split(';')[0] } });
 }
 
-function switchForm(sessionId: string): FormData {
+function switchForm(sessionId: string, requestId?: string): FormData {
   const form = new FormData();
   form.set('intent', 'switch');
   form.set('sessionId', sessionId);
+  if (requestId !== undefined) form.set('requestId', requestId);
+  return form;
+}
+
+function removeForm(sessionId: string, requestId?: string): FormData {
+  const form = new FormData();
+  form.set('intent', 'remove');
+  form.set('sessionId', sessionId);
+  if (requestId !== undefined) form.set('requestId', requestId);
   return form;
 }
 
@@ -109,5 +118,129 @@ describe('switchAccount — 755-M10 MFA-setup nudge suppression', () => {
     expect(outcome.location).toContain('/setup/mfa');
     expect(outcome.location).toContain('force=true');
     expect(outcome.location).toContain('checkAfter=true');
+  });
+});
+
+describe('switchAccount — current ceremony requestId threading (datumctl OIDC hang)', () => {
+  // A no-MFA user whose org seeds a non-zero skip window resolves to /signed-in (the same setup
+  // as the nudge-suppression spec). The cookie entry carries NO requestId, so any requestId on
+  // the destination must come from the CURRENT ceremony form field, not the stale cookie one.
+  const user: User = { id: 'u1', loginName: 'alice@acme.test', displayName: 'Alice' };
+
+  function makeProvider(): FakeAuthProvider {
+    const provider = new FakeAuthProvider({
+      users: [user],
+      authMethods: { u1: [] },
+      settingsByOrg: { 'nudge-org': { mfaInitSkipLifetimeMs: 10_000 } },
+    });
+    provider.seedLiveSession({ id: 's1', token: 'tok-s1', user });
+    return provider;
+  }
+
+  async function cookie(): Promise<string> {
+    return mintCookie({
+      id: 's1',
+      token: 'tok-s1',
+      loginName: 'alice@acme.test',
+      organization: 'nudge-org',
+    });
+  }
+
+  it('threads the CURRENT ceremony requestId onto the resolved /signed-in destination', async () => {
+    const provider = makeProvider();
+    const reqId = 'oidc_V3-current';
+
+    const outcome = await switchAccount(
+      provider,
+      makeRequest(await cookie()),
+      switchForm('s1', reqId)
+    );
+
+    expect(outcome.kind).toBe('redirect');
+    if (outcome.kind !== 'redirect') throw new Error('expected redirect');
+    expect(outcome.location).toMatch(/^\/signed-in(\?|$)/);
+    expect(outcome.location).toContain(`requestId=${encodeURIComponent(reqId)}`);
+  });
+
+  it('omits requestId when none is provided (standalone switch fallback unchanged)', async () => {
+    const provider = makeProvider();
+
+    const outcome = await switchAccount(provider, makeRequest(await cookie()), switchForm('s1'));
+
+    expect(outcome.kind).toBe('redirect');
+    if (outcome.kind !== 'redirect') throw new Error('expected redirect');
+    expect(outcome.location).toMatch(/^\/signed-in(\?|$)/);
+    expect(outcome.location).not.toContain('requestId=');
+  });
+
+  it('ignores a non-allowlisted requestId (treated as no ceremony)', async () => {
+    const provider = makeProvider();
+
+    const outcome = await switchAccount(
+      provider,
+      makeRequest(await cookie()),
+      switchForm('s1', 'evil_https://attacker.example')
+    );
+
+    expect(outcome.kind).toBe('redirect');
+    if (outcome.kind !== 'redirect') throw new Error('expected redirect');
+    expect(outcome.location).toMatch(/^\/signed-in(\?|$)/);
+    expect(outcome.location).not.toContain('requestId=');
+  });
+});
+
+describe('removeAccount — ceremony requestId threading', () => {
+  // removeAccount deletes the entry provider-side (best-effort, seeded so it succeeds) then
+  // redirects back to /accounts. The CURRENT ceremony id must ride that redirect so removing an
+  // account mid-ceremony keeps the flow — but only an allowlisted value is reflected (no injection).
+  const user: User = { id: 'u1', loginName: 'alice@acme.test', displayName: 'Alice' };
+
+  function makeProvider(): FakeAuthProvider {
+    const provider = new FakeAuthProvider({ users: [user] });
+    provider.seedLiveSession({ id: 's1', token: 'tok-s1', user });
+    return provider;
+  }
+
+  async function cookie(): Promise<string> {
+    return mintCookie({ id: 's1', token: 'tok-s1', loginName: 'alice@acme.test' });
+  }
+
+  it('carries an allowlisted requestId onto the /accounts redirect', async () => {
+    const provider = makeProvider();
+    const reqId = 'oidc_V3-current';
+
+    const outcome = await removeAccount(
+      provider,
+      makeRequest(await cookie()),
+      removeForm('s1', reqId)
+    );
+
+    expect(outcome.kind).toBe('redirect');
+    if (outcome.kind !== 'redirect') throw new Error('expected redirect');
+    expect(outcome.location).toBe(`/accounts?requestId=${encodeURIComponent(reqId)}`);
+  });
+
+  it('redirects to bare /accounts when no requestId is provided', async () => {
+    const provider = makeProvider();
+
+    const outcome = await removeAccount(provider, makeRequest(await cookie()), removeForm('s1'));
+
+    expect(outcome.kind).toBe('redirect');
+    if (outcome.kind !== 'redirect') throw new Error('expected redirect');
+    expect(outcome.location).toBe('/accounts');
+  });
+
+  it('drops a non-allowlisted requestId (no injection onto /accounts)', async () => {
+    const provider = makeProvider();
+
+    const outcome = await removeAccount(
+      provider,
+      makeRequest(await cookie()),
+      removeForm('s1', 'evil_x')
+    );
+
+    expect(outcome.kind).toBe('redirect');
+    if (outcome.kind !== 'redirect') throw new Error('expected redirect');
+    expect(outcome.location).toBe('/accounts');
   });
 });

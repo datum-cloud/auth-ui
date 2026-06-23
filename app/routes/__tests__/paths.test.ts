@@ -25,6 +25,10 @@ describe("paths.ts — typed builders return today's exact strings", () => {
     expect(paths.sso.provider.error('github')).toBe('/sso/github/error');
     expect(paths.device.index()).toBe('/device');
     expect(paths.device.authorize()).toBe('/device/authorize');
+    expect(paths.device.complete()).toBe('/device/complete');
+    expect(paths.device.complete({ decision: 'authorize' })).toBe(
+      '/device/complete?decision=authorize'
+    );
     expect(paths.verify.index()).toBe('/verify');
     expect(paths.verify.success()).toBe('/verify/success');
     expect(paths.error()).toBe('/error');
