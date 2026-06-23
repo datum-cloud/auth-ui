@@ -121,22 +121,15 @@ jobs:
           key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lock', '**/package.json') }}
       - run: bun install --frozen-lockfile
       - name: Dependency audit (blocking)
-        # Ignored advisories are either dev/build-only (never ship — Dockerfile installs
-        # --production) or present-but-unreachable transitive deps, tracked for an upstream fix.
-        #   GHSA-hmw2-7cc7-3qxx  form-data  <- cypress, start-server-and-test (dev)
-        #   GHSA-gv7w-rqvm-qjhr  esbuild    <- @lingui/cli, vite (build)
-        #   GHSA-g7r4-m6w7-qqqr  esbuild    <- @lingui/cli, vite (build)
-        #   GHSA-vmh5-mc38-953g  undici     <- vitest>jsdom (dev) + datum-ui>isomorphic-dompurify>jsdom; SOCKS5 ProxyAgent path unused
-        #   GHSA-pr7r-676h-xcf6  undici     <- same chains; shared-cache path unused
-        #   GHSA-cmwh-pvxp-8882  dompurify  <- datum-ui>isomorphic-dompurify; setConfig pollution needs attacker-controlled config (unreachable). FOLLOW-UP: datum-ui bump / overrides
-        run: >-
-          bun audit
-          --ignore=GHSA-hmw2-7cc7-3qxx
-          --ignore=GHSA-gv7w-rqvm-qjhr
-          --ignore=GHSA-g7r4-m6w7-qqqr
-          --ignore=GHSA-vmh5-mc38-953g
-          --ignore=GHSA-pr7r-676h-xcf6
-          --ignore=GHSA-cmwh-pvxp-8882
+        # No advisories are ignored: all known transitive vulns are REMEDIATED via
+        # package.json `overrides` (each parent's declared range accepts the patched version):
+        #   undici     ^7.28.0   jsdom accepts ^7.25.0          fixes 5 undici advisories (2 high)
+        #   form-data  ^4.0.6    cypress/axios accept ^4.0.x    fixes GHSA-hmw2-7cc7-3qxx (high)
+        #   dompurify  ^3.4.11   isomorphic-dompurify accepts ^3.4.8   fixes GHSA-cmwh-pvxp-8882
+        #   esbuild    ^0.28.1   vite accepts ^0.28; build + i18n extract verified   fixes GHSA-g7r4-m6w7-qqqr / GHSA-gv7w-rqvm-qjhr
+        # If a NEW transitive advisory appears with no override-compatible fix, add a
+        # documented `--ignore=<GHSA>` here as a temporary measure and open a remediation follow-up.
+        run: bun audit
       - name: Generate SBOM (CycloneDX)
         run: bunx @cyclonedx/cdxgen@11.10.0 -t js -o sbom.cdx.json --spec-version 1.5
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
