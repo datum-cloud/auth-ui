@@ -1,4 +1,3 @@
-import { ThemeToggle } from '@/components/theme-toggle/theme-toggle';
 import type { BrandingTheme } from '@/modules/auth/types';
 import { assetUrl } from '@/utils/asset-url';
 import { Avatar, AvatarFallback, AvatarImage } from '@datum-cloud/datum-ui/avatar';
@@ -28,7 +27,6 @@ export default function SplitLayout({
               <Logo.Flat aria-label="Datum" className="h-6 w-auto" tone="brand" />
             )}
           </Link>
-          <ThemeToggle />
         </div>
         <main className="flex w-full flex-1 items-center justify-center">
           <div className="w-full max-w-[400px]">{children}</div>

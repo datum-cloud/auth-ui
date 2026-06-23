@@ -113,7 +113,7 @@ export default function App() {
   );
 
   return (
-    <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
+    <ThemeProvider attribute="class" defaultTheme="light" enableSystem disableTransitionOnChange>
       <I18nProvider i18n={i18nInstance}>
         <ConformAdapter>
           <FathomAnalytics siteId={fathomSiteId} />
