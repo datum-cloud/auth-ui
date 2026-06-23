@@ -12,7 +12,14 @@ import { data, redirect } from 'react-router';
 // (used for plain 400 Bad Request and 502 data responses).
 
 export type SsoOutcome =
-  | { kind: 'redirect'; location: string; setCookie?: string; lastUsedCookie?: string }
+  | {
+      kind: 'redirect';
+      location: string;
+      setCookie?: string;
+      lastUsedCookie?: string;
+      // fingerprintId Set-Cookie minted for a browser that lacked it (null/absent on reuse).
+      fingerprintCookie?: string;
+    }
   | { kind: 'data'; payload: unknown; status?: number; headers?: Record<string, string> }
   | { kind: 'response'; response: Response };
 
@@ -24,10 +31,11 @@ export type SsoOutcome =
 export function outcomeToResponse(outcome: SsoOutcome): Response | ReturnType<typeof data> {
   switch (outcome.kind) {
     case 'redirect':
-      if (outcome.setCookie || outcome.lastUsedCookie) {
+      if (outcome.setCookie || outcome.lastUsedCookie || outcome.fingerprintCookie) {
         const h = new Headers();
         if (outcome.setCookie) h.append('set-cookie', outcome.setCookie);
         if (outcome.lastUsedCookie) h.append('set-cookie', outcome.lastUsedCookie);
+        if (outcome.fingerprintCookie) h.append('set-cookie', outcome.fingerprintCookie);
         return redirect(outcome.location, { headers: h });
       }
       return redirect(outcome.location);

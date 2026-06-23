@@ -19,7 +19,7 @@ import { decideIdpCallback } from '@/resources/sso/idp-callback';
 import { signInWithIdpIntent, requestScopedProviderReads } from '@/resources/sso/idp-session';
 import type { SsoOutcome } from '@/resources/sso/sso-outcome';
 import { logAuthEvent } from '@/server/observability';
-import { userAgentFromRequest } from '@/server/user-agent';
+import { getOrCreateFingerprintId, userAgentFromRequest } from '@/server/user-agent';
 import { providerErrorCode } from '@/utils/errors/auth-error';
 import { z } from 'zod';
 
@@ -70,6 +70,11 @@ export async function processIdpCallback(
   }
 
   const { id, token, link, requestId, organization } = parsed.data;
+
+  // Ensure the fingerprintId cookie exists for this browser. The SAME minted id feeds
+  // every createSession userAgent below (no first-session gap); fingerprintCookie is
+  // null on reuse and rides out on the redirect that finalizes the sign-in.
+  const [fingerprintId, fingerprintCookie] = getOrCreateFingerprintId(request);
 
   // Wrap the intent-fetch + session-resolution + decision block so a transient
   // ProviderError redirects to the branded error page and emits a failure audit event instead
@@ -158,7 +163,7 @@ export async function processIdpCallback(
           requestId,
           organization,
           fallbackLoginName: intent.information.idpUserName,
-          userAgent: userAgentFromRequest(request),
+          userAgent: userAgentFromRequest(request, fingerprintId),
         }));
       } catch (err) {
         const reason = err instanceof Error ? err.message : 'unknown';
@@ -176,7 +181,13 @@ export async function processIdpCallback(
         requestId,
       });
       const lastUsedCookie = await serializeLastUsedLogin(`idp:${intent.information.idpId}`);
-      return { kind: 'redirect', location: target, setCookie, lastUsedCookie };
+      return {
+        kind: 'redirect',
+        location: target,
+        setCookie,
+        lastUsedCookie,
+        fingerprintCookie: fingerprintCookie ?? undefined,
+      };
     }
 
     case 'link':
@@ -204,7 +215,7 @@ export async function processIdpCallback(
             requestId,
             orgId: organization,
             userId: decision.userId,
-            userAgent: userAgentFromRequest(request),
+            userAgent: userAgentFromRequest(request, fingerprintId),
           }
         );
         // Elide the post-create getUser(decision.userId) lookup — the cookie's
@@ -236,6 +247,7 @@ export async function processIdpCallback(
           location: target,
           setCookie: await serializeSessions(next),
           lastUsedCookie,
+          fingerprintCookie: fingerprintCookie ?? undefined,
         };
       } catch (err) {
         if (err instanceof ProviderError) {
@@ -287,7 +299,7 @@ export async function processIdpCallback(
           idpIntentId: id,
           idpIntentToken: token,
           emailVerified: intent.draft?.emailVerified ?? false,
-          userAgent: userAgentFromRequest(request),
+          userAgent: userAgentFromRequest(request, fingerprintId),
         });
         const lastUsedCookie = await serializeLastUsedLogin(`idp:${decision.link.idpId}`);
         return {
@@ -295,6 +307,7 @@ export async function processIdpCallback(
           location: result.target,
           setCookie: await serializeSessions(result.sessions),
           lastUsedCookie,
+          fingerprintCookie: fingerprintCookie ?? undefined,
         };
       } catch (err) {
         if (err instanceof ProviderError) {

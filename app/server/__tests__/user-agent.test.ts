@@ -11,7 +11,7 @@
 //   3. description is the raw UA string (Bowser parses browser/OS from it downstream)
 //   4. fingerprintId: explicit param, fingerprintId cookie fallback, param overrides cookie
 //   5. Empty fields are omitted (no UA → no header key; no XFF → no ip key)
-import { userAgentFromRequest } from '../user-agent';
+import { getOrCreateFingerprintId, userAgentFromRequest } from '../user-agent';
 import { describe, it, expect } from 'vitest';
 
 // Representative desktop Chrome UA used across tests.
@@ -173,5 +173,56 @@ describe('userAgentFromRequest', () => {
     const req = makeRequest({});
     const result = userAgentFromRequest(req);
     expect(Object.keys(result)).toHaveLength(0);
+  });
+});
+
+// ── getOrCreateFingerprintId ────────────────────────────────────────────────────
+// Mints + serializes the fingerprintId cookie when absent (closing the first-session
+// gap) and reuses the cookie value when present. Matches the OLD app's cookie
+// attributes (httpOnly, Path=/, Max-Age=1y) plus additive SameSite=Lax / Secure.
+
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+describe('getOrCreateFingerprintId', () => {
+  it('reuses the existing cookie value and emits NO Set-Cookie (null)', () => {
+    const req = makeRequest({ cookie: 'fingerprintId=existing-fp-123' });
+    const [id, setCookie] = getOrCreateFingerprintId(req);
+    expect(id).toBe('existing-fp-123');
+    expect(setCookie).toBeNull();
+  });
+
+  it('mints a uuid and a Set-Cookie when the cookie is absent', () => {
+    const req = makeRequest({});
+    const [id, setCookie] = getOrCreateFingerprintId(req, true);
+    expect(id).toMatch(UUID_RE);
+    expect(setCookie).not.toBeNull();
+    // The minted id is carried VERBATIM as the cookie value (bare uuid — byte-identical
+    // to what an old-app browser carries), so it round-trips through userAgentFromRequest.
+    expect(setCookie).toContain(`fingerprintId=${id}`);
+  });
+
+  it('serializes the OLD-app attributes: HttpOnly, Path=/, Max-Age=1y', () => {
+    const [, setCookie] = getOrCreateFingerprintId(makeRequest({}), true);
+    expect(setCookie).toContain('Max-Age=31536000');
+    expect(setCookie).toContain('Path=/');
+    expect(setCookie).toContain('HttpOnly');
+    expect(setCookie).toContain('SameSite=Lax');
+  });
+
+  it('flags Secure only when secure=true', () => {
+    expect(getOrCreateFingerprintId(makeRequest({}), true)[1]).toContain('Secure');
+    expect(getOrCreateFingerprintId(makeRequest({}), false)[1]).not.toContain('Secure');
+  });
+
+  it('mints distinct ids across calls when no cookie is present', () => {
+    const [a] = getOrCreateFingerprintId(makeRequest({}), false);
+    const [b] = getOrCreateFingerprintId(makeRequest({}), false);
+    expect(a).not.toBe(b);
+  });
+
+  it('the minted id round-trips through userAgentFromRequest as the fingerprintId', () => {
+    const [id] = getOrCreateFingerprintId(makeRequest({}), false);
+    const ua = userAgentFromRequest(makeRequest({ 'user-agent': CHROME_UA }), id);
+    expect(ua.fingerprintId).toBe(id);
   });
 });

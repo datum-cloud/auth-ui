@@ -21,7 +21,7 @@ import { providerForRequest } from '@/server/auth-context.server';
 import { getCsrfToken, assertCsrf } from '@/server/csrf';
 import { trustedAppOrigin } from '@/server/infra/app-origin.server';
 import { env } from '@/server/infra/env.server';
-import { userAgentFromRequest } from '@/server/user-agent';
+import { getOrCreateFingerprintId, userAgentFromRequest } from '@/server/user-agent';
 import { assetUrl } from '@/utils/asset-url';
 import { Badge } from '@datum-cloud/datum-ui/badge';
 import { Button, LinkButton } from '@datum-cloud/datum-ui/button';
@@ -116,12 +116,16 @@ export async function action({ request }: ActionFunctionArgs) {
     if (!parsed.success) return data({ error: 'INVALID_INPUT' }, { status: 400 });
     const { loginName, requestId, organization } = parsed.data;
     const list = await readSessions(request);
+    // Mint+persist the fingerprintId when absent and feed the SAME id into the
+    // ceremony session's userAgent (no first-session gap). fpCookie is null when the
+    // browser already carries the cookie (reuse).
+    const [fingerprintId, fpCookie] = getOrCreateFingerprintId(request);
     const result = await resolveIdentifier(provider, list, {
       loginName,
       requestId,
       organization,
       emailDeliveryEnabled: env.AUTH_EMAIL_DELIVERY_ENABLED,
-      userAgent: userAgentFromRequest(request),
+      userAgent: userAgentFromRequest(request, fingerprintId),
     });
     if (!result.ok) {
       // EMAIL_LOGIN_DISABLED is a true client-input rejection (400). USER_NOT_FOUND is a
@@ -134,9 +138,10 @@ export async function action({ request }: ActionFunctionArgs) {
       return data({ error: result.error });
     }
     const verifyParams = new URLSearchParams(result.params);
-    return redirect(`${paths.login.verify.email()}?${verifyParams.toString()}`, {
-      headers: { 'set-cookie': await serializeSessions(result.sessions) },
-    });
+    const headers = new Headers();
+    headers.append('set-cookie', await serializeSessions(result.sessions));
+    if (fpCookie) headers.append('set-cookie', fpCookie);
+    return redirect(`${paths.login.verify.email()}?${verifyParams.toString()}`, { headers });
   }
 
   // Identifier flow.
@@ -151,12 +156,15 @@ export async function action({ request }: ActionFunctionArgs) {
   }
 
   const list = await readSessions(request);
+  // Mint+persist the fingerprintId when absent and feed the SAME id into the
+  // ceremony session's userAgent (no first-session gap). fpCookie is null on reuse.
+  const [fingerprintId, fpCookie] = getOrCreateFingerprintId(request);
   const result = await resolveIdentifier(provider, list, {
     loginName,
     requestId,
     organization,
     emailDeliveryEnabled: env.AUTH_EMAIL_DELIVERY_ENABLED,
-    userAgent: userAgentFromRequest(request),
+    userAgent: userAgentFromRequest(request, fingerprintId),
     // Thread the settings already fetched above (for the phone gate)
     // so resolveIdentifier skips its inner re-fetch on the known-user happy path.
     settings,
@@ -172,9 +180,10 @@ export async function action({ request }: ActionFunctionArgs) {
     return data({ error: result.error });
   }
 
-  return redirect(`${result.target}?${result.params}`, {
-    headers: { 'set-cookie': await serializeSessions(result.sessions) },
-  });
+  const headers = new Headers();
+  headers.append('set-cookie', await serializeSessions(result.sessions));
+  if (fpCookie) headers.append('set-cookie', fpCookie);
+  return redirect(`${result.target}?${result.params}`, { headers });
 }
 
 export default function Login() {

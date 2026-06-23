@@ -1,6 +1,8 @@
 // app/server/user-agent.ts
 //
-// Builds the Zitadel UserAgent shape from a Web API Request.
+// Builds the Zitadel UserAgent shape from a Web API Request, and ensures the
+// `fingerprintId` cookie the OLD app minted keeps existing for browsers that
+// never carried it (cleared cookies / a browser that never visited the old app).
 // Ported from the old app's getUserAgent() in apps/login/src/lib/fingerprint.ts
 // (commit d78f91a101), adapted for the rebuilt server (no Next.js dependency).
 //
@@ -58,7 +60,61 @@ function fingerprintIdFromCookie(request: Request): string {
   return '';
 }
 
+// One year, matching the OLD app's setFingerprintIdCookie (maxAge: 31536000).
+const FINGERPRINT_MAX_AGE_SECONDS = 31536000;
+
+/**
+ * Serializes the `fingerprintId` Set-Cookie string with the SAME attributes the
+ * OLD app used (apps/login/src/lib/fingerprint.ts → setFingerprintIdCookie):
+ * httpOnly, Path=/, Max-Age=1y. Plus SameSite=Lax and Secure (in production) —
+ * additive hardening the OLD Next.js call omitted, harmless for a fingerprint
+ * cookie that is never read by client scripts.
+ *
+ * Serialized by hand (not via createCookie) so the stored value is the BARE uuid —
+ * byte-identical to what an old-app browser already carries — and round-trips
+ * losslessly through fingerprintIdFromCookie's decodeURIComponent.
+ */
+function serializeFingerprintCookie(id: string, secure: boolean): string {
+  const attrs = [
+    `${FINGERPRINT_COOKIE}=${encodeURIComponent(id)}`,
+    `Max-Age=${FINGERPRINT_MAX_AGE_SECONDS}`,
+    'Path=/',
+    'HttpOnly',
+    'SameSite=Lax',
+  ];
+  if (secure) {
+    attrs.push('Secure');
+  }
+  return attrs.join('; ');
+}
+
 // ── Public API ───────────────────────────────────────────────────────────────
+
+/**
+ * Ensures a `fingerprintId` exists for this request.
+ *
+ * - Cookie PRESENT → returns its value and a `null` setCookie (reuse, no re-mint;
+ *   mirrors getCsrfToken's "null when already set" convention so callers skip the
+ *   redundant Set-Cookie).
+ * - Cookie ABSENT → mints `crypto.randomUUID()` and returns it alongside a
+ *   Set-Cookie that callers append to the SAME request's response. The minted id is
+ *   passed to `userAgentFromRequest(request, id)` so the very first login already
+ *   carries the fingerprintId (no first-session gap).
+ *
+ * `secure` defaults to production so the cookie is not flagged Secure on plain-http
+ * local dev (where it would otherwise be dropped by the browser).
+ */
+export function getOrCreateFingerprintId(
+  request: Request,
+  secure: boolean = process.env.NODE_ENV === 'production'
+): [string, string | null] {
+  const existing = fingerprintIdFromCookie(request);
+  if (existing) {
+    return [existing, null];
+  }
+  const id = crypto.randomUUID();
+  return [id, serializeFingerprintCookie(id, secure)];
+}
 
 /**
  * Builds a Zitadel v2 UserAgent object from a Web API Request.
