@@ -1,4 +1,3 @@
-import { ThemeToggle } from '@/components/theme-toggle/theme-toggle';
 import type { BrandingTheme } from '@/modules/auth/types';
 import { Logo } from '@datum-cloud/datum-ui/logo';
 import { cn } from '@datum-cloud/datum-ui/utils';
@@ -27,7 +26,6 @@ export default function BlankLayout({
             <Logo.Flat aria-label="Datum" className="h-6 w-auto" tone="brand" />
           )}
         </Link>
-        <ThemeToggle />
       </div>
       <main className="flex flex-1 flex-col items-center justify-center">{children}</main>
     </div>
