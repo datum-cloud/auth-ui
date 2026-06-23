@@ -54,9 +54,15 @@ export function cspDirectives(isDev: boolean, frameAncestors: readonly string[] 
     scriptSrc: isDev
       ? ["'self'", "'unsafe-inline'", "'unsafe-eval'"]
       : ["'self'", NONCE, "'strict-dynamic'"],
-    // Production drops 'unsafe-inline' and uses the per-request nonce
-    // (mirrors scriptSrc); dev keeps 'unsafe-inline' for HMR-injected styles.
-    styleSrc: isDev ? ["'self'", "'unsafe-inline'"] : ["'self'", NONCE],
+    // style-src uses 'unsafe-inline' in dev AND prod (no nonce). CSS-in-JS libs
+    // (sonner toasts, Radix UI) inject <style>/<link> stylesheets and element.style
+    // attributes that cannot carry a nonce — Safari *refuses the stylesheet outright*
+    // ("Refused to apply a stylesheet... nonce... or 'unsafe-inline'..."), so styling
+    // breaks. Per CSP3 a nonce in the directive disables 'unsafe-inline', so the nonce
+    // is intentionally dropped here. Mirrors datum cloud-portal (app/server/entry.ts:
+    // "Allow inline styles for third-party widgets"). script-src stays strict
+    // (NONCE + 'strict-dynamic') — that is the real XSS boundary; style injection is low-risk.
+    styleSrc: ["'self'", "'unsafe-inline'"],
     imgSrc: ["'self'", 'data:', 'https:'],
     // Fathom analytics beacons POST to https://cdn.usefathom.com — without this
     // connect-src entry the browser blocks them. script-src needs no change:

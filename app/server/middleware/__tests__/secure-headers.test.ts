@@ -28,11 +28,18 @@ describe('cspDirectives', () => {
   });
 });
 
-describe('CSP style-src hardening', () => {
-  it('production style-src uses the nonce and drops unsafe-inline', () => {
+describe('CSP style-src policy', () => {
+  // style-src intentionally uses 'unsafe-inline' (no nonce) in dev AND prod so the
+  // <style>/<link> stylesheets and element.style writes that CSS-in-JS libs (sonner,
+  // Radix) emit are not refused by the browser. Per CSP3 a nonce would disable
+  // 'unsafe-inline', so it must be absent. Mirrors datum cloud-portal. The real XSS
+  // defense — script-src nonce — is unaffected.
+  it('production style-src uses unsafe-inline and drops the nonce', () => {
     const prod = cspDirectives(false);
-    expect(prod.styleSrc).toContain(NONCE);
-    expect(prod.styleSrc).not.toContain("'unsafe-inline'");
+    expect(prod.styleSrc).toContain("'unsafe-inline'");
+    expect(prod.styleSrc).not.toContain(NONCE);
+    // script-src stays strict — the load-bearing invariant
+    expect(prod.scriptSrc).toContain(NONCE);
   });
 
   it('dev style-src keeps unsafe-inline for HMR', () => {
