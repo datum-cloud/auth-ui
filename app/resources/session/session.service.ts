@@ -85,16 +85,20 @@ export async function resolveSignedIn(
   config: SignedInConfig
 ): Promise<SignedInOutcome> {
   const requestId = new URL(request.url).searchParams.get('requestId');
-
-  // OIDC/SAML ceremonies still hand back to /authorize to finish the protocol callback
-  // (createCallback → client ?code=). The device grant is DIFFERENT: it auto-completes here
-  // (see resolveDeviceCompletion) instead of bouncing back to a second consent screen.
-  if (requestId && (requestId.startsWith('oidc_') || requestId.startsWith('saml_'))) {
-    return { kind: 'redirect', location: `/authorize?requestId=${encodeURIComponent(requestId)}` };
-  }
-
   const list = await readSessions(request);
   const recent = mostRecent(list);
+
+  // OIDC/SAML ceremonies hand back to /authorize to finish the protocol callback
+  // (createCallback → client ?code=). Hand back the active sessionId too so /authorize completes
+  // via the session path (runCallback) instead of re-running decideAuthorize — without it a
+  // prompt=select_account request loops straight back to /accounts. The device grant is DIFFERENT:
+  // it auto-completes here (resolveDeviceCompletion), not via a second consent screen.
+  if (requestId && (requestId.startsWith('oidc_') || requestId.startsWith('saml_'))) {
+    const params = new URLSearchParams({ requestId });
+    if (recent) params.set('sessionId', recent.id);
+    return { kind: 'redirect', location: `/authorize?${params.toString()}` };
+  }
+
   if (!recent) return { kind: 'redirect', location: '/login' };
 
   // 755-M8: post-login device-grant AUTO-COMPLETE. The OLD signedin page completed the grant

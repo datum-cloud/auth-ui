@@ -101,7 +101,7 @@ msgstr "Authorization complete"
 msgid "Authorization failed"
 msgstr "Authorization failed"
 
-#: app/routes/device/authorize.tsx:125
+#: app/routes/device/authorize.tsx:130
 msgid "Authorize"
 msgstr "Authorize"
 
@@ -209,7 +209,7 @@ msgstr "Create a new account"
 msgid "Create account"
 msgstr "Create account"
 
-#: app/routes/device/authorize.tsx:134
+#: app/routes/device/authorize.tsx:140
 msgid "Deny"
 msgstr "Deny"
 

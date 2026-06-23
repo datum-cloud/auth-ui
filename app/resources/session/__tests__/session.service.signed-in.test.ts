@@ -86,6 +86,19 @@ describe('resolveSignedIn — protocol forward (regression)', () => {
     );
   });
 
+  it('hands back the active sessionId on oidc_ so /authorize completes (no select_account loop)', async () => {
+    const cookie = await mintSessionsCookie({ id: 's1' });
+    const outcome = await resolveSignedIn(
+      fake,
+      makeRequest('?requestId=oidc_V2_1', cookie),
+      makeConfig()
+    );
+    expect(outcome.kind).toBe('redirect');
+    const loc = outcome.kind === 'redirect' ? outcome.location : '';
+    expect(loc).toContain('requestId=oidc_V2_1');
+    expect(loc).toContain('sessionId=s1');
+  });
+
   it('forwards a saml_ requestId to /authorize', async () => {
     const outcome = await resolveSignedIn(fake, makeRequest('?requestId=saml_sr-1'), makeConfig());
     expect(outcome.kind).toBe('redirect');
