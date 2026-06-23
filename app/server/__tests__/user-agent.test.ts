@@ -6,10 +6,10 @@
 // standard undici Request header handling is used without browser restrictions.
 //
 // Covered:
-//   1. UA header → header['user-agent'].values array
+//   1. UA header → header['user-agent'].values is a SINGLE raw-UA value
 //   2. x-forwarded-for last-hop IP precedence (same proxy-trust model as rate-limit.ts)
-//   3. description parsed from a representative UA string
-//   4. fingerprintId passthrough
+//   3. description is the raw UA string (Bowser parses browser/OS from it downstream)
+//   4. fingerprintId: explicit param, fingerprintId cookie fallback, param overrides cookie
 //   5. Empty fields are omitted (no UA → no header key; no XFF → no ip key)
 import { userAgentFromRequest } from '../user-agent';
 import { describe, it, expect } from 'vitest';
@@ -25,13 +25,13 @@ function makeRequest(headers: Record<string, string> = {}): Request {
 describe('userAgentFromRequest', () => {
   // ── UA header ──────────────────────────────────────────────────────────────
 
-  it('maps user-agent header to header["user-agent"].values (OLD comma-split shape)', () => {
+  it('maps user-agent header to header["user-agent"].values as a single raw-UA value', () => {
     const req = makeRequest({ 'user-agent': CHROME_UA });
     const result = userAgentFromRequest(req);
     expect(result.header).toBeDefined();
-    // 755-M1: byte-match the OLD payload — the raw UA is comma-split (the field the
-    // cloud-portal session gateway parses), NOT a single-element array.
-    expect(result.header!['user-agent']).toEqual({ values: CHROME_UA.split(',') });
+    // 755-M2: a SINGLE full-UA value — NOT comma-split. Splitting fragments the UA
+    // at its internal `(KHTML, like Gecko)` comma and gives Bowser nothing parseable.
+    expect(result.header!['user-agent']).toEqual({ values: [CHROME_UA] });
   });
 
   it('omits header field when user-agent is absent', () => {
@@ -68,68 +68,33 @@ describe('userAgentFromRequest', () => {
     expect(result.ip).toBeUndefined();
   });
 
-  // ── description parsing ────────────────────────────────────────────────────
+  // ── description (raw UA) ─────────────────────────────────────────────────────
 
-  it('produces a non-empty description from a representative Chrome UA', () => {
+  it('uses the raw UA string as the description (Bowser parses OS/browser from it)', () => {
     const req = makeRequest({ 'user-agent': CHROME_UA });
     const result = userAgentFromRequest(req);
-    expect(result.description).toBeDefined();
-    expect(typeof result.description).toBe('string');
-    expect(result.description!.length).toBeGreaterThan(0);
+    // 755-M2: description is the verbatim UA — milo's gateway runs Bowser over
+    // whichever field maps to status.userAgent, and Bowser needs the raw UA tokens
+    // (e.g. `Macintosh`) to resolve the OS that previously came back null.
+    expect(result.description).toBe(CHROME_UA);
   });
 
-  it('description includes browser name for Chrome UA', () => {
-    const req = makeRequest({ 'user-agent': CHROME_UA });
-    const result = userAgentFromRequest(req);
-    // The old getUserAgent() builder embeds browser.name in description.
-    expect(result.description).toMatch(/chrome/i);
-  });
-
-  it('description includes OS name for macOS UA', () => {
-    const req = makeRequest({ 'user-agent': CHROME_UA });
-    const result = userAgentFromRequest(req);
-    // macOS should appear somewhere in the parsed OS segment.
-    expect(result.description).toMatch(/mac/i);
-  });
-
-  // ── 755-M1: byte-match the OLD auth-ui payload (cloud-portal session gateway parses it) ──
-
-  it('description uses the OLD comma-group format with OS preserved (not the " · " cleanup)', () => {
+  it('description retains the raw OS tokens Bowser needs (Macintosh / Mac OS X)', () => {
     const desc = userAgentFromRequest(makeRequest({ 'user-agent': CHROME_UA })).description!;
-    // OLD lib/fingerprint.ts: four comma-joined "name, version, " groups (browser/device/engine/OS),
-    // empty segments preserved. OS ("Mac OS, 10.15.7") MUST be present for the portal's OS column.
-    expect(desc).toContain('Chrome,');
-    expect(desc).toContain('Blink,');
-    expect(desc).toContain('Mac OS,');
-    expect(desc).toContain('10.15.7,');
-    expect(desc).toMatch(/,/); // comma-separated (OLD shape)
-    expect(desc).not.toContain(' · '); // NOT the " · " cleanup that regressed the gateway
+    expect(desc).toContain('Macintosh');
+    expect(desc).toContain('Mac OS X');
   });
 
-  it('emits the "Mac OS" OS token the cloud-portal gateway parses (NOT "macOS")', () => {
-    // Regression for the Active-Sessions OS-null bug: the OLD app's Next.js ua-parser
-    // emitted "Mac OS", and cloud-portal's session gateway extracts the OS field by
-    // matching that token in the comma-delimited description. The rebuild's "macOS"
-    // token failed that match, leaving the OS column null. Assert byte-parity here.
-    const desc = userAgentFromRequest(makeRequest({ 'user-agent': CHROME_UA })).description!;
-    expect(desc).toContain('Mac OS,');
-    expect(desc).not.toContain('macOS');
-  });
-
-  it('mobile UA includes the device + OS segments (OLD format)', () => {
+  it('description is the raw UA for a mobile UA too', () => {
     const IPHONE_UA =
       'Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1';
     const desc = userAgentFromRequest(makeRequest({ 'user-agent': IPHONE_UA })).description!;
-    expect(desc).toMatch(/Safari/);
-    expect(desc).toMatch(/iPhone/);
-    expect(desc).toMatch(/iOS, 17\.0/); // OLD format: "iOS, 17.0" (comma between name and version)
+    expect(desc).toBe(IPHONE_UA);
   });
 
-  it('attaches a description whenever a user-agent header is present (OLD always emitted one)', () => {
-    // The OLD format always returns a (possibly empty-ish) string when a UA header is present.
+  it('attaches a description whenever a user-agent header is present', () => {
     const result = userAgentFromRequest(makeRequest({ 'user-agent': 'curl/8.4.0' }));
-    expect(result.description).toBeDefined();
-    expect(typeof result.description).toBe('string');
+    expect(result.description).toBe('curl/8.4.0');
   });
 
   it('omits description field when user-agent is absent', () => {
@@ -138,16 +103,52 @@ describe('userAgentFromRequest', () => {
     expect(result.description).toBeUndefined();
   });
 
-  // ── fingerprintId passthrough ──────────────────────────────────────────────
+  // ── fingerprintId (param + cookie) ───────────────────────────────────────────
 
-  it('passes fingerprintId through to the result', () => {
+  it('passes an explicit fingerprintId param through to the result', () => {
     const req = makeRequest({ 'user-agent': CHROME_UA });
     const result = userAgentFromRequest(req, 'fp-abc-123');
     expect(result.fingerprintId).toBe('fp-abc-123');
   });
 
-  it('omits fingerprintId when not provided', () => {
+  it('reads fingerprintId from the fingerprintId cookie when no param is given', () => {
+    const req = makeRequest({
+      'user-agent': CHROME_UA,
+      cookie: 'foo=bar; fingerprintId=bbd33da2-1234-5678; baz=qux',
+    });
+    const result = userAgentFromRequest(req);
+    expect(result.fingerprintId).toBe('bbd33da2-1234-5678');
+  });
+
+  it('decodes a URL-encoded fingerprintId cookie value', () => {
+    const req = makeRequest({
+      'user-agent': CHROME_UA,
+      cookie: 'fingerprintId=abc%20def',
+    });
+    const result = userAgentFromRequest(req);
+    expect(result.fingerprintId).toBe('abc def');
+  });
+
+  it('lets an explicit fingerprintId param override the cookie', () => {
+    const req = makeRequest({
+      'user-agent': CHROME_UA,
+      cookie: 'fingerprintId=cookie-value',
+    });
+    const result = userAgentFromRequest(req, 'param-value');
+    expect(result.fingerprintId).toBe('param-value');
+  });
+
+  it('omits fingerprintId when neither a param nor a cookie is provided', () => {
     const req = makeRequest({ 'user-agent': CHROME_UA });
+    const result = userAgentFromRequest(req);
+    expect(result.fingerprintId).toBeUndefined();
+  });
+
+  it('omits fingerprintId when the cookie header has no fingerprintId entry', () => {
+    const req = makeRequest({
+      'user-agent': CHROME_UA,
+      cookie: 'foo=bar; baz=qux',
+    });
     const result = userAgentFromRequest(req);
     expect(result.fingerprintId).toBeUndefined();
   });
@@ -163,9 +164,9 @@ describe('userAgentFromRequest', () => {
     expect(result).toMatchObject({
       fingerprintId: 'fp-xyz',
       ip: '203.0.113.99',
-      header: { 'user-agent': { values: CHROME_UA.split(',') } },
+      description: CHROME_UA,
+      header: { 'user-agent': { values: [CHROME_UA] } },
     });
-    expect(result.description).toBeDefined();
   });
 
   it('returns empty object when no headers and no fingerprintId', () => {
