@@ -10,8 +10,9 @@ import {
 import { paths } from '@/routes/paths';
 import { providerForRequest } from '@/server/auth-context.server';
 import { getCsrfToken, assertCsrf } from '@/server/csrf';
+import { Badge } from '@datum-cloud/datum-ui/badge';
 import { Button, LinkButton } from '@datum-cloud/datum-ui/button';
-import { Trans, useLingui } from '@lingui/react/macro';
+import { Trans } from '@lingui/react/macro';
 import {
   data,
   redirect,
@@ -61,7 +62,6 @@ export default function DeviceAuthorize() {
   const loaderData = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
-  const { t } = useLingui();
   const isSubmitting = navigation.state === 'submitting';
 
   // Inline-only error surface for the deny/authorize ACTION error: it renders in a
@@ -112,13 +112,13 @@ export default function DeviceAuthorize() {
           </p>
         )}
         {scope.length > 0 && (
-          <ul aria-label={t`Requested permissions`} className="flex flex-col gap-2">
+          <div className="flex flex-wrap items-center gap-3">
             {scope.map((s) => (
-              <li key={s} className="rounded-md border px-3 py-2 text-sm break-all">
+              <Badge type="quaternary" key={s}>
                 {s}
-              </li>
+              </Badge>
             ))}
-          </ul>
+          </div>
         )}
         <RRForm method="post" className="flex w-full flex-col gap-4">
           <input type="hidden" name="csrf" value={csrfToken} />

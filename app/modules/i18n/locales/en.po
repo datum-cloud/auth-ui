@@ -109,7 +109,7 @@ msgstr "Authorize"
 msgid "Authorize device"
 msgstr "Authorize device"
 
-#: app/routes/sso/index.tsx:175
+#: app/routes/sso/index.tsx:186
 msgid "Available accounts to link"
 msgstr "Available accounts to link"
 
@@ -136,7 +136,7 @@ msgid "Change your password"
 msgstr "Change your password"
 
 #: app/routes/password/reset.tsx:97
-#: app/routes/signup/method.tsx:221
+#: app/routes/signup/method.tsx:222
 #: app/routes/signup/password.tsx:145
 msgid "Check your email"
 msgstr "Check your email"
@@ -174,7 +174,7 @@ msgstr "Confirm new password"
 msgid "Confirm password"
 msgstr "Confirm password"
 
-#: app/routes/sso/index.tsx:130
+#: app/routes/sso/index.tsx:137
 msgid "Connected accounts"
 msgstr "Connected accounts"
 
@@ -230,7 +230,7 @@ msgstr "Email code"
 
 #: app/routes/login/index.tsx:390
 #: app/routes/login/method.tsx:125
-#: app/routes/signup/method.tsx:264
+#: app/routes/signup/method.tsx:265
 msgid "Email me a sign-in link"
 msgstr "Email me a sign-in link"
 
@@ -299,7 +299,7 @@ msgstr "Enter your password"
 msgid "Enter your SMS code"
 msgstr "Enter your SMS code"
 
-#: app/routes/signup/method.tsx:243
+#: app/routes/signup/method.tsx:244
 msgid "Finish creating your account"
 msgstr "Finish creating your account"
 
@@ -449,10 +449,6 @@ msgstr "Register passkey"
 msgid "Registration is currently unavailable. Please contact your administrator."
 msgstr "Registration is currently unavailable. Please contact your administrator."
 
-#: app/routes/device/authorize.tsx:115
-msgid "Requested permissions"
-msgstr "Requested permissions"
-
 #: app/routes/login/verify/email.tsx:95
 #: app/routes/login/verify/sms.tsx:92
 #: app/routes/verify/index.tsx:200
@@ -492,7 +488,7 @@ msgstr "Service temporarily unavailable. Please try again."
 msgid "Session active"
 msgstr "Session active"
 
-#: app/routes/signup/method.tsx:300
+#: app/routes/signup/method.tsx:301
 #: app/routes/signup/password.tsx:160
 msgid "Set a password"
 msgstr "Set a password"
@@ -549,7 +545,7 @@ msgstr "Sign in with LDAP"
 #: app/routes/logout/index.tsx:48
 #: app/routes/logout/index.tsx:54
 #: app/routes/signed-in.tsx:99
-#: app/routes/sso/index.tsx:201
+#: app/routes/sso/index.tsx:212
 msgid "Sign out"
 msgstr "Sign out"
 
@@ -651,11 +647,11 @@ msgstr "Too many attempts. Please wait a moment and try again."
 msgid "Two-factor verification"
 msgstr "Two-factor verification"
 
-#: app/routes/sso/index.tsx:161
+#: app/routes/sso/index.tsx:172
 msgid "Unlink"
 msgstr "Unlink"
 
-#: app/routes/signup/method.tsx:282
+#: app/routes/signup/method.tsx:283
 msgid "Use a passkey"
 msgstr "Use a passkey"
 
@@ -736,7 +732,7 @@ msgstr "We've sent a password reset link to <0>{0}</0>"
 
 #. placeholder {0}: (actionData as { email: string }).email
 #. placeholder {0}: actionData.email
-#: app/routes/signup/method.tsx:223
+#: app/routes/signup/method.tsx:224
 #: app/routes/signup/password.tsx:147
 msgid "We've sent a verification link to <0>{0}</0>"
 msgstr "We've sent a verification link to <0>{0}</0>"
@@ -754,9 +750,10 @@ msgstr "You are signed in"
 msgid "You are signed in as <0>{loginName}</0>"
 msgstr "You are signed in as <0>{loginName}</0>"
 
-#: app/routes/sso/index.tsx:122
-msgid "You can link multiple accounts to your Datum account."
-msgstr "You can link multiple accounts to your Datum account."
+#. placeholder {0}: loginName && ( <> Logged in as <span className="font-medium">{loginName}</span>. </> )
+#: app/routes/sso/index.tsx:123
+msgid "You can link multiple accounts to your Datum account. {0}"
+msgstr "You can link multiple accounts to your Datum account. {0}"
 
 #: app/routes/signed-in.tsx:72
 msgid "You can now close this window and return to the device where you started."
@@ -781,6 +778,10 @@ msgstr "You must be signed in to link an external account."
 #: app/routes/signup/password.tsx:161
 msgid "You'll need to set a password to complete your signup."
 msgstr "You'll need to set a password to complete your signup."
+
+#: app/routes/signup/method.tsx:246
+msgid "You're almost done! <0>{loginName}</0>"
+msgstr "You're almost done! <0>{loginName}</0>"
 
 #: app/routes/logout/success.tsx:12
 msgid "You've been signed out"

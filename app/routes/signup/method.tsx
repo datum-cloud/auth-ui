@@ -1,6 +1,7 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
 import { AuthCeremony } from '@/components/auth-ceremony/auth-ceremony';
 import { AuthFormFields } from '@/components/auth-form/auth-form-fields';
+import { BackLink } from '@/components/back-link/back-link';
 import { useAuthActionError } from '@/hooks/use-auth-action-error';
 import { readSessions, serializeSessions } from '@/modules/auth/session/cookie';
 import { genericCheckYourEmail } from '@/resources/schemas/check-your-email.schema';
@@ -242,12 +243,12 @@ export default function SignupMethod() {
     <AuthCeremony
       title={<Trans>Finish creating your account</Trans>}
       description={
-        <>
-          {firstName} {lastName} · {loginName}
-        </>
+        <Trans>
+          You're almost done! <span className="font-medium">{loginName}</span>
+        </Trans>
       }
       error={errorMessage}>
-      <div className="flex flex-col gap-3">
+      <div className="flex w-full flex-col gap-3">
         {/* Email-link (passwordless) — always shown when email entry is allowed */}
         {view.showEmailLink ? (
           <RRForm method="post">
@@ -302,6 +303,8 @@ export default function SignupMethod() {
           </RRForm>
         ) : null}
       </div>
+
+      <BackLink />
     </AuthCeremony>
   );
 }

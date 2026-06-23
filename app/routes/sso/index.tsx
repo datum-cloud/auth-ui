@@ -119,10 +119,17 @@ export default function SsoPage() {
   return (
     <AuthCard
       title={<Trans>Linked accounts</Trans>}
-      description={<Trans>You can link multiple accounts to your Datum account.</Trans>}>
+      description={
+        <Trans>
+          You can link multiple accounts to your Datum account.{' '}
+          {loginName && (
+            <>
+              Logged in as <span className="font-medium">{loginName}</span>.
+            </>
+          )}
+        </Trans>
+      }>
       <div className="flex w-full flex-col gap-4">
-        {loginName ? <p className="text-foreground text-center text-sm">{loginName}</p> : null}
-
         {/* Linked IdPs */}
         {linked.length > 0 ? (
           <section className="flex flex-col gap-3">
@@ -137,8 +144,12 @@ export default function SsoPage() {
                   {/* 755-M6: provider icon + name badge (joined from the active-IdP list).
                       Falls back to the bare IdP user name / id when the provider is no longer
                       active. Icon is non-interactive — no nested-interactive a11y violation. */}
-                  <span className="flex min-w-0 items-center gap-2">
-                    <IdpIcon type={link.type} name={link.name} logoUrl={link.logoUrl} />
+                  <span className="flex min-w-0 items-center gap-3">
+                    <IdpIcon
+                      type={link.type}
+                      name={link.name || link.idpUserName || link.idpId}
+                      logoUrl={link.logoUrl}
+                    />
                     <span className="flex min-w-0 flex-col">
                       <span className="text-foreground truncate text-sm">
                         {link.name || link.idpUserName || link.idpId}
