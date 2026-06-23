@@ -24,8 +24,7 @@ vi.mock('@/server/auth-context.server', () => ({
 // Stub loadDeviceConsent to return a consent payload (happy path for loader coverage)
 vi.mock('@/resources/device', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/resources/device')>();
-  const { data, redirect } =
-    await vi.importActual<typeof import('react-router')>('react-router');
+  const { data, redirect } = await vi.importActual<typeof import('react-router')>('react-router');
   return {
     ...actual,
     loadDeviceConsent: async () => ({

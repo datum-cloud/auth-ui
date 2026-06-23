@@ -120,8 +120,13 @@ export default function DeviceAuthorize() {
           <input type="hidden" name="deviceAuthId" value={deviceAuthId} />
           <input type="hidden" name="requestId" value={requestId} />
           <FormError>{errorMessage}</FormError>
-          <div className="flex gap-3 pt-2">
-            <Button htmlType="submit" name="decision" value="authorize" disabled={isSubmitting}>
+          <div className="flex flex-col gap-3">
+            <Button
+              htmlType="submit"
+              name="decision"
+              className="w-full"
+              value="authorize"
+              disabled={isSubmitting}>
               <Trans>Authorize</Trans>
             </Button>
             <Button
@@ -130,6 +135,7 @@ export default function DeviceAuthorize() {
               value="deny"
               type="secondary"
               theme="outline"
+              className="w-full"
               disabled={isSubmitting}>
               <Trans>Deny</Trans>
             </Button>
