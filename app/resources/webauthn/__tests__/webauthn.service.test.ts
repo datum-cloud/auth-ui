@@ -17,7 +17,11 @@ import { FakeAuthProvider } from '@/modules/auth/providers/fake/fake-provider';
 import { getAuthProvider } from '@/modules/auth/select.server';
 import type { SessionEntry } from '@/modules/auth/session/cookie';
 import { ProviderError } from '@/modules/auth/types';
-import { requestPasskeyAttestation } from '@/resources/webauthn/webauthn.service';
+import {
+  requestPasskeyAttestation,
+  verifyPasskeyEnrollment,
+  verifyU2FEnrollment,
+} from '@/resources/webauthn/webauthn.service';
 import { hashActor, logAuthEvent } from '@/server/observability';
 import { describe, it, expect, vi, afterEach } from 'vitest';
 
@@ -138,5 +142,170 @@ describe('requestPasskeyAttestation — challenge failure audit', () => {
       );
     const fields = failureCall?.[2] as Record<string, unknown> | undefined;
     expect(fields?.code).toBe('UNKNOWN');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// verifyPasskeyEnrollment / verifyU2FEnrollment — characterization of the
+// divergences the parameterized merge MUST preserve:
+//   - distinct provider call (verifyPasskey(userId, passkeyId, cred) vs
+//     verifyU2F(userId, { u2fId, publicKeyCredential, tokenName: '' }))
+//   - distinct audit `factor` ('passkey' vs 'u2f')
+//   - distinct checkAfter target (/login/passkey vs /login/security-key)
+//   - malformed JSON → INVALID_INPUT; INVALID_CREDENTIALS ProviderError → typed error
+// ---------------------------------------------------------------------------
+
+const VALID_CRED = JSON.stringify({ id: 'cred-1' });
+
+describe('verifyPasskeyEnrollment', () => {
+  it("checkAfter='true' routes into /login/passkey threading the raw params", async () => {
+    const fake = getAuthProvider({ AUTH_PROVIDER: 'fake' }) as FakeAuthProvider;
+    const res = await verifyPasskeyEnrollment(fake, sessionsFor('alice@acme.test', 'org-1'), {
+      credential: VALID_CRED,
+      passkeyId: 'pk-1',
+      loginName: 'alice@acme.test',
+      requestId: 'req-9',
+      organization: 'org-1',
+      checkAfter: 'true',
+    });
+    expect(res.ok).toBe(true);
+    if (!res.ok) throw new Error('expected ok');
+    expect(res.target).toContain('/login/passkey?');
+    expect(res.target).toContain('loginName=alice%40acme.test');
+    expect(res.target).toContain('requestId=req-9');
+    expect(res.target).toContain('organization=org-1');
+  });
+
+  it('calls provider.verifyPasskey with (userId, passkeyId, parsedCredential)', async () => {
+    const fake = getAuthProvider({ AUTH_PROVIDER: 'fake' }) as FakeAuthProvider;
+    const spy = vi.spyOn(fake, 'verifyPasskey');
+    await verifyPasskeyEnrollment(fake, sessionsFor(), {
+      credential: VALID_CRED,
+      passkeyId: 'pk-1',
+      loginName: 'alice@acme.test',
+      checkAfter: 'true',
+    });
+    expect(spy).toHaveBeenCalledTimes(1);
+    const [userId, passkeyId, cred] = spy.mock.calls[0];
+    expect(typeof userId).toBe('string');
+    expect(passkeyId).toBe('pk-1');
+    expect(cred).toEqual({ id: 'cred-1' });
+  });
+
+  it('malformed credential JSON → INVALID_INPUT (no provider call)', async () => {
+    const fake = getAuthProvider({ AUTH_PROVIDER: 'fake' }) as FakeAuthProvider;
+    const spy = vi.spyOn(fake, 'verifyPasskey');
+    const res = await verifyPasskeyEnrollment(fake, sessionsFor(), {
+      credential: 'not-json',
+      passkeyId: 'pk-1',
+      loginName: 'alice@acme.test',
+    });
+    expect(res).toEqual({ ok: false, error: 'INVALID_INPUT' });
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it("INVALID_CREDENTIALS ProviderError → typed error + failure audit factor='passkey'", async () => {
+    const fake = getAuthProvider({ AUTH_PROVIDER: 'fake' }) as FakeAuthProvider;
+    vi.spyOn(fake, 'verifyPasskey').mockRejectedValue(
+      new ProviderError('INVALID_CREDENTIALS', 'bad cred')
+    );
+    const res = await verifyPasskeyEnrollment(fake, sessionsFor(), {
+      credential: VALID_CRED,
+      passkeyId: 'pk-1',
+      loginName: 'alice@acme.test',
+    });
+    expect(res).toEqual({ ok: false, error: 'INVALID_CREDENTIALS' });
+    const failureCall = vi
+      .mocked(logAuthEvent)
+      .mock.calls.find(([event, outcome]) => event === 'mfa_enroll' && outcome === 'failure');
+    expect((failureCall?.[2] as Record<string, unknown>)?.factor).toBe('passkey');
+  });
+
+  it('unset SESSION_EXPIRED when no matching session entry', async () => {
+    const fake = getAuthProvider({ AUTH_PROVIDER: 'fake' }) as FakeAuthProvider;
+    const res = await verifyPasskeyEnrollment(fake, [], {
+      credential: VALID_CRED,
+      passkeyId: 'pk-1',
+      loginName: 'alice@acme.test',
+    });
+    expect(res).toEqual({ ok: false, error: 'SESSION_EXPIRED' });
+  });
+});
+
+describe('verifyU2FEnrollment', () => {
+  it("checkAfter='true' routes into /login/security-key threading the raw params", async () => {
+    const fake = getAuthProvider({ AUTH_PROVIDER: 'fake' }) as FakeAuthProvider;
+    const res = await verifyU2FEnrollment(fake, sessionsFor('alice@acme.test', 'org-1'), {
+      credential: VALID_CRED,
+      u2fId: 'u2f-1',
+      loginName: 'alice@acme.test',
+      requestId: 'req-9',
+      organization: 'org-1',
+      checkAfter: 'true',
+    });
+    expect(res.ok).toBe(true);
+    if (!res.ok) throw new Error('expected ok');
+    expect(res.target).toContain('/login/security-key?');
+    expect(res.target).toContain('loginName=alice%40acme.test');
+    expect(res.target).toContain('requestId=req-9');
+    expect(res.target).toContain('organization=org-1');
+  });
+
+  it('calls provider.verifyU2F with the wrapped credential payload', async () => {
+    const fake = getAuthProvider({ AUTH_PROVIDER: 'fake' }) as FakeAuthProvider;
+    const spy = vi.spyOn(fake, 'verifyU2F');
+    await verifyU2FEnrollment(fake, sessionsFor(), {
+      credential: VALID_CRED,
+      u2fId: 'u2f-7',
+      loginName: 'alice@acme.test',
+      checkAfter: 'true',
+    });
+    expect(spy).toHaveBeenCalledTimes(1);
+    const [userId, payload] = spy.mock.calls[0];
+    expect(typeof userId).toBe('string');
+    expect(payload).toEqual({
+      u2fId: 'u2f-7',
+      publicKeyCredential: { id: 'cred-1' },
+      tokenName: '',
+    });
+  });
+
+  it('malformed credential JSON → INVALID_INPUT (no provider call)', async () => {
+    const fake = getAuthProvider({ AUTH_PROVIDER: 'fake' }) as FakeAuthProvider;
+    const spy = vi.spyOn(fake, 'verifyU2F');
+    const res = await verifyU2FEnrollment(fake, sessionsFor(), {
+      credential: 'not-json',
+      u2fId: 'u2f-1',
+      loginName: 'alice@acme.test',
+    });
+    expect(res).toEqual({ ok: false, error: 'INVALID_INPUT' });
+    expect(spy).not.toHaveBeenCalled();
+  });
+
+  it("INVALID_CREDENTIALS ProviderError → typed error + failure audit factor='u2f'", async () => {
+    const fake = getAuthProvider({ AUTH_PROVIDER: 'fake' }) as FakeAuthProvider;
+    vi.spyOn(fake, 'verifyU2F').mockRejectedValue(
+      new ProviderError('INVALID_CREDENTIALS', 'bad cred')
+    );
+    const res = await verifyU2FEnrollment(fake, sessionsFor(), {
+      credential: VALID_CRED,
+      u2fId: 'u2f-1',
+      loginName: 'alice@acme.test',
+    });
+    expect(res).toEqual({ ok: false, error: 'INVALID_CREDENTIALS' });
+    const failureCall = vi
+      .mocked(logAuthEvent)
+      .mock.calls.find(([event, outcome]) => event === 'mfa_enroll' && outcome === 'failure');
+    expect((failureCall?.[2] as Record<string, unknown>)?.factor).toBe('u2f');
+  });
+
+  it('unset SESSION_EXPIRED when no matching session entry', async () => {
+    const fake = getAuthProvider({ AUTH_PROVIDER: 'fake' }) as FakeAuthProvider;
+    const res = await verifyU2FEnrollment(fake, [], {
+      credential: VALID_CRED,
+      u2fId: 'u2f-1',
+      loginName: 'alice@acme.test',
+    });
+    expect(res).toEqual({ ok: false, error: 'SESSION_EXPIRED' });
   });
 });
