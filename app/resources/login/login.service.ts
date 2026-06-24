@@ -14,7 +14,12 @@
 // no raw cookie serialization lives here.
 import type { AuthProvider, SessionOpts } from '@/modules/auth/auth-provider';
 import { idpTypeToSlug } from '@/modules/auth/idp-slug';
-import { addSession, byLoginName, type SessionEntry } from '@/modules/auth/session/cookie';
+import {
+  addSession,
+  byLoginName,
+  sessionEntryFromSession,
+  type SessionEntry,
+} from '@/modules/auth/session/cookie';
 import type { LoginSettings } from '@/modules/auth/types';
 import { ProviderError } from '@/modules/auth/types';
 import { decideAfterIdentifier } from '@/resources/login/login-decision';
@@ -207,16 +212,10 @@ export async function resolveIdentifier(
     }
     logAuthEvent('identifier', 'success', { actor: hashActor(loginName) });
     const ghostSession = await provider.createSession({}, { requestId, orgId: org, userAgent });
-    const ghostSessions = addSession(list, {
-      id: ghostSession.id,
-      token: ghostSession.token,
-      loginName,
-      organization: org,
-      creationTs: ghostSession.changedAt,
-      expirationTs: ghostSession.expiresAt,
-      changeTs: ghostSession.changedAt,
-      requestId,
-    });
+    const ghostSessions = addSession(
+      list,
+      sessionEntryFromSession(ghostSession, { loginName, organization: org, requestId })
+    );
     const ghostParams = new URLSearchParams(threadParams(loginName, requestId, org));
     return { ok: true, target: '/login/password', params: ghostParams, sessions: ghostSessions };
   }
@@ -241,16 +240,10 @@ export async function resolveIdentifier(
   });
 
   // Persist the ceremony session into the (to-be-serialized) cookie list.
-  const sessions = addSession(list, {
-    id: session.id,
-    token: session.token,
-    loginName: user.loginName,
-    organization: org,
-    creationTs: session.changedAt,
-    expirationTs: session.expiresAt,
-    changeTs: session.changedAt,
-    requestId,
-  });
+  const sessions = addSession(
+    list,
+    sessionEntryFromSession(session, { loginName: user.loginName, organization: org, requestId })
+  );
 
   const params = new URLSearchParams({ loginName: user.loginName });
   if (requestId) params.set('requestId', requestId);

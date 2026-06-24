@@ -11,7 +11,11 @@
 // the route turns into a redirect()/data() response. No Request parsing, no CSRF,
 // no cookie I/O lives here.
 import type { AuthProvider, SessionOpts } from '@/modules/auth/auth-provider';
-import { addSession, type SessionEntry } from '@/modules/auth/session/cookie';
+import {
+  addSession,
+  sessionEntryFromSession,
+  type SessionEntry,
+} from '@/modules/auth/session/cookie';
 import { ProviderError } from '@/modules/auth/types';
 import { authorizeHandbackTarget } from '@/resources/shared/next-step-params';
 import { postRegisterStep } from '@/resources/signup/post-register';
@@ -119,16 +123,10 @@ export async function registerAndLinkIdp(
     { idpIntent: { idpIntentId: input.idpIntentId, idpIntentToken: input.idpIntentToken } },
     { orgId: organization, requestId, userId: user.id, userAgent }
   );
-  const sessions = addSession(list, {
-    id: session.id,
-    token: session.token,
-    loginName: user.loginName,
-    organization,
-    creationTs: session.changedAt,
-    expirationTs: session.expiresAt,
-    changeTs: session.changedAt,
-    requestId,
-  });
+  const sessions = addSession(
+    list,
+    sessionEntryFromSession(session, { loginName: user.loginName, organization, requestId })
+  );
   logAuthEvent('signup.requested', 'success', { actor: hashActor(user.loginName), organization });
   // Thread the just-created session id so /authorize finishes the callback via resolveOidc's
   // explicit-sessionId hand-back (runCallback) instead of re-running decideAuthorize — without it
@@ -232,16 +230,10 @@ export async function registerPasskeyFirst(
         {},
         { orgId: organization, requestId, userId: user.id, metadata: sessionMetadata, userAgent }
       );
-      const sessions = addSession(list, {
-        id: session.id,
-        token: session.token,
-        loginName: user.loginName,
-        organization,
-        creationTs: session.changedAt,
-        expirationTs: session.expiresAt,
-        changeTs: session.changedAt,
-        requestId,
-      });
+      const sessions = addSession(
+        list,
+        sessionEntryFromSession(session, { loginName: user.loginName, organization, requestId })
+      );
       logAuthEvent('signup.requested', 'success', { actor: hashActor(email), organization });
       return { kind: 'sent-with-session', email, sessions };
     } catch (error) {
@@ -262,16 +254,10 @@ export async function registerPasskeyFirst(
       {},
       { orgId: organization, requestId, userId: user.id, metadata: sessionMetadata, userAgent }
     );
-    const sessions = addSession(list, {
-      id: session.id,
-      token: session.token,
-      loginName: user.loginName,
-      organization,
-      creationTs: session.changedAt,
-      expirationTs: session.expiresAt,
-      changeTs: session.changedAt,
-      requestId,
-    });
+    const sessions = addSession(
+      list,
+      sessionEntryFromSession(session, { loginName: user.loginName, organization, requestId })
+    );
     logAuthEvent('signup.requested', 'success', { actor: hashActor(email), organization });
     const target = postRegisterStep({
       hasPassword: false,
@@ -369,16 +355,10 @@ export async function registerWithPassword(
         {},
         { orgId: organization, requestId, userId: user.id, metadata: sessionMetadata, userAgent }
       );
-      const sessions = addSession(list, {
-        id: session.id,
-        token: session.token,
-        loginName: user.loginName,
-        organization,
-        creationTs: session.changedAt,
-        expirationTs: session.expiresAt,
-        changeTs: session.changedAt,
-        requestId,
-      });
+      const sessions = addSession(
+        list,
+        sessionEntryFromSession(session, { loginName: user.loginName, organization, requestId })
+      );
       logAuthEvent('signup.requested', 'success', { actor: hashActor(email), organization });
       return { kind: 'sent-with-session', email, sessions };
     } catch (error) {
@@ -399,16 +379,10 @@ export async function registerWithPassword(
       {},
       { orgId: organization, requestId, userId: user.id, metadata: sessionMetadata, userAgent }
     );
-    const sessions = addSession(list, {
-      id: session.id,
-      token: session.token,
-      loginName: user.loginName,
-      organization,
-      creationTs: session.changedAt,
-      expirationTs: session.expiresAt,
-      changeTs: session.changedAt,
-      requestId,
-    });
+    const sessions = addSession(
+      list,
+      sessionEntryFromSession(session, { loginName: user.loginName, organization, requestId })
+    );
     logAuthEvent('signup.created', 'success', {
       userId: user.id,
       actor: hashActor(user.loginName),
@@ -544,16 +518,20 @@ export async function completeEmailLinkSignup(
   });
 
   // Step 4: persist the session and redirect to the (skippable) passkey-setup nudge.
-  const sessions = addSession(list, {
-    id: session.id,
-    token: verified.token,
-    loginName,
-    organization,
-    creationTs: verified.changedAt,
-    expirationTs: verified.expiresAt,
-    changeTs: verified.changedAt,
-    requestId,
-  });
+  // `id` is pinned to the original session (the entry we're persisting under), while the
+  // token/timestamps come from the post-`updateSession` `verified` result.
+  const sessions = addSession(
+    list,
+    sessionEntryFromSession(
+      {
+        id: session.id,
+        token: verified.token,
+        changedAt: verified.changedAt,
+        expiresAt: verified.expiresAt,
+      },
+      { loginName, organization, requestId }
+    )
+  );
 
   logAuthEvent('signup.created', 'success', { userId, actor: hashActor(loginName) });
 

@@ -11,7 +11,12 @@
  * can perform the redirect with the cookie in one response.
  */
 import type { AuthProvider, SessionOpts } from '@/modules/auth/auth-provider';
-import { addSession, readSessions, serializeSessions } from '@/modules/auth/session/cookie';
+import {
+  addSession,
+  readSessions,
+  sessionEntryFromSession,
+  serializeSessions,
+} from '@/modules/auth/session/cookie';
 import type { Session, User } from '@/modules/auth/types';
 import { authorizeHandbackTarget } from '@/resources/shared/next-step-params';
 
@@ -128,16 +133,10 @@ export async function signInWithIdpIntent(
   const loginName = fallbackLoginName ?? '';
 
   const entries = await readSessions(request);
-  const next = addSession(entries, {
-    id: session.id,
-    token: session.token,
-    loginName,
-    organization,
-    creationTs: session.changedAt,
-    expirationTs: session.expiresAt,
-    changeTs: session.changedAt,
-    requestId,
-  });
+  const next = addSession(
+    entries,
+    sessionEntryFromSession(session, { loginName, organization, requestId })
+  );
 
   const setCookie = await serializeSessions(next);
   // Thread the just-created session id so /authorize finishes the callback via resolveOidc's

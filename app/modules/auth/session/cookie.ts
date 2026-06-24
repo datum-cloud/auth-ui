@@ -8,6 +8,7 @@ import {
   byLoginName,
   type SessionEntry,
 } from './session';
+import type { Session } from '@/modules/auth/types';
 import { env } from '@/server/infra/env.server';
 import { logAuthEvent } from '@/server/observability';
 import { createCookie } from 'react-router';
@@ -104,6 +105,41 @@ export async function serializeSessions(list: SessionEntry[]): Promise<string> {
     (l) => sizeByLength.get(l.length) ?? Number.MAX_SAFE_INTEGER
   );
   return sessionsCookie.serialize(capped);
+}
+
+/**
+ * Map a freshly-created/verified provider {@link Session} to the cookie's
+ * {@link SessionEntry} shape. The provider Session carries no `loginName`
+ * (it lives on the optional `user` and is elided on several flows for an RPC
+ * saving), no `organization`, and no `requestId`, so those are supplied by the
+ * caller via `overrides`. `creationTs`/`changeTs` both mirror `session.changedAt`
+ * and `expirationTs` mirrors `session.expiresAt`, matching every creation site
+ * verbatim. `token` defaults to `session.token`; pass `overrides.token` only when
+ * the persisted token diverges from the session object handed in.
+ *
+ * NOTE: This is for CREATION sites only. Token-rotation/update sites spread an
+ * existing `SessionEntry` (`{ ...entry, token, changeTs, expirationTs }`) and
+ * must NOT use this builder — they preserve the prior entry's id/loginName/creationTs.
+ */
+export function sessionEntryFromSession(
+  session: Pick<Session, 'id' | 'token' | 'changedAt' | 'expiresAt'>,
+  overrides: {
+    loginName: string;
+    organization?: string;
+    requestId?: string;
+    token?: string;
+  }
+): SessionEntry {
+  return {
+    id: session.id,
+    token: overrides.token ?? session.token,
+    loginName: overrides.loginName,
+    organization: overrides.organization,
+    creationTs: session.changedAt,
+    expirationTs: session.expiresAt,
+    changeTs: session.changedAt,
+    requestId: overrides.requestId,
+  };
 }
 
 // Re-export helpers so route loaders/actions import from one place
