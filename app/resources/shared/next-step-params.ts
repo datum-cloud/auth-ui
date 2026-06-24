@@ -1,3 +1,4 @@
+import type { AuthMethod, LoginSettings, Session } from '@/modules/auth/types';
 import { REQUEST_ID_PATTERN } from '@/resources/schemas/request-id';
 import { nextStep, type NextStepInput } from '@/resources/shared/next-step';
 
@@ -55,6 +56,50 @@ export interface NextStepParams {
   // 755-M10: forwarded to nextStep → nextMfaStep to suppress ONLY the step-6 skippable
   // MFA-setup nudge on account-switch. Forced setup + real challenges are unaffected.
   suppressMfaSetupNudge?: boolean;
+}
+
+/**
+ * Derive the post-ceremony next step from a resolved provider `session`.
+ *
+ * This centralises ONLY the truly-shared assembly: pulling `factors` off the session,
+ * deriving `userVerified` from the passkey factor, and calling `nextStepWithParams`.
+ * The two genuinely-divergent inputs are passed in by each caller as ALREADY-RESOLVED
+ * values, never re-derived here — this is deliberate (the divergences are subtle and
+ * folding them in would silently change behavior):
+ *
+ *   - `loginName`: webauthn/mfa resolve `session.user?.loginName ?? loginName`; the
+ *     password login path passes the RAW typed loginName (it must NOT defer to the
+ *     session user). The caller decides; the helper just forwards it.
+ *   - `mfaInitSkippedAt`: the mfa-skip path passes the FRESH re-fetched user's value
+ *     (the session.user copy is stale right after stamping the skip); other callers pass
+ *     `session.user?.mfaInitSkippedAt`. The caller decides; the helper just forwards it.
+ *
+ * `suppressMfaSetupNudge` and the allowlisted-requestId override (account-switch) are
+ * NOT session-derived and stay bespoke in session.service — they do not use this helper.
+ */
+export interface NextStepFromSessionInput {
+  session: Session;
+  methods: AuthMethod[];
+  settings: LoginSettings;
+  /** Final resolved loginName (see note above — caller resolves the divergence). */
+  loginName: string;
+  /** Final resolved mfaInitSkippedAt (see note above — caller resolves the divergence). */
+  mfaInitSkippedAt: string | null | undefined;
+  requestId?: string;
+  organization?: string;
+}
+
+export function nextStepFromSession(input: NextStepFromSessionInput): string {
+  return nextStepWithParams({
+    factors: input.session.factors,
+    settings: input.settings,
+    enrolledMethods: input.methods,
+    loginName: input.loginName,
+    userVerified: input.session.factors.passkey?.userVerified ?? false,
+    mfaInitSkippedAt: input.mfaInitSkippedAt,
+    requestId: input.requestId,
+    organization: input.organization,
+  });
 }
 
 export function nextStepWithParams(input: NextStepParams): string {

@@ -1,5 +1,5 @@
-import { nextStepWithParams } from '../next-step-params';
-import type { Factors, LoginSettings } from '@/modules/auth/types';
+import { nextStepFromSession, nextStepWithParams } from '../next-step-params';
+import type { Factors, LoginSettings, Session } from '@/modules/auth/types';
 import { describe, it, expect } from 'vitest';
 
 // Primary fresh + no MFA required → target is /signed-in; only the requestId param differs.
@@ -75,5 +75,70 @@ describe('nextStepWithParams — no duplicated ceremony params (F3)', () => {
     expect(paramCount(url, 'organization')).toBe(1);
     // MFA-specific params nextStep set are preserved.
     expect(url).toContain('checkAfter=true');
+  });
+});
+
+// The shared nextStepFromSession helper forwards the caller-resolved loginName and
+// mfaInitSkippedAt VERBATIM (it must NOT re-derive them from session.user — the divergent
+// sources are the whole reason the values are passed in). It derives userVerified from the
+// session's passkey factor.
+describe('nextStepFromSession (shared assembly)', () => {
+  const setupMfaSettings = {
+    ...settings,
+    forceMfa: false,
+    mfaInitSkipLifetimeMs: 10_000,
+  } as unknown as LoginSettings;
+
+  it('forwards the caller loginName verbatim, ignoring session.user.loginName', () => {
+    // session.user carries a DIFFERENT loginName — the helper must use the passed one.
+    const session = {
+      factors,
+      user: { id: 'u1', loginName: 'session-user@x.test' },
+    } as unknown as Session;
+    const url = nextStepFromSession({
+      session,
+      methods: [],
+      settings: setupMfaSettings,
+      loginName: 'raw-typed@x.test',
+      mfaInitSkippedAt: null,
+    });
+    expect(url).toContain('loginName=raw-typed%40x.test');
+    expect(url).not.toContain('session-user');
+  });
+
+  it('forwards the caller mfaInitSkippedAt (fresh value) so a recent skip routes past setup', () => {
+    // session.user has NO skip stamp; the caller passes a fresh, recent skip → setup nudge suppressed.
+    const session = {
+      factors,
+      user: { id: 'u1', loginName: 'a@x.test', mfaInitSkippedAt: null },
+    } as unknown as Session;
+    const recent = new Date().toISOString();
+    const url = nextStepFromSession({
+      session,
+      methods: [],
+      settings: setupMfaSettings,
+      loginName: 'a@x.test',
+      mfaInitSkippedAt: recent,
+    });
+    // A fresh skip routes to /signed-in, NOT /setup/mfa.
+    expect(url).not.toContain('/setup/mfa');
+  });
+
+  it('derives userVerified=true from the session passkey factor (passwordless shortcut)', () => {
+    const passwordlessFactors = {
+      passkey: { verifiedAt: new Date('2999-01-01T00:00:00.000Z'), userVerified: true },
+    } as unknown as Factors;
+    const session = {
+      factors: passwordlessFactors,
+      user: { id: 'u1', loginName: 'a@x.test' },
+    } as unknown as Session;
+    const url = nextStepFromSession({
+      session,
+      methods: [],
+      settings,
+      loginName: 'a@x.test',
+      mfaInitSkippedAt: null,
+    });
+    expect(url).toContain('/signed-in');
   });
 });

@@ -19,7 +19,7 @@ import type { AuthProvider } from '@/modules/auth/auth-provider';
 import { byLoginName, addSession, type SessionEntry } from '@/modules/auth/session/cookie';
 import type { Session } from '@/modules/auth/types';
 import { ProviderError } from '@/modules/auth/types';
-import { nextStepWithParams, threadParams } from '@/resources/shared/next-step-params';
+import { nextStepFromSession as sharedNextStepFromSession, threadParams } from '@/resources/shared/next-step-params';
 import { logAuthEvent, hashActor } from '@/server/observability';
 
 // ── shared: derive the post-ceremony next step from a session ─────────────────
@@ -35,7 +35,9 @@ interface NextStepFromSessionInput {
 
 /**
  * passkey.userVerified drives the passwordless-shortcut in nextStep → /signed-in.
- * Centralises the identical next-step derivation shared by verify + setup actions.
+ * Thin webauthn-local wrapper over the shared assembly: resolves the webauthn divergence
+ * (prefer the session user's loginName; read mfaInitSkippedAt off the session user) and
+ * delegates the rest to the shared helper.
  */
 function nextStepFromSession({
   session,
@@ -45,12 +47,11 @@ function nextStepFromSession({
   requestId,
   organization,
 }: NextStepFromSessionInput): string {
-  return nextStepWithParams({
-    factors: session.factors,
+  return sharedNextStepFromSession({
+    session,
+    methods,
     settings,
-    enrolledMethods: methods,
     loginName: session.user?.loginName ?? loginName,
-    userVerified: session.factors.passkey?.userVerified ?? false,
     mfaInitSkippedAt: session.user?.mfaInitSkippedAt,
     requestId,
     organization,

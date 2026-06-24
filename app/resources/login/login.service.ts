@@ -24,7 +24,7 @@ import type { LoginSettings } from '@/modules/auth/types';
 import { ProviderError } from '@/modules/auth/types';
 import { decideAfterIdentifier } from '@/resources/login/login-decision';
 import { isEmailLike } from '@/resources/login/login.schema';
-import { nextStepWithParams, threadParams } from '@/resources/shared/next-step-params';
+import { nextStepFromSession, threadParams } from '@/resources/shared/next-step-params';
 import { idpReturnUrls } from '@/resources/sso/idp-return-urls';
 import { paths } from '@/routes/paths';
 import { logAuthEvent, hashActor } from '@/server/observability';
@@ -356,18 +356,14 @@ export async function verifyLoginPassword(
     expirationTs: session.expiresAt,
   });
 
-  // Derive userVerified + mfaInitSkippedAt so the composed nextStep engine can
-  // evaluate the full MFA decision tree (passkey UV + enrolled methods).
-  const userVerified = session.factors.passkey?.userVerified ?? false;
-  const mfaInitSkippedAt = session.user?.mfaInitSkippedAt ?? null;
-
-  const targetUrl = nextStepWithParams({
-    factors: session.factors,
+  const targetUrl = nextStepFromSession({
+    session,
+    methods,
     settings,
-    enrolledMethods: methods,
+    // CAVEAT: pass the RAW typed loginName — the password step must NOT defer to
+    // session.user?.loginName here (preserves the original login behavior).
     loginName,
-    userVerified,
-    mfaInitSkippedAt,
+    mfaInitSkippedAt: session.user?.mfaInitSkippedAt ?? null,
     requestId,
     organization,
   });
