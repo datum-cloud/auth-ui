@@ -1,5 +1,6 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
 import { AuthFormFields } from '@/components/auth-form/auth-form-fields';
+import { IdpIcon } from '@/components/idp-icon/idp-icon';
 import { slugify } from '@/modules/auth/idp-slug';
 import type { IdProvider } from '@/modules/auth/types';
 import {
@@ -10,7 +11,6 @@ import {
 } from '@/resources/sso';
 import { providerForRequest } from '@/server/auth-context.server';
 import { getCsrfToken, assertCsrf } from '@/server/csrf';
-import { assetUrl } from '@/utils/asset-url';
 import { Button } from '@datum-cloud/datum-ui/button';
 import { Separator } from '@datum-cloud/datum-ui/separator';
 import { Trans } from '@lingui/react/macro';
@@ -58,53 +58,6 @@ export async function action({ request }: ActionFunctionArgs, deps: SsoActionDep
   const outcome = await runSsoAction(provider, request, form, deps);
   if (outcome.kind === 'response' && outcome.response.status === 200) return null;
   return outcomeToResponse(outcome);
-}
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-// 755-M6: provider icon/name badge for a linked IdP. Ports the OLD linked-idp-list switch
-// (on the IdP type) to the rebuilt string-typed `type` ('GOOGLE' | 'GITHUB' | 'GITHUB_ES' | …
-// from toIdProvider). Resolution order: known-type SVG → provider logoUrl → name initials.
-// Non-interactive (plain <img>/<span>) so it never nests inside the row's unlink <button>.
-function IdpIcon({ type, name, logoUrl }: { type?: string; name?: string; logoUrl?: string }) {
-  const t = (type ?? '').toUpperCase();
-  if (t === 'GOOGLE') {
-    return (
-      <img
-        src={assetUrl(`/images/idps/google.png`)}
-        alt=""
-        aria-hidden
-        width={20}
-        height={20}
-        className="rounded"
-      />
-    );
-  }
-  if (t === 'GITHUB' || t === 'GITHUB_ES') {
-    return (
-      <img
-        src={assetUrl(`/images/idps/github.png`)}
-        alt=""
-        aria-hidden
-        width={20}
-        height={20}
-        className="rounded"
-      />
-    );
-  }
-  if (logoUrl) {
-    return <img src={logoUrl} alt="" aria-hidden width={20} height={20} className="rounded" />;
-  }
-  const initials = (name ?? '?').slice(0, 2).toUpperCase();
-  return (
-    <span
-      aria-hidden
-      className="bg-muted text-muted-foreground flex h-5 w-5 items-center justify-center rounded text-[10px] font-bold">
-      {initials}
-    </span>
-  );
 }
 
 // ---------------------------------------------------------------------------

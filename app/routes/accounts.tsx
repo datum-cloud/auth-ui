@@ -1,6 +1,7 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
 import { AuthFormFields } from '@/components/auth-form/auth-form-fields';
 import { FormError } from '@/components/form-error/form-error';
+import { IdpIcon } from '@/components/idp-icon/idp-icon';
 import { useAuthActionError } from '@/hooks/use-auth-action-error';
 import { isAllowedRequestId } from '@/resources/authorize';
 import {
@@ -15,7 +16,7 @@ import { Badge } from '@datum-cloud/datum-ui/badge';
 import { Button, LinkButton } from '@datum-cloud/datum-ui/button';
 import { Icon } from '@datum-cloud/datum-ui/icons';
 import { Trans } from '@lingui/react/macro';
-import { ArrowLeftRight, Trash2 } from 'lucide-react';
+import { Trash2 } from 'lucide-react';
 import {
   data,
   useLoaderData,
@@ -112,9 +113,9 @@ export default function AccountPicker() {
                   <button
                     type="submit"
                     className="hover:bg-muted/50 focus-visible:ring-ring flex w-full items-center gap-2 rounded-l-lg p-3 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none">
-                    <ArrowLeftRight
-                      className="text-muted-foreground size-4 shrink-0"
-                      aria-hidden="true"
+                    <IdpIcon
+                      type={account.idpType}
+                      name={account.displayName ?? account.loginName}
                     />
                     <span className="flex min-w-0 flex-col">
                       <span className="flex min-w-0 items-center gap-2">

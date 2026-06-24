@@ -36,7 +36,7 @@ msgstr "A new code has been sent to your email."
 msgid "Activate your device"
 msgstr "Activate your device"
 
-#: app/routes/accounts.tsx:92
+#: app/routes/accounts.tsx:93
 msgid "Add an account"
 msgstr "Add an account"
 
@@ -44,7 +44,7 @@ msgstr "Add an account"
 msgid "Add an extra layer of security to your account by setting up a second factor."
 msgstr "Add an extra layer of security to your account by setting up a second factor."
 
-#: app/routes/accounts.tsx:170
+#: app/routes/accounts.tsx:171
 msgid "Add another account"
 msgstr "Add another account"
 
@@ -108,7 +108,7 @@ msgstr "Authorize"
 msgid "Authorize device"
 msgstr "Authorize device"
 
-#: app/routes/sso/index.tsx:188
+#: app/routes/sso/index.tsx:141
 msgid "Available accounts to link"
 msgstr "Available accounts to link"
 
@@ -144,7 +144,7 @@ msgstr "Check your email"
 msgid "Choose a new password"
 msgstr "Choose a new password"
 
-#: app/routes/accounts.tsx:72
+#: app/routes/accounts.tsx:73
 msgid "Choose an account"
 msgstr "Choose an account"
 
@@ -173,7 +173,7 @@ msgstr "Confirm new password"
 msgid "Confirm password"
 msgstr "Confirm password"
 
-#: app/routes/sso/index.tsx:135
+#: app/routes/sso/index.tsx:88
 msgid "Connected accounts"
 msgstr "Connected accounts"
 
@@ -334,7 +334,7 @@ msgstr "Link expired"
 msgid "Link your account"
 msgstr "Link your account"
 
-#: app/routes/sso/index.tsx:119
+#: app/routes/sso/index.tsx:72
 msgid "Linked accounts"
 msgstr "Linked accounts"
 
@@ -342,7 +342,7 @@ msgstr "Linked accounts"
 msgid "Manual setup key"
 msgstr "Manual setup key"
 
-#: app/routes/accounts.tsx:135
+#: app/routes/accounts.tsx:136
 msgid "Needs re-authentication"
 msgstr "Needs re-authentication"
 
@@ -359,7 +359,7 @@ msgstr "No account was found and sign-up is not available."
 msgid "No sign-in method is available for this account."
 msgstr "No sign-in method is available for this account."
 
-#: app/routes/accounts.tsx:80
+#: app/routes/accounts.tsx:81
 msgid "No signed-in accounts."
 msgstr "No signed-in accounts."
 
@@ -471,7 +471,7 @@ msgstr "Scan the QR code below with your authenticator app, then enter the 6-dig
 msgid "Security key"
 msgstr "Security key"
 
-#: app/routes/accounts.tsx:73
+#: app/routes/accounts.tsx:74
 msgid "Select an account to continue or add a new one."
 msgstr "Select an account to continue or add a new one."
 
@@ -487,7 +487,7 @@ msgstr "Send reset link"
 msgid "Service temporarily unavailable. Please try again."
 msgstr "Service temporarily unavailable. Please try again."
 
-#: app/routes/accounts.tsx:133
+#: app/routes/accounts.tsx:134
 msgid "Session active"
 msgstr "Session active"
 
@@ -548,7 +548,7 @@ msgstr "Sign in with LDAP"
 #: app/routes/logout/index.tsx:47
 #: app/routes/logout/index.tsx:53
 #: app/routes/signed-in.tsx:97
-#: app/routes/sso/index.tsx:226
+#: app/routes/sso/index.tsx:179
 msgid "Sign out"
 msgstr "Sign out"
 
@@ -654,7 +654,7 @@ msgstr "Too many attempts. Please wait a moment and try again."
 msgid "Two-factor verification"
 msgstr "Two-factor verification"
 
-#: app/routes/sso/index.tsx:170
+#: app/routes/sso/index.tsx:123
 msgid "Unlink"
 msgstr "Unlink"
 
@@ -758,7 +758,7 @@ msgid "You are signed in as <0>{loginName}</0>"
 msgstr "You are signed in as <0>{loginName}</0>"
 
 #. placeholder {0}: loginName && ( <> Logged in as <span className="font-medium">{loginName}</span>. </> )
-#: app/routes/sso/index.tsx:121
+#: app/routes/sso/index.tsx:74
 msgid "You can link multiple accounts to your Datum account. {0}"
 msgstr "You can link multiple accounts to your Datum account. {0}"
 
