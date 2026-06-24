@@ -19,7 +19,10 @@ import type { AuthProvider } from '@/modules/auth/auth-provider';
 import { byLoginName, addSession, type SessionEntry } from '@/modules/auth/session/cookie';
 import type { Session } from '@/modules/auth/types';
 import { ProviderError } from '@/modules/auth/types';
-import { nextStepFromSession as sharedNextStepFromSession, threadParams } from '@/resources/shared/next-step-params';
+import {
+  nextStepFromSession as sharedNextStepFromSession,
+  threadParams,
+} from '@/resources/shared/next-step-params';
 import { logAuthEvent, hashActor } from '@/server/observability';
 
 // ── shared: derive the post-ceremony next step from a session ─────────────────
