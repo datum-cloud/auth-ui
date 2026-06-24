@@ -6,32 +6,7 @@ export {
   offerableSetupRoutes,
   resolveMfaSetup,
   recordMfaSetupSkip,
-  // Routing helpers + schemas re-exported by the service.
-  SECOND_FACTOR_METHODS,
-  USE_SCREEN,
-  intersectWithPolicy,
-  nextMfaStep,
-  secondFactorMethodSchema,
-  setupSkipSchema,
-  otpCodeSchema,
-  otpDeliveryCodeSchema,
+  // Retained for a future passkey-in-chooser flow (no current through-barrel consumer).
   mfaMethodSchema,
-  credentialSchema,
 } from './mfa.service';
-export type {
-  MfaPickerInput,
-  MfaPickerResult,
-  MfaPickerRedirect,
-  MfaPickerData,
-  ChooseMfaMethodResult,
-  ChooseMfaMethodError,
-  MfaSetupInput,
-  MfaSetupResult,
-  MfaSetupRedirect,
-  MfaSetupData,
-  RecordMfaSetupSkipResult,
-  RecordMfaSetupSkipError,
-  SecondFactorMethod,
-  MfaRoutingInput,
-  MfaRoutingResult,
-} from './mfa.service';
+export type { SecondFactorMethod } from './mfa.service';

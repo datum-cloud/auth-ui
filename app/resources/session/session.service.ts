@@ -368,7 +368,6 @@ export async function listAccounts(
         organization: entry.organization,
         displayName: pSession.user?.displayName,
         nextPath,
-        // isActive: nextPath === '/signed-in' || nextPath.startsWith('/signed-in?'),
         isActive: entry.loginName === pSession.user?.loginName,
       };
     })

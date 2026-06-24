@@ -13,16 +13,5 @@ export {
   performLogout,
   logoutOutcomeToResponse,
   completeOidcLogout,
-  switchSchema,
-  removeSchema,
-  DEFAULT_LOGIN_SETTINGS,
 } from './session.service';
-export type {
-  SignedInOutcome,
-  SignedInConfig,
-  EnrichedAccount,
-  AccountActionError,
-  AccountActionOutcome,
-  LogoutOutcome,
-  SessionEntry,
-} from './session.service';
+export type { SignedInConfig } from './session.service';

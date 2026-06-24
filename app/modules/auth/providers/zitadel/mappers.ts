@@ -169,14 +169,6 @@ export function toSession(
       otpEmail?: { verifiedAt?: unknown };
       u2f?: { verifiedAt?: unknown; userVerified?: unknown };
     };
-    challenges?: {
-      webAuthN?: {
-        publicKeyCredentialRequestOptions?: unknown;
-        publicKeyCredentialCreationOptions?: unknown;
-      };
-      otpEmail?: unknown;
-      otpSms?: unknown;
-    };
     expirationDate?: unknown;
     changeDate?: unknown;
   },
@@ -204,27 +196,6 @@ export function toSession(
   };
   const v = (x?: { verifiedAt?: unknown }): Date | null =>
     x?.verifiedAt ? tsToDate(x.verifiedAt) : null;
-  // Map the webauthn/otp challenge bag back onto the returned Session.
-  // updateSession populates Session.challenges when checks request a webauthn/otp challenge;
-  // the route reads it to drive the browser ceremony. No 4th `challenges` arg anywhere.
-  const challenges: SessionChallenges | undefined = proto.challenges
-    ? {
-        webAuthN: proto.challenges.webAuthN
-          ? {
-              publicKeyCredentialRequestOptions:
-                proto.challenges.webAuthN.publicKeyCredentialRequestOptions,
-              publicKeyCredentialCreationOptions:
-                proto.challenges.webAuthN.publicKeyCredentialCreationOptions,
-            }
-          : undefined,
-        // proto otpEmail is the returned code (returnCode delivery); surface it through
-        // the typed otpEmailCode only when it is a non-empty string.
-        ...(typeof proto.challenges.otpEmail === 'string' && proto.challenges.otpEmail.length > 0
-          ? { otpEmailCode: proto.challenges.otpEmail }
-          : {}),
-        otpSms: proto.challenges.otpSms,
-      }
-    : undefined;
   return {
     id: proto.id ?? '',
     token,
@@ -253,7 +224,6 @@ export function toSession(
         userVerified: Boolean(proto.factors?.u2f?.userVerified),
       },
     },
-    ...(challenges ? { challenges } : {}),
     expiresAt: proto.expirationDate ? tsToIso(proto.expirationDate) : '',
     changedAt: proto.changeDate ? tsToIso(proto.changeDate) : '',
   };
@@ -268,10 +238,9 @@ export function toSession(
  *   Challenges.otpSms?:   string  — the OTP code returned when RequestChallenges.OTPSMS.returnCode=true
  *   Challenges.otpEmail?: string  — the OTP code returned when RequestChallenges.OTPEmail uses returnCode delivery
  *
- * NOTE: The `toSession` mapper (above) has a structurally identical challenges branch for the
- * GetSession path, but that path never carries challenges on live Zitadel (Session entity proto
- * has no challenges field). This function is the authoritative mapper for the SetSession response
- * path; do not remove the toSession branch as it covers the in-memory/fake path in tests.
+ * This is the authoritative mapper for the SetSession response path. The `toSession` mapper
+ * (above) deliberately does NOT map challenges: the GetSession/Session entity proto carries no
+ * challenges field, so that path never produces them on live Zitadel.
  */
 export function toSessionChallenges(proto: {
   webAuthN?: { publicKeyCredentialRequestOptions?: unknown } | null;

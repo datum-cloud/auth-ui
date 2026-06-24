@@ -11,6 +11,7 @@ node_modules
 /cypress/screenshots
 .claude/settings.local.json
 app/modules/i18n/locales/*.ts
+app/modules/i18n/locales/*.js
 /.lighthouseci
 .playwright-mcp/
 dev-ca.crt
