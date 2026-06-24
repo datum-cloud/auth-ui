@@ -1,6 +1,8 @@
 import { useLoginContext } from '@/hooks/use-login-context';
 import SplitLayout from '@/layouts/split.layout';
 import { decideAfterIdentifier } from '@/resources/login/login-decision';
+import { readCeremonyParams } from '@/resources/shared/ceremony-params';
+import { redirectToLogin } from '@/routes/login-bounce';
 import { paths } from '@/routes/paths';
 import { providerForRequest } from '@/server/auth-context.server';
 import { env } from '@/server/infra/env.server';
@@ -15,18 +17,12 @@ export const meta: MetaFunction = () => [{ title: 'Choose how to sign in' }];
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const provider = providerForRequest(request);
-  const url = new URL(request.url);
+  const { loginName, requestId, organization } = readCeremonyParams(new URL(request.url));
 
-  const loginName = url.searchParams.get('loginName') ?? '';
-  const requestId = url.searchParams.get('requestId') ?? undefined;
-  const organization = url.searchParams.get('organization') ?? undefined;
-
-  if (!loginName)
-    return redirect(paths.login.index(requestId ? { requestId, organization } : undefined));
+  if (!loginName) return redirect(redirectToLogin(requestId, organization));
 
   const user = await provider.findUser(loginName, organization);
-  if (!user)
-    return redirect(paths.login.index(requestId ? { requestId, organization } : undefined));
+  if (!user) return redirect(redirectToLogin(requestId, organization));
 
   // The method chooser is a branded screen — thread getBranding through so SplitLayout
   // renders the org logo, mirroring /login and /signup. Fetched in parallel with the rest.

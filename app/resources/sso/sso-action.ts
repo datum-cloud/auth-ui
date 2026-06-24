@@ -8,6 +8,7 @@ import type { AuthProvider } from '@/modules/auth/auth-provider';
 import { idpTypeToSlug, slugify } from '@/modules/auth/idp-slug';
 import { readSessions, mostRecent } from '@/modules/auth/session/cookie';
 import { ProviderError } from '@/modules/auth/types';
+import { ssoErrorRedirect } from '@/resources/shared/next-step-params';
 import { idpReturnUrls } from '@/resources/sso/idp-return-urls';
 import type { SsoOutcome } from '@/resources/sso/sso-outcome';
 import { trustedAppOrigin } from '@/server/infra/app-origin.server';
@@ -140,10 +141,7 @@ export async function runSsoAction(
     if (err instanceof ProviderError) {
       deps.onAuthEvent?.('idp_start', 'failure');
       logAuthEvent('idp_start', 'failure', { reason: err.code });
-      return {
-        kind: 'redirect',
-        location: `/sso/${encodeURIComponent(slug)}/error?reason=${encodeURIComponent(providerErrorCode(err.code))}`,
-      };
+      return { kind: 'redirect', location: ssoErrorRedirect(slug, providerErrorCode(err.code)) };
     }
     throw err; // unknown → root ErrorBoundary
   }

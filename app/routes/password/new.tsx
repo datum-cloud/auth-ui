@@ -1,5 +1,6 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
 import { SubmitButton } from '@/components/auth-form/auth-form';
+import { AuthFormFields } from '@/components/auth-form/auth-form-fields';
 import { BackLink } from '@/components/back-link/back-link';
 import { FormError } from '@/components/form-error/form-error';
 import { useAuthActionError } from '@/hooks/use-auth-action-error';
@@ -75,11 +76,9 @@ export default function PasswordNew() {
         defaultValues={{ password: '', confirm: '' }}
         isSubmitting={navigation.state === 'submitting'}
         className="flex w-full flex-col gap-4">
-        <input type="hidden" name="csrf" value={csrfToken} />
+        <AuthFormFields csrf={csrfToken} requestId={requestId} organization={organization} />
         <input type="hidden" name="code" value={code} />
         <input type="hidden" name="userId" value={userId} />
-        {organization ? <input type="hidden" name="organization" value={organization} /> : null}
-        {requestId ? <input type="hidden" name="requestId" value={requestId} /> : null}
         <Form.Field name="password" label={t`New password`} required>
           <Form.Input type="password" autoFocus autoComplete="new-password" />
         </Form.Field>

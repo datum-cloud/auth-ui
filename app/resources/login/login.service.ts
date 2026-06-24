@@ -19,7 +19,7 @@ import type { LoginSettings } from '@/modules/auth/types';
 import { ProviderError } from '@/modules/auth/types';
 import { decideAfterIdentifier } from '@/resources/login/login-decision';
 import { isEmailLike } from '@/resources/login/login.schema';
-import { nextStepWithParams } from '@/resources/shared/next-step-params';
+import { nextStepWithParams, threadParams } from '@/resources/shared/next-step-params';
 import { idpReturnUrls } from '@/resources/sso/idp-return-urls';
 import { paths } from '@/routes/paths';
 import { logAuthEvent, hashActor } from '@/server/observability';
@@ -217,9 +217,7 @@ export async function resolveIdentifier(
       changeTs: ghostSession.changedAt,
       requestId,
     });
-    const ghostParams = new URLSearchParams({ loginName });
-    if (requestId) ghostParams.set('requestId', requestId);
-    if (org) ghostParams.set('organization', org);
+    const ghostParams = new URLSearchParams(threadParams(loginName, requestId, org));
     return { ok: true, target: '/login/password', params: ghostParams, sessions: ghostSessions };
   }
   logAuthEvent('identifier', 'success', { actor: hashActor(loginName) });

@@ -1,5 +1,6 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
 import { SubmitButton } from '@/components/auth-form/auth-form';
+import { AuthFormFields } from '@/components/auth-form/auth-form-fields';
 import { BackLink } from '@/components/back-link/back-link';
 import { FormError } from '@/components/form-error/form-error';
 import { useAuthActionError } from '@/hooks/use-auth-action-error';
@@ -112,9 +113,7 @@ export default function PasswordReset() {
         defaultValues={{ loginName: '' }}
         isSubmitting={navigation.state === 'submitting'}
         className="mb-4 flex flex-col gap-4">
-        <input type="hidden" name="csrf" value={csrfToken} />
-        {organization ? <input type="hidden" name="organization" value={organization} /> : null}
-        {requestId ? <input type="hidden" name="requestId" value={requestId} /> : null}
+        <AuthFormFields csrf={csrfToken} requestId={requestId} organization={organization} />
         <Form.Field name="loginName" label={t`Email or username`} required>
           <Form.Input
             type="text"

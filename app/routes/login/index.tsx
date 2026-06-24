@@ -1,6 +1,8 @@
 import { SubmitButton } from '@/components/auth-form/auth-form';
 import { AuthFormFields } from '@/components/auth-form/auth-form-fields';
+import { IdpButtonList } from '@/components/auth-form/idp-button-list';
 import { LastUsedBadge } from '@/components/auth-form/last-used-badge';
+import { OrDivider } from '@/components/auth-form/or-divider';
 import { FormError } from '@/components/form-error/form-error';
 import { useAuthActionError } from '@/hooks/use-auth-action-error';
 import { useLoginContext } from '@/hooks/use-login-context';
@@ -24,7 +26,6 @@ import { loaderCsrf, assertCsrf } from '@/server/csrf';
 import { trustedAppOrigin } from '@/server/infra/app-origin.server';
 import { env } from '@/server/infra/env.server';
 import { getOrCreateFingerprintId, userAgentFromRequest } from '@/server/user-agent';
-import { assetUrl } from '@/utils/asset-url';
 import { Button, LinkButton } from '@datum-cloud/datum-ui/button';
 import { Form } from '@datum-cloud/datum-ui/form';
 import { Icon } from '@datum-cloud/datum-ui/icons';
@@ -257,37 +258,15 @@ export default function Login() {
       </div>
 
       {view.showIdpButtons ? (
-        <div className="flex flex-col gap-3">
-          {idps.map((idp) => (
-            <RRForm key={idp.id} method="post">
-              <AuthFormFields csrf={csrfToken} requestId={requestId} organization={organization} />
-              <input type="hidden" name="intent" value="idp" />
-              <input type="hidden" name="idpId" value={idp.id} />
-              <Button
-                size="large"
-                className="relative h-13 gap-3"
-                type="quaternary"
-                theme="outline"
-                block
-                htmlType="submit"
-                loading={submittingIdpId === idp.id}
-                iconPosition="left"
-                icon={
-                  <img
-                    src={assetUrl(
-                      `/images/idps/${idp.name.toLowerCase().replace(/\s+/g, '-')}.png`
-                    )}
-                    alt={idp.name}
-                    aria-hidden="true"
-                    className="size-4 object-contain"
-                  />
-                }>
-                <Trans>{idp.name}</Trans>
-                <LastUsedBadge active={lastUsedLogin === `idp:${idp.id}`} />
-              </Button>
-            </RRForm>
-          ))}
-        </div>
+        <IdpButtonList
+          idps={idps}
+          csrf={csrfToken}
+          requestId={requestId}
+          organization={organization}
+          submittingIdpId={submittingIdpId}
+          relative
+          lastUsedLogin={lastUsedLogin}
+        />
       ) : null}
 
       {view.showPasskeyPrompt ? (
@@ -306,15 +285,7 @@ export default function Login() {
         </LinkButton>
       ) : null}
 
-      {view.showPasswordForm && view.showIdpButtons ? (
-        <div className="relative my-8 flex items-center" aria-hidden="true">
-          <div className="border-border flex-grow border-t" />
-          <span className="text-foreground/60 mx-3 shrink-0 text-xs">
-            <Trans>or</Trans>
-          </span>
-          <div className="border-border flex-grow border-t" />
-        </div>
-      ) : null}
+      {view.showPasswordForm && view.showIdpButtons ? <OrDivider /> : null}
 
       {view.showPasswordForm ? (
         <>

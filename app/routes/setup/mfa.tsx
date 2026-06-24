@@ -5,6 +5,7 @@ import { readSessions } from '@/modules/auth/session/cookie';
 import type { ProviderCapabilities } from '@/modules/auth/types';
 import { resolveMfaSetup, recordMfaSetupSkip } from '@/resources/mfa';
 import { setupSkipSchema } from '@/resources/mfa/mfa.schema';
+import { readCeremonyParams } from '@/resources/shared/ceremony-params';
 import { paths } from '@/routes/paths';
 import { providerForRequest } from '@/server/auth-context.server';
 import { loaderCsrf, assertCsrf } from '@/server/csrf';
@@ -84,9 +85,7 @@ const CAPABILITY_ROUTES: Array<{
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const url = new URL(request.url);
-  const loginName = url.searchParams.get('loginName') ?? '';
-  const requestId = url.searchParams.get('requestId') ?? undefined;
-  const organization = url.searchParams.get('organization') ?? undefined;
+  const { loginName, requestId, organization } = readCeremonyParams(url);
   const { force, checkAfter } = setupSkipSchema.parse(Object.fromEntries(url.searchParams));
 
   // Service resolves the session guard, user lookup, and the capability + login-policy gating

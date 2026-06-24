@@ -10,6 +10,7 @@ import { serializeLastUsedLogin } from '@/modules/auth/session/last-used-login';
 import { verifyLoginPassword } from '@/resources/login';
 import { attemptsRemaining } from '@/resources/login/login-view';
 import { loginPasswordSchema, loginPasswordClientSchema } from '@/resources/login/login.schema';
+import { redirectToLogin } from '@/routes/login-bounce';
 import { paths } from '@/routes/paths';
 import { providerForRequest } from '@/server/auth-context.server';
 import { loaderCsrf, assertCsrf } from '@/server/csrf';
@@ -150,9 +151,7 @@ export default function Password() {
         {serverError?.kind === 'SESSION_EXPIRED' && (
           <FormError>
             <Trans>Your session has expired.</Trans>{' '}
-            <Link
-              to={paths.login.index(requestId ? { requestId, organization } : undefined)}
-              className="underline">
+            <Link to={redirectToLogin(requestId, organization)} className="underline">
               <Trans>Sign in again</Trans>
             </Link>
           </FormError>

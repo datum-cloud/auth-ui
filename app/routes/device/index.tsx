@@ -1,5 +1,6 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
 import { SubmitButton } from '@/components/auth-form/auth-form';
+import { AuthFormFields } from '@/components/auth-form/auth-form-fields';
 import { FormError } from '@/components/form-error/form-error';
 import { useAuthActionError } from '@/hooks/use-auth-action-error';
 import { lookupDeviceCode, lookupOutcomeToResponse } from '@/resources/device';
@@ -63,7 +64,7 @@ export default function Device() {
         defaultValues={{ userCode: userCode }}
         isSubmitting={navigation.state === 'submitting'}
         className="flex w-full flex-col gap-4">
-        <input type="hidden" name="csrf" value={csrfToken} />
+        <AuthFormFields csrf={csrfToken} />
         <Form.Field name="userCode" label={t`Device code`} required>
           <Form.Input placeholder={t`WDJB-MJHT`} autoFocus autoComplete="off" />
         </Form.Field>

@@ -19,7 +19,7 @@ import type { AuthProvider } from '@/modules/auth/auth-provider';
 import { byLoginName, addSession, type SessionEntry } from '@/modules/auth/session/cookie';
 import type { Session } from '@/modules/auth/types';
 import { ProviderError } from '@/modules/auth/types';
-import { nextStepWithParams } from '@/resources/shared/next-step-params';
+import { nextStepWithParams, threadParams } from '@/resources/shared/next-step-params';
 import { logAuthEvent, hashActor } from '@/server/observability';
 
 // ── shared: derive the post-ceremony next step from a session ─────────────────
@@ -444,10 +444,10 @@ export async function verifyPasskeyEnrollment(
 
   // checkAfter=true: immediately route into the matching verify screen.
   if (checkAfter === 'true') {
-    const params = new URLSearchParams({ loginName });
-    if (requestId) params.set('requestId', requestId);
-    if (organization) params.set('organization', organization);
-    return { ok: true, target: `/login/passkey?${params.toString()}` };
+    return {
+      ok: true,
+      target: `/login/passkey?${threadParams(loginName, requestId, organization)}`,
+    };
   }
 
   // Normal post-enrollment routing: derive next step from current session state.
@@ -528,10 +528,10 @@ export async function verifyU2FEnrollment(
 
   // checkAfter=true: immediately route into the matching verify screen.
   if (checkAfter === 'true') {
-    const params = new URLSearchParams({ loginName });
-    if (requestId) params.set('requestId', requestId);
-    if (organization) params.set('organization', organization);
-    return { ok: true, target: `/login/security-key?${params.toString()}` };
+    return {
+      ok: true,
+      target: `/login/security-key?${threadParams(loginName, requestId, organization)}`,
+    };
   }
 
   // Normal post-enrollment routing: derive next step from current session state.

@@ -13,6 +13,7 @@
 import type { AuthProvider, SessionOpts } from '@/modules/auth/auth-provider';
 import { addSession, readSessions, serializeSessions } from '@/modules/auth/session/cookie';
 import type { Session, User } from '@/modules/auth/types';
+import { authorizeHandbackTarget } from '@/resources/shared/next-step-params';
 
 // ── Request-scoped provider-read cache ─────────────────────────────
 //
@@ -144,9 +145,7 @@ export async function signInWithIdpIntent(
   // it a prompt=select_account / prompt=login ceremony loops straight back to /accounts (or
   // /login). Mirrors the password path's /authorize?requestId&sessionId hand-back. device_
   // requestIds intentionally never reach here as /authorize (they go via /signed-in).
-  const target = requestId
-    ? `/authorize?requestId=${encodeURIComponent(requestId)}&sessionId=${encodeURIComponent(session.id)}`
-    : '/signed-in';
+  const target = authorizeHandbackTarget(requestId, session.id);
 
   return { setCookie, target };
 }

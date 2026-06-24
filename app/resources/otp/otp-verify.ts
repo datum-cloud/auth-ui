@@ -37,6 +37,7 @@ import {
   type OtpVerifyChannel,
   type SubmitOtpError,
 } from '@/resources/otp/otp.service';
+import { threadParams } from '@/resources/shared/next-step-params';
 import { providerForRequest } from '@/server/auth-context.server';
 import { assertCsrf, loaderCsrf } from '@/server/csrf';
 import { trustedAppOrigin } from '@/server/infra/app-origin.server';
@@ -137,10 +138,7 @@ export function createOtpVerifyHandlers(cfg: OtpVerifyConfig) {
     // Resend: re-navigate to this verify screen WITHOUT ?code so the loader sends a
     // fresh challenge (the action itself does not dispatch — avoids a double-send).
     if (intent === 'resend' && channelHasChallenge(cfg.channel)) {
-      const p = new URLSearchParams({ loginName });
-      if (requestId) p.set('requestId', requestId);
-      if (organization) p.set('organization', organization);
-      return redirect(`${cfg.verifyPath}?${p.toString()}`);
+      return redirect(`${cfg.verifyPath}?${threadParams(loginName, requestId, organization)}`);
     }
 
     const sessions = await readSessions(request);

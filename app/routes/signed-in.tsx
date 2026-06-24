@@ -1,4 +1,5 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
+import { AuthFormFields } from '@/components/auth-form/auth-form-fields';
 import { TrackOnMount } from '@/modules/analytics/fathom';
 import { resolveSignedIn } from '@/resources/session';
 import { providerForRequest } from '@/server/auth-context.server';
@@ -91,7 +92,7 @@ export default function SignedIn() {
             Explicit literal path because RR basename-prefixing only applies to RR <Form>.
             A logout journey should select form[action^="/id/logout"] — keep that prefix. */}
         <form method="post" action="/id/logout?index">
-          <input type="hidden" name="csrf" value={csrfToken} />
+          <AuthFormFields csrf={csrfToken} />
           <Button type="primary" theme="solid" htmlType="submit" block>
             <Trans>Sign out</Trans>
           </Button>

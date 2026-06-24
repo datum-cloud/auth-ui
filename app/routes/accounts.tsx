@@ -1,4 +1,5 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
+import { AuthFormFields } from '@/components/auth-form/auth-form-fields';
 import { FormError } from '@/components/form-error/form-error';
 import { useAuthActionError } from '@/hooks/use-auth-action-error';
 import { isAllowedRequestId } from '@/resources/authorize';
@@ -101,12 +102,13 @@ export default function AccountPicker() {
               <div key={account.sessionId} className="flex items-stretch gap-2 rounded-lg border">
                 {/* Switch form: the whole account-info area is the submit control. */}
                 <RRForm method="POST" className="min-w-0 flex-1">
-                  <input type="hidden" name="csrf" value={csrfToken} />
+                  {/* AuthFormFields carries csrf + the CURRENT ceremony id (requestId) so a
+                      mid-OIDC/SAML/device switch resolves back into the protocol callback
+                      instead of a terminal /signed-in page. requestId is null when no ceremony
+                      is active → coerced to undefined so the hidden input is omitted. */}
+                  <AuthFormFields csrf={csrfToken} requestId={requestId ?? undefined} />
                   <input type="hidden" name="intent" value="switch" />
                   <input type="hidden" name="sessionId" value={account.sessionId} />
-                  {/* Carries the CURRENT ceremony id so a mid-OIDC/SAML/device switch resolves
-                      back into the protocol callback instead of a terminal /signed-in page. */}
-                  {requestId ? <input type="hidden" name="requestId" value={requestId} /> : null}
                   <button
                     type="submit"
                     className="hover:bg-muted/50 focus-visible:ring-ring flex w-full items-center gap-2 rounded-l-lg p-3 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none">
@@ -139,11 +141,10 @@ export default function AccountPicker() {
 
                 {/* Remove form — sibling, NOT nested in the switch button. */}
                 <RRForm method="POST" className="flex shrink-0 items-center pr-2">
-                  <input type="hidden" name="csrf" value={csrfToken} />
+                  {/* Preserve the ceremony id on the post-remove redirect back to /accounts. */}
+                  <AuthFormFields csrf={csrfToken} requestId={requestId ?? undefined} />
                   <input type="hidden" name="intent" value="remove" />
                   <input type="hidden" name="sessionId" value={account.sessionId} />
-                  {/* Preserve the ceremony id on the post-remove redirect back to /accounts. */}
-                  {requestId ? <input type="hidden" name="requestId" value={requestId} /> : null}
                   <Button
                     size="xs"
                     theme="link"

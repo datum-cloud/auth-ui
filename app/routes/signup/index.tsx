@@ -1,5 +1,7 @@
 import { SubmitButton } from '@/components/auth-form/auth-form';
 import { AuthFormFields } from '@/components/auth-form/auth-form-fields';
+import { IdpButtonList } from '@/components/auth-form/idp-button-list';
+import { OrDivider } from '@/components/auth-form/or-divider';
 import { FormError } from '@/components/form-error/form-error';
 import { useAuthActionError } from '@/hooks/use-auth-action-error';
 import SplitLayout from '@/layouts/split.layout';
@@ -17,7 +19,6 @@ import { providerForRequest } from '@/server/auth-context.server';
 import { loaderCsrf, assertCsrf } from '@/server/csrf';
 import { trustedAppOrigin } from '@/server/infra/app-origin.server';
 import { env } from '@/server/infra/env.server';
-import { assetUrl } from '@/utils/asset-url';
 import { actionError } from '@/utils/errors/auth-error';
 import { Button } from '@datum-cloud/datum-ui/button';
 import { Form } from '@datum-cloud/datum-ui/form';
@@ -203,51 +204,16 @@ export default function Signup() {
         ) : (
           <>
             {view.showIdpButtons ? (
-              <div className="flex flex-col gap-3">
-                {idps.map((idp) => (
-                  <RRForm key={idp.id} method="post">
-                    <AuthFormFields
-                      csrf={csrfToken}
-                      requestId={requestId}
-                      organization={organization}
-                    />
-                    <input type="hidden" name="intent" value="idp" />
-                    <input type="hidden" name="idpId" value={idp.id} />
-                    <Button
-                      size="large"
-                      className="h-13 gap-3"
-                      type="quaternary"
-                      theme="outline"
-                      block
-                      htmlType="submit"
-                      loading={submittingIdpId === idp.id}
-                      iconPosition="left"
-                      icon={
-                        <img
-                          src={assetUrl(
-                            `/images/idps/${idp.name.toLowerCase().replace(/\s+/g, '-')}.png`
-                          )}
-                          alt={idp.name}
-                          aria-hidden="true"
-                          className="size-4 object-contain"
-                        />
-                      }>
-                      <Trans>{idp.name}</Trans>
-                    </Button>
-                  </RRForm>
-                ))}
-              </div>
+              <IdpButtonList
+                idps={idps}
+                csrf={csrfToken}
+                requestId={requestId}
+                organization={organization}
+                submittingIdpId={submittingIdpId}
+              />
             ) : null}
 
-            {view.showIdpButtons && view.allowEmailEntry ? (
-              <div className="relative my-8 flex items-center" aria-hidden="true">
-                <div className="border-border flex-grow border-t" />
-                <span className="text-foreground/60 mx-3 shrink-0 text-xs">
-                  <Trans>or</Trans>
-                </span>
-                <div className="border-border flex-grow border-t" />
-              </div>
-            ) : null}
+            {view.showIdpButtons && view.allowEmailEntry ? <OrDivider /> : null}
 
             {view.allowEmailEntry ? (
               <>

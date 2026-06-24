@@ -4,6 +4,7 @@ import { useAuthActionRecovery } from '@/hooks/use-auth-action-recovery';
 import { useLoginContext } from '@/hooks/use-login-context';
 import { readSessions } from '@/modules/auth/session/cookie';
 import { resolveMfaPicker, chooseMfaMethod, type SecondFactorMethod } from '@/resources/mfa';
+import { readCeremonyParams } from '@/resources/shared/ceremony-params';
 import { paths } from '@/routes/paths';
 import { providerForRequest } from '@/server/auth-context.server';
 import { loaderCsrf, assertCsrf } from '@/server/csrf';
@@ -60,10 +61,7 @@ const METHOD_LABELS: Record<SecondFactorMethod, { label: ReactNode; icon: ReactN
 // ─── Loader ──────────────────────────────────────────────────────────────────
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  const url = new URL(request.url);
-  const loginName = url.searchParams.get('loginName') ?? '';
-  const requestId = url.searchParams.get('requestId') ?? undefined;
-  const organization = url.searchParams.get('organization') ?? undefined;
+  const { loginName, requestId, organization } = readCeremonyParams(new URL(request.url));
 
   // Service resolves the session guard, user lookup, policy-filtered 2nd factors, and the
   // single-factor short-circuit. The route only reads the cookie, mints the CSRF token, and

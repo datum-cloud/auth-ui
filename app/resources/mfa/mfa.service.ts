@@ -20,23 +20,9 @@ import { secondFactorMethodSchema } from './mfa.schema';
 import type { AuthProvider } from '@/modules/auth/auth-provider';
 import { byLoginName, type SessionEntry } from '@/modules/auth/session/cookie';
 import type { AuthMethod, LoginSettings, ProviderCapabilities } from '@/modules/auth/types';
-import { nextStepWithParams } from '@/resources/shared/next-step-params';
+import { nextStepWithParams, threadParams } from '@/resources/shared/next-step-params';
 import { logAuthEvent, hashActor } from '@/server/observability';
 import { z } from 'zod';
-
-// ── shared helpers ────────────────────────────────────────────────────────────
-
-/**
- * Build the threaded query string carried through every MFA screen. loginName is
- * always present; requestId/organization only when set. Returned as a string the
- * route appends to the target path.
- */
-function threadParams(loginName: string, requestId?: string, organization?: string): string {
-  const params = new URLSearchParams({ loginName });
-  if (requestId) params.set('requestId', requestId);
-  if (organization) params.set('organization', organization);
-  return params.toString();
-}
 
 // ── /login/mfa loader: resolve the chooser ────────────────────────────────────
 

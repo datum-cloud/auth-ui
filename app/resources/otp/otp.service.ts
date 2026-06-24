@@ -20,7 +20,7 @@ import type { AuthProvider } from '@/modules/auth/auth-provider';
 import { ProviderError } from '@/modules/auth/types';
 import { otpCodeSchema, otpDeliveryCodeSchema } from '@/resources/mfa/mfa.schema';
 import { otpEmailUrlTemplate } from '@/resources/otp/otp-email-url-template';
-import { nextStepWithParams } from '@/resources/shared/next-step-params';
+import { nextStepWithParams, threadParams } from '@/resources/shared/next-step-params';
 import { logAuthEvent } from '@/server/observability';
 import { z } from 'zod';
 
@@ -318,10 +318,10 @@ export async function enrollTotp(
   // checkAfter=true: immediately route into the matching verify screen so the
   // user can confirm the newly enrolled factor works.
   if (checkAfter === 'true') {
-    const params = new URLSearchParams({ loginName });
-    if (requestId) params.set('requestId', requestId);
-    if (organization) params.set('organization', organization);
-    return { ok: true, target: `/login/verify/authenticator?${params.toString()}` };
+    return {
+      ok: true,
+      target: `/login/verify/authenticator?${threadParams(loginName, requestId, organization)}`,
+    };
   }
 
   // Normal post-enrollment routing: derive next step from current session state.

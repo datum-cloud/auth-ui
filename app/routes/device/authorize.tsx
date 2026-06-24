@@ -1,4 +1,5 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
+import { AuthFormFields } from '@/components/auth-form/auth-form-fields';
 import { FormError } from '@/components/form-error/form-error';
 import { useAuthActionError } from '@/hooks/use-auth-action-error';
 import {
@@ -117,7 +118,7 @@ export default function DeviceAuthorize() {
           </div>
         )}
         <RRForm method="post" className="flex w-full flex-col gap-4">
-          <input type="hidden" name="csrf" value={csrfToken} />
+          <AuthFormFields csrf={csrfToken} />
           <input type="hidden" name="deviceAuthId" value={deviceAuthId} />
           <input type="hidden" name="requestId" value={requestId} />
           <FormError>{errorMessage}</FormError>

@@ -1,4 +1,5 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
+import { AuthFormFields } from '@/components/auth-form/auth-form-fields';
 import { performLogout, logoutOutcomeToResponse, completeOidcLogout } from '@/resources/session';
 import { providerForRequest } from '@/server/auth-context.server';
 import { assertCsrf, loaderCsrf } from '@/server/csrf';
@@ -47,7 +48,7 @@ export default function Logout() {
       description={<Trans>Are you sure you want to sign out?</Trans>}>
       <div className="flex flex-col gap-4 text-center">
         <form method="post" action="?index">
-          <input type="hidden" name="csrf" value={csrfToken} />
+          <AuthFormFields csrf={csrfToken} />
           <Button type="primary" theme="solid" htmlType="submit" block>
             <Trans>Sign out</Trans>
           </Button>
