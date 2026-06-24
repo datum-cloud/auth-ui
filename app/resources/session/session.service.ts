@@ -32,6 +32,7 @@ import { isAllowedRequestId } from '@/resources/authorize';
 import { deviceDecision } from '@/resources/device';
 import { postLoginDestinationWithSource } from '@/resources/login/post-login-destination';
 import { nextStepWithParams } from '@/resources/shared/next-step-params';
+import { paths } from '@/routes/paths';
 import { env } from '@/server/infra/env.server';
 import { logAuthEvent, hashActor } from '@/server/observability';
 import { data, redirect } from 'react-router';
@@ -393,6 +394,10 @@ export const switchSchema = z.object({
   // allowlisted (oidc_/saml_/device_) value; a standalone switch resolves to the normal
   // post-login destination (it does NOT resume the session's original, possibly-expired id).
   requestId: z.string().optional(),
+  // Device-grant "change account" sub-flow: when present, the switch returns to the device
+  // consent screen (/device/authorize?user_code=...) with the newly-active account, so the
+  // user reviews and authorizes — instead of the normal post-login destination.
+  userCode: z.string().optional(),
 });
 
 export const removeSchema = z.object({
@@ -432,7 +437,7 @@ export async function switchAccount(
   const parsed = switchSchema.safeParse(Object.fromEntries(form));
   if (!parsed.success) return { kind: 'error', error: 'INVALID_INPUT', status: 400 };
 
-  const { sessionId, requestId } = parsed.data;
+  const { sessionId, requestId, userCode } = parsed.data;
   const cookieSessions = await readSessions(request);
   const entry = byId(cookieSessions, sessionId);
   if (!entry) return { kind: 'error', error: 'NOT_FOUND', status: 404 };
@@ -466,7 +471,11 @@ export async function switchAccount(
 
   logAuthEvent('account_switch', 'success', { sessionId, userId });
 
-  return { kind: 'redirect', location: nextPath, setCookie: await serializeSessions(updated) };
+  // Device-grant "change account": the switched-to account is now mostRecent, so return to the
+  // /device/authorize consent screen for review + Authorize. Standalone/OIDC switches keep the
+  // normal resolved destination.
+  const location = userCode ? paths.device.authorize({ user_code: userCode }) : nextPath;
+  return { kind: 'redirect', location, setCookie: await serializeSessions(updated) };
 }
 
 /**

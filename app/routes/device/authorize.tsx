@@ -2,6 +2,7 @@ import { AuthCard } from '@/components/auth-card/auth-card';
 import { AuthFormFields } from '@/components/auth-form/auth-form-fields';
 import { FormError } from '@/components/form-error/form-error';
 import { useAuthActionError } from '@/hooks/use-auth-action-error';
+import { mostRecent, readSessions } from '@/modules/auth/session/cookie';
 import {
   decisionOutcomeToResponse,
   deviceConsentErrorToResponse,
@@ -44,8 +45,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
   }
 
   const { csrfToken, headers } = await loaderCsrf(request);
+  // The account that will authorize the grant is the most-recent session (resolveDeviceDecision
+  // authorizes with mostRecent too) — surface it so the user can confirm or switch.
+  const activeLoginName = mostRecent(await readSessions(request))?.loginName ?? null;
 
-  return data({ csrfToken, ...outcome.consent }, { headers });
+  return data({ csrfToken, activeLoginName, ...outcome.consent }, { headers });
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -93,7 +97,10 @@ export default function DeviceAuthorize() {
   // /device/complete screen on a successful decision (sidestepping RR7's post-action
   // revalidation of this route's getDeviceAuth loader). actionData only ever carries an
   // action ERROR here, surfaced inline via <FormError> below.
-  const { csrfToken, appName, scope, deviceAuthId, requestId } = loaderData;
+  const { csrfToken, appName, scope, deviceAuthId, requestId, activeLoginName } = loaderData;
+  // requestId is `device_<userCode>`; thread the stable user code to /accounts so a
+  // "change account" switch returns here to the consent screen with the newly-active account.
+  const userCode = requestId.startsWith('device_') ? requestId.slice('device_'.length) : '';
 
   return (
     <AuthCard
@@ -108,6 +115,22 @@ export default function DeviceAuthorize() {
         )
       }>
       <div className="flex flex-col gap-4">
+        {activeLoginName ? (
+          <div className="text-muted-foreground flex flex-wrap items-center justify-center gap-x-1.5 text-center text-sm">
+            <span>
+              <Trans>Authorizing as</Trans>{' '}
+              <span className="text-foreground font-medium">{activeLoginName}</span>
+            </span>
+            <LinkButton
+              theme="link"
+              type="quaternary"
+              className="h-auto p-0 text-sm"
+              as={Link}
+              href={paths.accounts({ user_code: userCode })}>
+              <Trans>Use a different account</Trans>
+            </LinkButton>
+          </div>
+        ) : null}
         {scope.length > 0 && (
           <div className="flex flex-wrap items-center gap-3">
             {scope.map((s) => (

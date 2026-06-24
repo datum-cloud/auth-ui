@@ -39,12 +39,17 @@ export async function loader({ request }: LoaderFunctionArgs) {
   // Thread the CURRENT ceremony requestId (a mid-OIDC/SAML/device account switch reaches the
   // picker at /accounts?requestId=…). Only an allowlisted (oidc_/saml_/device_) id is carried;
   // anything else is treated as absent so a switch/remove never reflects an arbitrary value.
-  const candidate = new URL(request.url).searchParams.get('requestId') ?? undefined;
+  const url = new URL(request.url);
+  const candidate = url.searchParams.get('requestId') ?? undefined;
   const requestId = isAllowedRequestId(candidate) ? candidate : null;
+  // Device-grant "change account": the stable user_code carries the device context so a switch
+  // returns to /device/authorize (consent) with the now-active account, and "add account" logs
+  // in for that device grant.
+  const userCode = url.searchParams.get('user_code') ?? null;
 
   const { csrfToken, headers } = await loaderCsrf(request);
 
-  return data({ csrfToken, accounts, requestId }, { headers });
+  return data({ csrfToken, accounts, requestId, userCode }, { headers });
 }
 
 // ─── Action ──────────────────────────────────────────────────────────────────
@@ -61,12 +66,19 @@ export async function action({ request }: ActionFunctionArgs) {
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function AccountPicker() {
-  const { csrfToken, accounts, requestId } = useLoaderData<typeof loader>();
+  const { csrfToken, accounts, requestId, userCode } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
 
   // Inline-only error surface: the action error renders in a <FormError> (role="alert")
   // banner near the top of the accounts content — no toast.
   const errorMessage = useAuthActionError(actionData);
+
+  // "Add another account" target. In the device-grant "change account" sub-flow (userCode set)
+  // log in for that device grant (device_<userCode>) so the fresh account auto-authorizes the
+  // device; otherwise carry the current ceremony requestId (or nothing for a standalone add).
+  const addAccountHref = userCode
+    ? paths.login.index({ requestId: `device_${userCode}` })
+    : paths.login.index(requestId ? { requestId } : undefined);
 
   return (
     <AuthCard
@@ -89,7 +101,7 @@ export default function AccountPicker() {
               theme="link"
               type="quaternary"
               as={Link}
-              href={paths.login.index(requestId ? { requestId } : undefined)}>
+              href={addAccountHref}>
               <Trans>Add an account</Trans>
             </LinkButton>
           </div>
@@ -110,6 +122,8 @@ export default function AccountPicker() {
                   <AuthFormFields csrf={csrfToken} requestId={requestId ?? undefined} />
                   <input type="hidden" name="intent" value="switch" />
                   <input type="hidden" name="sessionId" value={account.sessionId} />
+                  {/* Device "change account": return to /device/authorize consent after switch. */}
+                  {userCode ? <input type="hidden" name="userCode" value={userCode} /> : null}
                   <button
                     type="submit"
                     className="hover:bg-muted/50 focus-visible:ring-ring flex w-full items-center gap-2 rounded-l-lg p-3 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none">
@@ -167,7 +181,7 @@ export default function AccountPicker() {
               type="quaternary"
               className="text-muted-foreground text-sm"
               as={Link}
-              href={paths.login.index(requestId ? { requestId } : undefined)}>
+              href={addAccountHref}>
               <Trans>Add another account</Trans>
             </LinkButton>
           </>
