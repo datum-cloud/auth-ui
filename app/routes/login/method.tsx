@@ -26,10 +26,12 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const requestId = url.searchParams.get('requestId') ?? undefined;
   const organization = url.searchParams.get('organization') ?? undefined;
 
-  if (!loginName) return redirect(paths.login.index());
+  if (!loginName)
+    return redirect(paths.login.index(requestId ? { requestId, organization } : undefined));
 
   const user = await provider.findUser(loginName, organization);
-  if (!user) return redirect(paths.login.index());
+  if (!user)
+    return redirect(paths.login.index(requestId ? { requestId, organization } : undefined));
 
   // The method chooser is a branded screen — thread getBranding through so SplitLayout
   // renders the org logo, mirroring /login and /signup. Fetched in parallel with the rest.

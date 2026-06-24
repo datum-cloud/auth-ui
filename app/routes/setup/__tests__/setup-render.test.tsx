@@ -119,11 +119,13 @@ describe('setup/email — shared primitive adoption', () => {
   });
 
   // A SESSION_EXPIRED dead-end now offers an inline "Sign in again" recovery
-  // <Link> → /login inside the banner. Behavior otherwise unchanged.
-  it('renders an inline "Sign in again" recovery link to /login on SESSION_EXPIRED', async () => {
+  // <Link> inside the banner. With the OIDC ceremony context in scope (IDENTITY
+  // carries requestId/organization), the link PRESERVES requestId+organization so a
+  // mid-OIDC user returns to the relying party (not the default post-login redirect).
+  it('renders an inline "Sign in again" recovery link preserving the ceremony on SESSION_EXPIRED', async () => {
     mountRoute(SetupEmail, 'email', { ...IDENTITY }, { error: 'SESSION_EXPIRED' });
     const link = await screen.findByRole('link', { name: 'Sign in again' });
-    expect(link.getAttribute('href')).toBe('/login');
+    expect(link.getAttribute('href')).toBe('/login?requestId=rq1&organization=acme');
   });
 
   it('mounts the IdentityBadge for the threaded loginName (ceremony scaffold owned)', async () => {
@@ -149,10 +151,10 @@ describe('setup/sms — shared primitive adoption', () => {
     expect(await screen.findByRole('alert')).toBeInTheDocument();
   });
 
-  it('renders an inline "Sign in again" recovery link to /login on SESSION_EXPIRED', async () => {
+  it('renders an inline "Sign in again" recovery link preserving the ceremony on SESSION_EXPIRED', async () => {
     mountRoute(SetupSms, 'sms', { ...IDENTITY }, { error: 'SESSION_EXPIRED' });
     const link = await screen.findByRole('link', { name: 'Sign in again' });
-    expect(link.getAttribute('href')).toBe('/login');
+    expect(link.getAttribute('href')).toBe('/login?requestId=rq1&organization=acme');
   });
 });
 
@@ -301,10 +303,10 @@ describe('setup/mfa — shared primitive adoption', () => {
     expect(await screen.findByRole('alert')).toBeInTheDocument();
   });
 
-  it('renders an inline "Sign in again" recovery link to /login on SESSION_EXPIRED', async () => {
+  it('renders an inline "Sign in again" recovery link preserving the ceremony on SESSION_EXPIRED', async () => {
     mountRoute(SetupMfa, 'mfa', loaderData, { error: 'SESSION_EXPIRED' });
     const link = await screen.findByRole('link', { name: 'Sign in again' });
-    expect(link.getAttribute('href')).toBe('/login');
+    expect(link.getAttribute('href')).toBe('/login?requestId=rq1&organization=acme');
   });
 
   // F4: the "Authenticator app" method link must have a SINGLE accessible name (its visible

@@ -36,7 +36,10 @@ export default function SetupSecurityKey() {
   const formRef = useRef<HTMLFormElement>(null);
 
   // Inline message + a recovery <Link> for recoverable codes (SESSION_EXPIRED → "Sign in again").
-  const { message: errorMessage, recovery } = useAuthActionRecovery(actionData);
+  const { message: errorMessage, recovery } = useAuthActionRecovery(actionData, {
+    requestId,
+    organization,
+  });
 
   return (
     <AuthCeremony

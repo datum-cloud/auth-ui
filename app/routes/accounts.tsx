@@ -82,7 +82,14 @@ export default function AccountPicker() {
             </p>
             {/* LinkButton (single styled <a>) — NOT Button asChild, which emits
                 <button><a> (nested-interactive axe violation in the prod build). */}
-            <LinkButton theme="link" type="quaternary" as={Link} href={paths.login.index()}>
+            {/* Carry the ceremony requestId so a fresh "add account" login resumes the
+                OIDC/SAML/device callback (like the switch form) rather than dead-ending at
+                the default post-login redirect. */}
+            <LinkButton
+              theme="link"
+              type="quaternary"
+              as={Link}
+              href={paths.login.index(requestId ? { requestId } : undefined)}>
               <Trans>Add an account</Trans>
             </LinkButton>
           </div>
@@ -152,12 +159,15 @@ export default function AccountPicker() {
               </div>
             ))}
 
+            {/* Same as the switch form: thread the ceremony requestId so a brand-new account's
+                login resumes the OIDC/SAML/device callback (→ datumctl) instead of falling
+                through to the default post-login redirect (cloud portal). */}
             <LinkButton
               theme="link"
               type="quaternary"
               className="text-muted-foreground text-sm"
               as={Link}
-              href={paths.login.index()}>
+              href={paths.login.index(requestId ? { requestId } : undefined)}>
               <Trans>Add another account</Trans>
             </LinkButton>
           </>

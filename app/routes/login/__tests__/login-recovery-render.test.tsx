@@ -62,10 +62,12 @@ afterEach(() => {
 describe('login/verify/email — inline recovery', () => {
   const loaderData = { csrfToken: 'tok-1', code: '', next: undefined };
 
-  it('renders a "Sign in again" recovery link to /login on SESSION_EXPIRED', async () => {
+  it('renders a "Sign in again" recovery link preserving the ceremony on SESSION_EXPIRED', async () => {
     mount(VerifyEmail, '/login/verify/email', loaderData, { error: 'SESSION_EXPIRED' });
     const link = await screen.findByRole('link', { name: 'Sign in again' });
-    expect(link.getAttribute('href')).toBe('/login');
+    // LOGIN_CONTEXT carries requestId/organization, so the recovery link threads them
+    // back to /login — a mid-OIDC user returns to the relying party.
+    expect(link.getAttribute('href')).toBe('/login?requestId=rq1&organization=acme');
     // and the inline banner is still present (recovery is additive to the message).
     expect(screen.getByRole('alert')).toBeInTheDocument();
   });
@@ -80,10 +82,10 @@ describe('login/verify/email — inline recovery', () => {
 describe('login/mfa — inline recovery', () => {
   const loaderData = { csrfToken: 'tok-1', secondFactors: ['otp_email'] };
 
-  it('renders a "Sign in again" recovery link to /login when SESSION_EXPIRED surfaces inline', async () => {
+  it('renders a "Sign in again" recovery link preserving the ceremony when SESSION_EXPIRED surfaces inline', async () => {
     mount(LoginMfa, '/login/mfa', loaderData, { error: 'SESSION_EXPIRED' });
     const link = await screen.findByRole('link', { name: 'Sign in again' });
-    expect(link.getAttribute('href')).toBe('/login');
+    expect(link.getAttribute('href')).toBe('/login?requestId=rq1&organization=acme');
   });
 
   it('renders NO recovery link for a non-recoverable code (banner only)', async () => {

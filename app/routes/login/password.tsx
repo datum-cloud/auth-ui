@@ -158,7 +158,9 @@ export default function Password() {
         {serverError?.kind === 'SESSION_EXPIRED' && (
           <FormError>
             <Trans>Your session has expired.</Trans>{' '}
-            <Link to={paths.login.index()} className="underline">
+            <Link
+              to={paths.login.index(requestId ? { requestId, organization } : undefined)}
+              className="underline">
               <Trans>Sign in again</Trans>
             </Link>
           </FormError>

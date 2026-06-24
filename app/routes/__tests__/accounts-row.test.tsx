@@ -143,6 +143,31 @@ describe('accounts row — 755-M9 row-level switch target', () => {
     expect(container.querySelector('input[name="requestId"]')).toBeNull();
   });
 
+  it('threads the ceremony requestId into the "Add another account" link when present', () => {
+    mountAccounts({
+      csrfToken: 'csrf-tok',
+      accounts: [account()],
+      requestId: 'oidc_V3-current',
+    });
+
+    const link = screen.getByRole('link', { name: 'Add another account' });
+    expect(link.getAttribute('href')).toBe('/login?requestId=oidc_V3-current');
+  });
+
+  it('links "Add another account" to a plain /login when no ceremony is active', () => {
+    mountAccounts({ csrfToken: 'csrf-tok', accounts: [account()], requestId: null });
+
+    const link = screen.getByRole('link', { name: 'Add another account' });
+    expect(link.getAttribute('href')).toBe('/login');
+  });
+
+  it('threads the ceremony requestId into the empty-state "Add an account" link', () => {
+    mountAccounts({ csrfToken: 'csrf-tok', accounts: [], requestId: 'oidc_V3-current' });
+
+    const link = screen.getByRole('link', { name: 'Add an account' });
+    expect(link.getAttribute('href')).toBe('/login?requestId=oidc_V3-current');
+  });
+
   it('renders an IdP badge when idpName is present', () => {
     mountAccounts({ csrfToken: 't', accounts: [account({ idpName: 'Google' })] });
     expect(screen.getByText('Google')).toBeInTheDocument();

@@ -137,7 +137,10 @@ export default function SetupMfa() {
 
   // Resolve the inline message + a recovery <Link> for recoverable codes
   // (SESSION_EXPIRED → "Sign in again").
-  const { message: errorMessage, recovery } = useAuthActionRecovery(actionData);
+  const { message: errorMessage, recovery } = useAuthActionRecovery(actionData, {
+    requestId,
+    organization,
+  });
 
   // Build query params that thread through to each enrollment screen.
   const sharedParams = new URLSearchParams({ loginName });

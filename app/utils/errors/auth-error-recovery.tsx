@@ -31,15 +31,23 @@ export interface AuthErrorRecovery {
  * Returns a resolver so the Lingui `t` macro (a render-time hook) stays inside a
  * component, matching `useAuthErrorMessage`'s shape.
  */
-export function useAuthErrorRecovery() {
+export function useAuthErrorRecovery(ctx?: { requestId?: string; organization?: string }) {
   const { t } = useLingui();
+  // Thread the in-scope OIDC ceremony context (requestId + organization) onto the
+  // recovery destination so a mid-OIDC user who hits a dead-end (SESSION_EXPIRED,
+  // NO_SUPPORTED_METHOD, PASSWORD_NOT_ALLOWED) returns to /login STILL inside the
+  // ceremony — instead of dropping requestId and landing at the default post-login
+  // redirect. withQuery skips undefined, so a non-OIDC flow keeps the bare /login.
+  const query = ctx?.requestId
+    ? { requestId: ctx.requestId, organization: ctx.organization }
+    : undefined;
   return (code: string | undefined): AuthErrorRecovery | undefined => {
     switch (code) {
       case 'SESSION_EXPIRED':
-        return { to: paths.login.index(), label: t`Sign in again` };
+        return { to: paths.login.index(query), label: t`Sign in again` };
       case 'NO_SUPPORTED_METHOD':
       case 'PASSWORD_NOT_ALLOWED':
-        return { to: paths.login.index(), label: t`Start over` };
+        return { to: paths.login.index(query), label: t`Start over` };
       default:
         return undefined;
     }

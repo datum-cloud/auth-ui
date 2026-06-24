@@ -50,7 +50,10 @@ export default function VerifyAuthenticator() {
 
   // Shared error pipeline; the message surfaces inline through AuthCeremony,
   // plus an inline recovery <Link> for recoverable codes (e.g. SESSION_EXPIRED → "Sign in again").
-  const { message: errorMessage, recovery } = useAuthActionRecovery(actionData);
+  const { message: errorMessage, recovery } = useAuthActionRecovery(actionData, {
+    requestId,
+    organization,
+  });
 
   return (
     <AuthCeremony

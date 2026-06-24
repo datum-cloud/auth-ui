@@ -37,12 +37,14 @@ export async function loader({ request }: LoaderFunctionArgs) {
   // Guard: require an active session for this loginName (mirror login.verify.authenticator.tsx).
   const sessions = await readSessions(request);
   const entry = byLoginName(sessions, loginName, organization);
-  if (!entry) return redirect(paths.login.index());
+  if (!entry)
+    return redirect(paths.login.index(requestId ? { requestId, organization } : undefined));
 
   // Resolve userId via findUser — SessionEntry carries no userId field (mirror login.mfa.tsx).
   const provider = providerForRequest(request);
   const user = await provider.findUser(loginName, organization);
-  if (!user) return redirect(paths.login.index());
+  if (!user)
+    return redirect(paths.login.index(requestId ? { requestId, organization } : undefined));
 
   // Register TOTP: returns deterministic { uri, secret } in fake; real adapter generates a new key.
   const { uri, secret } = await provider.registerTotp(user.id);
@@ -87,7 +89,10 @@ export default function SetupAuthenticator() {
   const { t } = useLingui();
 
   // Inline message + a recovery <Link> for recoverable codes (SESSION_EXPIRED → "Sign in again").
-  const { message: errorMessage, recovery } = useAuthActionRecovery(actionData);
+  const { message: errorMessage, recovery } = useAuthActionRecovery(actionData, {
+    requestId,
+    organization,
+  });
 
   return (
     <AuthCeremony

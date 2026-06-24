@@ -162,6 +162,29 @@ describe('/login/method loader', () => {
     expect((res as Response).headers.get('location')).toBe('/login');
   });
 
+  // OIDC ceremony preservation (broken-session guards): when an in-scope requestId is
+  // present, the guard redirects back to /login WITH requestId+organization so a
+  // mid-OIDC user returns to the relying party instead of the default post-login redirect.
+  it('unknown user WITH requestId → redirect preserves requestId + organization', async () => {
+    const url = `${ORIGIN}/id/login/method?loginName=nobody%40acme.test&requestId=rq1&organization=acme`;
+    const res = await methodLoader(loaderArgs(url));
+
+    expect(res).toBeInstanceOf(Response);
+    expect((res as Response).status).toBe(302);
+    expect((res as Response).headers.get('location')).toBe(
+      '/login?requestId=rq1&organization=acme'
+    );
+  });
+
+  it('missing loginName WITH requestId → redirect preserves requestId', async () => {
+    const url = `${ORIGIN}/id/login/method?requestId=rq1`;
+    const res = await methodLoader(loaderArgs(url));
+
+    expect(res).toBeInstanceOf(Response);
+    expect((res as Response).status).toBe(302);
+    expect((res as Response).headers.get('location')).toBe('/login?requestId=rq1');
+  });
+
   // u1 = alice@acme.test, authMethods: ['password'] — only 1 primary method.
   // decideAfterIdentifier would send her to /login/password, not /login/method.
   // The loader detects < 2 available and redirects to the single target.
