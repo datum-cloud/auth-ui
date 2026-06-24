@@ -4,7 +4,10 @@ import { captureException } from '@/server/sentry.server';
 import { createReadableStreamFromReadable } from '@react-router/node';
 import { isbot } from 'isbot';
 import { PassThrough } from 'node:stream';
-import { renderToPipeableStream } from 'react-dom/server';
+// Import the explicit Node entry: under the bun runtime, bare 'react-dom/server'
+// resolves to server.bun.js (Web Streams only — no renderToPipeableStream). This SSR
+// path uses Node streams (PassThrough + @react-router/node), so pin the node build.
+import { renderToPipeableStream } from 'react-dom/server.node';
 import type { AppLoadContext, EntryContext, HandleErrorFunction } from 'react-router';
 import { ServerRouter } from 'react-router';
 
