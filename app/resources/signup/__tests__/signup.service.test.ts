@@ -13,11 +13,26 @@ import {
   registerPasskeyFirst,
   registerWithPassword,
 } from '@/resources/signup';
+import { hashActor, logAuthEvent } from '@/server/observability';
 import { describe, it, expect, vi, afterEach } from 'vitest';
+
+// Mock observability so tests can intercept logAuthEvent calls (audit-shape characterization).
+vi.mock('@/server/observability', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/server/observability')>();
+  return { ...actual, logAuthEvent: vi.fn() };
+});
 
 afterEach(() => {
   vi.restoreAllMocks();
+  vi.mocked(logAuthEvent).mockClear();
 });
+
+/** Find the first logAuthEvent call matching the given event name. */
+function auditCall(event: string): [string, string, Record<string, unknown>?] | undefined {
+  return vi.mocked(logAuthEvent).mock.calls.find((c) => c[0] === event) as
+    | [string, string, Record<string, unknown>?]
+    | undefined;
+}
 
 /** The IdP register-and-link inputs the original route test POSTed. */
 function idpInput(overrides: Record<string, string> = {}) {
@@ -116,6 +131,89 @@ describe('registerPasskeyFirst — userAgent forwarded to createSession', () => 
       userAgent: ua,
     });
     expect(fake.lastCreateSessionOpts?.userAgent).toEqual(ua);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Audit-event divergence characterization. registerPasskeyFirst and
+// registerWithPassword share most of their flow BUT emit DIFFERENT audit on the
+// no-verification success path — the merge must NOT collapse these:
+//   - passkey-first  no-verify success → 'signup.requested' { actor: hash(email), organization }
+//   - with-password  no-verify success → 'signup.created'   { userId, actor: hash(loginName) }
+// Both require-verification + ALREADY_EXISTS paths emit 'signup.requested' identically.
+// ---------------------------------------------------------------------------
+
+describe('signup register audit-event shape (divergence guard)', () => {
+  const base = {
+    email: 'dave@acme.test',
+    firstName: 'Dave',
+    lastName: 'Acme',
+    origin: 'https://auth.datum.test',
+  };
+
+  it("registerPasskeyFirst no-verify success emits 'signup.requested' with {actor, organization}", async () => {
+    const fake = getAuthProvider({ AUTH_PROVIDER: 'fake' }) as FakeAuthProvider;
+    const res = await registerPasskeyFirst(fake, [], {
+      ...base,
+      organization: 'org-z',
+      requireVerification: false,
+    });
+    expect(res.kind).toBe('redirect');
+    // The passkey path uses 'signup.requested', NOT 'signup.created'.
+    expect(auditCall('signup.created')).toBeUndefined();
+    const fields = auditCall('signup.requested')?.[2];
+    expect(fields).toEqual({ actor: hashActor('dave@acme.test'), organization: 'org-z' });
+    expect(fields).not.toHaveProperty('userId');
+  });
+
+  it("registerWithPassword no-verify success emits 'signup.created' with {userId, actor}", async () => {
+    const fake = getAuthProvider({ AUTH_PROVIDER: 'fake' }) as FakeAuthProvider;
+    const res = await registerWithPassword(fake, [], {
+      ...base,
+      password: 'hunter2hunter2',
+      organization: 'org-z',
+      requireVerification: false,
+    });
+    expect(res.kind).toBe('redirect');
+    // The password path uses 'signup.created', carrying userId, and hashes loginName (not email).
+    const fields = auditCall('signup.created')?.[2];
+    expect(typeof fields?.userId).toBe('string');
+    expect(fields?.userId).toBeTruthy();
+    // fake sets loginName === email, so the hash matches either; the field key shape is what diverges.
+    expect(fields?.actor).toBe(hashActor('dave@acme.test'));
+    expect(fields).not.toHaveProperty('organization');
+  });
+
+  it("registerPasskeyFirst requireVerification success emits 'signup.requested' {actor, organization}", async () => {
+    const fake = getAuthProvider({ AUTH_PROVIDER: 'fake' }) as FakeAuthProvider;
+    const res = await registerPasskeyFirst(fake, [], {
+      ...base,
+      organization: 'org-z',
+      requireVerification: true,
+    });
+    expect(res.kind).toBe('sent-with-session');
+    expect(auditCall('signup.created')).toBeUndefined();
+    expect(auditCall('signup.requested')?.[2]).toEqual({
+      actor: hashActor('dave@acme.test'),
+      organization: 'org-z',
+    });
+  });
+
+  it("registerWithPassword requireVerification success emits 'signup.requested' {actor, organization}", async () => {
+    const fake = getAuthProvider({ AUTH_PROVIDER: 'fake' }) as FakeAuthProvider;
+    const res = await registerWithPassword(fake, [], {
+      ...base,
+      password: 'hunter2hunter2',
+      organization: 'org-z',
+      requireVerification: true,
+    });
+    expect(res.kind).toBe('sent-with-session');
+    // With verification ON, the password path also uses 'signup.requested' (NOT 'created').
+    expect(auditCall('signup.created')).toBeUndefined();
+    expect(auditCall('signup.requested')?.[2]).toEqual({
+      actor: hashActor('dave@acme.test'),
+      organization: 'org-z',
+    });
   });
 });
 
