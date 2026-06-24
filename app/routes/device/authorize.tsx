@@ -106,31 +106,33 @@ export default function DeviceAuthorize() {
     <AuthCard
       title={<Trans>Authorize device</Trans>}
       description={
-        appName ? (
-          <Trans>
-            <strong>{appName}</strong> is requesting access.
-          </Trans>
-        ) : (
-          <Trans>Device authorization requested</Trans>
-        )
+        <>
+          {appName ? (
+            <Trans>
+              <strong>{appName}</strong> is requesting access.
+            </Trans>
+          ) : (
+            <Trans>Device authorization requested</Trans>
+          )}
+          {activeLoginName ? (
+            <span className="mt-2 flex flex-wrap items-center justify-center gap-x-1.5">
+              <span>
+                <Trans>Authorizing as</Trans>{' '}
+                <span className="text-foreground font-medium">{activeLoginName}</span>
+              </span>
+              <LinkButton
+                theme="link"
+                type="quaternary"
+                className="h-auto p-0 text-sm"
+                as={Link}
+                href={paths.accounts({ user_code: userCode })}>
+                <Trans>Use a different account</Trans>
+              </LinkButton>
+            </span>
+          ) : null}
+        </>
       }>
       <div className="flex flex-col gap-4">
-        {activeLoginName ? (
-          <div className="text-muted-foreground flex flex-wrap items-center justify-center gap-x-1.5 text-center text-sm">
-            <span>
-              <Trans>Authorizing as</Trans>{' '}
-              <span className="text-foreground font-medium">{activeLoginName}</span>
-            </span>
-            <LinkButton
-              theme="link"
-              type="quaternary"
-              className="h-auto p-0 text-sm"
-              as={Link}
-              href={paths.accounts({ user_code: userCode })}>
-              <Trans>Use a different account</Trans>
-            </LinkButton>
-          </div>
-        ) : null}
         {scope.length > 0 && (
           <div className="flex flex-wrap items-center gap-3">
             {scope.map((s) => (

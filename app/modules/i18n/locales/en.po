@@ -24,7 +24,7 @@ msgstr "{0, plural, one {# attempt remaining.} other {# attempts remaining.}}"
 msgid "{0}"
 msgstr "{0}"
 
-#: app/routes/device/authorize.tsx:110
+#: app/routes/device/authorize.tsx:111
 msgid "<0>{appName}</0> is requesting access."
 msgstr "<0>{appName}</0> is requesting access."
 
@@ -36,7 +36,7 @@ msgstr "A new code has been sent to your email."
 msgid "Activate your device"
 msgstr "Activate your device"
 
-#: app/routes/accounts.tsx:105
+#: app/routes/accounts.tsx:101
 msgid "Add an account"
 msgstr "Add an account"
 
@@ -44,7 +44,7 @@ msgstr "Add an account"
 msgid "Add an extra layer of security to your account by setting up a second factor."
 msgstr "Add an extra layer of security to your account by setting up a second factor."
 
-#: app/routes/accounts.tsx:185
+#: app/routes/accounts.tsx:181
 msgid "Add another account"
 msgstr "Add another account"
 
@@ -100,7 +100,7 @@ msgstr "Authorization complete"
 msgid "Authorization failed"
 msgstr "Authorization failed"
 
-#: app/routes/device/authorize.tsx:155
+#: app/routes/device/authorize.tsx:157
 msgid "Authorize"
 msgstr "Authorize"
 
@@ -108,7 +108,7 @@ msgstr "Authorize"
 msgid "Authorize device"
 msgstr "Authorize device"
 
-#: app/routes/device/authorize.tsx:121
+#: app/routes/device/authorize.tsx:120
 msgid "Authorizing as"
 msgstr "Authorizing as"
 
@@ -212,11 +212,11 @@ msgstr "Create a new account"
 msgid "Create account"
 msgstr "Create account"
 
-#: app/routes/device/authorize.tsx:165
+#: app/routes/device/authorize.tsx:167
 msgid "Deny"
 msgstr "Deny"
 
-#: app/routes/device/authorize.tsx:114
+#: app/routes/device/authorize.tsx:115
 msgid "Device authorization requested"
 msgstr "Device authorization requested"
 
@@ -346,7 +346,7 @@ msgstr "Linked accounts"
 msgid "Manual setup key"
 msgstr "Manual setup key"
 
-#: app/routes/accounts.tsx:150
+#: app/routes/accounts.tsx:146
 msgid "Needs re-authentication"
 msgstr "Needs re-authentication"
 
@@ -491,7 +491,7 @@ msgstr "Send reset link"
 msgid "Service temporarily unavailable. Please try again."
 msgstr "Service temporarily unavailable. Please try again."
 
-#: app/routes/accounts.tsx:148
+#: app/routes/accounts.tsx:144
 msgid "Session active"
 msgstr "Session active"
 
@@ -662,7 +662,7 @@ msgstr "Two-factor verification"
 msgid "Unlink"
 msgstr "Unlink"
 
-#: app/routes/device/authorize.tsx:130
+#: app/routes/device/authorize.tsx:129
 msgid "Use a different account"
 msgstr "Use a different account"
 
