@@ -20,8 +20,9 @@ import {
   serializeSessions,
   type SessionEntry,
 } from '@/modules/auth/session/cookie';
-import { ProviderError } from '@/modules/auth/types';
+import { ProviderError, type Session } from '@/modules/auth/types';
 import { decideAuthorize } from '@/resources/authorize/authorize-decision';
+import { primaryFresh } from '@/resources/shared/lifetimes';
 import { logAuthEvent } from '@/server/observability';
 import { type AuthErrorCode, providerErrorCode } from '@/utils/errors/auth-error';
 import { redirect } from 'react-router';
@@ -40,6 +41,13 @@ const DEAD_SESSION_CODES: ReadonlySet<ProviderError['code']> = new Set([
   'NOT_FOUND',
   'PERMISSION_DENIED',
 ]);
+
+// Freshness window for honoring a query-handed-back sessionId against a prompt=login request.
+// The post-auth finalize redirect is near-immediate (the ceremony hands the just-authenticated
+// session id straight back to /authorize), so 2 minutes generously covers redirect latency +
+// clock skew while keeping forced re-auth meaningful — a STALE session id forged onto the URL
+// can no longer satisfy prompt=login.
+const FRESH_LOGIN_WINDOW_MS = 2 * 60 * 1000; // 2 minutes
 
 /**
  * A typed description of what the /authorize loader resolved to. The route (and the
@@ -118,8 +126,9 @@ function errorRedirect(url: URL, code: AuthErrorCode): Response {
 /**
  * Validate that a cookie session is still alive before reusing it in createCallback.
  *
- * Returns an AuthorizeOutcome (caller must return it immediately) for the two non-alive
- * outcomes, and `null` only when the session is ALIVE (caller proceeds to createCallback):
+ * Returns an AuthorizeOutcome (which carries a `kind`; caller must return it immediately) for the
+ * two non-alive outcomes, and `{ session }` ONLY when the session is ALIVE (caller proceeds to the
+ * freshness gate / createCallback). Callers discriminate on `'kind' in result`:
  *
  *   • CONFIRMED DEAD — getSession → null, or a ProviderError with a DEAD_SESSION_CODES code:
  *     drop the stale entry from the cookie and re-prompt /login (self-heal; mirrors the SAML
@@ -131,6 +140,9 @@ function errorRedirect(url: URL, code: AuthErrorCode): Response {
  *     `oidc_callback` failure WITH the code so the transient is diagnosable. A Zitadel hiccup
  *     must never silently re-login a valid user, and must never be swallowed.
  *
+ *   • ALIVE — return the live `Session` so the caller can inspect its factors (the prompt=login
+ *     freshness gate needs `factors.*.verifiedAt`) before reusing it in createCallback.
+ *
  * Distinguishing dead vs transient by the error code is the critical precision that prevents
  * introducing a new bug (logging out a valid user on a transient blip).
  */
@@ -140,7 +152,7 @@ async function healIfSessionDead(
   entry: SessionEntry,
   requestId: string,
   rawId: string
-): Promise<AuthorizeOutcome | null> {
+): Promise<AuthorizeOutcome | { session: Session }> {
   let alive: Awaited<ReturnType<AuthProvider['getSession']>>;
   try {
     alive = await provider.getSession(entry.id, entry.token);
@@ -160,7 +172,7 @@ async function healIfSessionDead(
     return { kind: 'error-redirect', code: providerErrorCode(code) };
   }
   if (!alive) return healStaleEntry(list, entry, requestId, rawId); // confirmed dead
-  return null; // alive → proceed to createCallback
+  return { session: alive }; // alive → caller proceeds to the freshness gate / createCallback
 }
 
 /** Drop the stale entry, re-prompt /login, and emit a traceable session_stale event. */
@@ -265,7 +277,8 @@ async function resolveOidc(
   provider: AuthProvider,
   request: Request,
   url: URL,
-  requestId: string
+  requestId: string,
+  nowMs: number = Date.now()
 ): Promise<AuthorizeOutcome> {
   const rawId = requestId.replace('oidc_', '');
 
@@ -288,9 +301,21 @@ async function resolveOidc(
     if (entry) {
       // Validate liveness BEFORE reuse: a stale post-logout cookie self-heals to /login here
       // instead of reaching createCallback on a terminated session (→ ALREADY_DONE → /error).
-      const healed = await healIfSessionDead(provider, list, entry, requestId, rawId);
-      if (healed) return healed;
-      return runCallback(provider, rawId, entry);
+      const gate = await healIfSessionDead(provider, list, entry, requestId, rawId);
+      if ('kind' in gate) return gate; // dead/transient → outcome already decided
+
+      // ANTI-FORGERY FRESHNESS GATE (prompt=login only). The sessionId is query-supplied, so a
+      // caller can forge `&sessionId=<their_own_STALE_live_session>` onto a prompt=login request
+      // to skip the forced re-authentication the AS explicitly demanded. A handed-back session may
+      // satisfy prompt=login ONLY if it was genuinely freshly authenticated THIS ceremony (a
+      // primary factor verified within FRESH_LOGIN_WINDOW_MS). If it is stale, fall through to
+      // decideAuthorize, which routes prompt=login → /login (forced re-auth). select_account is
+      // harmless (picking your own live session), so the gate is scoped to prompt=login.
+      const mustReauth =
+        authRequest.prompt.includes('login') &&
+        !primaryFresh(gate.session.factors, nowMs, FRESH_LOGIN_WINDOW_MS);
+      if (!mustReauth) return runCallback(provider, rawId, entry);
+      // else: stale prompt=login → do NOT finalize; fall through to decideAuthorize below.
     }
   }
 
@@ -304,9 +329,11 @@ async function resolveOidc(
   if (decision.target === 'callback') {
     const entry = byId(list, decision.params?.sessionId ?? '');
     if (!entry) return { kind: 'error-redirect', code: 'no_session' };
-    // Validate liveness BEFORE reuse (same self-heal as the explicit-sessionId path above).
+    // Validate liveness BEFORE reuse (same self-heal as the explicit-sessionId path above). No
+    // freshness gate here: for prompt=login decideAuthorize returns target '/login', never
+    // 'callback', so this branch is unreachable under prompt=login (only none/default reuse).
     const healed = await healIfSessionDead(provider, list, entry, requestId, rawId);
-    if (healed) return healed;
+    if ('kind' in healed) return healed;
     return runCallback(provider, rawId, entry);
   }
   if (decision.target === 'error') {
@@ -332,7 +359,8 @@ async function resolveOidc(
  */
 export async function resolveAuthorize(
   provider: AuthProvider,
-  request: Request
+  request: Request,
+  nowMs: number = Date.now()
 ): Promise<AuthorizeOutcome> {
   const url = new URL(request.url);
   const requestId = normalizeRequestId(url);
@@ -344,5 +372,5 @@ export async function resolveAuthorize(
 
   if (requestId.startsWith('saml_')) return resolveSaml(provider, request, requestId);
   if (requestId.startsWith('device_')) return resolveDevice(requestId);
-  return resolveOidc(provider, request, url, requestId);
+  return resolveOidc(provider, request, url, requestId, nowMs);
 }
