@@ -20,7 +20,7 @@ import { secondFactorMethodSchema } from './mfa.schema';
 import type { AuthProvider } from '@/modules/auth/auth-provider';
 import { byLoginName, type SessionEntry } from '@/modules/auth/session/cookie';
 import type { AuthMethod, LoginSettings, ProviderCapabilities } from '@/modules/auth/types';
-import { nextStepWithParams, threadParams } from '@/resources/shared/next-step-params';
+import { nextStepFromSession, threadParams } from '@/resources/shared/next-step-params';
 import { logAuthEvent, hashActor } from '@/server/observability';
 import { z } from 'zod';
 
@@ -346,12 +346,13 @@ export async function recordMfaSetupSkip(
     provider.getLoginSettings(organization),
   ]);
 
-  const target = nextStepWithParams({
-    factors: session.factors,
+  const target = nextStepFromSession({
+    session,
+    methods,
     settings,
-    enrolledMethods: methods,
     loginName: session.user?.loginName ?? loginName,
-    userVerified: session.factors.passkey?.userVerified ?? false,
+    // CAVEAT: read the FRESH refreshedUser stamp, NOT session.user (which is stale right
+    // after setMfaInitSkipped) — otherwise the just-recorded skip would not suppress the nudge.
     mfaInitSkippedAt: refreshedUser?.mfaInitSkippedAt,
     requestId,
     organization,

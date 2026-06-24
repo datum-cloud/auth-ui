@@ -19,7 +19,10 @@ import type { AuthProvider } from '@/modules/auth/auth-provider';
 import { byLoginName, addSession, type SessionEntry } from '@/modules/auth/session/cookie';
 import type { Session } from '@/modules/auth/types';
 import { ProviderError } from '@/modules/auth/types';
-import { nextStepWithParams, threadParams } from '@/resources/shared/next-step-params';
+import {
+  nextStepFromSession as sharedNextStepFromSession,
+  threadParams,
+} from '@/resources/shared/next-step-params';
 import { logAuthEvent, hashActor } from '@/server/observability';
 
 // ── shared: derive the post-ceremony next step from a session ─────────────────
@@ -35,7 +38,9 @@ interface NextStepFromSessionInput {
 
 /**
  * passkey.userVerified drives the passwordless-shortcut in nextStep → /signed-in.
- * Centralises the identical next-step derivation shared by verify + setup actions.
+ * Thin webauthn-local wrapper over the shared assembly: resolves the webauthn divergence
+ * (prefer the session user's loginName; read mfaInitSkippedAt off the session user) and
+ * delegates the rest to the shared helper.
  */
 function nextStepFromSession({
   session,
@@ -45,12 +50,11 @@ function nextStepFromSession({
   requestId,
   organization,
 }: NextStepFromSessionInput): string {
-  return nextStepWithParams({
-    factors: session.factors,
+  return sharedNextStepFromSession({
+    session,
+    methods,
     settings,
-    enrolledMethods: methods,
     loginName: session.user?.loginName ?? loginName,
-    userVerified: session.factors.passkey?.userVerified ?? false,
     mfaInitSkippedAt: session.user?.mfaInitSkippedAt,
     requestId,
     organization,
@@ -413,10 +417,41 @@ export interface PasskeyEnrollInput {
  * Otherwise derive the next step from the current session state (SESSION_EXPIRED if the
  * session has since died).
  */
-export async function verifyPasskeyEnrollment(
+/**
+ * Per-factor enrollment config — the only points where passkey and U2F enrollment
+ * diverge. Mirrors the cfg-object pattern of requestWebAuthnChallenge / verifyWebAuthnAssertion.
+ *
+ *  - `factor`: audit-event factor field ('passkey' vs 'u2f').
+ *  - `verify`: the provider call — passkey verifies (userId, passkeyId, cred) directly;
+ *     U2F wraps the parsed credential into { u2fId, publicKeyCredential, tokenName: '' }.
+ *  - `checkAfterPath`: the verify screen routed into when checkAfter='true'.
+ */
+interface EnrollmentConfig {
+  factor: 'passkey' | 'u2f';
+  verify: (provider: AuthProvider, userId: string, parsedCredential: unknown) => Promise<void>;
+  checkAfterPath: '/login/passkey' | '/login/security-key';
+}
+
+/** Fields shared by every enrollment-verify input (factor-specific ids live in the cfg closure). */
+interface EnrollmentCommonInput {
+  credential: string;
+  loginName: string;
+  requestId?: string;
+  organization?: string;
+  checkAfter?: 'true' | 'false';
+}
+
+/**
+ * Shared enrollment-verify flow. Resolves the active session + user, parses the
+ * credential JSON, runs the cfg's provider verify call, emits the success/failure
+ * audit (with the cfg's factor), then either routes into the checkAfter verify
+ * screen or derives the next step from the refreshed session.
+ */
+async function verifyEnrollment(
   provider: AuthProvider,
   sessions: SessionEntry[],
-  { credential, passkeyId, loginName, requestId, organization, checkAfter }: PasskeyEnrollInput
+  cfg: EnrollmentConfig,
+  { credential, loginName, requestId, organization, checkAfter }: EnrollmentCommonInput
 ): Promise<EnrollResult> {
   const resolved = await resolveEnrollee(provider, sessions, loginName, organization);
   if (!resolved) return { ok: false, error: 'SESSION_EXPIRED' };
@@ -431,22 +466,22 @@ export async function verifyPasskeyEnrollment(
   }
 
   try {
-    await provider.verifyPasskey(userId, passkeyId, parsedCredential);
+    await cfg.verify(provider, userId, parsedCredential);
   } catch (err) {
-    logAuthEvent('mfa_enroll', 'failure', { userId, factor: 'passkey' });
+    logAuthEvent('mfa_enroll', 'failure', { userId, factor: cfg.factor });
     if (err instanceof ProviderError && err.code === 'INVALID_CREDENTIALS') {
       return { ok: false, error: 'INVALID_CREDENTIALS' };
     }
     throw err;
   }
 
-  logAuthEvent('mfa_enroll', 'success', { userId, factor: 'passkey' });
+  logAuthEvent('mfa_enroll', 'success', { userId, factor: cfg.factor });
 
   // checkAfter=true: immediately route into the matching verify screen.
   if (checkAfter === 'true') {
     return {
       ok: true,
-      target: `/login/passkey?${threadParams(loginName, requestId, organization)}`,
+      target: `${cfg.checkAfterPath}?${threadParams(loginName, requestId, organization)}`,
     };
   }
 
@@ -469,6 +504,23 @@ export async function verifyPasskeyEnrollment(
   });
 
   return { ok: true, target };
+}
+
+export async function verifyPasskeyEnrollment(
+  provider: AuthProvider,
+  sessions: SessionEntry[],
+  { credential, passkeyId, loginName, requestId, organization, checkAfter }: PasskeyEnrollInput
+): Promise<EnrollResult> {
+  return verifyEnrollment(
+    provider,
+    sessions,
+    {
+      factor: 'passkey',
+      verify: (p, userId, cred) => p.verifyPasskey(userId, passkeyId, cred),
+      checkAfterPath: '/login/passkey',
+    },
+    { credential, loginName, requestId, organization, checkAfter }
+  );
 }
 
 export interface U2FEnrollInput {
@@ -499,58 +551,16 @@ export async function verifyU2FEnrollment(
   sessions: SessionEntry[],
   { credential, u2fId, loginName, requestId, organization, checkAfter }: U2FEnrollInput
 ): Promise<EnrollResult> {
-  const resolved = await resolveEnrollee(provider, sessions, loginName, organization);
-  if (!resolved) return { ok: false, error: 'SESSION_EXPIRED' };
-
-  const { entry, userId } = resolved;
-
-  let parsedCredential: unknown;
-  try {
-    parsedCredential = JSON.parse(credential) as unknown;
-  } catch {
-    return { ok: false, error: 'INVALID_INPUT' };
-  }
-
-  // Zitadel verifyU2F reads { u2fId, publicKeyCredential, tokenName } off the cred object.
-  const credPayload = { u2fId, publicKeyCredential: parsedCredential, tokenName: '' };
-
-  try {
-    await provider.verifyU2F(userId, credPayload);
-  } catch (err) {
-    logAuthEvent('mfa_enroll', 'failure', { userId, factor: 'u2f' });
-    if (err instanceof ProviderError && err.code === 'INVALID_CREDENTIALS') {
-      return { ok: false, error: 'INVALID_CREDENTIALS' };
-    }
-    throw err;
-  }
-
-  logAuthEvent('mfa_enroll', 'success', { userId, factor: 'u2f' });
-
-  // checkAfter=true: immediately route into the matching verify screen.
-  if (checkAfter === 'true') {
-    return {
-      ok: true,
-      target: `/login/security-key?${threadParams(loginName, requestId, organization)}`,
-    };
-  }
-
-  // Normal post-enrollment routing: derive next step from current session state.
-  const session = await provider.getSession(entry.id, entry.token);
-  if (!session) return { ok: false, error: 'SESSION_EXPIRED' };
-
-  const [methods, settings] = await Promise.all([
-    provider.listAuthMethods(userId),
-    provider.getLoginSettings(organization),
-  ]);
-
-  const target = nextStepFromSession({
-    session,
-    methods,
-    settings,
-    loginName,
-    requestId,
-    organization,
-  });
-
-  return { ok: true, target };
+  return verifyEnrollment(
+    provider,
+    sessions,
+    {
+      factor: 'u2f',
+      // Zitadel verifyU2F reads { u2fId, publicKeyCredential, tokenName } off the cred object.
+      verify: (p, userId, cred) =>
+        p.verifyU2F(userId, { u2fId, publicKeyCredential: cred, tokenName: '' }),
+      checkAfterPath: '/login/security-key',
+    },
+    { credential, loginName, requestId, organization, checkAfter }
+  );
 }

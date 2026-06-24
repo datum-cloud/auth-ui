@@ -11,7 +11,11 @@
 // the route turns into a redirect()/data() response. No Request parsing, no CSRF,
 // no cookie I/O lives here.
 import type { AuthProvider, SessionOpts } from '@/modules/auth/auth-provider';
-import { addSession, type SessionEntry } from '@/modules/auth/session/cookie';
+import {
+  addSession,
+  sessionEntryFromSession,
+  type SessionEntry,
+} from '@/modules/auth/session/cookie';
 import { ProviderError } from '@/modules/auth/types';
 import { authorizeHandbackTarget } from '@/resources/shared/next-step-params';
 import { postRegisterStep } from '@/resources/signup/post-register';
@@ -119,16 +123,10 @@ export async function registerAndLinkIdp(
     { idpIntent: { idpIntentId: input.idpIntentId, idpIntentToken: input.idpIntentToken } },
     { orgId: organization, requestId, userId: user.id, userAgent }
   );
-  const sessions = addSession(list, {
-    id: session.id,
-    token: session.token,
-    loginName: user.loginName,
-    organization,
-    creationTs: session.changedAt,
-    expirationTs: session.expiresAt,
-    changeTs: session.changedAt,
-    requestId,
-  });
+  const sessions = addSession(
+    list,
+    sessionEntryFromSession(session, { loginName: user.loginName, organization, requestId })
+  );
   logAuthEvent('signup.requested', 'success', { actor: hashActor(user.loginName), organization });
   // Thread the just-created session id so /authorize finishes the callback via resolveOidc's
   // explicit-sessionId hand-back (runCallback) instead of re-running decideAuthorize — without it
@@ -191,57 +189,56 @@ export type PasskeyFirstRegisterResult =
   | SignupSentResult
   | SignupRedirectResult;
 
+type RegisteredUser = Awaited<ReturnType<AuthProvider['register']>>;
+
 /**
- * Passkey-first path: register directly, then apply enumeration-safe handling.
- *
- * When verification is required, both the fresh-signup and the ALREADY_EXISTS
- * branches yield the generic check-your-email response (the success branch also
- * persists a ceremony session so the /verify return flow can resume). When
- * verification is off, register and route forward via postRegisterStep; a
- * duplicate still yields the generic response.
+ * Shared enumeration-safe register flow for the passkey-first and with-password
+ * paths. Both share: the createSession → addSession wiring, the require-verification
+ * success/ALREADY_EXISTS audits (identical 'signup.requested'), and the
+ * no-verification ALREADY_EXISTS audit. They DIVERGE on:
+ *   - `register`: the provider.register call (passkey-first omits password and only
+ *     attaches verifyUrlTemplate when verification is required; with-password always
+ *     passes a password + verifyUrlTemplate).
+ *   - `hasPassword`: feeds postRegisterStep.
+ *   - `noVerifySuccessAudit`: the no-verification success path emits DIFFERENT audit
+ *     — passkey-first 'signup.requested'{actor,organization}, with-password
+ *     'signup.created'{userId,actor(loginName)}. Parameterized, never collapsed.
  */
-export async function registerPasskeyFirst(
+async function runEnumerationSafeRegister(
   provider: AuthProvider,
   list: SessionEntry[],
-  input: PasskeyFirstRegisterInput
-): Promise<PasskeyFirstRegisterResult> {
-  const {
-    email,
-    firstName,
-    lastName,
-    organization,
-    requestId,
-    origin,
-    deviceTrackingToken,
-    userAgent,
-  } = input;
+  cfg: {
+    email: string;
+    organization?: string;
+    requestId?: string;
+    deviceTrackingToken?: string;
+    userAgent?: SessionOpts['userAgent'];
+    requireVerification: boolean;
+    hasPassword: boolean;
+    register: () => Promise<RegisteredUser>;
+    noVerifySuccessAudit: (user: RegisteredUser) => void;
+  }
+): Promise<SignupSentWithSessionResult | SignupSentResult | SignupRedirectResult> {
+  const { email, organization, requestId, deviceTrackingToken, userAgent } = cfg;
   const sessionMetadata = deviceTrackingToken
     ? { [MAXMIND_TRACKING_TOKEN_METADATA_KEY]: deviceTrackingToken }
     : undefined;
 
-  if (input.requireVerification) {
+  const persistSession = async (user: RegisteredUser): Promise<SessionEntry[]> => {
+    const session = await provider.createSession(
+      {},
+      { orgId: organization, requestId, userId: user.id, metadata: sessionMetadata, userAgent }
+    );
+    return addSession(
+      list,
+      sessionEntryFromSession(session, { loginName: user.loginName, organization, requestId })
+    );
+  };
+
+  if (cfg.requireVerification) {
     try {
-      const user = await provider.register({
-        email,
-        firstName,
-        lastName,
-        orgId: organization,
-        verifyUrlTemplate: verifyUrlTemplate({ origin, requestId }),
-      });
-      const session = await provider.createSession(
-        {},
-        { orgId: organization, requestId, userId: user.id, metadata: sessionMetadata, userAgent }
-      );
-      const sessions = addSession(list, {
-        id: session.id,
-        token: session.token,
-        loginName: user.loginName,
-        organization,
-        creationTs: session.changedAt,
-        expirationTs: session.expiresAt,
-        changeTs: session.changedAt,
-        requestId,
-      });
+      const user = await cfg.register();
+      const sessions = await persistSession(user);
       logAuthEvent('signup.requested', 'success', { actor: hashActor(email), organization });
       return { kind: 'sent-with-session', email, sessions };
     } catch (error) {
@@ -257,24 +254,12 @@ export async function registerPasskeyFirst(
 
   // Verification not required: register and route forward.
   try {
-    const user = await provider.register({ email, firstName, lastName, orgId: organization });
-    const session = await provider.createSession(
-      {},
-      { orgId: organization, requestId, userId: user.id, metadata: sessionMetadata, userAgent }
-    );
-    const sessions = addSession(list, {
-      id: session.id,
-      token: session.token,
-      loginName: user.loginName,
-      organization,
-      creationTs: session.changedAt,
-      expirationTs: session.expiresAt,
-      changeTs: session.changedAt,
-      requestId,
-    });
-    logAuthEvent('signup.requested', 'success', { actor: hashActor(email), organization });
+    const user = await cfg.register();
+    const sessions = await persistSession(user);
+    // Audit shape DIVERGES per path — parameterized, never collapsed to one event.
+    cfg.noVerifySuccessAudit(user);
     const target = postRegisterStep({
-      hasPassword: false,
+      hasPassword: cfg.hasPassword,
       emailVerified: false,
       requireVerification: false,
       loginName: user.loginName,
@@ -291,6 +276,47 @@ export async function registerPasskeyFirst(
     }
     throw error;
   }
+}
+
+/**
+ * Passkey-first path: register directly, then apply enumeration-safe handling.
+ *
+ * When verification is required, both the fresh-signup and the ALREADY_EXISTS
+ * branches yield the generic check-your-email response (the success branch also
+ * persists a ceremony session so the /verify return flow can resume). When
+ * verification is off, register and route forward via postRegisterStep; a
+ * duplicate still yields the generic response.
+ */
+export async function registerPasskeyFirst(
+  provider: AuthProvider,
+  list: SessionEntry[],
+  input: PasskeyFirstRegisterInput
+): Promise<PasskeyFirstRegisterResult> {
+  const { email, firstName, lastName, organization, requestId, origin } = input;
+
+  return runEnumerationSafeRegister(provider, list, {
+    email,
+    organization,
+    requestId,
+    deviceTrackingToken: input.deviceTrackingToken,
+    userAgent: input.userAgent,
+    requireVerification: input.requireVerification,
+    hasPassword: false,
+    // Passkey-first attaches verifyUrlTemplate ONLY when verification is required;
+    // the no-verification path registers without it (preserves original behavior).
+    register: () =>
+      input.requireVerification
+        ? provider.register({
+            email,
+            firstName,
+            lastName,
+            orgId: organization,
+            verifyUrlTemplate: verifyUrlTemplate({ origin, requestId }),
+          })
+        : provider.register({ email, firstName, lastName, orgId: organization }),
+    noVerifySuccessAudit: () =>
+      logAuthEvent('signup.requested', 'success', { actor: hashActor(email), organization }),
+  });
 }
 
 // ── set-a-password register (/signup/password) ─────────────────────────────────
@@ -331,20 +357,7 @@ export async function registerWithPassword(
   list: SessionEntry[],
   input: RegisterWithPasswordInput
 ): Promise<RegisterWithPasswordResult> {
-  const {
-    email,
-    firstName,
-    lastName,
-    password,
-    organization,
-    requestId,
-    origin,
-    deviceTrackingToken,
-    userAgent,
-  } = input;
-  const sessionMetadata = deviceTrackingToken
-    ? { [MAXMIND_TRACKING_TOKEN_METADATA_KEY]: deviceTrackingToken }
-    : undefined;
+  const { email, firstName, lastName, password, organization, requestId, origin } = input;
 
   // Steer the verification mail's link back to OUR /verify route (raw provider
   // placeholders, filled by Zitadel). requestId rides along so the post-verify step
@@ -352,84 +365,31 @@ export async function registerWithPassword(
   // (PUBLIC_ORIGIN), NOT the request Host header, to block Host-header injection.
   const tmpl = verifyUrlTemplate({ origin, requestId });
 
-  const register = () =>
-    provider.register({
-      email,
-      firstName,
-      lastName,
-      password,
-      orgId: organization,
-      verifyUrlTemplate: tmpl,
-    });
-
-  if (input.requireVerification) {
-    try {
-      const user = await register();
-      const session = await provider.createSession(
-        {},
-        { orgId: organization, requestId, userId: user.id, metadata: sessionMetadata, userAgent }
-      );
-      const sessions = addSession(list, {
-        id: session.id,
-        token: session.token,
-        loginName: user.loginName,
-        organization,
-        creationTs: session.changedAt,
-        expirationTs: session.expiresAt,
-        changeTs: session.changedAt,
-        requestId,
-      });
-      logAuthEvent('signup.requested', 'success', { actor: hashActor(email), organization });
-      return { kind: 'sent-with-session', email, sessions };
-    } catch (error) {
-      if (error instanceof ProviderError && error.code === 'ALREADY_EXISTS') {
-        // ENUMERATION SAFETY: same audit event + identical response as the success path
-        // (never surface error.message — raw "User already exists" leaks account existence).
-        logAuthEvent('signup.requested', 'success', { actor: hashActor(email) });
-        return { kind: 'sent', email };
-      }
-      throw error;
-    }
-  }
-
-  // Verification not required: register and route forward; duplicate still generic.
-  try {
-    const user = await register();
-    const session = await provider.createSession(
-      {},
-      { orgId: organization, requestId, userId: user.id, metadata: sessionMetadata, userAgent }
-    );
-    const sessions = addSession(list, {
-      id: session.id,
-      token: session.token,
-      loginName: user.loginName,
-      organization,
-      creationTs: session.changedAt,
-      expirationTs: session.expiresAt,
-      changeTs: session.changedAt,
-      requestId,
-    });
-    logAuthEvent('signup.created', 'success', {
-      userId: user.id,
-      actor: hashActor(user.loginName),
-    });
-    const target = postRegisterStep({
-      hasPassword: true,
-      emailVerified: false,
-      requireVerification: false,
-      loginName: user.loginName,
-      userId: user.id,
-      organization,
-      requestId,
-    });
-    return { kind: 'redirect', target, sessions };
-  } catch (error) {
-    if (error instanceof ProviderError && error.code === 'ALREADY_EXISTS') {
-      logAuthEvent('signup.requested', 'success', { actor: hashActor(email) });
-      return { kind: 'sent', email };
-    }
-    throw error;
-  }
+  return runEnumerationSafeRegister(provider, list, {
+    email,
+    organization,
+    requestId,
+    deviceTrackingToken: input.deviceTrackingToken,
+    userAgent: input.userAgent,
+    requireVerification: input.requireVerification,
+    hasPassword: true,
+    // With-password always passes a password + verifyUrlTemplate (both branches).
+    register: () =>
+      provider.register({
+        email,
+        firstName,
+        lastName,
+        password,
+        orgId: organization,
+        verifyUrlTemplate: tmpl,
+      }),
+    // Distinct audit from the passkey path: 'signup.created' carrying userId, hashing loginName.
+    noVerifySuccessAudit: (user) =>
+      logAuthEvent('signup.created', 'success', {
+        userId: user.id,
+        actor: hashActor(user.loginName),
+      }),
+  });
 }
 
 // ── email-link (passwordless) register ────────────────────────────────────────
@@ -544,16 +504,20 @@ export async function completeEmailLinkSignup(
   });
 
   // Step 4: persist the session and redirect to the (skippable) passkey-setup nudge.
-  const sessions = addSession(list, {
-    id: session.id,
-    token: verified.token,
-    loginName,
-    organization,
-    creationTs: verified.changedAt,
-    expirationTs: verified.expiresAt,
-    changeTs: verified.changedAt,
-    requestId,
-  });
+  // `id` is pinned to the original session (the entry we're persisting under), while the
+  // token/timestamps come from the post-`updateSession` `verified` result.
+  const sessions = addSession(
+    list,
+    sessionEntryFromSession(
+      {
+        id: session.id,
+        token: verified.token,
+        changedAt: verified.changedAt,
+        expiresAt: verified.expiresAt,
+      },
+      { loginName, organization, requestId }
+    )
+  );
 
   logAuthEvent('signup.created', 'success', { userId, actor: hashActor(loginName) });
 

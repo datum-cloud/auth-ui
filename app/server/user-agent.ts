@@ -20,6 +20,7 @@
 // approach (comma-split header + a custom comma-joined description) fragmented
 // the UA at its internal `(KHTML, like Gecko)` comma and gave Bowser nothing
 // parseable, so Active-Sessions showed `os: null`. Sending the raw UA fixes it.
+import { lastHopIp } from '@/server/net';
 
 export interface ZitadelUserAgent {
   fingerprintId?: string;
@@ -136,9 +137,9 @@ export function userAgentFromRequest(request: Request, fingerprintId?: string): 
     result.fingerprintId = fp;
   }
 
-  // IP: last-hop XFF — mirrors the rate-limit middleware strategy exactly.
-  const xff = request.headers.get('x-forwarded-for') ?? '';
-  const ip = xff.split(',').at(-1)?.trim() || '';
+  // IP: last-hop XFF — shares the single source of truth with the rate-limit middleware
+  // (server/net.ts lastHopIp). Absent/empty ⇒ undefined ⇒ field omitted.
+  const ip = lastHopIp(request.headers.get('x-forwarded-for') ?? '');
   if (ip) {
     result.ip = ip;
   }

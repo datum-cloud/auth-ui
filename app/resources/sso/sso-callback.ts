@@ -9,6 +9,7 @@ import {
   readSessions,
   mostRecent,
   addSession,
+  sessionEntryFromSession,
   serializeSessions,
 } from '@/modules/auth/session/cookie';
 import { serializeLastUsedLogin } from '@/modules/auth/session/last-used-login';
@@ -240,16 +241,10 @@ export async function processIdpCallback(
         // loginName is a display hint and intent.information.idpUserName already carries the
         // IdP-vouched login name (behavior-identical, one fewer RPC on the link/auto-link path).
         const loginName = intent.information.idpUserName;
-        const next = addSession(entries, {
-          id: session.id,
-          token: session.token,
-          loginName,
-          organization,
-          creationTs: session.changedAt,
-          expirationTs: session.expiresAt,
-          changeTs: session.changedAt,
-          requestId,
-        });
+        const next = addSession(
+          entries,
+          sessionEntryFromSession(session, { loginName, organization, requestId })
+        );
         logAuthEvent('idp.link', 'success', {
           userId: decision.userId,
           idpId: decision.link.idpId,
