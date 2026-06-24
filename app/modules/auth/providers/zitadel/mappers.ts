@@ -124,16 +124,26 @@ export function toAuthRequest(proto: {
   };
 }
 
-// Converts a proto Timestamp (or ISO string) to an ISO string, or null if absent.
-// Used to map User.mfaInitSkippedAt (P5).
-export function mfaInitSkippedToIso(val: unknown): string | null {
-  if (!val) return null;
+// Shared core: convert a proto Timestamp to an ISO string, with string-passthrough.
+// A value that is ALREADY a string is returned verbatim (it is NOT routed through
+// Date parsing) — callers rely on this to avoid re-normalizing ISO strings. On an
+// absent/malformed proto Timestamp the caller-supplied `fallback` is returned.
+// Note: this does NOT short-circuit empty strings — callers that must treat ''/falsy
+// specially (e.g. mfaInitSkippedToIso) apply that guard before delegating here.
+function timestampToIso<F extends string | null>(val: unknown, fallback: F): string | F {
   if (typeof val === 'string') return val;
   try {
     return timestampDate(val as Timestamp).toISOString();
   } catch {
-    return null;
+    return fallback;
   }
+}
+
+// Converts a proto Timestamp (or ISO string) to an ISO string, or null if absent.
+// Used to map User.mfaInitSkippedAt (P5).
+export function mfaInitSkippedToIso(val: unknown): string | null {
+  if (!val) return null;
+  return timestampToIso(val, null);
 }
 
 // session/user/settings/branding/auth-method mappers (kept thin — fill fields as services land)
@@ -175,15 +185,10 @@ export function toSession(
   token: string
 ): Session {
   // Never let a malformed proto Timestamp throw out of the mapper into the
-  // loader — mirror the mfaInitSkippedToIso guard and degrade to '' (treated as "unset").
-  const tsToIso = (val: unknown): string => {
-    if (typeof val === 'string') return val;
-    try {
-      return timestampDate(val as Timestamp).toISOString();
-    } catch {
-      return '';
-    }
-  };
+  // loader — degrade to '' (treated as "unset"). Unlike mfaInitSkippedToIso this has
+  // no leading falsy guard: callers gate with `proto.x ? tsToIso(...) : ''`, and a
+  // string value (incl. '') passes through verbatim via timestampToIso.
+  const tsToIso = (val: unknown): string => timestampToIso(val, '');
   // Factor verifiedAt is now `Date | null`. Parse the proto Timestamp (or ISO string)
   // into a real Date; an absent or malformed value normalizes to null (treated as unverified).
   const tsToDate = (val: unknown): Date | null => {

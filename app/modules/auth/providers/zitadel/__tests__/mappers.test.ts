@@ -131,6 +131,21 @@ it('toSession returns empty-string timestamps instead of throwing on a malformed
   expect(session.expiresAt).toBe('');
 });
 
+it('toSession passes a string expiration/change date through verbatim (string-passthrough)', () => {
+  const session = toSession(
+    {
+      id: 's',
+      factors: { user: { id: 'u1', loginName: 'x' } },
+      expirationDate: '2026-12-31T23:59:59.000Z',
+      changeDate: 'not-an-iso-but-a-string',
+    },
+    'tok'
+  );
+  expect(session.expiresAt).toBe('2026-12-31T23:59:59.000Z');
+  // Non-ISO strings are NOT routed through Date parsing — they pass through as-is.
+  expect(session.changedAt).toBe('not-an-iso-but-a-string');
+});
+
 it('maps gRPC code 9 without verified/already to FAILED_PRECONDITION, not UNKNOWN', () => {
   const mapped = normalizeError({ code: 9, message: 'precondition: mfa not initialised' });
   expect(mapped.code).toBe('FAILED_PRECONDITION');
