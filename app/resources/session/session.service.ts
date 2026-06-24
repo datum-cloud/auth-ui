@@ -231,11 +231,10 @@ async function resolveNextPath(
   // (/signed-in) and the step-6 skippable MFA-setup nudge is suppressed. Real forced MFA
   // (settings.forceMfa) and real challenges still route normally.
   //
-  // `requestId` is the CURRENT ceremony id threaded through the /accounts picker (e.g. a
-  // mid-OIDC account switch). When present AND allowlisted it overrides the STALE
-  // `entry.requestId` baked into the cookie session, so the resolved next path carries the
-  // live ceremony id (→ /signed-in?requestId=oidc_<current> → /authorize → client callback).
-  // Absent/non-allowlisted keeps the existing `entry.requestId` behavior (standalone switch).
+  // `requestId` is the CURRENT, live ceremony id threaded through the /accounts picker URL
+  // (a mid-OIDC/SAML/device account switch) → /signed-in?requestId=<current> → /authorize →
+  // client callback. A STANDALONE switch (no live ceremony in the URL) resolves to the normal
+  // post-login destination; it deliberately does NOT resume the session's original requestId.
   opts: { suppressMfaSetupNudge?: boolean; requestId?: string } = {}
 ): Promise<string> {
   const userId = session.user?.id ?? '';
@@ -249,7 +248,12 @@ async function resolveNextPath(
 
   const userVerified = session.factors.passkey?.userVerified ?? false;
 
-  const requestId = isAllowedRequestId(opts.requestId) ? opts.requestId : entry.requestId;
+  // Only resume a LIVE ceremony — the current allowlisted requestId threaded through the
+  // /accounts URL (a mid-OIDC/SAML/device switch). Do NOT fall back to entry.requestId: a
+  // STANDALONE switch must not resume the session's ORIGINAL OIDC/SAML request (baked into the
+  // cookie at creation, now long expired), which would hand back to /authorize and fail with
+  // request_expired. With no live ceremony the switch resolves to the normal post-login path.
+  const requestId = isAllowedRequestId(opts.requestId) ? opts.requestId : undefined;
 
   return nextStepWithParams({
     factors: session.factors,
@@ -386,7 +390,8 @@ export const switchSchema = z.object({
   sessionId: z.string().min(1),
   // The CURRENT ceremony requestId threaded through the /accounts picker (empty/absent for a
   // standalone switch). switchAccount forwards it to resolveNextPath, which only honors an
-  // allowlisted (oidc_/saml_/device_) value — empty string falls back to the entry's requestId.
+  // allowlisted (oidc_/saml_/device_) value; a standalone switch resolves to the normal
+  // post-login destination (it does NOT resume the session's original, possibly-expired id).
   requestId: z.string().optional(),
 });
 
