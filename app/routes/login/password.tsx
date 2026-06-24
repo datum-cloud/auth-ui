@@ -2,6 +2,7 @@ import { AuthCeremony } from '@/components/auth-ceremony/auth-ceremony';
 import { SubmitButton } from '@/components/auth-form/auth-form';
 import { AuthFormFields } from '@/components/auth-form/auth-form-fields';
 import { FormError } from '@/components/form-error/form-error';
+import { useLoginContext } from '@/hooks/use-login-context';
 // ADAPTATION (plan-drift fix): readSessions/serializeSessions live in @/modules/auth/session/cookie
 // (which re-exports them from session.ts) — the canonical one-stop import for route-layer session I/O.
 import { readSessions, serializeSessions } from '@/modules/auth/session/cookie';
@@ -11,7 +12,7 @@ import { attemptsRemaining } from '@/resources/login/login-view';
 import { loginPasswordSchema, loginPasswordClientSchema } from '@/resources/login/login.schema';
 import { paths } from '@/routes/paths';
 import { providerForRequest } from '@/server/auth-context.server';
-import { getCsrfToken, assertCsrf } from '@/server/csrf';
+import { loaderCsrf, assertCsrf } from '@/server/csrf';
 import { Form } from '@datum-cloud/datum-ui/form';
 import { Trans, Plural, useLingui } from '@lingui/react/macro';
 import {
@@ -20,7 +21,6 @@ import {
   useActionData,
   useLoaderData,
   useNavigation,
-  useRouteLoaderData,
   type ActionFunctionArgs,
   type LoaderFunctionArgs,
   type MetaFunction,
@@ -34,10 +34,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const organization = url.searchParams.get('organization') ?? undefined;
   const provider = providerForRequest(request);
   const settings = await provider.getLoginSettings(organization);
-  const [csrfToken, setCookie] = await getCsrfToken(request);
-  // DEVIATION 3 (getCsrfToken null-guard): only set 'set-cookie' when non-null (same as login.tsx).
-  const headers: Record<string, string> = {};
-  if (setCookie !== null) headers['set-cookie'] = setCookie;
+  const { csrfToken, headers } = await loaderCsrf(request);
   return data({ csrfToken, hidePasswordReset: settings.hidePasswordReset === true }, { headers });
 }
 
@@ -79,12 +76,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
 export default function Password() {
   const { csrfToken, hidePasswordReset } = useLoaderData<typeof loader>();
-  // RR7 infers the parent-layout loader return through the generic — the `as` cast is gone.
-  // The `?? { loginName: '' }` only satisfies the structurally-possible-undefined branch; these
-  // routes always render under the `login` layout, so it is never taken at runtime.
-  const { loginName, requestId, organization } = useRouteLoaderData<
-    typeof import('@/routes/login/layout').loader
-  >('login') ?? { loginName: '' };
+  const { loginName, requestId, organization } = useLoginContext();
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
   const { t } = useLingui();

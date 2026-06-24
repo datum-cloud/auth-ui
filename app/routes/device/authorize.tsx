@@ -9,7 +9,7 @@ import {
 } from '@/resources/device';
 import { paths } from '@/routes/paths';
 import { providerForRequest } from '@/server/auth-context.server';
-import { getCsrfToken, assertCsrf } from '@/server/csrf';
+import { loaderCsrf, assertCsrf } from '@/server/csrf';
 import { Badge } from '@datum-cloud/datum-ui/badge';
 import { Button, LinkButton } from '@datum-cloud/datum-ui/button';
 import { Trans } from '@lingui/react/macro';
@@ -42,9 +42,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     return deviceConsentErrorToResponse(outcome.error);
   }
 
-  const [csrfToken, setCookie] = await getCsrfToken(request);
-  const headers: Record<string, string> = {};
-  if (setCookie !== null) headers['set-cookie'] = setCookie;
+  const { csrfToken, headers } = await loaderCsrf(request);
 
   return data({ csrfToken, ...outcome.consent }, { headers });
 }

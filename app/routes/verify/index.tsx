@@ -6,7 +6,7 @@ import { readSessions, mostRecent } from '@/modules/auth/session/cookie';
 import { dispatchEmailCode, resendEmailCode, submitEmailCode } from '@/resources/verify';
 import { verifyCodeSchema, verifyCodeClientSchema } from '@/resources/verify/verify.schema';
 import { providerForRequest } from '@/server/auth-context.server';
-import { getCsrfToken, assertCsrf } from '@/server/csrf';
+import { loaderCsrf, assertCsrf } from '@/server/csrf';
 import { trustedAppOrigin } from '@/server/infra/app-origin.server';
 import { Button } from '@datum-cloud/datum-ui/button';
 import { Form } from '@datum-cloud/datum-ui/form';
@@ -34,9 +34,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const organization = url.searchParams.get('organization') ?? undefined;
   const requestId = url.searchParams.get('requestId') ?? undefined;
 
-  const [csrfToken, setCookie] = await getCsrfToken(request);
-  const headers: Record<string, string> = {};
-  if (setCookie !== null) headers['set-cookie'] = setCookie;
+  const { csrfToken, headers } = await loaderCsrf(request);
 
   // The email-code dispatch is gated on session ownership inside the
   // service. Resolve the active session from the SIGNED cookie here and hand it in;

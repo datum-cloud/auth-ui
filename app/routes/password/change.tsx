@@ -7,7 +7,7 @@ import { readSessions, mostRecent, byId } from '@/modules/auth/session/cookie';
 import { changePassword } from '@/resources/password';
 import { changePasswordClientSchema } from '@/resources/password/password.schema';
 import { providerForRequest } from '@/server/auth-context.server';
-import { getCsrfToken, assertCsrf } from '@/server/csrf';
+import { loaderCsrf, assertCsrf } from '@/server/csrf';
 import { actionError } from '@/utils/errors/auth-error';
 import { Form } from '@datum-cloud/datum-ui/form';
 import { Trans, useLingui } from '@lingui/react/macro';
@@ -27,9 +27,7 @@ export const meta: MetaFunction = () => [{ title: 'Change your password' }];
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const url = new URL(request.url);
-  const [csrfToken, setCookie] = await getCsrfToken(request);
-  const headers: Record<string, string> = {};
-  if (setCookie !== null) headers['set-cookie'] = setCookie;
+  const { csrfToken, headers } = await loaderCsrf(request);
   // Resolve the active ceremony session so the form can carry its id and show whose
   // password is being changed. The session token never leaves the server cookie.
   const active = mostRecent(await readSessions(request));

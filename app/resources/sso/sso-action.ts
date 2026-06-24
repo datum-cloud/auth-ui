@@ -5,7 +5,7 @@
 // `runSsoAction` signature + `SsoActionDeps` shape are unchanged and re-exported
 // through the sso barrel.
 import type { AuthProvider } from '@/modules/auth/auth-provider';
-import { idpTypeToSlug } from '@/modules/auth/idp-slug';
+import { idpTypeToSlug, slugify } from '@/modules/auth/idp-slug';
 import { readSessions, mostRecent } from '@/modules/auth/session/cookie';
 import { ProviderError } from '@/modules/auth/types';
 import { idpReturnUrls } from '@/resources/sso/idp-return-urls';
@@ -26,12 +26,6 @@ export interface SsoActionDeps {
     urls: { success: string; failure: string }
   ) => Promise<{ authUrl?: string | null | undefined }>;
   onAuthEvent?: (event: string, outcome: 'success' | 'failure') => void;
-}
-
-// ── helpers ─────────────────────────────────────────────────────────────────────
-
-function slugify(name: string): string {
-  return name.toLowerCase().replace(/\s+/g, '-');
 }
 
 // ── /sso action ─────────────────────────────────────────────────────────────────

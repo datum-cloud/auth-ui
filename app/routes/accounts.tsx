@@ -9,7 +9,7 @@ import {
 } from '@/resources/session';
 import { paths } from '@/routes/paths';
 import { providerForRequest } from '@/server/auth-context.server';
-import { getCsrfToken, assertCsrf } from '@/server/csrf';
+import { loaderCsrf, assertCsrf } from '@/server/csrf';
 import { Badge } from '@datum-cloud/datum-ui/badge';
 import { Button, LinkButton } from '@datum-cloud/datum-ui/button';
 import { Icon } from '@datum-cloud/datum-ui/icons';
@@ -40,9 +40,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const candidate = new URL(request.url).searchParams.get('requestId') ?? undefined;
   const requestId = isAllowedRequestId(candidate) ? candidate : null;
 
-  const [csrfToken, setCookie] = await getCsrfToken(request);
-  const headers: Record<string, string> = {};
-  if (setCookie !== null) headers['set-cookie'] = setCookie;
+  const { csrfToken, headers } = await loaderCsrf(request);
 
   return data({ csrfToken, accounts, requestId }, { headers });
 }

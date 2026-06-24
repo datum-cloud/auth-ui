@@ -6,7 +6,7 @@ import { useAuthActionError } from '@/hooks/use-auth-action-error';
 import { submitNewPassword } from '@/resources/password';
 import { newPasswordClientSchema } from '@/resources/password/password.schema';
 import { providerForRequest } from '@/server/auth-context.server';
-import { getCsrfToken, assertCsrf } from '@/server/csrf';
+import { loaderCsrf, assertCsrf } from '@/server/csrf';
 import { actionError } from '@/utils/errors/auth-error';
 import { Form } from '@datum-cloud/datum-ui/form';
 import { Trans, useLingui } from '@lingui/react/macro';
@@ -26,9 +26,7 @@ export const meta: MetaFunction = () => [{ title: 'Set new password' }];
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const url = new URL(request.url);
-  const [csrfToken, setCookie] = await getCsrfToken(request);
-  const headers: Record<string, string> = {};
-  if (setCookie !== null) headers['set-cookie'] = setCookie;
+  const { csrfToken, headers } = await loaderCsrf(request);
   return data(
     {
       csrfToken,

@@ -7,7 +7,7 @@ import { resolveMfaSetup, recordMfaSetupSkip } from '@/resources/mfa';
 import { setupSkipSchema } from '@/resources/mfa/mfa.schema';
 import { paths } from '@/routes/paths';
 import { providerForRequest } from '@/server/auth-context.server';
-import { getCsrfToken, assertCsrf } from '@/server/csrf';
+import { loaderCsrf, assertCsrf } from '@/server/csrf';
 import { assetUrl } from '@/utils/asset-url';
 import { Button, LinkButton } from '@datum-cloud/datum-ui/button';
 import { Icon } from '@datum-cloud/datum-ui/icons';
@@ -97,9 +97,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const result = await resolveMfaSetup(provider, sessions, { loginName, organization });
   if (result.kind === 'redirect') return redirect(result.target);
 
-  const [csrfToken, setCookie] = await getCsrfToken(request);
-  const headers: Record<string, string> = {};
-  if (setCookie !== null) headers['set-cookie'] = setCookie;
+  const { csrfToken, headers } = await loaderCsrf(request);
 
   return data(
     {

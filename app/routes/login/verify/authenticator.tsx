@@ -3,6 +3,7 @@ import { OtpCodeField } from '@/components/auth-ceremony/otp-code-field';
 import { SubmitButton } from '@/components/auth-form/auth-form';
 import { AuthFormFields } from '@/components/auth-form/auth-form-fields';
 import { useAuthActionRecovery } from '@/hooks/use-auth-action-recovery';
+import { useLoginContext } from '@/hooks/use-login-context';
 import {
   createOtpVerifyHandlers,
   type OtpVerifyActionData,
@@ -12,13 +13,7 @@ import { otpCodeClientSchema } from '@/resources/otp/otp.schema';
 import { paths } from '@/routes/paths';
 import { Form } from '@datum-cloud/datum-ui/form';
 import { Trans, useLingui } from '@lingui/react/macro';
-import {
-  useActionData,
-  useLoaderData,
-  useNavigation,
-  useRouteLoaderData,
-  type MetaFunction,
-} from 'react-router';
+import { useActionData, useLoaderData, useNavigation, type MetaFunction } from 'react-router';
 import { Form as RRForm } from 'react-router';
 
 export const meta: MetaFunction = () => [{ title: 'Enter your authenticator code' }];
@@ -38,12 +33,7 @@ export const action = handlers.action;
 
 export default function VerifyAuthenticator() {
   const { csrfToken } = useLoaderData() as OtpVerifyLoaderData;
-  // RR7 infers the parent-layout loader return through the generic — the `as` cast is gone.
-  // The `?? { loginName: '' }` only satisfies the structurally-possible-undefined branch; these
-  // routes always render under the `login` layout, so it is never taken at runtime.
-  const { loginName, requestId, organization } = useRouteLoaderData<
-    typeof import('@/routes/login/layout').loader
-  >('login') ?? { loginName: '' };
+  const { loginName, requestId, organization } = useLoginContext();
   const actionData = useActionData() as OtpVerifyActionData | undefined;
   const navigation = useNavigation();
   const { t } = useLingui();

@@ -9,6 +9,14 @@ export function idpTypeToSlug(type: string): string | null {
   return TYPE_TO_SLUG[type] ?? null;
 }
 
+// Slugify an IdP display name for use as a stable `provider` form value / URL segment.
+// Single source of truth: the /sso loader emits this slug into a hidden input and the
+// /sso action matches it back against `slugify(activeIdp.name)`, so both sides MUST share
+// one implementation — a divergence here silently breaks the link/start flow.
+export function slugify(name: string): string {
+  return name.toLowerCase().replace(/\s+/g, '-');
+}
+
 export function slugToProvider(slug: string, providers: IdProvider[]): IdProvider | null {
   const wanted = slug.toLowerCase();
   return providers.find((p) => idpTypeToSlug(p.type) === wanted) ?? null;

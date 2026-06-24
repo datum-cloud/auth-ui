@@ -1,7 +1,7 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
 import { performLogout, logoutOutcomeToResponse, completeOidcLogout } from '@/resources/session';
 import { providerForRequest } from '@/server/auth-context.server';
-import { assertCsrf, getCsrfToken } from '@/server/csrf';
+import { assertCsrf, loaderCsrf } from '@/server/csrf';
 import { Button } from '@datum-cloud/datum-ui/button';
 import { Trans } from '@lingui/react/macro';
 import {
@@ -26,9 +26,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     return logoutOutcomeToResponse(outcome);
   }
 
-  const [csrfToken, setCookie] = await getCsrfToken(request);
-  const headers: Record<string, string> = {};
-  if (setCookie !== null) headers['set-cookie'] = setCookie;
+  const { csrfToken, headers } = await loaderCsrf(request);
   return data({ csrfToken }, { headers });
 }
 

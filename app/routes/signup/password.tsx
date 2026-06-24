@@ -10,7 +10,7 @@ import { genericCheckYourEmail } from '@/resources/schemas/check-your-email.sche
 import { registerWithPassword } from '@/resources/signup';
 import { signupPasswordSchema } from '@/resources/signup/signup.schema';
 import { providerForRequest } from '@/server/auth-context.server';
-import { getCsrfToken, assertCsrf } from '@/server/csrf';
+import { loaderCsrf, assertCsrf } from '@/server/csrf';
 import { requireEmailVerification } from '@/server/env';
 import { trustedAppOrigin } from '@/server/infra/app-origin.server';
 import { env } from '@/server/infra/env.server';
@@ -35,9 +35,7 @@ export const meta: MetaFunction = () => [{ title: 'Set a password' }];
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const url = new URL(request.url);
-  const [csrfToken, setCookie] = await getCsrfToken(request);
-  const headers: Record<string, string> = {};
-  if (setCookie !== null) headers['set-cookie'] = setCookie;
+  const { csrfToken, headers } = await loaderCsrf(request);
   return data(
     {
       csrfToken,

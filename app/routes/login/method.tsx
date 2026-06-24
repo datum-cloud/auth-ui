@@ -1,3 +1,4 @@
+import { useLoginContext } from '@/hooks/use-login-context';
 import SplitLayout from '@/layouts/split.layout';
 import { decideAfterIdentifier } from '@/resources/login/login-decision';
 import { paths } from '@/routes/paths';
@@ -7,13 +8,7 @@ import { LinkButton } from '@datum-cloud/datum-ui/button';
 import { Icon } from '@datum-cloud/datum-ui/icons';
 import { Trans } from '@lingui/react/macro';
 import { Key, Lock, Mail, UserCircle } from 'lucide-react';
-import {
-  redirect,
-  useLoaderData,
-  useRouteLoaderData,
-  type LoaderFunctionArgs,
-  type MetaFunction,
-} from 'react-router';
+import { redirect, useLoaderData, type LoaderFunctionArgs, type MetaFunction } from 'react-router';
 import { Link } from 'react-router';
 
 export const meta: MetaFunction = () => [{ title: 'Choose how to sign in' }];
@@ -73,12 +68,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
 export default function LoginMethod() {
   const { methods, branding } = useLoaderData<typeof loader>();
-  // RR7 infers the parent-layout loader return through the generic — the `as` cast is gone.
-  // The `?? { loginName: '' }` only satisfies the structurally-possible-undefined branch; these
-  // routes always render under the `login` layout, so it is never taken at runtime.
-  const { loginName, requestId, organization } = useRouteLoaderData<
-    typeof import('@/routes/login/layout').loader
-  >('login') ?? { loginName: '' };
+  const { loginName, requestId, organization } = useLoginContext();
 
   // Typed paths.* emit the identical query string buildParams produced
   // (loginName, then requestId, then organization — undefined values are skipped).

@@ -14,7 +14,7 @@ import { resolveSignupView } from '@/resources/signup/signup-view';
 import { signupIdentifierSchema } from '@/resources/signup/signup.schema';
 import { paths } from '@/routes/paths';
 import { providerForRequest } from '@/server/auth-context.server';
-import { getCsrfToken, assertCsrf } from '@/server/csrf';
+import { loaderCsrf, assertCsrf } from '@/server/csrf';
 import { trustedAppOrigin } from '@/server/infra/app-origin.server';
 import { env } from '@/server/infra/env.server';
 import { assetUrl } from '@/utils/asset-url';
@@ -48,9 +48,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     provider.capabilities.externalIdp ? provider.getActiveIdPs(organization) : Promise.resolve([]),
   ]);
 
-  const [csrfToken, setCookie] = await getCsrfToken(request);
-  const headers: Record<string, string> = {};
-  if (setCookie !== null) headers['set-cookie'] = setCookie;
+  const { csrfToken, headers } = await loaderCsrf(request);
 
   // Phase 4 register-and-link: the IdP callback (/sso/:provider/callback) redirects a brand-new
   // IdP user here with the intent + draft so this screen can compose register → addIdpLink → createSession.

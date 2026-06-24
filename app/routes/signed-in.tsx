@@ -2,7 +2,7 @@ import { AuthCard } from '@/components/auth-card/auth-card';
 import { TrackOnMount } from '@/modules/analytics/fathom';
 import { resolveSignedIn } from '@/resources/session';
 import { providerForRequest } from '@/server/auth-context.server';
-import { getCsrfToken } from '@/server/csrf';
+import { loaderCsrf } from '@/server/csrf';
 import { env } from '@/server/infra/env.server';
 import { Button } from '@datum-cloud/datum-ui/button';
 import { Trans } from '@lingui/react/macro';
@@ -27,10 +27,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   }
 
   // Terminal "You are signed in" page — mint a CSRF token for the sign-out form.
-  const [csrfToken, setCookie] = await getCsrfToken(request);
-  // DEVIATION (getCsrfToken null-guard): only set 'set-cookie' when non-null (same pattern as login.tsx).
-  const headers: Record<string, string> = {};
-  if (setCookie !== null) headers['set-cookie'] = setCookie;
+  const { csrfToken, headers } = await loaderCsrf(request);
   return data(
     { loginName: outcome.loginName, csrfToken, deviceComplete: outcome.deviceComplete ?? false },
     { headers }

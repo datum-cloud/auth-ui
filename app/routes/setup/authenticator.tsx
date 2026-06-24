@@ -9,7 +9,7 @@ import { enrollTotp } from '@/resources/otp';
 import { otpCodeClientSchema } from '@/resources/otp/otp.schema';
 import { paths } from '@/routes/paths';
 import { providerForRequest } from '@/server/auth-context.server';
-import { getCsrfToken, assertCsrf } from '@/server/csrf';
+import { loaderCsrf, assertCsrf } from '@/server/csrf';
 import { Form } from '@datum-cloud/datum-ui/form';
 import { Trans, useLingui } from '@lingui/react/macro';
 import { QRCodeSVG } from 'qrcode.react';
@@ -49,9 +49,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   // Register TOTP: returns deterministic { uri, secret } in fake; real adapter generates a new key.
   const { uri, secret } = await provider.registerTotp(user.id);
 
-  const [csrfToken, setCookie] = await getCsrfToken(request);
-  const headers: Record<string, string> = {};
-  if (setCookie !== null) headers['set-cookie'] = setCookie;
+  const { csrfToken, headers } = await loaderCsrf(request);
 
   return data(
     { csrfToken, loginName, requestId, organization, force, checkAfter, uri, secret },
