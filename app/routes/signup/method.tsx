@@ -13,7 +13,7 @@ import {
 import { resolveSignupView } from '@/resources/signup/signup-view';
 import { signupMethodSchema } from '@/resources/signup/signup.schema';
 import { providerForRequest } from '@/server/auth-context.server';
-import { getCsrfToken, assertCsrf } from '@/server/csrf';
+import { loaderCsrf, assertCsrf } from '@/server/csrf';
 import { requireEmailVerification } from '@/server/env';
 import { trustedAppOrigin } from '@/server/infra/app-origin.server';
 import { env } from '@/server/infra/env.server';
@@ -52,9 +52,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   ]);
   const view = resolveSignupView(settings, idps, env.AUTH_EMAIL_DELIVERY_ENABLED);
 
-  const [csrfToken, setCookie] = await getCsrfToken(request);
-  const headers: Record<string, string> = {};
-  if (setCookie !== null) headers['set-cookie'] = setCookie;
+  const { csrfToken, headers } = await loaderCsrf(request);
 
   return data(
     {

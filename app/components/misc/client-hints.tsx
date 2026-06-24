@@ -17,8 +17,6 @@ const hintsUtils = getHintUtils({
   // add other hints here
 });
 
-export const { getHints } = hintsUtils;
-
 /**
  * @returns inline script element that checks for client hints and sets cookies
  * if they are not set then reloads the page if any cookie was set to an

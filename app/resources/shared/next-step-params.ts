@@ -2,6 +2,40 @@ import { REQUEST_ID_PATTERN } from '@/resources/schemas/request-id';
 import { nextStep, type NextStepInput } from '@/resources/shared/next-step';
 
 /**
+ * Unconditional ceremony-context query threader: loginName is always present;
+ * requestId/organization only when truthy. Returns the encoded query string the
+ * caller appends to a target path. This is the SIMPLE builder (no REQUEST_ID_PATTERN
+ * validation) — use `nextStepWithParams` when the validating variant is required.
+ */
+export function threadParams(loginName: string, requestId?: string, organization?: string): string {
+  const params = new URLSearchParams({ loginName });
+  if (requestId) params.set('requestId', requestId);
+  if (organization) params.set('organization', organization);
+  return params.toString();
+}
+
+/**
+ * Post-callback hand-back target: when a ceremony requestId is present, route back
+ * into /authorize with the explicit sessionId (mirrors the password path's hand-back);
+ * otherwise the terminal /signed-in. Encode-only — these sites intentionally do NOT
+ * run REQUEST_ID_PATTERN validation.
+ */
+export function authorizeHandbackTarget(requestId: string | undefined, sessionId: string): string {
+  return requestId
+    ? `/authorize?requestId=${encodeURIComponent(requestId)}&sessionId=${encodeURIComponent(sessionId)}`
+    : '/signed-in';
+}
+
+/**
+ * The branded SSO error redirect location: /sso/<slug>/error?reason=<reason>. Both
+ * segments are URL-encoded. Callers pass the already-mapped reason (e.g. via
+ * providerErrorCode); the special-case idp.link ALREADY_EXISTS block stays bespoke.
+ */
+export function ssoErrorRedirect(slug: string, reason: string): string {
+  return `/sso/${encodeURIComponent(slug)}/error?reason=${encodeURIComponent(reason)}`;
+}
+
+/**
  * Route-layer bridge: calls the pure `nextStep` engine and appends the threaded
  * query params (loginName, requestId, organization) so every verify/setup action
  * redirects with the ceremony context intact.

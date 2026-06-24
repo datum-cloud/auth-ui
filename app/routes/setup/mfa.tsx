@@ -5,9 +5,10 @@ import { readSessions } from '@/modules/auth/session/cookie';
 import type { ProviderCapabilities } from '@/modules/auth/types';
 import { resolveMfaSetup, recordMfaSetupSkip } from '@/resources/mfa';
 import { setupSkipSchema } from '@/resources/mfa/mfa.schema';
+import { readCeremonyParams } from '@/resources/shared/ceremony-params';
 import { paths } from '@/routes/paths';
 import { providerForRequest } from '@/server/auth-context.server';
-import { getCsrfToken, assertCsrf } from '@/server/csrf';
+import { loaderCsrf, assertCsrf } from '@/server/csrf';
 import { assetUrl } from '@/utils/asset-url';
 import { Button, LinkButton } from '@datum-cloud/datum-ui/button';
 import { Icon } from '@datum-cloud/datum-ui/icons';
@@ -84,9 +85,7 @@ const CAPABILITY_ROUTES: Array<{
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const url = new URL(request.url);
-  const loginName = url.searchParams.get('loginName') ?? '';
-  const requestId = url.searchParams.get('requestId') ?? undefined;
-  const organization = url.searchParams.get('organization') ?? undefined;
+  const { loginName, requestId, organization } = readCeremonyParams(url);
   const { force, checkAfter } = setupSkipSchema.parse(Object.fromEntries(url.searchParams));
 
   // Service resolves the session guard, user lookup, and the capability + login-policy gating
@@ -97,9 +96,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const result = await resolveMfaSetup(provider, sessions, { loginName, organization });
   if (result.kind === 'redirect') return redirect(result.target);
 
-  const [csrfToken, setCookie] = await getCsrfToken(request);
-  const headers: Record<string, string> = {};
-  if (setCookie !== null) headers['set-cookie'] = setCookie;
+  const { csrfToken, headers } = await loaderCsrf(request);
 
   return data(
     {

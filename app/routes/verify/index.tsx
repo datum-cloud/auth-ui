@@ -1,12 +1,13 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
 import { SubmitButton } from '@/components/auth-form/auth-form';
+import { AuthFormFields } from '@/components/auth-form/auth-form-fields';
 import { FormError } from '@/components/form-error/form-error';
 import { useAuthActionError } from '@/hooks/use-auth-action-error';
 import { readSessions, mostRecent } from '@/modules/auth/session/cookie';
 import { dispatchEmailCode, resendEmailCode, submitEmailCode } from '@/resources/verify';
 import { verifyCodeSchema, verifyCodeClientSchema } from '@/resources/verify/verify.schema';
 import { providerForRequest } from '@/server/auth-context.server';
-import { getCsrfToken, assertCsrf } from '@/server/csrf';
+import { loaderCsrf, assertCsrf } from '@/server/csrf';
 import { trustedAppOrigin } from '@/server/infra/app-origin.server';
 import { Button } from '@datum-cloud/datum-ui/button';
 import { Form } from '@datum-cloud/datum-ui/form';
@@ -34,9 +35,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const organization = url.searchParams.get('organization') ?? undefined;
   const requestId = url.searchParams.get('requestId') ?? undefined;
 
-  const [csrfToken, setCookie] = await getCsrfToken(request);
-  const headers: Record<string, string> = {};
-  if (setCookie !== null) headers['set-cookie'] = setCookie;
+  const { csrfToken, headers } = await loaderCsrf(request);
 
   // The email-code dispatch is gated on session ownership inside the
   // service. Resolve the active session from the SIGNED cookie here and hand it in;
@@ -144,13 +143,15 @@ export default function Verify() {
           defaultValues={{ code }}
           isSubmitting={navigation.state === 'submitting'}
           className="flex w-full flex-col gap-4">
-          <input type="hidden" name="csrf" value={csrfToken} />
+          <AuthFormFields
+            csrf={csrfToken}
+            loginName={loginName}
+            requestId={requestId}
+            organization={organization}
+          />
           <input type="hidden" name="userId" value={userId} />
           <input type="hidden" name="intent" value="verify" />
           {invite ? <input type="hidden" name="invite" value={invite} /> : null}
-          {loginName ? <input type="hidden" name="loginName" value={loginName} /> : null}
-          {organization ? <input type="hidden" name="organization" value={organization} /> : null}
-          {requestId ? <input type="hidden" name="requestId" value={requestId} /> : null}
           <Form.Field name="code" label={t`Verification code`} required>
             <Form.Input inputMode="numeric" autoComplete="one-time-code" autoFocus />
           </Form.Field>
@@ -183,14 +184,16 @@ export default function Verify() {
             requires code.min(1); the code='resend' sentinel makes the parse succeed and the
             resend branch ignores the code entirely. */}
         <RRForm method="post">
-          <input type="hidden" name="csrf" value={csrfToken} />
+          <AuthFormFields
+            csrf={csrfToken}
+            loginName={loginName}
+            requestId={requestId}
+            organization={organization}
+          />
           <input type="hidden" name="userId" value={userId} />
           <input type="hidden" name="code" value="resend" />
           <input type="hidden" name="intent" value="resend" />
           {invite ? <input type="hidden" name="invite" value={invite} /> : null}
-          {loginName ? <input type="hidden" name="loginName" value={loginName} /> : null}
-          {organization ? <input type="hidden" name="organization" value={organization} /> : null}
-          {requestId ? <input type="hidden" name="requestId" value={requestId} /> : null}
           <Button
             type="secondary"
             theme="outline"

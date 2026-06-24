@@ -12,7 +12,7 @@ vi.mock('@/server/auth-context.server', () => ({
   providerForRequest: () => ({ deleteSession: vi.fn(async () => undefined) }),
 }));
 vi.mock('@/server/csrf', () => ({
-  getCsrfToken: vi.fn(async () => ['csrf-abc', null]),
+  loaderCsrf: vi.fn(async () => ({ csrfToken: 'csrf-abc', headers: {} })),
   assertCsrf: vi.fn(),
 }));
 vi.mock('@/resources/session', async (orig) => ({

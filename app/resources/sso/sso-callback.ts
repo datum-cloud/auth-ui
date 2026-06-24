@@ -14,6 +14,7 @@ import {
 import { serializeLastUsedLogin } from '@/modules/auth/session/last-used-login';
 import { ProviderError } from '@/modules/auth/types';
 import type { IdpIntentResult } from '@/modules/auth/types';
+import { authorizeHandbackTarget, ssoErrorRedirect } from '@/resources/shared/next-step-params';
 import { registerAndLinkIdp } from '@/resources/signup';
 import { deriveIdpProfileName } from '@/resources/sso/derive-idp-name';
 import { decideIdpCallback } from '@/resources/sso/idp-callback';
@@ -64,10 +65,7 @@ export async function processIdpCallback(
     ((id: string, token: string) => provider.retrieveIdpIntent(id, token));
 
   if (!parsed.success) {
-    return {
-      kind: 'redirect',
-      location: `/sso/${encodeURIComponent(slug)}/error?reason=context-missing`,
-    };
+    return { kind: 'redirect', location: ssoErrorRedirect(slug, 'context-missing') };
   }
 
   const { id, token, link, requestId, organization } = parsed.data;
@@ -166,10 +164,7 @@ export async function processIdpCallback(
     if (err instanceof ProviderError) {
       deps.onAuthEvent?.('idp.signin', 'failure');
       logAuthEvent('idp.signin', 'failure', { reason: err.code, requestId });
-      return {
-        kind: 'redirect',
-        location: `/sso/${encodeURIComponent(slug)}/error?reason=${encodeURIComponent(providerErrorCode(err.code))}`,
-      };
+      return { kind: 'redirect', location: ssoErrorRedirect(slug, providerErrorCode(err.code)) };
     }
     throw err; // unknown → root ErrorBoundary renders the branded page
   }
@@ -265,9 +260,7 @@ export async function processIdpCallback(
         // resolveOidc's explicit-sessionId hand-back (runCallback) instead of re-running
         // decideAuthorize — without it a prompt=select_account / prompt=login ceremony loops
         // straight back to /accounts (or /login). Mirrors the password path's hand-back.
-        const target = requestId
-          ? `/authorize?requestId=${encodeURIComponent(requestId)}&sessionId=${encodeURIComponent(session.id)}`
-          : '/signed-in';
+        const target = authorizeHandbackTarget(requestId, session.id);
         const lastUsedCookie = await serializeLastUsedLogin(`idp:${decision.link.idpId}`);
         return {
           kind: 'redirect',
@@ -351,7 +344,7 @@ export async function processIdpCallback(
           logAuthEvent('idp.register', 'failure', { reason: err.code, requestId });
           return {
             kind: 'redirect',
-            location: `/sso/${encodeURIComponent(slug)}/error?reason=${encodeURIComponent(providerErrorCode(err.code))}`,
+            location: ssoErrorRedirect(slug, providerErrorCode(err.code)),
           };
         }
         throw err; // unknown → root ErrorBoundary
@@ -364,10 +357,7 @@ export async function processIdpCallback(
         idpId: intent.information.idpId,
         requestId,
       });
-      return {
-        kind: 'redirect',
-        location: `/sso/${encodeURIComponent(slug)}/error?reason=${encodeURIComponent(decision.reason)}`,
-      };
+      return { kind: 'redirect', location: ssoErrorRedirect(slug, decision.reason) };
     }
 
     default: {

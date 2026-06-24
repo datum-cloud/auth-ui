@@ -25,7 +25,7 @@ import { type AuthProvider } from '@/modules/auth/auth-provider';
 import { readSessions, byLoginName } from '@/modules/auth/session/cookie';
 import { ProviderError } from '@/modules/auth/types';
 import { setupSkipSchema } from '@/resources/mfa/mfa.schema';
-import { nextStepWithParams } from '@/resources/shared/next-step-params';
+import { nextStepWithParams, threadParams } from '@/resources/shared/next-step-params';
 import { providerForRequest } from '@/server/auth-context.server';
 import { getCsrfToken, assertCsrf } from '@/server/csrf';
 import { logAuthEvent } from '@/server/observability';
@@ -173,10 +173,7 @@ export function createOtpEnrollHandlers(cfg: OtpEnrollConfig) {
 
     // checkAfter=true: immediately route into the matching verify screen.
     if (checkAfter === 'true') {
-      const params = new URLSearchParams({ loginName });
-      if (requestId) params.set('requestId', requestId);
-      if (organization) params.set('organization', organization);
-      return redirect(`${cfg.verifyPath}?${params.toString()}`);
+      return redirect(`${cfg.verifyPath}?${threadParams(loginName, requestId, organization)}`);
     }
 
     // Normal post-enrollment routing.

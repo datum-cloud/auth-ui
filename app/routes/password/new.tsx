@@ -1,12 +1,13 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
 import { SubmitButton } from '@/components/auth-form/auth-form';
+import { AuthFormFields } from '@/components/auth-form/auth-form-fields';
 import { BackLink } from '@/components/back-link/back-link';
 import { FormError } from '@/components/form-error/form-error';
 import { useAuthActionError } from '@/hooks/use-auth-action-error';
 import { submitNewPassword } from '@/resources/password';
 import { newPasswordClientSchema } from '@/resources/password/password.schema';
 import { providerForRequest } from '@/server/auth-context.server';
-import { getCsrfToken, assertCsrf } from '@/server/csrf';
+import { loaderCsrf, assertCsrf } from '@/server/csrf';
 import { actionError } from '@/utils/errors/auth-error';
 import { Form } from '@datum-cloud/datum-ui/form';
 import { Trans, useLingui } from '@lingui/react/macro';
@@ -26,9 +27,7 @@ export const meta: MetaFunction = () => [{ title: 'Set new password' }];
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const url = new URL(request.url);
-  const [csrfToken, setCookie] = await getCsrfToken(request);
-  const headers: Record<string, string> = {};
-  if (setCookie !== null) headers['set-cookie'] = setCookie;
+  const { csrfToken, headers } = await loaderCsrf(request);
   return data(
     {
       csrfToken,
@@ -77,11 +76,9 @@ export default function PasswordNew() {
         defaultValues={{ password: '', confirm: '' }}
         isSubmitting={navigation.state === 'submitting'}
         className="flex w-full flex-col gap-4">
-        <input type="hidden" name="csrf" value={csrfToken} />
+        <AuthFormFields csrf={csrfToken} requestId={requestId} organization={organization} />
         <input type="hidden" name="code" value={code} />
         <input type="hidden" name="userId" value={userId} />
-        {organization ? <input type="hidden" name="organization" value={organization} /> : null}
-        {requestId ? <input type="hidden" name="requestId" value={requestId} /> : null}
         <Form.Field name="password" label={t`New password`} required>
           <Form.Input type="password" autoFocus autoComplete="new-password" />
         </Form.Field>

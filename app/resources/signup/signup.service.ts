@@ -13,6 +13,7 @@
 import type { AuthProvider, SessionOpts } from '@/modules/auth/auth-provider';
 import { addSession, type SessionEntry } from '@/modules/auth/session/cookie';
 import { ProviderError } from '@/modules/auth/types';
+import { authorizeHandbackTarget } from '@/resources/shared/next-step-params';
 import { postRegisterStep } from '@/resources/signup/post-register';
 import {
   verifyUrlTemplate,
@@ -133,9 +134,7 @@ export async function registerAndLinkIdp(
   // explicit-sessionId hand-back (runCallback) instead of re-running decideAuthorize — without it
   // a brand-new IdP user completing a prompt=select_account / prompt=login ceremony loops straight
   // back to /accounts (or /login). Mirrors the password path's hand-back.
-  const target = requestId
-    ? `/authorize?requestId=${encodeURIComponent(requestId)}&sessionId=${encodeURIComponent(session.id)}`
-    : '/signed-in';
+  const target = authorizeHandbackTarget(requestId, session.id);
   return { kind: 'redirect', target, sessions };
 }
 

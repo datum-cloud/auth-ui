@@ -1,9 +1,9 @@
+import { BrandLogo } from '@/components/brand-logo/brand-logo';
 import type { BrandingTheme } from '@/modules/auth/types';
 import { assetUrl } from '@/utils/asset-url';
 import { Avatar, AvatarFallback, AvatarImage } from '@datum-cloud/datum-ui/avatar';
 import { LinkButton } from '@datum-cloud/datum-ui/button';
 import { Icon } from '@datum-cloud/datum-ui/icons';
-import { Logo } from '@datum-cloud/datum-ui/logo';
 import { Trans } from '@lingui/react/macro';
 import { BookOpen } from 'lucide-react';
 import { Link } from 'react-router';
@@ -20,13 +20,7 @@ export default function SplitLayout({
       {/* Left panel is the login form.*/}
       <div className="dark:bg-background relative flex min-h-screen w-full flex-col bg-white p-3 sm:p-4 md:px-[41px] md:py-8">
         <div className="flex items-center justify-between">
-          <Link to="/">
-            {branding?.logoUrl ? (
-              <img src={branding.logoUrl} alt="" aria-hidden="true" className="h-6 w-auto" />
-            ) : (
-              <Logo.Flat aria-label="Datum" className="h-6 w-auto" tone="brand" />
-            )}
-          </Link>
+          <BrandLogo branding={branding} />
         </div>
         <main className="flex w-full flex-1 items-center justify-center">
           <div className="w-full max-w-[400px]">{children}</div>

@@ -107,5 +107,5 @@ export async function serializeSessions(list: SessionEntry[]): Promise<string> {
 }
 
 // Re-export helpers so route loaders/actions import from one place
-export { capSessions, mostRecent, removeSession, addSession, listSessions, byId, byLoginName };
+export { mostRecent, removeSession, addSession, listSessions, byId, byLoginName };
 export type { SessionEntry };

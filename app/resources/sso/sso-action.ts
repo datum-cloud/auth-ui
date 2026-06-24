@@ -5,9 +5,10 @@
 // `runSsoAction` signature + `SsoActionDeps` shape are unchanged and re-exported
 // through the sso barrel.
 import type { AuthProvider } from '@/modules/auth/auth-provider';
-import { idpTypeToSlug } from '@/modules/auth/idp-slug';
+import { idpTypeToSlug, slugify } from '@/modules/auth/idp-slug';
 import { readSessions, mostRecent } from '@/modules/auth/session/cookie';
 import { ProviderError } from '@/modules/auth/types';
+import { ssoErrorRedirect } from '@/resources/shared/next-step-params';
 import { idpReturnUrls } from '@/resources/sso/idp-return-urls';
 import type { SsoOutcome } from '@/resources/sso/sso-outcome';
 import { trustedAppOrigin } from '@/server/infra/app-origin.server';
@@ -26,12 +27,6 @@ export interface SsoActionDeps {
     urls: { success: string; failure: string }
   ) => Promise<{ authUrl?: string | null | undefined }>;
   onAuthEvent?: (event: string, outcome: 'success' | 'failure') => void;
-}
-
-// ── helpers ─────────────────────────────────────────────────────────────────────
-
-function slugify(name: string): string {
-  return name.toLowerCase().replace(/\s+/g, '-');
 }
 
 // ── /sso action ─────────────────────────────────────────────────────────────────
@@ -146,10 +141,7 @@ export async function runSsoAction(
     if (err instanceof ProviderError) {
       deps.onAuthEvent?.('idp_start', 'failure');
       logAuthEvent('idp_start', 'failure', { reason: err.code });
-      return {
-        kind: 'redirect',
-        location: `/sso/${encodeURIComponent(slug)}/error?reason=${encodeURIComponent(providerErrorCode(err.code))}`,
-      };
+      return { kind: 'redirect', location: ssoErrorRedirect(slug, providerErrorCode(err.code)) };
     }
     throw err; // unknown → root ErrorBoundary
   }

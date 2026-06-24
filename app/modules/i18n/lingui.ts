@@ -1,4 +1,3 @@
-import { setupI18n } from '@lingui/core';
 import type { Messages } from '@lingui/core';
 
 // The 'es' catalog was byte-identical to 'en' (no real translations). Removed so
@@ -16,5 +15,3 @@ export async function loadMessages(locale: string): Promise<Messages> {
   const { messages } = await import(`./locales/${locale}.po`);
   return messages as Messages;
 }
-
-export { setupI18n };

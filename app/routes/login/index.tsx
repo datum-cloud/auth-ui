@@ -1,7 +1,11 @@
 import { SubmitButton } from '@/components/auth-form/auth-form';
 import { AuthFormFields } from '@/components/auth-form/auth-form-fields';
+import { IdpButtonList } from '@/components/auth-form/idp-button-list';
+import { LastUsedBadge } from '@/components/auth-form/last-used-badge';
+import { OrDivider } from '@/components/auth-form/or-divider';
 import { FormError } from '@/components/form-error/form-error';
 import { useAuthActionError } from '@/hooks/use-auth-action-error';
+import { useLoginContext } from '@/hooks/use-login-context';
 import SplitLayout from '@/layouts/split.layout';
 // ADAPTATION (plan-drift fix): readSessions + serializeSessions live in @/modules/auth/session/cookie.
 // The locked plan block incorrectly listed them as coming from @/modules/auth/session/session
@@ -18,12 +22,10 @@ import {
 } from '@/resources/login/login.schema';
 import { paths } from '@/routes/paths';
 import { providerForRequest } from '@/server/auth-context.server';
-import { getCsrfToken, assertCsrf } from '@/server/csrf';
+import { loaderCsrf, assertCsrf } from '@/server/csrf';
 import { trustedAppOrigin } from '@/server/infra/app-origin.server';
 import { env } from '@/server/infra/env.server';
 import { getOrCreateFingerprintId, userAgentFromRequest } from '@/server/user-agent';
-import { assetUrl } from '@/utils/asset-url';
-import { Badge } from '@datum-cloud/datum-ui/badge';
 import { Button, LinkButton } from '@datum-cloud/datum-ui/button';
 import { Form } from '@datum-cloud/datum-ui/form';
 import { Icon } from '@datum-cloud/datum-ui/icons';
@@ -38,14 +40,7 @@ import {
   type LoaderFunctionArgs,
   type MetaFunction,
 } from 'react-router';
-import {
-  Form as RRForm,
-  Link,
-  useLoaderData,
-  useActionData,
-  useNavigation,
-  useRouteLoaderData,
-} from 'react-router';
+import { Form as RRForm, Link, useLoaderData, useActionData, useNavigation } from 'react-router';
 
 export const meta: MetaFunction = () => [{ title: 'Sign in' }];
 
@@ -65,12 +60,12 @@ export async function loader({ request }: LoaderFunctionArgs) {
     provider.getBranding(organization),
     provider.capabilities.externalIdp ? provider.getActiveIdPs(organization) : Promise.resolve([]),
   ]);
-  const [csrfToken, setCookie] = await getCsrfToken(request);
-  // ADAPTATION (getCsrfToken null handling): only set 'set-cookie' when non-null.
-  const headers: Record<string, string> = {};
-  if (setCookie !== null) headers['set-cookie'] = setCookie;
+  // CSRF assembly + last-used read are independent (local cookie/crypto, no network) — run in parallel.
+  const [{ csrfToken, headers }, lastUsedLogin] = await Promise.all([
+    loaderCsrf(request),
+    readLastUsedLogin(request),
+  ]);
   const notice = url.searchParams.get('notice') ?? undefined;
-  const lastUsedLogin = await readLastUsedLogin(request);
   return data(
     {
       settings,
@@ -189,12 +184,7 @@ export async function action({ request }: ActionFunctionArgs) {
 export default function Login() {
   const { csrfToken, idps, settings, branding, emailDeliveryEnabled, notice, lastUsedLogin } =
     useLoaderData<typeof loader>();
-  // RR7 infers the parent-layout loader return through the generic — the `as` cast is gone.
-  // The `?? { loginName: '' }` only satisfies the structurally-possible-undefined branch; these
-  // routes always render under the `login` layout, so it is never taken at runtime.
-  const { loginName, requestId, organization } = useRouteLoaderData<
-    typeof import('@/routes/login/layout').loader
-  >('login') ?? { loginName: '' };
+  const { loginName, requestId, organization } = useLoginContext();
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
   const { t } = useLingui();
@@ -268,44 +258,15 @@ export default function Login() {
       </div>
 
       {view.showIdpButtons ? (
-        <div className="flex flex-col gap-3">
-          {idps.map((idp) => (
-            <RRForm key={idp.id} method="post">
-              <AuthFormFields csrf={csrfToken} requestId={requestId} organization={organization} />
-              <input type="hidden" name="intent" value="idp" />
-              <input type="hidden" name="idpId" value={idp.id} />
-              <Button
-                size="large"
-                className="relative h-13 gap-3"
-                type="quaternary"
-                theme="outline"
-                block
-                htmlType="submit"
-                loading={submittingIdpId === idp.id}
-                iconPosition="left"
-                icon={
-                  <img
-                    src={assetUrl(
-                      `/images/idps/${idp.name.toLowerCase().replace(/\s+/g, '-')}.png`
-                    )}
-                    alt={idp.name}
-                    aria-hidden="true"
-                    className="size-4 object-contain"
-                  />
-                }>
-                <Trans>{idp.name}</Trans>
-                {lastUsedLogin === `idp:${idp.id}` ? (
-                  <Badge
-                    type="primary"
-                    theme="solid"
-                    className="absolute -top-3.5 -right-5 rounded-lg text-xs text-white dark:text-[#0c1d31]">
-                    <Trans>Last used</Trans>
-                  </Badge>
-                ) : null}
-              </Button>
-            </RRForm>
-          ))}
-        </div>
+        <IdpButtonList
+          idps={idps}
+          csrf={csrfToken}
+          requestId={requestId}
+          organization={organization}
+          submittingIdpId={submittingIdpId}
+          relative
+          lastUsedLogin={lastUsedLogin}
+        />
       ) : null}
 
       {view.showPasskeyPrompt ? (
@@ -320,26 +281,11 @@ export default function Login() {
           iconPosition="left"
           icon={<Icon icon={UserKey} />}>
           <Trans>Passkey</Trans>
-          {lastUsedLogin === 'passkey' ? (
-            <Badge
-              type="primary"
-              theme="solid"
-              className="absolute -top-3.5 -right-5 rounded-lg text-xs text-white dark:text-[#0c1d31]">
-              <Trans>Last used</Trans>
-            </Badge>
-          ) : null}
+          <LastUsedBadge active={lastUsedLogin === 'passkey'} />
         </LinkButton>
       ) : null}
 
-      {view.showPasswordForm && view.showIdpButtons ? (
-        <div className="relative my-8 flex items-center" aria-hidden="true">
-          <div className="border-border flex-grow border-t" />
-          <span className="text-foreground/60 mx-3 shrink-0 text-xs">
-            <Trans>or</Trans>
-          </span>
-          <div className="border-border flex-grow border-t" />
-        </div>
-      ) : null}
+      {view.showPasswordForm && view.showIdpButtons ? <OrDivider /> : null}
 
       {view.showPasswordForm ? (
         <>
@@ -354,14 +300,7 @@ export default function Login() {
               icon={<Icon icon={Mail} />}
               onClick={() => setShowEmailField(true)}>
               <Trans>Email</Trans>
-              {lastUsedLogin === 'email' ? (
-                <Badge
-                  type="primary"
-                  theme="solid"
-                  className="absolute -top-3.5 -right-5 rounded-lg text-xs text-white dark:text-[#0c1d31]">
-                  <Trans>Last used</Trans>
-                </Badge>
-              ) : null}
+              <LastUsedBadge active={lastUsedLogin === 'email'} />
             </Button>
           ) : (
             <Form.Root

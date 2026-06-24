@@ -1,6 +1,6 @@
 import { env } from '@/server/infra/env.server';
 import { CSRF_FORM_KEY } from '@/shared';
-import { createCookie, data, type LoaderFunctionArgs } from 'react-router';
+import { createCookie } from 'react-router';
 import { CSRF, CSRFError } from 'remix-utils/csrf/server';
 
 // Fix 6: scope cookie to /id (matches the app basename; legacy-fork co-existence defense —
@@ -60,17 +60,4 @@ export async function loaderCsrf(
   const headers: Record<string, string> = {};
   if (setCookie !== null) headers['set-cookie'] = setCookie;
   return { csrfToken, headers };
-}
-
-// Optional HOF for loaders whose only header concern is csrf. Additive — not yet adopted.
-// Returns react-router's `data()` envelope (DataWithResponseInit), not a raw Response — the
-// return type is inferred from `data(...)` rather than annotated Promise<Response> (TS2740).
-export function withCsrf<T>(
-  loaderFn: (args: LoaderFunctionArgs, ctx: { csrfToken: string }) => Promise<T> | T
-) {
-  return async (args: LoaderFunctionArgs) => {
-    const { csrfToken, headers } = await loaderCsrf(args.request);
-    const result = await loaderFn(args, { csrfToken });
-    return data(result, { headers });
-  };
 }

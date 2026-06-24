@@ -5,7 +5,7 @@ import { useAuthActionError } from '@/hooks/use-auth-action-error';
 import { submitLdapCredentials, outcomeToResponse, type LdapActionData } from '@/resources/sso';
 import { ldapClientSchema } from '@/resources/sso/sso.schema';
 import { providerForRequest } from '@/server/auth-context.server';
-import { getCsrfToken, assertCsrf } from '@/server/csrf';
+import { loaderCsrf, assertCsrf } from '@/server/csrf';
 import { Form } from '@datum-cloud/datum-ui/form';
 import { Trans, useLingui } from '@lingui/react/macro';
 import {
@@ -29,9 +29,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const requestId = url.searchParams.get('requestId') ?? undefined;
   const organization = url.searchParams.get('organization') ?? undefined;
 
-  const [csrfToken, setCookie] = await getCsrfToken(request);
-  const headers: Record<string, string> = {};
-  if (setCookie !== null) headers['set-cookie'] = setCookie;
+  const { csrfToken, headers } = await loaderCsrf(request);
 
   return data({ csrfToken, idpId, requestId, organization }, { headers });
 }

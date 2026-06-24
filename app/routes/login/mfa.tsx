@@ -1,11 +1,13 @@
 import { AuthCeremony } from '@/components/auth-ceremony/auth-ceremony';
 import { AuthFormFields } from '@/components/auth-form/auth-form-fields';
 import { useAuthActionRecovery } from '@/hooks/use-auth-action-recovery';
+import { useLoginContext } from '@/hooks/use-login-context';
 import { readSessions } from '@/modules/auth/session/cookie';
 import { resolveMfaPicker, chooseMfaMethod, type SecondFactorMethod } from '@/resources/mfa';
+import { readCeremonyParams } from '@/resources/shared/ceremony-params';
 import { paths } from '@/routes/paths';
 import { providerForRequest } from '@/server/auth-context.server';
-import { getCsrfToken, assertCsrf } from '@/server/csrf';
+import { loaderCsrf, assertCsrf } from '@/server/csrf';
 import { assetUrl } from '@/utils/asset-url';
 import { Button } from '@datum-cloud/datum-ui/button';
 import { Icon } from '@datum-cloud/datum-ui/icons';
@@ -17,7 +19,6 @@ import {
   redirect,
   useActionData,
   useLoaderData,
-  useRouteLoaderData,
   type ActionFunctionArgs,
   type LoaderFunctionArgs,
   type MetaFunction,
@@ -60,10 +61,7 @@ const METHOD_LABELS: Record<SecondFactorMethod, { label: ReactNode; icon: ReactN
 // ─── Loader ──────────────────────────────────────────────────────────────────
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  const url = new URL(request.url);
-  const loginName = url.searchParams.get('loginName') ?? '';
-  const requestId = url.searchParams.get('requestId') ?? undefined;
-  const organization = url.searchParams.get('organization') ?? undefined;
+  const { loginName, requestId, organization } = readCeremonyParams(new URL(request.url));
 
   // Service resolves the session guard, user lookup, policy-filtered 2nd factors, and the
   // single-factor short-circuit. The route only reads the cookie, mints the CSRF token, and
@@ -73,9 +71,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const result = await resolveMfaPicker(provider, sessions, { loginName, requestId, organization });
   if (result.kind === 'redirect') return redirect(result.target);
 
-  const [csrfToken, setCookie] = await getCsrfToken(request);
-  const headers: Record<string, string> = {};
-  if (setCookie !== null) headers['set-cookie'] = setCookie;
+  const { csrfToken, headers } = await loaderCsrf(request);
 
   return data({ csrfToken, secondFactors: result.secondFactors }, { headers });
 }
@@ -111,12 +107,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
 export default function MfaPicker() {
   const { csrfToken, secondFactors } = useLoaderData<typeof loader>();
-  // RR7 infers the parent-layout loader return through the generic — the `as` cast is gone.
-  // The `?? { loginName: '' }` only satisfies the structurally-possible-undefined branch; these
-  // routes always render under the `login` layout, so it is never taken at runtime.
-  const { loginName, requestId, organization } = useRouteLoaderData<
-    typeof import('@/routes/login/layout').loader
-  >('login') ?? { loginName: '' };
+  const { loginName, requestId, organization } = useLoginContext();
   const actionData = useActionData<typeof action>();
   // Shared error pipeline; the message surfaces inline through AuthCeremony,
   // plus an inline recovery <Link> for recoverable codes (e.g. SESSION_EXPIRED → "Sign in again").

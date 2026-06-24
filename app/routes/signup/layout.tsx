@@ -1,3 +1,4 @@
+import { readCeremonyParams } from '@/resources/shared/ceremony-params';
 import { Outlet, type LoaderFunctionArgs } from 'react-router';
 
 /**
@@ -23,12 +24,7 @@ export interface SignupLayoutData {
  * (they run independently); the hoist removes duplicated *render-time* context.
  */
 export async function loader({ request }: LoaderFunctionArgs): Promise<SignupLayoutData> {
-  const url = new URL(request.url);
-  return {
-    loginName: url.searchParams.get('loginName') ?? '',
-    requestId: url.searchParams.get('requestId') ?? undefined,
-    organization: url.searchParams.get('organization') ?? undefined,
-  };
+  return readCeremonyParams(new URL(request.url));
 }
 
 export default function SignupLayout() {

@@ -1,4 +1,5 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
+import { AuthFormFields } from '@/components/auth-form/auth-form-fields';
 import { FormError } from '@/components/form-error/form-error';
 import { useAuthActionError } from '@/hooks/use-auth-action-error';
 import {
@@ -9,7 +10,7 @@ import {
 } from '@/resources/device';
 import { paths } from '@/routes/paths';
 import { providerForRequest } from '@/server/auth-context.server';
-import { getCsrfToken, assertCsrf } from '@/server/csrf';
+import { loaderCsrf, assertCsrf } from '@/server/csrf';
 import { Badge } from '@datum-cloud/datum-ui/badge';
 import { Button, LinkButton } from '@datum-cloud/datum-ui/button';
 import { Trans } from '@lingui/react/macro';
@@ -42,9 +43,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     return deviceConsentErrorToResponse(outcome.error);
   }
 
-  const [csrfToken, setCookie] = await getCsrfToken(request);
-  const headers: Record<string, string> = {};
-  if (setCookie !== null) headers['set-cookie'] = setCookie;
+  const { csrfToken, headers } = await loaderCsrf(request);
 
   return data({ csrfToken, ...outcome.consent }, { headers });
 }
@@ -119,7 +118,7 @@ export default function DeviceAuthorize() {
           </div>
         )}
         <RRForm method="post" className="flex w-full flex-col gap-4">
-          <input type="hidden" name="csrf" value={csrfToken} />
+          <AuthFormFields csrf={csrfToken} />
           <input type="hidden" name="deviceAuthId" value={deviceAuthId} />
           <input type="hidden" name="requestId" value={requestId} />
           <FormError>{errorMessage}</FormError>

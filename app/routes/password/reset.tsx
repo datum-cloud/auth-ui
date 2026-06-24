@@ -1,5 +1,6 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
 import { SubmitButton } from '@/components/auth-form/auth-form';
+import { AuthFormFields } from '@/components/auth-form/auth-form-fields';
 import { BackLink } from '@/components/back-link/back-link';
 import { FormError } from '@/components/form-error/form-error';
 import { useAuthActionError } from '@/hooks/use-auth-action-error';
@@ -8,7 +9,7 @@ import { requestPasswordReset } from '@/resources/password';
 import { resetRequestSchema, resetRequestClientSchema } from '@/resources/password/password.schema';
 import { genericCheckYourEmail } from '@/resources/schemas/check-your-email.schema';
 import { providerForRequest } from '@/server/auth-context.server';
-import { getCsrfToken, assertCsrf } from '@/server/csrf';
+import { loaderCsrf, assertCsrf } from '@/server/csrf';
 import { trustedAppOrigin } from '@/server/infra/app-origin.server';
 import { env } from '@/server/infra/env.server';
 import { actionError } from '@/utils/errors/auth-error';
@@ -31,9 +32,7 @@ export const meta: MetaFunction = () => [{ title: 'Reset password' }];
 export async function loader({ request }: LoaderFunctionArgs) {
   if (!env.AUTH_EMAIL_DELIVERY_ENABLED) return redirect('/login');
   const url = new URL(request.url);
-  const [csrfToken, setCookie] = await getCsrfToken(request);
-  const headers: Record<string, string> = {};
-  if (setCookie !== null) headers['set-cookie'] = setCookie;
+  const { csrfToken, headers } = await loaderCsrf(request);
   const organization = url.searchParams.get('organization') ?? undefined;
   const provider = providerForRequest(request);
   const branding = await provider.getBranding(organization);
@@ -114,9 +113,7 @@ export default function PasswordReset() {
         defaultValues={{ loginName: '' }}
         isSubmitting={navigation.state === 'submitting'}
         className="mb-4 flex flex-col gap-4">
-        <input type="hidden" name="csrf" value={csrfToken} />
-        {organization ? <input type="hidden" name="organization" value={organization} /> : null}
-        {requestId ? <input type="hidden" name="requestId" value={requestId} /> : null}
+        <AuthFormFields csrf={csrfToken} requestId={requestId} organization={organization} />
         <Form.Field name="loginName" label={t`Email or username`} required>
           <Form.Input
             type="text"

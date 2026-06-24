@@ -1,5 +1,6 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
 import { AuthFormFields } from '@/components/auth-form/auth-form-fields';
+import { slugify } from '@/modules/auth/idp-slug';
 import type { IdProvider } from '@/modules/auth/types';
 import {
   resolveSsoManagement,
@@ -62,10 +63,6 @@ export async function action({ request }: ActionFunctionArgs, deps: SsoActionDep
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-function slugify(name: string): string {
-  return name.toLowerCase().replace(/\s+/g, '-');
-}
 
 // 755-M6: provider icon/name badge for a linked IdP. Ports the OLD linked-idp-list switch
 // (on the IdP type) to the rebuilt string-typed `type` ('GOOGLE' | 'GITHUB' | 'GITHUB_ES' | …

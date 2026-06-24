@@ -1,8 +1,9 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
+import { AuthFormFields } from '@/components/auth-form/auth-form-fields';
 import { TrackOnMount } from '@/modules/analytics/fathom';
 import { resolveSignedIn } from '@/resources/session';
 import { providerForRequest } from '@/server/auth-context.server';
-import { getCsrfToken } from '@/server/csrf';
+import { loaderCsrf } from '@/server/csrf';
 import { env } from '@/server/infra/env.server';
 import { Button } from '@datum-cloud/datum-ui/button';
 import { Trans } from '@lingui/react/macro';
@@ -27,10 +28,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   }
 
   // Terminal "You are signed in" page — mint a CSRF token for the sign-out form.
-  const [csrfToken, setCookie] = await getCsrfToken(request);
-  // DEVIATION (getCsrfToken null-guard): only set 'set-cookie' when non-null (same pattern as login.tsx).
-  const headers: Record<string, string> = {};
-  if (setCookie !== null) headers['set-cookie'] = setCookie;
+  const { csrfToken, headers } = await loaderCsrf(request);
   return data(
     { loginName: outcome.loginName, csrfToken, deviceComplete: outcome.deviceComplete ?? false },
     { headers }
@@ -94,7 +92,7 @@ export default function SignedIn() {
             Explicit literal path because RR basename-prefixing only applies to RR <Form>.
             A logout journey should select form[action^="/id/logout"] — keep that prefix. */}
         <form method="post" action="/id/logout?index">
-          <input type="hidden" name="csrf" value={csrfToken} />
+          <AuthFormFields csrf={csrfToken} />
           <Button type="primary" theme="solid" htmlType="submit" block>
             <Trans>Sign out</Trans>
           </Button>

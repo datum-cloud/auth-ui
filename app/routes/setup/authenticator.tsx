@@ -7,9 +7,10 @@ import { readSessions, byLoginName } from '@/modules/auth/session/cookie';
 import { setupSkipSchema } from '@/resources/mfa/mfa.schema';
 import { enrollTotp } from '@/resources/otp';
 import { otpCodeClientSchema } from '@/resources/otp/otp.schema';
-import { paths } from '@/routes/paths';
+import { readCeremonyParams } from '@/resources/shared/ceremony-params';
+import { redirectToLogin } from '@/routes/login-bounce';
 import { providerForRequest } from '@/server/auth-context.server';
-import { getCsrfToken, assertCsrf } from '@/server/csrf';
+import { loaderCsrf, assertCsrf } from '@/server/csrf';
 import { Form } from '@datum-cloud/datum-ui/form';
 import { Trans, useLingui } from '@lingui/react/macro';
 import { QRCodeSVG } from 'qrcode.react';
@@ -29,29 +30,23 @@ export const meta: MetaFunction = () => [{ title: 'Set up authenticator app' }];
 
 export async function loader({ request }: LoaderFunctionArgs) {
   const url = new URL(request.url);
-  const loginName = url.searchParams.get('loginName') ?? '';
-  const requestId = url.searchParams.get('requestId') ?? undefined;
-  const organization = url.searchParams.get('organization') ?? undefined;
+  const { loginName, requestId, organization } = readCeremonyParams(url);
   const { force, checkAfter } = setupSkipSchema.parse(Object.fromEntries(url.searchParams));
 
   // Guard: require an active session for this loginName (mirror login.verify.authenticator.tsx).
   const sessions = await readSessions(request);
   const entry = byLoginName(sessions, loginName, organization);
-  if (!entry)
-    return redirect(paths.login.index(requestId ? { requestId, organization } : undefined));
+  if (!entry) return redirect(redirectToLogin(requestId, organization));
 
   // Resolve userId via findUser — SessionEntry carries no userId field (mirror login.mfa.tsx).
   const provider = providerForRequest(request);
   const user = await provider.findUser(loginName, organization);
-  if (!user)
-    return redirect(paths.login.index(requestId ? { requestId, organization } : undefined));
+  if (!user) return redirect(redirectToLogin(requestId, organization));
 
   // Register TOTP: returns deterministic { uri, secret } in fake; real adapter generates a new key.
   const { uri, secret } = await provider.registerTotp(user.id);
 
-  const [csrfToken, setCookie] = await getCsrfToken(request);
-  const headers: Record<string, string> = {};
-  if (setCookie !== null) headers['set-cookie'] = setCookie;
+  const { csrfToken, headers } = await loaderCsrf(request);
 
   return data(
     { csrfToken, loginName, requestId, organization, force, checkAfter, uri, secret },
