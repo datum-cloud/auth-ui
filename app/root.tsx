@@ -80,7 +80,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 
         <Meta />
         <Links />
-        {/* 755-M4: must mirror the <ThemeProvider> props below exactly so the pre-hydration
+        {/* Must mirror the <ThemeProvider> props below exactly so the pre-hydration
             class on <html> matches React's first render (no FOUC, no hydration mismatch).
             enableSystem + defaultTheme="system" → a fresh visitor follows prefers-color-scheme;
             the persisted ThemeToggle choice (localStorage) overrides it on return visits. */}

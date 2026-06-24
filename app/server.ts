@@ -22,7 +22,7 @@ import { createHonoServer } from 'react-router-hono-server/bun';
 declare module 'react-router' {
   interface AppLoadContext {
     traceId: string;
-    // EL-TRANSPORT-1 + CSP nonce threading: per-request nonce from hono secure-headers.
+    // CSP nonce threading: per-request nonce from hono secure-headers.
     cspNonce: string | undefined;
   }
 }
@@ -42,7 +42,7 @@ export default await createHonoServer<RequestContextEnv>({
   },
   configure(app) {
     const isDev = env.NODE_ENV !== 'production';
-    // EL-TRANSPORT-1: x-zitadel-forward-host directs where the service-user token is sent.
+    // x-zitadel-forward-host directs where the service-user token is sent.
     // External callers must never control it — strip it at the edge; only the
     // ZITADEL_TRUSTED_FORWARD_HOSTS allowlist may reintroduce trust.
     // Bun/Hono: c.req.raw.headers is a read-only Headers instance in the Fetch API;
@@ -61,7 +61,7 @@ export default await createHonoServer<RequestContextEnv>({
     // mix is a BREACH-class oracle. JS/CSS carry no secrets and are where the
     // bytes are anyway, so compression is scoped to the asset path.
     app.use('/id/assets/*', compress());
-    // P7 perf fix: react-router-hono-server mounts static assets at /assets/* but vite
+    // Perf fix: react-router-hono-server mounts static assets at /assets/* but vite
     // base='/id/' makes the browser request them as /id/assets/*.  In production the
     // ingress strips the /id prefix before hitting this server; in local `bun run start`
     // (used by lhci) the prefix is preserved and the RR7 catch-all returns error HTML for

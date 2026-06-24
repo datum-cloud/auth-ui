@@ -305,7 +305,7 @@ export function durationToMs(d: unknown): number | undefined {
   return ms === 0 ? undefined : ms;
 }
 
-// Bug C — login-policy second/multi factor TYPE enums.
+// Login-policy second/multi factor TYPE enums.
 // SECOND_FACTOR_MAP is a DIFFERENT enum from AUTH_METHOD_MAP above (per-user enrolled methods):
 // it maps proto SecondFactorType (settings/v2 login_settings_pb.d.ts) — OTP(=TOTP)=1, U2F=2,
 // OTP_EMAIL=3, OTP_SMS=4 — to the same neutral AuthMethod strings used by SECOND_FACTOR_METHODS /

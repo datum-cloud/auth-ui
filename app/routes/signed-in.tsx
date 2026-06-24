@@ -21,7 +21,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
   if (outcome.kind === 'redirect') return redirect(outcome.location);
 
-  // 755-M8: the post-login device-grant auto-authorization FAILED — render a tailored
+  // The post-login device-grant auto-authorization FAILED — render a tailored
   // recovery card (no sign-out form / no CSRF needed for this terminal state).
   if (outcome.kind === 'device-error') {
     return data({ deviceError: true } as const);
@@ -38,7 +38,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 export default function SignedIn() {
   const loaderData = useLoaderData<typeof loader>();
 
-  // 755-M8: device auto-authorization failed — tailored inline recovery (no sign-out form).
+  // Device auto-authorization failed — tailored inline recovery (no sign-out form).
   if ('deviceError' in loaderData) {
     return (
       <AuthCard
@@ -52,7 +52,7 @@ export default function SignedIn() {
 
   const { loginName, csrfToken, deviceComplete } = loaderData;
 
-  // 755-M8: device grant was auto-completed after login — restore the OLD behavior of landing
+  // Device grant was auto-completed after login — restore the OLD behavior of landing
   // on a "you can close this window" terminal page (no second Authorize click, no sign-out form).
   if (deviceComplete) {
     return (

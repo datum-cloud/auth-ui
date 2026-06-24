@@ -157,7 +157,7 @@ export interface LoginSettings {
   defaultRedirectUri?: string;
   /**
    * Policy-allowed second-factor methods from the login policy (proto `secondFactors`).
-   * Bug C: routing/setup intersect enrolled methods with this when present & non-empty.
+   * Routing/setup intersect enrolled methods with this when present & non-empty.
    * `undefined` (fake/older settings) → no restriction (enrolled-only, back-compat).
    * Note: this is a DIFFERENT enum from the per-user enrolled AuthMethod list — it reflects
    * which TYPES the org policy enables, not what the user has enrolled.
@@ -165,7 +165,7 @@ export interface LoginSettings {
   secondFactors?: AuthMethod[];
   /**
    * Policy-allowed multi-factor methods (proto `multiFactors`, e.g. U2F-with-verification → passkey).
-   * Bug C: gates the passkey row in the setup chooser. `undefined` → no restriction (back-compat).
+   * Gates the passkey row in the setup chooser. `undefined` → no restriction (back-compat).
    */
   multiFactors?: AuthMethod[];
 }

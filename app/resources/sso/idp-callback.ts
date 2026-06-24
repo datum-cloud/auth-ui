@@ -8,7 +8,7 @@ export interface IdpCallbackInput {
   // Same-email user resolved server-side (findUser + listAuthMethods) ONLY on the register
   // path. Optional so already-linked / link-ceremony callers need not compute it.
   existingAccount?: { userId: string; hasPassword: boolean } | null;
-  // POSTURE B2 (755-J2): owning Datum user of the IdP email, resolved server-side via
+  // POSTURE B2: owning Datum user of the IdP email, resolved server-side via
   // provider.findUser(intent.draft.email) ONLY for the link+fresh-identity case
   // (link === true && intent.userId == null). `null` ⇒ no Datum account owns that email.
   // Used to prove the fresh IdP identity's email belongs to the SESSION user before we link
@@ -40,7 +40,7 @@ export function decideIdpCallback({
 }: IdpCallbackInput): IdpDecision {
   // ── Linking ceremony (?link=true) ──────────────────────────────────────────────
   //
-  // SECURITY POSTURE B2 (755-J2). The link target is ALWAYS the active session user — an
+  // SECURITY POSTURE B2. The link target is ALWAYS the active session user — an
   // identity is only ever linked into the account whose ceremony cookie we just resolved
   // server-side. We never trust a client-supplied userId. There are two shapes:
   //

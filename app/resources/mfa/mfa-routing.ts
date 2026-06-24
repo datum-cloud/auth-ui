@@ -21,7 +21,7 @@ export interface MfaRoutingInput {
   context: Extract<FlowContext, { role: 'mfa' }>;
   requestId?: string;
   organization?: string;
-  // 755-M10: when true, suppress ONLY the step-6 skippable MFA-setup nudge (return `done`
+  // When true, suppress ONLY the step-6 skippable MFA-setup nudge (return `done`
   // instead of `/setup/mfa?force=false`). Set on account-SWITCH, where re-firing the
   // enroll-now prompt is a regression. Steps 1–5 are unaffected: real challenges
   // (steps 1–4) and FORCED setup (step 5, settings.forceMfa) still route normally.
@@ -54,7 +54,7 @@ export const USE_SCREEN: Record<SecondFactorMethod, string> = {
 };
 
 /**
- * Bug C: intersect the user's enrolled second factors with the org login policy's allowed
+ * Intersect the user's enrolled second factors with the org login policy's allowed
  * `secondFactors` so a policy-disabled-but-still-enrolled method (e.g. OTP-Email after the type
  * was disabled) is never offered. A non-empty policy restricts; undefined/empty policy signals
  * "no restriction" → return `enrolled` unchanged (back-compat for fake/older settings).
@@ -101,7 +101,7 @@ export function nextMfaStep(input: MfaRoutingInput): MfaRoutingResult {
   const enrolled = input.enrolledMethods.filter((m): m is SecondFactorMethod =>
     (SECOND_FACTOR_METHODS as readonly string[]).includes(m)
   );
-  // Bug C: gate by the org login policy's allowed second factors (shared helper — see
+  // Gate by the org login policy's allowed second factors (shared helper — see
   // intersectWithPolicy). Empty intersection falls through to the setup steps below =
   // skippable new-factor enrollment.
   const available = intersectWithPolicy(enrolled, settings.secondFactors);
@@ -122,7 +122,7 @@ export function nextMfaStep(input: MfaRoutingInput): MfaRoutingResult {
   }
 
   // 6. Skippable setup prompt, gated by the skip lifetime.
-  // 755-M10: on account-switch the caller suppresses this nudge — switching to an
+  // On account-switch the caller suppresses this nudge — switching to an
   // already-signed-in account must NOT re-fire the enroll-now prompt. Forced setup
   // (step 5 above) and real challenges (steps 1–4) have already been handled, so this
   // early `done` only skips the optional nudge, never a real requirement.

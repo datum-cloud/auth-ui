@@ -54,7 +54,7 @@ export type MfaPickerResult = MfaPickerRedirect | MfaPickerData;
  *
  * Filters the user's enrolled methods to 2nd factors only (password/passkey/idp
  * excluded), then intersects with the org login policy's allowed secondFactors
- * (Bug C / C4 — shared gate via intersectWithPolicy; undefined/empty policy →
+ * (shared gate via intersectWithPolicy; undefined/empty policy →
  * enrolled-only, back-compat). Exactly one allowed factor → redirect straight to its
  * use screen; otherwise return the list for the chooser to render.
  *
@@ -82,7 +82,7 @@ export async function resolveMfaPicker(
     (SECOND_FACTOR_METHODS as readonly string[]).includes(m)
   );
 
-  // Bug C (C4): never list a method the org login policy has disabled. Shared gate
+  // Never list a method the org login policy has disabled. Shared gate
   // (see intersectWithPolicy): undefined/empty policy → enrolled-only (back-compat).
   const secondFactors = intersectWithPolicy(enrolled, settings.secondFactors);
 
@@ -160,7 +160,7 @@ export async function chooseMfaMethod(
 // ── /setup/mfa loader: which enrollment rows to offer ─────────────────────────
 
 /**
- * Bug C-setup (C6): which login-policy set governs each capability key, and the neutral
+ * Which login-policy set governs each capability key, and the neutral
  * AuthMethod it must appear in to be policy-allowed.
  *  - passkey is a MULTI-factor (proto multiFactors → 'passkey'), NOT a second factor.
  *  - u2f / totpOtp / emailOtp / smsOtp are SECOND factors (proto secondFactors).
@@ -244,7 +244,7 @@ export type MfaSetupResult = MfaSetupRedirect | MfaSetupData;
  * (the SessionEntry carries no userId field). Either guard failing → redirect('/login').
  *
  * Capabilities determine which enrollment methods the provider supports; the org login
- * policy further gates which of those are actually enabled (Bug C-setup / C6). The gating
+ * policy further gates which of those are actually enabled. The gating
  * is pure and server-only, so compute the offerable KEYS here and ship just those — never
  * the raw policy arrays. (Keys, not route objects: the route labels are non-serializable
  * JSX.)

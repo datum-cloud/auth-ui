@@ -13,7 +13,7 @@ import { env } from '@/server/infra/env.server';
 // ── /sso loader ─────────────────────────────────────────────────────────────────
 
 /**
- * Route view-model for a linked IdP (755-M6). Extends the bare provider `IdpLink`
+ * Route view-model for a linked IdP. Extends the bare provider `IdpLink`
  * ({idpId, idpUserId, idpUserName}) with the display fields joined in from the active-IdP
  * list ({name, type, logoUrl}) so the route can render a provider icon + name instead of a
  * bare UUID. The provider-display fields are optional: a link whose IdP is no longer active
@@ -36,9 +36,9 @@ export interface SsoManagementData {
 
 /**
  * Join raw IdP links to the active-provider list by `idpId` to attach display metadata
- * ({name, type, logoUrl}) and DEDUPE the linked list by `idpId` (755-M6).
+ * ({name, type, logoUrl}) and DEDUPE the linked list by `idpId`.
  *
- * Dedupe is defensive: the real duplicate SOURCE is the 755-J2 partial-link residue (a fresh
+ * Dedupe is defensive: the real duplicate SOURCE is the partial-link residue (a fresh
  * link that errored mid-ceremony could leave two rows for one IdP). First occurrence wins.
  * Exported for unit testing the join + dedupe in isolation from the loader's I/O.
  */
@@ -105,7 +105,7 @@ export async function resolveSsoManagement(
 
   // listIdpLinks now returns IdpLink[] — no cast needed.
   const links = await provider.listIdpLinks(userId);
-  // 755-M6: join links ↔ active IdPs by idpId to attach {name,type,logoUrl} and dedupe.
+  // Join links ↔ active IdPs by idpId to attach {name,type,logoUrl} and dedupe.
   const linked = joinLinkedIdps(links, active);
   const linkedIds = new Set(linked.map((l) => l.idpId));
 

@@ -6,7 +6,7 @@ import { createHash } from 'node:crypto';
 export interface TransportEnv {
   ZITADEL_API_URL?: string;
   ZITADEL_CUSTOM_REQUEST_HEADERS?: string;
-  // EL-TRANSPORT-1: fail-closed allowlist for x-zitadel-forward-host.
+  // Fail-closed allowlist for x-zitadel-forward-host.
   // Unset or empty array = reject ALL forward-host overrides.
   trustedForwardHosts?: string[];
 }
@@ -18,7 +18,7 @@ function normalizeForwardHost(raw: string): string {
   return with_scheme.replace(/\/+$/, '');
 }
 
-// EL-TRANSPORT-1: forward-host header accepted ONLY if its https-normalized value
+// Forward-host header accepted ONLY if its https-normalized value
 // is in the trustedForwardHosts allowlist. Unset/empty list → reject all.
 export function resolveServiceUrl(headers: Headers, env: TransportEnv): string {
   const forwarded = headers.get('x-zitadel-forward-host');
@@ -56,7 +56,7 @@ function capInsert<V>(cache: Map<string, V>, key: string, value: V): void {
 // Transports (one HTTP/2 session manager each) are expensive; cache by config so the
 // hot login path reuses one connection instead of opening a socket per RPC group.
 // Key cardinality: env-config-derived today (~1 entry). When a forward-host resolver is
-// wired (Task 8 EL gate, EL-TRANSPORT-1), the key must remain bounded/trusted — callers
+// wired, the key must remain bounded/trusted — callers
 // must validate the forward-host value before it becomes part of the cache key.
 const transportCache = new Map<string, ReturnType<typeof libCreateServerTransport>>();
 

@@ -90,7 +90,7 @@ function makeFake(): FakeAuthProvider {
     ],
     // P5 Task 14 e2e seed: per-org login settings overrides.
     // 'force-org' has forceMfa=true; all other users (no org param) get the default forceMfa=false.
-    // Bug C seed: 'totp-only-org' enables ONLY TOTP as a second factor in policy, so an
+    // Seed: 'totp-only-org' enables ONLY TOTP as a second factor in policy, so an
     // enrolled-but-policy-disabled method (e.g. otp_email) is dropped by the routing/chooser
     // intersection. Leaving secondFactors/multiFactors undefined for every other org preserves
     // the enrolled-only back-compat behavior the older specs assert.
@@ -115,7 +115,7 @@ function makeFake(): FakeAuthProvider {
       },
     },
     // P6 Task 9 e2e seed: LDAP credentials for the ldap-bob@acme.test user.
-    // P7: 'unlinked' mirrors real Zitadel — valid LDAP creds but no linked Zitadel
+    // 'unlinked' mirrors real Zitadel — valid LDAP creds but no linked Zitadel
     // account (startLdapIntent returns userId=''), so direct sign-in must fail gracefully.
     ldapUsers: [
       { username: 'bob', password: 'pw', userId: 'u13' },

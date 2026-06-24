@@ -53,7 +53,7 @@ export interface NextStepParams {
   mfaInitSkippedAt?: string | null;
   requestId?: string;
   organization?: string;
-  // 755-M10: forwarded to nextStep → nextMfaStep to suppress ONLY the step-6 skippable
+  // Forwarded to nextStep → nextMfaStep to suppress ONLY the step-6 skippable
   // MFA-setup nudge on account-switch. Forced setup + real challenges are unaffected.
   suppressMfaSetupNudge?: boolean;
 }
@@ -118,7 +118,7 @@ export function nextStepWithParams(input: NextStepParams): string {
 
   // nextStep ALREADY bakes the ceremony params (loginName/requestId/organization) into the
   // target's query — so we must MERGE into that existing query (set() dedupes), not blindly
-  // append with `&`, which produced a duplicated `loginName=…&loginName=…` (F3). Splitting on
+  // append with `&`, which produced a duplicated `loginName=…&loginName=…`. Splitting on
   // the first '?' preserves any MFA-specific params (force/checkAfter) nextStep already set.
   const qIndex = target.indexOf('?');
   const base = qIndex === -1 ? target : target.slice(0, qIndex);

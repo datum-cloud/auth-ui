@@ -1,5 +1,5 @@
 /**
- * P7 observability: env-gated Sentry server init.
+ * Observability: env-gated Sentry server init.
  *
  * Import this module ONCE, early in the server entry (entry.server.tsx or server.ts).
  * When SENTRY_DSN is unset the module exports a no-op `captureException` and an

@@ -13,10 +13,10 @@
 //   xff.split(',').at(-1)?.trim()
 // This is the single source of truth for proxy trust.
 //
-// 755-M2: send the RAW user-agent string in BOTH `header['user-agent']` and
+// Send the RAW user-agent string in BOTH `header['user-agent']` and
 // `description`. milo-os/graphql-gateway runs the Bowser library over whichever
 // field maps to `status.userAgent`, and Bowser only detects OS/browser from a
-// real UA string (it keys off raw tokens like `Macintosh`). The earlier M1
+// real UA string (it keys off raw tokens like `Macintosh`). The earlier
 // approach (comma-split header + a custom comma-joined description) fragmented
 // the UA at its internal `(KHTML, like Gecko)` comma and gave Bowser nothing
 // parseable, so Active-Sessions showed `os: null`. Sending the raw UA fixes it.
@@ -145,7 +145,7 @@ export function userAgentFromRequest(request: Request, fingerprintId?: string): 
   }
 
   // UA header → header shape + description.
-  // 755-M2: send the FULL raw UA as a SINGLE header value (do NOT comma-split —
+  // Send the FULL raw UA as a SINGLE header value (do NOT comma-split —
   // that fragments the UA at `(KHTML, like Gecko)` and breaks Bowser). The raw UA
   // is also mirrored into `description` because milo's gateway runs Bowser over
   // whichever field it maps to `status.userAgent`.

@@ -123,7 +123,7 @@ export async function processIdpCallback(
       }
     }
 
-    // POSTURE B2 (755-J2): for the link+FRESH-identity case (link ceremony, Zitadel has no
+    // POSTURE B2: for the link+FRESH-identity case (link ceremony, Zitadel has no
     // mapping yet → intent.userId == null) resolve the Datum account that OWNS the IdP's
     // verified email. decideIdpCallback only links the fresh identity into the session user
     // when this owner IS the session user (mirror of the register-path findUser above — the
@@ -272,7 +272,7 @@ export async function processIdpCallback(
             reason: err.code,
             requestId,
           });
-          // 755-J1: ALREADY_EXISTS means this IdP identity is already linked to a DIFFERENT
+          // ALREADY_EXISTS means this IdP identity is already linked to a DIFFERENT
           // Datum account. The generic providerErrorCode() collapses it to `signin_failed`
           // ("Could not complete sign-in") which is misleading — the user needs to know the
           // identity belongs elsewhere. Surface a distinct, accurate reason that reuses the

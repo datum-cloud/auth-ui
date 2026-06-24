@@ -90,10 +90,10 @@ export function appSecureHeaders(
     // allowlist is configured, OMIT XFO (false) and rely on CSP frame-ancestors —
     // otherwise XFO:DENY would block the very embed the allowlist is meant to permit.
     xFrameOptions: framingLockedDown(frameAncestors) ? 'DENY' : false,
-    // P7 Task 8: tightened from origin-when-cross-origin (P0 review work item) —
+    // Tightened from origin-when-cross-origin (P0 review work item) —
     // never leak path/query to other origins; same-origin keeps the full URL.
     referrerPolicy: 'strict-origin-when-cross-origin',
-    // P7 Task 8 (P0 carry-over): deny powerful features the auth UI never uses.
+    // P0 carry-over: deny powerful features the auth UI never uses.
     // publickey-credentials-get stays self — WebAuthn ceremonies need it.
     permissionsPolicy: {
       camera: [],

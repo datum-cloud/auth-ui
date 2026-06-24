@@ -101,7 +101,7 @@ export async function resolveSignedIn(
 
   if (!recent) return { kind: 'redirect', location: '/login' };
 
-  // 755-M8: post-login device-grant AUTO-COMPLETE. The OLD signedin page completed the grant
+  // Post-login device-grant AUTO-COMPLETE. The OLD signedin page completed the grant
   // automatically (completeDeviceAuthorization) — no second manual Authorize click. The rebuild
   // regressed to bouncing device_ back to /authorize → /device/authorize (a redundant consent
   // screen). Restore the auto-complete: with an active session present, authorize the grant
@@ -144,7 +144,7 @@ export async function resolveSignedIn(
 }
 
 /**
- * 755-M8: complete a device authorization grant automatically after login.
+ * Complete a device authorization grant automatically after login.
  *
  * Mirrors the OLD `completeDeviceAuthorization` flow: the user code is the stable handle threaded
  * through the login ceremony as `device_<userCode>` (the adapter returns a fresh opaque
@@ -196,8 +196,8 @@ export interface EnrichedAccount {
   /** path === '/signed-in' means the session is fully active */
   nextPath: string;
   isActive: boolean;
-  // 755-M9/M6: optional IdP indicator for the row badge. Populated by the SSO link↔provider
-  // join (755-M6); until that lands these stay undefined and the row simply renders no badge.
+  // Optional IdP indicator for the row badge. Populated by the SSO link↔provider
+  // join; until that lands these stay undefined and the row simply renders no badge.
   idpName?: string;
   idpType?: string;
 }
@@ -222,7 +222,7 @@ async function resolveNextPath(
   provider: AuthProvider,
   session: Session,
   entry: { loginName: string; organization?: string; requestId?: string },
-  // 755-M10: account-SWITCH passes this so the resolved destination is the continuation
+  // Account-SWITCH passes this so the resolved destination is the continuation
   // (/signed-in) and the step-6 skippable MFA-setup nudge is suppressed. Real forced MFA
   // (settings.forceMfa) and real challenges still route normally.
   //
@@ -438,7 +438,7 @@ export async function switchAccount(
     }
 
     userId = freshSession.user?.id ?? entry.loginName;
-    // 755-M10: on switch, resolve to the continuation/signed-in destination and suppress
+    // On switch, resolve to the continuation/signed-in destination and suppress
     // ONLY the step-6 skippable MFA-setup nudge. Forced MFA + real challenges still route.
     // `requestId` carries the CURRENT ceremony (a mid-OIDC/SAML/device switch) so the resolved
     // path threads the live id back into the protocol callback instead of the stale cookie one.

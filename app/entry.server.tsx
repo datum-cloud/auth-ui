@@ -1,4 +1,4 @@
-// P7 observability: initialise Sentry FIRST so the SDK is active before any
+// Observability: initialise Sentry FIRST so the SDK is active before any
 // application modules load.  This import is a no-op when SENTRY_DSN is unset.
 import { captureException } from '@/server/sentry.server';
 import { createReadableStreamFromReadable } from '@react-router/node';

@@ -108,7 +108,7 @@ export default function SetupAuthenticator() {
           the camera isn't available). Explicit dimensions avoid layout shift; the white
           frame preserves the quiet-zone contrast scanners need. */}
       <div className="flex w-full justify-center">
-        {/* 755-M4: bg-white below is intentional in BOTH themes — a TOTP QR needs a light quiet
+        {/* bg-white below is intentional in BOTH themes — a TOTP QR needs a light quiet
             zone for reliable camera scanning; it must NOT flip to a dark surface. */}
         <QRCodeSVG
           data-testid="totp-qr"

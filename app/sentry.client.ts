@@ -1,5 +1,5 @@
 /**
- * P7 observability — client-side Sentry init (env-gated, no-op by default).
+ * Observability — client-side Sentry init (env-gated, no-op by default).
  *
  * Mirrors sentry.server.ts on the browser side: when no client DSN is configured
  * this is a true no-op (no SDK init, no network). When a DSN IS present, the SDK

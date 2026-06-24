@@ -370,7 +370,7 @@ export async function verifyLoginPassword(
 
   // /authorize finalization carve-out (see doc above).
   const isSignedIn = targetUrl === '/signed-in' || targetUrl.startsWith('/signed-in?');
-  // 755-M8: a `device_` requestId must NOT take the /authorize carve-out. It has to reach
+  // A `device_` requestId must NOT take the /authorize carve-out. It has to reach
   // `/signed-in?requestId=device_…`, where resolveSignedIn auto-completes the device grant
   // (mirroring the OLD app's /signedin → completeDeviceAuthorization), so `datumctl login`
   // finishes WITHOUT a second manual Authorize click. Only oidc_/saml_ go through /authorize.

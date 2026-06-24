@@ -11,7 +11,7 @@ export function meta() {
 const REASONS: Record<string, React.ReactNode> = {
   'context-missing': <Trans>The sign-in link was incomplete or expired.</Trans>,
   'access-denied': <Trans>That identity belongs to a different account.</Trans>,
-  // 755-J1: ALREADY_EXISTS on link/auto-link — the IdP identity is already linked to a
+  // ALREADY_EXISTS on link/auto-link — the IdP identity is already linked to a
   // different Datum account. Reuses the access-denied copy (i18n key 0ciILs) so no new
   // string is introduced, but as a DISTINCT reason it no longer collapses into the generic
   // signin_failed fallthrough below.

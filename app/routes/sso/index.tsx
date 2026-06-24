@@ -92,7 +92,7 @@ export default function SsoPage() {
                 <li
                   key={`${link.idpId}-${link.idpUserId}`}
                   className="flex h-13 items-center justify-between gap-3 rounded-md border px-4">
-                  {/* 755-M6: provider icon + name badge (joined from the active-IdP list).
+                  {/* Provider icon + name badge (joined from the active-IdP list).
                       Falls back to the bare IdP user name / id when the provider is no longer
                       active. Icon is non-interactive — no nested-interactive a11y violation. */}
                   <span className="flex min-w-0 items-center gap-3">

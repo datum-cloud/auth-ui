@@ -18,7 +18,7 @@ const schema = z
     // below apply whenever this is unset or 'zitadel' — never for 'fake'.
     AUTH_PROVIDER: z.string().optional(),
     NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
-    // EL-TRANSPORT-1: comma-separated list of trusted values for x-zitadel-forward-host.
+    // Comma-separated list of trusted values for x-zitadel-forward-host.
     // Unset (default) = reject ALL forward-host overrides (fail-closed).
     ZITADEL_TRUSTED_FORWARD_HOSTS: z.string().optional(),
     // Extra headers injected on EVERY outbound Zitadel API request (applied as a Connect
@@ -36,7 +36,7 @@ const schema = z
     // post_logout_redirect parameter (e.g. http://localhost:3001,https://portal.example.com).
     // Optional — unset means only same-origin relative paths are permitted (fail-closed).
     POST_LOGOUT_ALLOWLIST: z.string().optional(),
-    // P7 observability: Sentry error monitoring + tracing.
+    // Observability: Sentry error monitoring + tracing.
     // Both vars are OPTIONAL — unset means Sentry is disabled at boot (true no-op).
     // SENTRY_DSN must be a valid https DSN when set; an invalid value fails fast at startup.
     SENTRY_DSN: z

@@ -59,7 +59,7 @@ const CAPABILITY_ROUTES: Array<{
     // Decorative icon: the link's accessible name comes from its visible "Authenticator app"
     // text, so the img MUST be alt="" + aria-hidden — otherwise a screen reader announces the
     // name twice ("Authenticator app Authenticator app"). The Icon-based rows are already
-    // decorative SVGs with no accessible name, so only this <img> needed fixing. (F4)
+    // decorative SVGs with no accessible name, so only this <img> needed fixing.
     icon: (
       <img
         src={assetUrl('/images/idps/totp.png')}
@@ -88,8 +88,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const { loginName, requestId, organization } = readCeremonyParams(url);
   const { force, checkAfter } = setupSkipSchema.parse(Object.fromEntries(url.searchParams));
 
-  // Service resolves the session guard, user lookup, and the capability + login-policy gating
-  // (Bug C-setup), returning either a redirect or the offerable enrollment KEYS. The route only
+  // Service resolves the session guard, user lookup, and the capability + login-policy gating,
+  // returning either a redirect or the offerable enrollment KEYS. The route only
   // reads the cookie, mints the CSRF token, and wires the result to a redirect or rendered chooser.
   const provider = providerForRequest(request);
   const sessions = await readSessions(request);
@@ -147,7 +147,7 @@ export default function SetupMfa() {
   if (checkAfter) sharedParams.set('checkAfter', checkAfter);
   const qs = sharedParams.toString();
 
-  // The loader already applied the capability + login-policy gate (Bug C-setup) and sent the
+  // The loader already applied the capability + login-policy gate and sent the
   // offerable KEYS. Re-derive the renderable routes (with their non-serializable JSX labels)
   // by filtering CAPABILITY_ROUTES — the keys are the single source of truth for WHICH rows show.
   const offerableKeySet = new Set(offerableKeys);

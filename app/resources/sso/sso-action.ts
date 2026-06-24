@@ -109,7 +109,7 @@ export async function runSsoAction(
   if (idpTypeToSlug(target.type) === 'ldap') {
     // Account-linking via LDAP is not yet supported — guard it here so the user
     // gets a clear error rather than a silent plain sign-in.
-    // TODO(P7): wire LDAP link via retrieveIdpIntent information + addIdpLink
+    // TODO: wire LDAP link via retrieveIdpIntent information + addIdpLink
     if (payload.linkOnly === 'true') {
       return { kind: 'redirect', location: `/sso/ldap/error?reason=ldap-link-unsupported` };
     }

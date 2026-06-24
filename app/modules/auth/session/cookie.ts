@@ -15,7 +15,7 @@ import { createCookie } from 'react-router';
 import { z } from 'zod';
 
 // ---------------------------------------------------------------------------
-// Zod schema — mirrors SessionEntry exactly (P7 Task 8 Step 8: P0 carry-over guard)
+// Zod schema — mirrors SessionEntry exactly (P0 carry-over guard)
 // ---------------------------------------------------------------------------
 
 const EntrySchema = z.object({

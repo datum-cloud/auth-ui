@@ -126,7 +126,7 @@ export async function action({ request }: ActionFunctionArgs) {
       // EMAIL_LOGIN_DISABLED is a true client-input rejection (400). USER_NOT_FOUND is a
       // HANDLED, inline-rendered outcome — return it as normal action data with a 200 so the
       // RR single-fetch (/login.data?index) does NOT surface a 404 the browser console-errors
-      // on. The inline <FormError> still renders from `data.error`. (F1)
+      // on. The inline <FormError> still renders from `data.error`.
       if (result.error === 'EMAIL_LOGIN_DISABLED') {
         return data({ error: result.error }, { status: 400 });
       }
@@ -168,7 +168,7 @@ export async function action({ request }: ActionFunctionArgs) {
     // EMAIL_LOGIN_DISABLED is a true client-input rejection (400). USER_NOT_FOUND is a
     // HANDLED, inline-rendered outcome — return it as normal action data with a 200 so the
     // RR single-fetch (/login.data?index) does NOT surface a 404 the browser console-errors
-    // on. The inline <FormError> still renders from `data.error`. (F1)
+    // on. The inline <FormError> still renders from `data.error`.
     if (result.error === 'EMAIL_LOGIN_DISABLED') {
       return data({ error: result.error }, { status: 400 });
     }

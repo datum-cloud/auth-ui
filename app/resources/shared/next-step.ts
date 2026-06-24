@@ -14,7 +14,7 @@ export interface NextStepInput {
   mfaInitSkippedAt?: string | null;
   requestId?: string;
   organization?: string;
-  // 755-M10: threaded from account-switch to suppress ONLY the step-6 skippable
+  // Threaded from account-switch to suppress ONLY the step-6 skippable
   // MFA-setup nudge. Real challenges + forced setup are unaffected.
   suppressMfaSetupNudge?: boolean;
 }

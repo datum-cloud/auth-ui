@@ -69,7 +69,7 @@ export default function SplitLayout({
         <div className="flex w-full flex-1 items-center justify-center">
           <div className="relative flex w-full max-w-[400px] flex-col gap-6">
             <div className="absolute -top-36 -left-24 z-0 max-w-[115px]">
-              {/* 755-M3: intrinsic 232×290 raster line-art. width/height pin the aspect ratio so
+              {/* Intrinsic 232×290 raster line-art. width/height pin the aspect ratio so
                   the absolutely-positioned panel reserves space and never shifts layout (CLS).
                   object-contain keeps the line-art crisp/uncropped while it scales down into the
                   115px box. TODO(design): replace with a vector (SVG) or AVIF source — a designer
@@ -88,7 +88,7 @@ export default function SplitLayout({
               <Trans>
                 Using Datum requires setting up a billing account, but to help you explore without
                 cost, we add{' '}
-                {/* 755-M4: the lime credit chip (aurora-moss #e6f59f) is a fixed brand accent that
+                {/* The lime credit chip (aurora-moss #e6f59f) is a fixed brand accent that
                     stays light in BOTH themes, so it pins dark text (midnight-fjord) explicitly —
                     text-foreground would flip to light on dark and become unreadable on lime. */}
                 <span className="bg-[#e6f59f] px-0.5 font-semibold text-[#0c1d31]">$50 USD</span> in
@@ -112,7 +112,7 @@ export default function SplitLayout({
 
             <div className="flex flex-col">
               <Avatar className="mb-2 size-10 rounded-lg">
-                {/* 755-M3: 80×80 source rendered into a 40px (size-10) slot — the existing source is
+                {/* 80×80 source rendered into a 40px (size-10) slot — the existing source is
                     already 2× DPR. The 2x density descriptor declares that intent so retina screens
                     render the avatar crisply; width/height reserve the 40px box (CLS). */}
                 <AvatarImage
@@ -125,13 +125,13 @@ export default function SplitLayout({
                 <AvatarFallback>ZS</AvatarFallback>
               </Avatar>
               <span className="text-muted-foreground leading-4">Zac Smith</span>
-              {/* 755-M3: full-opacity --muted-foreground (not /80). At 12px the /80 alpha composites
+              {/* Full-opacity --muted-foreground (not /80). At 12px the /80 alpha composites
                   to ≈3.8:1 on the cream panel (fails WCAG AA); full opacity clears ≈6:1 in light and
                   keeps dark mode's own muted token. */}
               <span className="text-muted-foreground text-xs">Co-founder and CEO</span>
             </div>
 
-            {/* 755-M3: 95×38 signature raster at ~1× in a 96px-wide slot. width/height pin the box
+            {/* 95×38 signature raster at ~1× in a 96px-wide slot. width/height pin the box
                 (CLS) and object-contain keeps the strokes crisp without stretching. TODO(design): a
                 vector (SVG) signature is still needed — only this low-res raster currently exists. */}
             <img
@@ -146,7 +146,7 @@ export default function SplitLayout({
         </div>
 
         <div className="absolute right-0 bottom-0 z-0 max-w-[500px] md:max-w-[800px]">
-          {/* 755-M3: intrinsic 707×155 raster line-art stretched into a fluid box up to 800px wide,
+          {/* Intrinsic 707×155 raster line-art stretched into a fluid box up to 800px wide,
               so it currently upscales (soft). width/height pin the aspect ratio for CLS; object-contain
               avoids the crop/extra blur object-cover introduced. TODO(design): replace with a vector
               (SVG) or higher-res AVIF source — a designer asset is still needed to render crisply at

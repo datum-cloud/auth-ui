@@ -1,4 +1,4 @@
-// P7 observability: initialise client Sentry FIRST (env-gated no-op without
+// Observability: initialise client Sentry FIRST (env-gated no-op without
 // VITE_SENTRY_DSN) so the SDK — and its allowlist scrubber — is active
 // before hydration captures anything browser-side.
 import { initClientSentry } from '@/sentry.client';
