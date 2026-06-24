@@ -100,7 +100,7 @@ msgstr "Authorization complete"
 msgid "Authorization failed"
 msgstr "Authorization failed"
 
-#: app/routes/device/authorize.tsx:157
+#: app/routes/device/authorize.tsx:162
 msgid "Authorize"
 msgstr "Authorize"
 
@@ -212,7 +212,8 @@ msgstr "Create a new account"
 msgid "Create account"
 msgstr "Create account"
 
-#: app/routes/device/authorize.tsx:167
+#: app/routes/device/authorize.tsx:172
+#: app/routes/device/authorize.tsx:198
 msgid "Deny"
 msgstr "Deny"
 
@@ -541,6 +542,10 @@ msgstr "Sign in"
 msgid "Sign in again"
 msgstr "Sign in again"
 
+#: app/routes/device/authorize.tsx:184
+msgid "Sign in to continue"
+msgstr "Sign in to continue"
+
 #: app/routes/sso/link.tsx:48
 msgid "Sign in with"
 msgstr "Sign in with"
@@ -789,6 +794,10 @@ msgstr "You may return to your device."
 #: app/routes/sso/link.tsx:43
 msgid "You must be signed in to link an external account."
 msgstr "You must be signed in to link an external account."
+
+#: app/routes/device/authorize.tsx:134
+msgid "You'll be asked to sign in before authorizing."
+msgstr "You'll be asked to sign in before authorizing."
 
 #: app/routes/signup/password.tsx:159
 msgid "You'll need to set a password to complete your signup."

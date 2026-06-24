@@ -146,6 +146,9 @@ describe('device/authorize — inline ACTION error in the consent form (no toast
     scope: ['read'],
     deviceAuthId: 'dev-1',
     requestId: 'rq-1',
+    // Signed-in consent: the authorize/deny action-error path only occurs with an active
+    // session (a sessionless authorize redirects to /login rather than producing an error).
+    activeLoginName: 'user@example.test',
   };
 
   it('renders the deny/authorize action error inline in a role="alert" banner inside the consent form', async () => {
@@ -156,6 +159,14 @@ describe('device/authorize — inline ACTION error in the consent form (no toast
     expect(alert).toHaveTextContent('msg:FAILED_PRECONDITION');
     // The consent form is still present (this is NOT the loader-recovery card).
     expect(screen.getByRole('button', { name: /Authorize/ })).toBeInTheDocument();
+  });
+
+  it('with no active session, shows a "Sign in to continue" CTA instead of Authorize', async () => {
+    mountAt(DeviceAuthorize, '/device/authorize', { ...consentLoaderData, activeLoginName: null });
+    expect(await screen.findByRole('link', { name: /Sign in to continue/ })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /Authorize/ })).not.toBeInTheDocument();
+    // Deny stays available — a sessionless user can still reject an unrecognized device.
+    expect(screen.getByRole('button', { name: /Deny/ })).toBeInTheDocument();
   });
 
   it('renders NO alert banner when there is no action error', async () => {

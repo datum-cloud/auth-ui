@@ -97,11 +97,7 @@ export default function AccountPicker() {
             {/* Carry the ceremony requestId so a fresh "add account" login resumes the
                 OIDC/SAML/device callback (like the switch form) rather than dead-ending at
                 the default post-login redirect. */}
-            <LinkButton
-              theme="link"
-              type="quaternary"
-              as={Link}
-              href={addAccountHref}>
+            <LinkButton theme="link" type="quaternary" as={Link} href={addAccountHref}>
               <Trans>Add an account</Trans>
             </LinkButton>
           </div>

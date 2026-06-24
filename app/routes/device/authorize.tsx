@@ -129,7 +129,11 @@ export default function DeviceAuthorize() {
                 <Trans>Use a different account</Trans>
               </LinkButton>
             </span>
-          ) : null}
+          ) : (
+            <span className="mt-2 block">
+              <Trans>You'll be asked to sign in before authorizing.</Trans>
+            </span>
+          )}
         </>
       }>
       <div className="flex flex-col gap-4">
@@ -142,32 +146,60 @@ export default function DeviceAuthorize() {
             ))}
           </div>
         )}
-        <RRForm method="post" className="flex w-full flex-col gap-4">
-          <AuthFormFields csrf={csrfToken} />
-          <input type="hidden" name="deviceAuthId" value={deviceAuthId} />
-          <input type="hidden" name="requestId" value={requestId} />
-          <FormError>{errorMessage}</FormError>
-          <div className="flex flex-col gap-3">
-            <Button
-              htmlType="submit"
-              name="decision"
-              className="w-full"
-              value="authorize"
-              disabled={isSubmitting}>
-              <Trans>Authorize</Trans>
-            </Button>
-            <Button
-              htmlType="submit"
-              name="decision"
-              value="deny"
-              type="secondary"
-              theme="outline"
-              className="w-full"
-              disabled={isSubmitting}>
-              <Trans>Deny</Trans>
-            </Button>
+        {activeLoginName ? (
+          <RRForm method="post" className="flex w-full flex-col gap-4">
+            <AuthFormFields csrf={csrfToken} />
+            <input type="hidden" name="deviceAuthId" value={deviceAuthId} />
+            <input type="hidden" name="requestId" value={requestId} />
+            <FormError>{errorMessage}</FormError>
+            <div className="flex flex-col gap-3">
+              <Button
+                htmlType="submit"
+                name="decision"
+                className="w-full"
+                value="authorize"
+                disabled={isSubmitting}>
+                <Trans>Authorize</Trans>
+              </Button>
+              <Button
+                htmlType="submit"
+                name="decision"
+                value="deny"
+                type="secondary"
+                theme="outline"
+                className="w-full"
+                disabled={isSubmitting}>
+                <Trans>Deny</Trans>
+              </Button>
+            </div>
+          </RRForm>
+        ) : (
+          // Not signed in: authorizing requires a session. Lead with a clear "Sign in to
+          // continue" CTA (after login the device auto-completes — no second consent click)
+          // instead of an Authorize button that silently bounces to /login. Deny still works
+          // sessionlessly, so a user can reject an unrecognized device without signing in.
+          <div className="flex w-full flex-col gap-3">
+            <FormError>{errorMessage}</FormError>
+            <LinkButton type="primary" block as={Link} href={paths.login.index({ requestId })}>
+              <Trans>Sign in to continue</Trans>
+            </LinkButton>
+            <RRForm method="post">
+              <AuthFormFields csrf={csrfToken} />
+              <input type="hidden" name="deviceAuthId" value={deviceAuthId} />
+              <input type="hidden" name="requestId" value={requestId} />
+              <Button
+                htmlType="submit"
+                name="decision"
+                value="deny"
+                type="secondary"
+                theme="outline"
+                block
+                disabled={isSubmitting}>
+                <Trans>Deny</Trans>
+              </Button>
+            </RRForm>
           </div>
-        </RRForm>
+        )}
       </div>
     </AuthCard>
   );
