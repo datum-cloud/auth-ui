@@ -156,6 +156,8 @@ export default function AccountPicker() {
                   <AuthFormFields csrf={csrfToken} requestId={requestId ?? undefined} />
                   <input type="hidden" name="intent" value="remove" />
                   <input type="hidden" name="sessionId" value={account.sessionId} />
+                  {/* Device "change account": keep the device context after a mid-flow remove. */}
+                  {userCode ? <input type="hidden" name="userCode" value={userCode} /> : null}
                   <Button
                     size="xs"
                     theme="link"

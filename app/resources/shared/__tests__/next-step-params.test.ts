@@ -1,4 +1,4 @@
-import { nextStepFromSession, nextStepWithParams } from '../next-step-params';
+import { authorizeHandbackTarget, nextStepFromSession, nextStepWithParams } from '../next-step-params';
 import type { Factors, LoginSettings, Session } from '@/modules/auth/types';
 import { describe, it, expect } from 'vitest';
 
@@ -16,6 +16,33 @@ const settings = {
   forceMfa: false,
   forceMfaLocalOnly: false,
 } as unknown as LoginSettings;
+
+// authorizeHandbackTarget is the IdP/signup hand-back router (sso-callback, idp-session,
+// signup.service). It must dispatch by requestId prefix the SAME way the password path's
+// /signed-in does — crucially, a device_ grant is NOT an OIDC/SAML auth request and must finish
+// via /signed-in (→ resolveDeviceCompletion auto-authorize), NOT /authorize (which mis-resolves
+// it → default cloud-portal redirect). This pins the device-add-during-grant return flow.
+describe('authorizeHandbackTarget', () => {
+  it('routes a device_ requestId to /signed-in (auto-complete), NOT /authorize', () => {
+    const target = authorizeHandbackTarget('device_LQWC-KMNH', 'sess-1');
+    expect(target).toBe('/signed-in?requestId=device_LQWC-KMNH');
+    expect(target).not.toContain('/authorize');
+  });
+
+  it('routes an oidc_ requestId back into /authorize with the explicit sessionId', () => {
+    const target = authorizeHandbackTarget('oidc_abc', 'sess-1');
+    expect(target).toBe('/authorize?requestId=oidc_abc&sessionId=sess-1');
+  });
+
+  it('routes a saml_ requestId back into /authorize with the explicit sessionId', () => {
+    const target = authorizeHandbackTarget('saml_xyz', 'sess-1');
+    expect(target).toBe('/authorize?requestId=saml_xyz&sessionId=sess-1');
+  });
+
+  it('falls back to the terminal /signed-in when no requestId is present', () => {
+    expect(authorizeHandbackTarget(undefined, 'sess-1')).toBe('/signed-in');
+  });
+});
 
 describe('nextStepWithParams requestId validation', () => {
   it('threads a well-formed requestId', () => {

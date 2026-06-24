@@ -44,7 +44,7 @@ msgstr "Add an account"
 msgid "Add an extra layer of security to your account by setting up a second factor."
 msgstr "Add an extra layer of security to your account by setting up a second factor."
 
-#: app/routes/accounts.tsx:181
+#: app/routes/accounts.tsx:183
 msgid "Add another account"
 msgstr "Add another account"
 
