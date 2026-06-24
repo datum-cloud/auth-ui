@@ -170,6 +170,47 @@ describe('signup register-and-link path', () => {
       expect.objectContaining({ userAgent: ua })
     );
   });
+
+  it('threads the new sessionId into /authorize when a requestId rides in (no select_account loop)', async () => {
+    const fake = getAuthProvider({ AUTH_PROVIDER: 'fake' }) as FakeAuthProvider;
+    vi.spyOn(fake, 'register').mockResolvedValue({ id: 'u3', loginName: 'alice@acme.test' });
+    vi.spyOn(fake, 'addIdpLink').mockResolvedValue(undefined as never);
+    vi.spyOn(fake, 'createSession').mockResolvedValue({
+      id: 'sess-link-1',
+      token: 'sess-tok3',
+      changedAt: '2026-01-01T00:00:00.000Z',
+      expiresAt: '2099-01-01T00:00:00.000Z',
+    } as never);
+
+    const r = await registerAndLinkIdp(fake, [], { ...idpInput(), requestId: 'oidc_abc' });
+
+    expect(r.kind).toBe('redirect');
+    if (r.kind === 'redirect') {
+      // The just-created session id must hand back to /authorize so resolveOidc finishes the
+      // callback via runCallback instead of bouncing a select_account/login ceremony to /accounts.
+      expect(r.target).toContain('/authorize?requestId=oidc_abc');
+      expect(r.target).toContain('sessionId=sess-link-1');
+    }
+  });
+
+  it('lands on /signed-in (no sessionId) when no requestId rides in', async () => {
+    const fake = getAuthProvider({ AUTH_PROVIDER: 'fake' }) as FakeAuthProvider;
+    vi.spyOn(fake, 'register').mockResolvedValue({ id: 'u4', loginName: 'alice@acme.test' });
+    vi.spyOn(fake, 'addIdpLink').mockResolvedValue(undefined as never);
+    vi.spyOn(fake, 'createSession').mockResolvedValue({
+      id: 'sess-link-2',
+      token: 'sess-tok4',
+      changedAt: '2026-01-01T00:00:00.000Z',
+      expiresAt: '2099-01-01T00:00:00.000Z',
+    } as never);
+
+    const r = await registerAndLinkIdp(fake, [], idpInput());
+
+    expect(r.kind).toBe('redirect');
+    if (r.kind === 'redirect') {
+      expect(r.target).toBe('/signed-in');
+    }
+  });
 });
 
 describe('completeEmailLinkSignup', () => {

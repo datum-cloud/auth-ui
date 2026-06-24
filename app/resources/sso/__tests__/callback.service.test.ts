@@ -237,6 +237,53 @@ describe('processIdpCallback — existing same-email account auto-link (Task-3)'
     expect(newUser).toBeDefined();
     expect(newUser!.displayName).toBe('anindia0703 anindia0703');
   });
+
+  // ── OIDC ceremony hand-back: when a requestId rides in, the IdP-callback finalization must
+  // thread the just-created session id so resolveOidc finishes the callback (no select_account /
+  // login loop back to /accounts). Covers the auto-link (sign-in) and auto-create paths.
+  it('auto-link path threads sessionId into /authorize when a requestId rides in', async () => {
+    const { FakeAuthProvider } = await import('@/modules/auth/providers/fake/fake-provider');
+    const provider = new FakeAuthProvider({
+      users: [{ id: 'u1', loginName: 'you@gmail.com', displayName: 'You User' }],
+      // passwordless → auto-link decision
+    });
+    const { processIdpCallback, outcomeToResponse } = await import('@/resources/sso');
+
+    const request = new Request(
+      'https://auth.localtest.me/sso/google/callback?id=intent-1&token=tok-1&requestId=oidc_ceremony'
+    );
+    const outcome = await processIdpCallback(provider, request, 'google', {
+      retrieveIdpIntent: async () => REGISTER_INTENT_VERIFIED,
+      onAuthEvent: () => {},
+    });
+    const res = outcomeToResponse(outcome) as Response;
+
+    expect(res.status).toBe(302);
+    const loc = res.headers.get('location') ?? '';
+    expect(loc).toContain('/authorize?requestId=oidc_ceremony');
+    // resolveOidc's explicit-sessionId hand-back finishes the callback (no /accounts bounce).
+    expect(loc).toMatch(/[?&]sessionId=sess-\d+/);
+  });
+
+  it('auto-create path threads sessionId into /authorize when a requestId rides in', async () => {
+    const { FakeAuthProvider } = await import('@/modules/auth/providers/fake/fake-provider');
+    const provider = new FakeAuthProvider({}); // empty store → auto-create
+    const { processIdpCallback, outcomeToResponse } = await import('@/resources/sso');
+
+    const request = new Request(
+      'https://auth.localtest.me/sso/google/callback?id=intent-1&token=tok-1&requestId=oidc_ceremony'
+    );
+    const outcome = await processIdpCallback(provider, request, 'google', {
+      retrieveIdpIntent: async () => REGISTER_INTENT_VERIFIED,
+      onAuthEvent: () => {},
+    });
+    const res = outcomeToResponse(outcome) as Response;
+
+    expect(res.status).toBe(302);
+    const loc = res.headers.get('location') ?? '';
+    expect(loc).toContain('/authorize?requestId=oidc_ceremony');
+    expect(loc).toMatch(/[?&]sessionId=sess-\d+/);
+  });
 });
 
 // ---------------------------------------------------------------------------

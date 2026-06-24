@@ -41,7 +41,7 @@ describe('/sso/ldap action (submitLdapCredentials)', () => {
     expect(setCookie).toContain('sessions=');
   });
 
-  it('valid creds WITH requestId → 302 to /authorize?requestId=oidc_x', async () => {
+  it('valid creds WITH requestId → 302 to /authorize?requestId=oidc_x&sessionId=<id>', async () => {
     const res = (await runLdap({
       username: 'bob',
       password: 'pw',
@@ -51,7 +51,11 @@ describe('/sso/ldap action (submitLdapCredentials)', () => {
 
     expect(res.status).toBe(302);
     const location = res.headers.get('location') ?? '';
-    expect(location).toBe('/authorize?requestId=oidc_x');
+    // Threads the just-created session id so resolveOidc's explicit-sessionId hand-back
+    // finishes the callback (no select_account / login bounce). The fake provider mints ids
+    // as `sess-<n>` from a shared counter, so assert structure, not the exact number.
+    expect(location).toContain('/authorize?requestId=oidc_x');
+    expect(location).toMatch(/[?&]sessionId=sess-\d+/);
   });
 
   it('bad creds → 401 with error INVALID_CREDENTIALS, not a redirect', async () => {

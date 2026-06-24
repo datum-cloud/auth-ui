@@ -261,8 +261,12 @@ export async function processIdpCallback(
           requestId,
           auto: decision.kind === 'auto-link',
         });
+        // Thread the just-created session id so /authorize finishes the callback via
+        // resolveOidc's explicit-sessionId hand-back (runCallback) instead of re-running
+        // decideAuthorize — without it a prompt=select_account / prompt=login ceremony loops
+        // straight back to /accounts (or /login). Mirrors the password path's hand-back.
         const target = requestId
-          ? `/authorize?requestId=${encodeURIComponent(requestId)}`
+          ? `/authorize?requestId=${encodeURIComponent(requestId)}&sessionId=${encodeURIComponent(session.id)}`
           : '/signed-in';
         const lastUsedCookie = await serializeLastUsedLogin(`idp:${decision.link.idpId}`);
         return {

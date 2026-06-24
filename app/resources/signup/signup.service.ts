@@ -129,7 +129,13 @@ export async function registerAndLinkIdp(
     requestId,
   });
   logAuthEvent('signup.requested', 'success', { actor: hashActor(user.loginName), organization });
-  const target = requestId ? `/authorize?requestId=${encodeURIComponent(requestId)}` : '/signed-in';
+  // Thread the just-created session id so /authorize finishes the callback via resolveOidc's
+  // explicit-sessionId hand-back (runCallback) instead of re-running decideAuthorize — without it
+  // a brand-new IdP user completing a prompt=select_account / prompt=login ceremony loops straight
+  // back to /accounts (or /login). Mirrors the password path's hand-back.
+  const target = requestId
+    ? `/authorize?requestId=${encodeURIComponent(requestId)}&sessionId=${encodeURIComponent(session.id)}`
+    : '/signed-in';
   return { kind: 'redirect', target, sessions };
 }
 

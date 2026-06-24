@@ -139,7 +139,14 @@ export async function signInWithIdpIntent(
   });
 
   const setCookie = await serializeSessions(next);
-  const target = requestId ? `/authorize?requestId=${encodeURIComponent(requestId)}` : '/signed-in';
+  // Thread the just-created session id so /authorize finishes the callback via resolveOidc's
+  // explicit-sessionId hand-back (runCallback) instead of re-running decideAuthorize — without
+  // it a prompt=select_account / prompt=login ceremony loops straight back to /accounts (or
+  // /login). Mirrors the password path's /authorize?requestId&sessionId hand-back. device_
+  // requestIds intentionally never reach here as /authorize (they go via /signed-in).
+  const target = requestId
+    ? `/authorize?requestId=${encodeURIComponent(requestId)}&sessionId=${encodeURIComponent(session.id)}`
+    : '/signed-in';
 
   return { setCookie, target };
 }
