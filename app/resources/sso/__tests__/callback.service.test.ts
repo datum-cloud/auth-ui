@@ -19,7 +19,15 @@ import { lastUsedLoginCookie } from '@/modules/auth/session/last-used-login';
 import { ProviderError } from '@/modules/auth/types';
 import type { IdpIntentResult } from '@/modules/auth/types';
 import { processIdpCallback, outcomeToResponse } from '@/resources/sso';
+import { logAuthEvent } from '@/server/observability';
 import { describe, it, expect, vi, afterEach } from 'vitest';
+
+// Mock observability so tests can intercept logAuthEvent calls (e.g. the PII-safe idp.link
+// account-link-by-email decision log). Keep the rest of the module intact.
+vi.mock('@/server/observability', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/server/observability')>();
+  return { ...actual, logAuthEvent: vi.fn() };
+});
 
 /** Parse the last-used-login token from a set-cookie header value, or null if absent. */
 async function parseLastUsedCookie(setCookieHeader: string | null): Promise<string | null> {
@@ -81,7 +89,10 @@ const REGISTER_INTENT: IdpIntentResult = {
   draft: { email: 'newbie@idp.test', firstName: 'New', lastName: 'Bie' },
 };
 
-afterEach(() => vi.restoreAllMocks());
+afterEach(() => {
+  vi.restoreAllMocks();
+  vi.mocked(logAuthEvent).mockClear();
+});
 
 describe('processIdpCallback — provider error handling', () => {
   it('redirects to the SSO error page and logs idp.signin failure when retrieveIdpIntent throws', async () => {
@@ -192,6 +203,116 @@ describe('processIdpCallback — existing same-email account auto-link (Task-3)'
     const newUser = await provider.findUser('you@gmail.com');
     expect(newUser).toBeDefined();
     expect(provider.isEmailVerified(newUser!.id)).toBe(true);
+  });
+
+  it('auto-creates a GitHub-style user with NO names by falling back to idpUserName', async () => {
+    const { FakeAuthProvider } = await import('@/modules/auth/providers/fake/fake-provider');
+    const provider = new FakeAuthProvider({});
+    const { processIdpCallback, outcomeToResponse } = await import('@/resources/sso');
+
+    // GitHub draft: only the login, no given/family/display name.
+    const githubIntent: IdpIntentResult = {
+      userId: null,
+      information: { idpId: 'idp-gh', idpUserId: 'gh-1', idpUserName: 'anindia0703' },
+      draft: { email: 'gh-user@idp.test', emailVerified: true },
+    };
+
+    const request = new Request(
+      'https://auth.localtest.me/sso/github/callback?id=intent-1&token=tok-1'
+    );
+    const outcome = await processIdpCallback(provider, request, 'github', {
+      retrieveIdpIntent: async () => githubIntent,
+      onAuthEvent: () => {},
+    });
+    const res = outcomeToResponse(outcome) as Response;
+
+    // Register succeeded (non-empty names → no Zitadel GivenName length rejection).
+    expect(res.status).toBe(302);
+    const loc = res.headers.get('location') ?? '';
+    expect(loc === '/signed-in' || loc.startsWith('/authorize')).toBe(true);
+
+    // The created user carries the derived (idpUserName) given/family — the fake stores
+    // displayName as `${firstName} ${lastName}`, so both must be the login, not empty.
+    const newUser = await provider.findUser('gh-user@idp.test');
+    expect(newUser).toBeDefined();
+    expect(newUser!.displayName).toBe('anindia0703 anindia0703');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Account-link-by-email observability: a fresh external IdP whose verified email matches an
+// existing account emits a PII-safe idp.link log (needs_auth when the account has a password,
+// auto_linked when it is passwordless). Booleans + ids only — never the raw email/loginName.
+// ---------------------------------------------------------------------------
+
+describe('processIdpCallback — account-link-by-email observability log', () => {
+  it('emits idp.link failure reason=needs_auth (PII-safe) for the link-needs-auth decision', async () => {
+    const { FakeAuthProvider } = await import('@/modules/auth/providers/fake/fake-provider');
+    const provider = new FakeAuthProvider({
+      users: [{ id: 'u1', loginName: 'you@gmail.com', displayName: 'You User' }],
+      authMethods: { u1: ['password'] }, // has a password → link-needs-auth decision
+    });
+    const { processIdpCallback, outcomeToResponse } = await import('@/resources/sso');
+
+    const request = new Request(
+      'https://auth.localtest.me/sso/google/callback?id=intent-1&token=tok-1'
+    );
+    const outcome = await processIdpCallback(provider, request, 'google', {
+      retrieveIdpIntent: async () => REGISTER_INTENT_VERIFIED,
+      onAuthEvent: () => {},
+    });
+    outcomeToResponse(outcome);
+
+    // The account-link decision log fired with the snake_case needs_auth reason + PII-safe fields.
+    expect(logAuthEvent).toHaveBeenCalledWith(
+      'idp.link',
+      'failure',
+      expect.objectContaining({
+        reason: 'needs_auth',
+        idpId: 'idp-g',
+        emailVerified: true,
+        existingHasPassword: true,
+      })
+    );
+
+    // Defense-in-depth: no idp.link account-link log carried the raw email/loginName.
+    const linkCalls = vi.mocked(logAuthEvent).mock.calls.filter(([event]) => event === 'idp.link');
+    expect(linkCalls.length).toBeGreaterThan(0);
+    const serialized = JSON.stringify(linkCalls);
+    expect(serialized).not.toContain('you@gmail.com');
+  });
+
+  it('emits idp.link success reason=auto_linked (PII-safe) for the auto-link decision', async () => {
+    const { FakeAuthProvider } = await import('@/modules/auth/providers/fake/fake-provider');
+    const provider = new FakeAuthProvider({
+      users: [{ id: 'u1', loginName: 'you@gmail.com', displayName: 'You User' }],
+      // no password seeded → listAuthMethods returns [] → auto-link decision
+    });
+    const { processIdpCallback, outcomeToResponse } = await import('@/resources/sso');
+
+    const request = new Request(
+      'https://auth.localtest.me/sso/google/callback?id=intent-1&token=tok-1'
+    );
+    const outcome = await processIdpCallback(provider, request, 'google', {
+      retrieveIdpIntent: async () => REGISTER_INTENT_VERIFIED,
+      onAuthEvent: () => {},
+    });
+    outcomeToResponse(outcome);
+
+    // The account-link decision log fired with the snake_case auto_linked reason.
+    expect(logAuthEvent).toHaveBeenCalledWith(
+      'idp.link',
+      'success',
+      expect.objectContaining({
+        reason: 'auto_linked',
+        idpId: 'idp-g',
+      })
+    );
+
+    // No idp.link account-link log carried the raw email/loginName.
+    const linkCalls = vi.mocked(logAuthEvent).mock.calls.filter(([event]) => event === 'idp.link');
+    const serialized = JSON.stringify(linkCalls);
+    expect(serialized).not.toContain('you@gmail.com');
   });
 });
 

@@ -32,6 +32,8 @@ export type {
 export { shouldShowIdpButtons, shouldAutoStartSingleIdp } from './idp-buttons';
 export { decideIdpCallback } from './idp-callback';
 export type { IdpCallbackInput, IdpDecision } from './idp-callback';
+export { deriveIdpProfileName } from './derive-idp-name';
+export type { DeriveIdpProfileNameInput, DeriveIdpProfileNameResult } from './derive-idp-name';
 export { idpReturnUrls, APP_BASENAME } from './idp-return-urls';
 export type { IdpReturnOpts } from './idp-return-urls';
 export { signInWithIdpIntent, requestScopedProviderReads } from './idp-session';

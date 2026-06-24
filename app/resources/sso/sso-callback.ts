@@ -15,6 +15,7 @@ import { serializeLastUsedLogin } from '@/modules/auth/session/last-used-login';
 import { ProviderError } from '@/modules/auth/types';
 import type { IdpIntentResult } from '@/modules/auth/types';
 import { registerAndLinkIdp } from '@/resources/signup';
+import { deriveIdpProfileName } from '@/resources/sso/derive-idp-name';
 import { decideIdpCallback } from '@/resources/sso/idp-callback';
 import { signInWithIdpIntent, requestScopedProviderReads } from '@/resources/sso/idp-session';
 import type { SsoOutcome } from '@/resources/sso/sso-outcome';
@@ -116,7 +117,10 @@ export async function processIdpCallback(
       const existing = await provider.findUser(intent.draft.email, organization);
       if (existing) {
         const methods = await provider.listAuthMethods(existing.id);
-        existingAccount = { userId: existing.id, hasPassword: methods.includes('password') };
+        existingAccount = {
+          userId: existing.id,
+          hasPassword: methods.includes('password'),
+        };
       }
     }
 
@@ -139,6 +143,25 @@ export async function processIdpCallback(
       existingAccount,
       linkEmailOwnerUserId,
     });
+    // Account-link-by-email decision: a fresh external IdP whose verified email matches an
+    // existing account. Logged (PII-safe) so this new "sign in to link" / silent-auto-link path
+    // is diagnosable. auto-link fires only when the IdP email is verified AND the existing account
+    // has no password; otherwise the user must authenticate first (link-needs-auth).
+    if (decision.kind === 'link-needs-auth') {
+      logAuthEvent('idp.link', 'failure', {
+        reason: 'needs_auth',
+        requestId,
+        idpId: intent.information?.idpId,
+        emailVerified: intent.draft?.emailVerified ?? false,
+        existingHasPassword: existingAccount?.hasPassword ?? false,
+      });
+    } else if (decision.kind === 'auto-link') {
+      logAuthEvent('idp.link', 'success', {
+        reason: 'auto_linked',
+        requestId,
+        idpId: intent.information?.idpId,
+      });
+    }
   } catch (err) {
     if (err instanceof ProviderError) {
       deps.onAuthEvent?.('idp.signin', 'failure');
@@ -287,10 +310,19 @@ export async function processIdpCallback(
       // New IdP user: auto-create (email already verified by the IdP), link, and sign in
       // directly — no /signup/method hop needed.
       try {
+        // GitHub (and some other IdPs) return no given/family name — often only the login.
+        // Derive Zitadel-valid non-empty names (displayName split → idpUserName fallback) so
+        // addHumanUser's profile.givenName/familyName length constraint is satisfied.
+        const { firstName, lastName } = deriveIdpProfileName({
+          firstName: decision.draft.firstName,
+          lastName: decision.draft.lastName,
+          displayName: decision.draft.displayName,
+          idpUserName: decision.link.idpUserName,
+        });
         const result = await registerAndLinkIdp(provider, entries, {
           email: decision.draft.email ?? '',
-          firstName: decision.draft.firstName ?? '',
-          lastName: decision.draft.lastName ?? '',
+          firstName,
+          lastName,
           organization,
           requestId,
           idpId: decision.link.idpId,

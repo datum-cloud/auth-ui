@@ -11,6 +11,7 @@ import { providerForRequest } from '@/server/auth-context.server';
 import { getCsrfToken, assertCsrf } from '@/server/csrf';
 import { assetUrl } from '@/utils/asset-url';
 import { Button } from '@datum-cloud/datum-ui/button';
+import { Separator } from '@datum-cloud/datum-ui/separator';
 import { Trans } from '@lingui/react/macro';
 import {
   data,
@@ -140,7 +141,7 @@ export default function SsoPage() {
               {linked.map((link) => (
                 <li
                   key={`${link.idpId}-${link.idpUserId}`}
-                  className="flex items-center justify-between gap-3">
+                  className="flex h-13 items-center justify-between gap-3 rounded-md border px-4">
                   {/* 755-M6: provider icon + name badge (joined from the active-IdP list).
                       Falls back to the bare IdP user name / id when the provider is no longer
                       active. Icon is non-interactive — no nested-interactive a11y violation. */}
@@ -179,6 +180,10 @@ export default function SsoPage() {
           </section>
         ) : null}
 
+        {/* Divider between the connected list and the available-to-link list — only
+            when both are present so a single-section page has no dangling rule. */}
+        {linked.length > 0 && unlinked.length > 0 ? <Separator /> : null}
+
         {/* Unlinked / available IdPs */}
         {unlinked.length > 0 ? (
           <section className="flex flex-col gap-3">
@@ -194,7 +199,19 @@ export default function SsoPage() {
                     <input type="hidden" name="intent" value="start" />
                     <input type="hidden" name="provider" value={slugify(idp.name)} />
                     <input type="hidden" name="linkOnly" value="true" />
-                    <Button type="primary" theme="solid" htmlType="submit" block>
+                    {/* Mirrors the setup/mfa.tsx enrollment rows: large outline row with the
+                        provider icon on the left. These are real form submits (start the link
+                        flow), so it stays a <Button htmlType="submit"> — not a LinkButton/<a>.
+                        IdpIcon is decorative (aria-hidden); the accessible name is idp.name. */}
+                    <Button
+                      size="large"
+                      className="h-13 gap-3"
+                      type="quaternary"
+                      theme="outline"
+                      block
+                      iconPosition="left"
+                      icon={<IdpIcon type={idp.type} name={idp.name} logoUrl={idp.logoUrl} />}
+                      htmlType="submit">
                       {idp.name}
                     </Button>
                   </RRForm>
@@ -208,7 +225,7 @@ export default function SsoPage() {
             action-less logout/layout (native <form> won't add it like RR <Form> does). */}
         <form method="post" action="/id/logout?index">
           <AuthFormFields csrf={csrfToken} />
-          <Button type="secondary" theme="outline" htmlType="submit" block>
+          <Button type="secondary" theme="link" htmlType="submit" block>
             <Trans>Sign out</Trans>
           </Button>
         </form>

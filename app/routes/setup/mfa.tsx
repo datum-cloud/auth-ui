@@ -163,7 +163,8 @@ export default function SetupMfa() {
       recovery={recovery}
       loginName={loginName}
       requestId={requestId}
-      organization={organization}>
+      organization={organization}
+      showBackLink={false}>
       <div className="flex w-full flex-col gap-3">
         {/* LinkButton (single styled <a>) — NOT Button asChild, which emits
             <button><a> (nested-interactive axe violation in the prod build). These

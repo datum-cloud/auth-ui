@@ -332,9 +332,10 @@ describe('setup/mfa — shared primitive adoption', () => {
   });
 });
 
-// Once previous-step.ts maps the /setup/* paths, AuthCeremony's
-// always-present <BackLink/> resolves a target and renders. createRoutesStub mounts
-// each route at /setup/<segment>, so useLocation().pathname drives previousStepFor.
+// Once previous-step.ts maps the /setup/* paths, AuthCeremony's <BackLink/> resolves a
+// target and renders — EXCEPT on the setup/mfa entry step, which passes showBackLink={false}
+// to suppress it (covered by the negative case below). createRoutesStub mounts each route at
+// /setup/<segment>, so useLocation().pathname drives previousStepFor.
 describe('setup/* — BackLink renders to the predecessor', () => {
   const cases: Array<[name: string, Component: () => ReactNode, segment: string, loader: unknown]> =
     [
@@ -358,7 +359,6 @@ describe('setup/* — BackLink renders to the predecessor', () => {
         'security-key',
         { ...IDENTITY, credentialId: 'u1', publicKey: {}, challengeFailed: false },
       ],
-      ['mfa', SetupMfa, 'mfa', { ...IDENTITY, offerableKeys: ['passkey'] }],
     ];
 
   it.each(cases)(
@@ -372,4 +372,15 @@ describe('setup/* — BackLink renders to the predecessor', () => {
       expect(back).toBeDefined();
     }
   );
+
+  // setup/mfa is the ENTRY step of MFA enrollment, so it suppresses the BackLink
+  // (showBackLink={false} in app/routes/setup/mfa.tsx) — the method screens above keep theirs.
+  it('setup/mfa suppresses the Back link (entry step — showBackLink=false)', () => {
+    const { container } = mountRoute(SetupMfa, 'mfa', { ...IDENTITY, offerableKeys: ['passkey'] });
+    const links = Array.from(container.querySelectorAll('a')).map(
+      (a) => a.getAttribute('href') ?? ''
+    );
+    const back = links.find((h) => h.startsWith('/login/password'));
+    expect(back).toBeUndefined();
+  });
 });

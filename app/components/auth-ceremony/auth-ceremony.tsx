@@ -29,6 +29,7 @@ export interface AuthCeremonyProps {
   loginName?: string;
   requestId?: string;
   organization?: string;
+  showBackLink?: boolean;
 }
 
 // Tokenized ceremony spacing — owned here so every ceremony screen shares one rhythm
@@ -44,6 +45,7 @@ export function AuthCeremony({
   loginName,
   requestId,
   organization,
+  showBackLink = true,
 }: AuthCeremonyProps) {
   return (
     <AuthCard title={title} description={description}>
@@ -70,7 +72,7 @@ export function AuthCeremony({
           </FormError>
         ) : null}
         {children}
-        <BackLink />
+        {showBackLink && <BackLink />}
       </div>
     </AuthCard>
   );

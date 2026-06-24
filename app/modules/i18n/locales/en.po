@@ -20,7 +20,7 @@ msgstr "{0, plural, one {# attempt remaining.} other {# attempts remaining.}}"
 #. placeholder {0}: idp.name
 #. placeholder {0}: r.label
 #: app/routes/login/index.tsx:296
-#: app/routes/setup/mfa.tsx:183
+#: app/routes/setup/mfa.tsx:184
 #: app/routes/signup/index.tsx:237
 msgid "{0}"
 msgstr "{0}"
@@ -109,7 +109,7 @@ msgstr "Authorize"
 msgid "Authorize device"
 msgstr "Authorize device"
 
-#: app/routes/sso/index.tsx:186
+#: app/routes/sso/index.tsx:191
 msgid "Available accounts to link"
 msgstr "Available accounts to link"
 
@@ -174,7 +174,7 @@ msgstr "Confirm new password"
 msgid "Confirm password"
 msgstr "Confirm password"
 
-#: app/routes/sso/index.tsx:137
+#: app/routes/sso/index.tsx:138
 msgid "Connected accounts"
 msgstr "Connected accounts"
 
@@ -338,7 +338,7 @@ msgstr "Link expired"
 msgid "Link your account"
 msgstr "Link your account"
 
-#: app/routes/sso/index.tsx:121
+#: app/routes/sso/index.tsx:122
 msgid "Linked accounts"
 msgstr "Linked accounts"
 
@@ -553,7 +553,7 @@ msgstr "Sign in with LDAP"
 #: app/routes/logout/index.tsx:48
 #: app/routes/logout/index.tsx:54
 #: app/routes/signed-in.tsx:99
-#: app/routes/sso/index.tsx:212
+#: app/routes/sso/index.tsx:229
 msgid "Sign out"
 msgstr "Sign out"
 
@@ -565,7 +565,7 @@ msgstr "Sign-in is currently unavailable for this account. Please contact your a
 msgid "Signing in as"
 msgstr "Signing in as"
 
-#: app/routes/setup/mfa.tsx:206
+#: app/routes/setup/mfa.tsx:207
 msgid "Skip for now"
 msgstr "Skip for now"
 
@@ -659,7 +659,7 @@ msgstr "Too many attempts. Please wait a moment and try again."
 msgid "Two-factor verification"
 msgstr "Two-factor verification"
 
-#: app/routes/sso/index.tsx:172
+#: app/routes/sso/index.tsx:173
 msgid "Unlink"
 msgstr "Unlink"
 
@@ -763,7 +763,7 @@ msgid "You are signed in as <0>{loginName}</0>"
 msgstr "You are signed in as <0>{loginName}</0>"
 
 #. placeholder {0}: loginName && ( <> Logged in as <span className="font-medium">{loginName}</span>. </> )
-#: app/routes/sso/index.tsx:123
+#: app/routes/sso/index.tsx:124
 msgid "You can link multiple accounts to your Datum account. {0}"
 msgstr "You can link multiple accounts to your Datum account. {0}"
 
