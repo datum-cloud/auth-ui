@@ -251,8 +251,21 @@ export async function resolveDeviceDecision(
       })
     );
   } catch (error) {
-    // stale deviceAuthId / provider outage — audit + render a displayable error
     if (error instanceof ProviderError) {
+      // Idempotent success: the grant may already be finalized — the post-login
+      // auto-complete (resolveDeviceCompletion) authorized it on the way in, or this is
+      // a double-submit. Zitadel returns ALREADY_DONE; that IS success from the user's
+      // perspective, so land on the terminal completion screen instead of a 502.
+      if (error.code === 'ALREADY_DONE') {
+        logAuthEvent('device_authorize', 'success', {
+          decision,
+          deviceAuthId,
+          requestId,
+          reason: 'already_done',
+        });
+        return { kind: 'redirect', location: paths.device.complete({ decision }) };
+      }
+      // stale deviceAuthId / provider outage — audit + render a displayable error
       logAuthEvent('device_authorize', 'failure', {
         decision,
         deviceAuthId,

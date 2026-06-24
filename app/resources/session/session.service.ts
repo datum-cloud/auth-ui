@@ -170,12 +170,17 @@ async function resolveDeviceCompletion(
       deviceDecision({ decision: 'authorize', session: { id: recent.id, token: recent.token } })
     );
   } catch (err) {
-    logAuthEvent('device_authorize', 'failure', {
-      requestId,
-      actor: hashActor(recent.loginName),
-      reason: err instanceof ProviderError ? err.code : 'UNKNOWN',
-    });
-    return { kind: 'device-error' };
+    // Idempotent: the grant may already be finalized — the explicit consent-page POST
+    // (resolveDeviceDecision) won the race, or this is a re-entry. ALREADY_DONE means the
+    // device IS authorized, so fall through to the success/completion path, not an error.
+    if (!(err instanceof ProviderError && err.code === 'ALREADY_DONE')) {
+      logAuthEvent('device_authorize', 'failure', {
+        requestId,
+        actor: hashActor(recent.loginName),
+        reason: err instanceof ProviderError ? err.code : 'UNKNOWN',
+      });
+      return { kind: 'device-error' };
+    }
   }
 
   logAuthEvent('device_authorize', 'success', {
