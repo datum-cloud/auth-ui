@@ -258,6 +258,17 @@ describe('switchAccount — "Needs re-authentication" recovery (stale/revoked se
     expect(outcome.error).toBe('PROVIDER_ERROR');
     expect(outcome.status).toBe(500);
   });
+
+  it('sets a reauth-intent cookie so the login/callback can verify the identity', async () => {
+    const provider = new FakeAuthProvider({ users: [user] });
+    provider.setSessionResult('s1', { mode: 'throw', code: 'NOT_FOUND' });
+    const outcome = await switchAccount(provider, makeRequest(await cookie()), switchForm('s1'));
+
+    expect(outcome.kind).toBe('redirect');
+    if (outcome.kind !== 'redirect') throw new Error('expected redirect');
+    // The dead entry is KEPT (not pruned) until re-auth succeeds; an intent cookie is set.
+    expect(outcome.cookies?.some((c) => c.includes('reauth-intent='))).toBe(true);
+  });
 });
 
 describe('removeAccount — ceremony requestId threading', () => {

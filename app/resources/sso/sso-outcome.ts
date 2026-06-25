@@ -19,6 +19,8 @@ export type SsoOutcome =
       lastUsedCookie?: string;
       // fingerprintId Set-Cookie minted for a browser that lacked it (null/absent on reuse).
       fingerprintCookie?: string;
+      // Clears the `reauth-intent` marker once a re-auth flow resolves (match or mismatch).
+      reauthClearCookie?: string;
     }
   | { kind: 'data'; payload: unknown; status?: number; headers?: Record<string, string> }
   | { kind: 'response'; response: Response };
@@ -31,11 +33,17 @@ export type SsoOutcome =
 export function outcomeToResponse(outcome: SsoOutcome): Response | ReturnType<typeof data> {
   switch (outcome.kind) {
     case 'redirect':
-      if (outcome.setCookie || outcome.lastUsedCookie || outcome.fingerprintCookie) {
+      if (
+        outcome.setCookie ||
+        outcome.lastUsedCookie ||
+        outcome.fingerprintCookie ||
+        outcome.reauthClearCookie
+      ) {
         const h = new Headers();
         if (outcome.setCookie) h.append('set-cookie', outcome.setCookie);
         if (outcome.lastUsedCookie) h.append('set-cookie', outcome.lastUsedCookie);
         if (outcome.fingerprintCookie) h.append('set-cookie', outcome.fingerprintCookie);
+        if (outcome.reauthClearCookie) h.append('set-cookie', outcome.reauthClearCookie);
         return redirect(outcome.location, { headers: h });
       }
       return redirect(outcome.location);

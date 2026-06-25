@@ -174,8 +174,9 @@ export async function processIdpCallback(
     case 'sign-in': {
       let setCookie: string;
       let target: string;
+      let reauthClearCookie: string | undefined;
       try {
-        ({ setCookie, target } = await signInWithIdpIntent(provider, request, {
+        ({ setCookie, target, reauthClearCookie } = await signInWithIdpIntent(provider, request, {
           idpIntentId: id,
           idpIntentToken: token,
           userId: decision.userId,
@@ -206,6 +207,7 @@ export async function processIdpCallback(
         setCookie,
         lastUsedCookie,
         fingerprintCookie: fingerprintCookie ?? undefined,
+        reauthClearCookie,
       };
     }
 

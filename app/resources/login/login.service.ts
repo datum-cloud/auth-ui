@@ -60,6 +60,13 @@ export interface StartIdpInput {
   requestId?: string;
   /** Org scope to carry through the ceremony. */
   organization?: string;
+  /**
+   * RE-AUTH best-effort: the loginName being re-authenticated. Appended to the IdP authorize URL
+   * as `login_hint` so providers that honor it (Google / generic OIDC) pre-select that account.
+   * Providers that don't (e.g. GitHub) ignore the unknown param — the callback's identity check
+   * is the real guard, this only improves the picker UX.
+   */
+  reauthHint?: string;
 }
 
 export type StartIdpError = 'IDP_UNAVAILABLE';
@@ -74,7 +81,7 @@ export type StartIdpResult = { ok: true; authUrl: string } | { ok: false; error:
  */
 export async function startIdpIntent(
   provider: AuthProvider,
-  { idpId, origin, requestId, organization }: StartIdpInput
+  { idpId, origin, requestId, organization, reauthHint }: StartIdpInput
 ): Promise<StartIdpResult> {
   const slug = idpTypeToSlug(idpId) ?? idpId;
   const { success, failure } = idpReturnUrls(origin, slug, { requestId, organization });
@@ -84,7 +91,25 @@ export async function startIdpIntent(
     return { ok: false, error: 'IDP_UNAVAILABLE' };
   }
   logAuthEvent('idp_start', 'success', { idpId });
-  return { ok: true, authUrl: result.authUrl };
+  return { ok: true, authUrl: withLoginHint(result.authUrl, reauthHint) };
+}
+
+/**
+ * Best-effort re-auth pre-selection: append `login_hint=<loginName>` to the IdP authorize URL so
+ * providers that honor it (Google / generic OIDC) pre-select the account being re-authenticated.
+ * Unknown params are ignored by providers that don't (e.g. GitHub). A malformed authUrl is
+ * returned untouched — this is a UX nicety, never load-bearing (the callback's identity check is
+ * the real guard).
+ */
+function withLoginHint(authUrl: string, reauthHint?: string): string {
+  if (!reauthHint) return authUrl;
+  try {
+    const url = new URL(authUrl);
+    url.searchParams.set('login_hint', reauthHint);
+    return url.toString();
+  } catch {
+    return authUrl;
+  }
 }
 
 // ── identifier flow ────────────────────────────────────────────────────────────
@@ -239,9 +264,15 @@ export async function resolveIdentifier(
     context: { role: 'primary' }, // post-identifier decision is the primary flow
   });
 
-  // Persist the ceremony session into the (to-be-serialized) cookie list.
+  // Persist the ceremony session into the (to-be-serialized) cookie list. Supersede any prior
+  // entry for the SAME identity (loginName+org): a fresh login — including re-authenticating a
+  // "Needs re-authentication" account whose dead entry is intentionally kept until now —
+  // replaces the stale session for that identity rather than leaving a duplicate that would
+  // shadow the live one in byLoginName lookups. Different identities (add another account) are
+  // left untouched.
+  const base = list.filter((s) => !(s.loginName === user.loginName && s.organization === org));
   const sessions = addSession(
-    list,
+    base,
     sessionEntryFromSession(session, { loginName: user.loginName, organization: org, requestId })
   );
 

@@ -26,13 +26,9 @@ import {
   byId,
   type SessionEntry,
 } from '@/modules/auth/session/cookie';
-import type {
-  Session,
-  AuthMethod,
-  LoginSettings,
-  ProviderErrorCode,
-} from '@/modules/auth/types';
+import type { Session, AuthMethod, LoginSettings, ProviderErrorCode } from '@/modules/auth/types';
 import { ProviderError } from '@/modules/auth/types';
+import { serializeReauthIntent } from '@/modules/auth/session/reauth-intent';
 import { isAllowedRequestId } from '@/resources/authorize';
 import { deviceDecision } from '@/resources/device';
 import { postLoginDestinationWithSource } from '@/resources/login/post-login-destination';
@@ -429,7 +425,7 @@ export type AccountActionError =
  * `data()` error with the appropriate status.
  */
 export type AccountActionOutcome =
-  | { kind: 'redirect'; location: string; setCookie: string }
+  | { kind: 'redirect'; location: string; setCookie: string; cookies?: string[] }
   | { kind: 'error'; error: AccountActionError; status: 400 | 404 | 500 };
 
 // getSession failures that are genuinely transient backend problems (NOT a dead session): these
@@ -445,11 +441,17 @@ const SWITCH_TRANSIENT_CODES = new Set<ProviderErrorCode>([
 
 /**
  * Recover a switch into a "Needs re-authentication" account: its stored session token is
- * stale/revoked, so the session can't be activated (getSession throws or returns null). Drop the
- * dead entry from the cookie and send the user to re-login for THIS identity, resuming any live
- * ceremony — a device user_code takes precedence (device_<code>), else an allowlisted OIDC/SAML
- * requestId — so the original flow still completes after they sign back in. The loginName is
- * pre-filled so the user re-authenticates the exact account they picked.
+ * stale/revoked, so the session can't be activated (getSession throws or returns null). Send the
+ * user to re-login for THIS identity, resuming any live ceremony — a device user_code takes
+ * precedence (device_<code>), else an allowlisted OIDC/SAML requestId — so the original flow still
+ * completes after they sign back in. The loginName is pre-filled so the user re-authenticates the
+ * exact account they picked.
+ *
+ * The dead entry is INTENTIONALLY kept (not pruned) until re-auth of this identity actually
+ * succeeds: a `reauth-intent` cookie records the identity being re-authenticated, and the login /
+ * IdP completion point verifies the result matches it — pruning the stale entry only on a match,
+ * and on a MISMATCH keeping both accounts (so a wrong/abandoned re-auth never silently drops the
+ * account or completes the ceremony as someone else).
  */
 async function reauthRedirect(
   entry: SessionEntry,
@@ -463,8 +465,12 @@ async function reauthRedirect(
       ? { requestId }
       : {};
   const location = paths.login.index({ ...ceremony, loginName: entry.loginName });
-  const pruned = removeSession(cookieSessions, entry.id);
-  return { kind: 'redirect', location, setCookie: await serializeSessions(pruned) };
+  return {
+    kind: 'redirect',
+    location,
+    setCookie: await serializeSessions(cookieSessions),
+    cookies: [await serializeReauthIntent(entry.loginName)],
+  };
 }
 
 /**
@@ -615,7 +621,10 @@ export async function resolveAccountAction(
 /** Turn an AccountActionOutcome into the Response the /accounts route returns. */
 export function accountActionOutcomeToResponse(outcome: AccountActionOutcome) {
   if (outcome.kind === 'redirect') {
-    return redirect(outcome.location, { headers: { 'set-cookie': outcome.setCookie } });
+    const headers = new Headers();
+    headers.append('set-cookie', outcome.setCookie);
+    for (const cookie of outcome.cookies ?? []) headers.append('set-cookie', cookie);
+    return redirect(outcome.location, { headers });
   }
   return data({ error: outcome.error }, { status: outcome.status });
 }

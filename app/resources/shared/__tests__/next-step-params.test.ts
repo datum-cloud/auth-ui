@@ -1,4 +1,8 @@
-import { authorizeHandbackTarget, nextStepFromSession, nextStepWithParams } from '../next-step-params';
+import {
+  authorizeHandbackTarget,
+  nextStepFromSession,
+  nextStepWithParams,
+} from '../next-step-params';
 import type { Factors, LoginSettings, Session } from '@/modules/auth/types';
 import { describe, it, expect } from 'vitest';
 

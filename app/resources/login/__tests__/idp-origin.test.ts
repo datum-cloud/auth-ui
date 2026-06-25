@@ -44,3 +44,25 @@ describe('login IdP start: return URLs must use PUBLIC_ORIGIN, not request Host'
     expect(successUrl).not.toContain('evil.example');
   });
 });
+
+describe('login IdP start: re-auth login_hint (best-effort IdP pre-selection)', () => {
+  it('appends login_hint to the authorize URL when re-authenticating a specific account', async () => {
+    const fake = getAuthProvider({ AUTH_PROVIDER: 'fake' }) as FakeAuthProvider;
+    const result = await startIdpIntent(fake, {
+      idpId: GOOGLE_IDP_ID,
+      origin: PUBLIC_ORIGIN,
+      reauthHint: 'alice@acme.test',
+    });
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('expected ok');
+    expect(result.authUrl).toContain('login_hint=alice%40acme.test');
+  });
+
+  it('omits login_hint for a normal (non-re-auth) IdP start', async () => {
+    const fake = getAuthProvider({ AUTH_PROVIDER: 'fake' }) as FakeAuthProvider;
+    const result = await startIdpIntent(fake, { idpId: GOOGLE_IDP_ID, origin: PUBLIC_ORIGIN });
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error('expected ok');
+    expect(result.authUrl).not.toContain('login_hint');
+  });
+});

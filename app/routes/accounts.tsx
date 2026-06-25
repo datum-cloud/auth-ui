@@ -46,10 +46,14 @@ export async function loader({ request }: LoaderFunctionArgs) {
   // returns to /device/authorize (consent) with the now-active account, and "add account" logs
   // in for that device grant.
   const userCode = url.searchParams.get('user_code') ?? null;
+  // Re-auth landed here because the account that authenticated differs from the one being
+  // re-authenticated (see reauthRedirect / the login + IdP identity guards). Surface a banner so
+  // the user knows both accounts are kept and they should pick how to continue.
+  const reauthMismatch = url.searchParams.get('reauthMismatch') === '1';
 
   const { csrfToken, headers } = await loaderCsrf(request);
 
-  return data({ csrfToken, accounts, requestId, userCode }, { headers });
+  return data({ csrfToken, accounts, requestId, userCode, reauthMismatch }, { headers });
 }
 
 // ─── Action ──────────────────────────────────────────────────────────────────
@@ -66,7 +70,8 @@ export async function action({ request }: ActionFunctionArgs) {
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function AccountPicker() {
-  const { csrfToken, accounts, requestId, userCode } = useLoaderData<typeof loader>();
+  const { csrfToken, accounts, requestId, userCode, reauthMismatch } =
+    useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
 
   // Inline-only error surface: the action error renders in a <FormError> (role="alert")
@@ -86,6 +91,16 @@ export default function AccountPicker() {
       description={<Trans>Select an account to continue or add a new one.</Trans>}
       className="max-w-[450px]">
       <div className="flex flex-col gap-3">
+        {reauthMismatch ? (
+          <p
+            role="status"
+            className="bg-muted/50 text-muted-foreground rounded-lg px-3 py-2 text-center text-sm">
+            <Trans>
+              You signed in as a different account than the one you were re-authenticating. Both are
+              kept — choose an account to continue.
+            </Trans>
+          </p>
+        ) : null}
         <FormError>{errorMessage}</FormError>
         {accounts.length === 0 ? (
           <div className="flex flex-col items-center gap-4 py-4">

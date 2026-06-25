@@ -7,6 +7,7 @@ import { useLoginContext } from '@/hooks/use-login-context';
 // (which re-exports them from session.ts) — the canonical one-stop import for route-layer session I/O.
 import { readSessions, serializeSessions } from '@/modules/auth/session/cookie';
 import { serializeLastUsedLogin } from '@/modules/auth/session/last-used-login';
+import { clearReauthIntent, readReauthIntent } from '@/modules/auth/session/reauth-intent';
 import { verifyLoginPassword } from '@/resources/login';
 import { attemptsRemaining } from '@/resources/login/login-view';
 import { loginPasswordSchema, loginPasswordClientSchema } from '@/resources/login/login.schema';
@@ -72,6 +73,21 @@ export async function action({ request }: ActionFunctionArgs) {
   const headers = new Headers();
   headers.append('set-cookie', await serializeSessions(result.sessions));
   headers.append('set-cookie', await serializeLastUsedLogin('email'));
+
+  // RE-AUTH identity guard (password path). When this login is re-authenticating a specific
+  // account, verify the identity that authenticated matches. The intent marker is cleared either
+  // way; on a MISMATCH we don't continue the ceremony as the typed-in different identity — keep
+  // both accounts and bounce to the picker so the user chooses.
+  const reauthFor = await readReauthIntent(request);
+  if (reauthFor !== null) {
+    headers.append('set-cookie', await clearReauthIntent());
+    if (loginName !== reauthFor) {
+      const params = new URLSearchParams({ reauthMismatch: '1' });
+      if (requestId) params.set('requestId', requestId);
+      return redirect(`${paths.accounts()}?${params.toString()}`, { headers });
+    }
+  }
+
   return redirect(result.target, { headers });
 }
 

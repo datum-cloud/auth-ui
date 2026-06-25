@@ -79,6 +79,21 @@ describe('accounts — inline action error (no toast)', () => {
     await screen.findByText(/Choose an account/);
     expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
+
+  it('shows the re-auth mismatch banner when reauthMismatch is set', async () => {
+    mountAt(AccountPicker, '/accounts', { ...loaderData, reauthMismatch: true });
+    expect(
+      await screen.findByText(/different account than the one you were re-authenticating/i)
+    ).toBeInTheDocument();
+  });
+
+  it('does not show the re-auth mismatch banner by default', async () => {
+    mountAt(AccountPicker, '/accounts', loaderData);
+    await screen.findByText(/Choose an account/);
+    expect(
+      screen.queryByText(/different account than the one you were re-authenticating/i)
+    ).not.toBeInTheDocument();
+  });
 });
 
 describe('password/reset — inline action error (no toast)', () => {
