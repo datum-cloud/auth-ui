@@ -189,6 +189,77 @@ describe('switchAccount — current ceremony requestId threading (datumctl OIDC 
   });
 });
 
+describe('switchAccount — "Needs re-authentication" recovery (stale/revoked session)', () => {
+  // A switch target whose stored token no longer resolves — getSession throws a session-validity
+  // error (NOT_FOUND / PERMISSION_DENIED / …) OR returns null — must NOT dead-end on a 500. The
+  // user is routed to re-login for that identity, resuming any live ceremony, with the dead entry
+  // dropped from the cookie. Only a genuinely transient backend failure still 500s.
+  const user: User = { id: 'u1', loginName: 'alice@acme.test', displayName: 'Alice' };
+
+  async function cookie(): Promise<string> {
+    return mintCookie({ id: 's1', token: 'tok-s1', loginName: 'alice@acme.test' });
+  }
+
+  it('redirects to /login (pre-filled loginName) when getSession returns null, not a 500', async () => {
+    // No seeded live session → getSession returns null → re-auth recovery.
+    const provider = new FakeAuthProvider({ users: [user] });
+    const outcome = await switchAccount(provider, makeRequest(await cookie()), switchForm('s1'));
+
+    expect(outcome.kind).toBe('redirect');
+    if (outcome.kind !== 'redirect') throw new Error('expected redirect');
+    expect(outcome.location).toMatch(/^\/login(\?|$)/);
+    expect(outcome.location).toContain('loginName=alice%40acme.test');
+  });
+
+  it('redirects to /login when getSession throws a session-validity error (e.g. NOT_FOUND)', async () => {
+    const provider = new FakeAuthProvider({ users: [user] });
+    provider.setSessionResult('s1', { mode: 'throw', code: 'NOT_FOUND' });
+    const outcome = await switchAccount(provider, makeRequest(await cookie()), switchForm('s1'));
+
+    expect(outcome.kind).toBe('redirect');
+    if (outcome.kind !== 'redirect') throw new Error('expected redirect');
+    expect(outcome.location).toMatch(/^\/login(\?|$)/);
+  });
+
+  it('threads a live OIDC requestId onto the re-login redirect so the ceremony resumes', async () => {
+    const provider = new FakeAuthProvider({ users: [user] });
+    provider.setSessionResult('s1', { mode: 'throw', code: 'PERMISSION_DENIED' });
+    const outcome = await switchAccount(
+      provider,
+      makeRequest(await cookie()),
+      switchForm('s1', 'oidc_V3-current')
+    );
+
+    expect(outcome.kind).toBe('redirect');
+    if (outcome.kind !== 'redirect') throw new Error('expected redirect');
+    expect(outcome.location).toMatch(/^\/login\?/);
+    expect(outcome.location).toContain('requestId=oidc_V3-current');
+  });
+
+  it('routes a device-grant re-auth to /login?requestId=device_<code> (resumes the grant)', async () => {
+    const provider = new FakeAuthProvider({ users: [user] });
+    provider.setSessionResult('s1', { mode: 'null' });
+    const form = switchForm('s1');
+    form.set('userCode', 'LQWC-KMNH');
+    const outcome = await switchAccount(provider, makeRequest(await cookie()), form);
+
+    expect(outcome.kind).toBe('redirect');
+    if (outcome.kind !== 'redirect') throw new Error('expected redirect');
+    expect(outcome.location).toContain('requestId=device_LQWC-KMNH');
+  });
+
+  it('still surfaces PROVIDER_ERROR 500 for a genuinely transient backend failure', async () => {
+    const provider = new FakeAuthProvider({ users: [user] });
+    provider.setSessionResult('s1', { mode: 'throw', code: 'UNAVAILABLE' });
+    const outcome = await switchAccount(provider, makeRequest(await cookie()), switchForm('s1'));
+
+    expect(outcome.kind).toBe('error');
+    if (outcome.kind !== 'error') throw new Error('expected error');
+    expect(outcome.error).toBe('PROVIDER_ERROR');
+    expect(outcome.status).toBe(500);
+  });
+});
+
 describe('removeAccount — ceremony requestId threading', () => {
   // removeAccount deletes the entry provider-side (best-effort, seeded so it succeeds) then
   // redirects back to /accounts. The CURRENT ceremony id must ride that redirect so removing an

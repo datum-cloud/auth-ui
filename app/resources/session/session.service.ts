@@ -26,7 +26,12 @@ import {
   byId,
   type SessionEntry,
 } from '@/modules/auth/session/cookie';
-import type { Session, AuthMethod, LoginSettings } from '@/modules/auth/types';
+import type {
+  Session,
+  AuthMethod,
+  LoginSettings,
+  ProviderErrorCode,
+} from '@/modules/auth/types';
 import { ProviderError } from '@/modules/auth/types';
 import { isAllowedRequestId } from '@/resources/authorize';
 import { deviceDecision } from '@/resources/device';
@@ -427,11 +432,48 @@ export type AccountActionOutcome =
   | { kind: 'redirect'; location: string; setCookie: string }
   | { kind: 'error'; error: AccountActionError; status: 400 | 404 | 500 };
 
+// getSession failures that are genuinely transient backend problems (NOT a dead session): these
+// keep surfacing as PROVIDER_ERROR 500 so real outages stay visible/alertable. EVERY other
+// provider error (NOT_FOUND / PERMISSION_DENIED / FAILED_PRECONDITION / …) means the stored
+// session token is stale or revoked — the "Needs re-authentication" state — and is recovered by
+// routing the user to re-login rather than dead-ending on a 500.
+const SWITCH_TRANSIENT_CODES = new Set<ProviderErrorCode>([
+  'UNAVAILABLE',
+  'DEADLINE_EXCEEDED',
+  'RATE_LIMITED',
+]);
+
+/**
+ * Recover a switch into a "Needs re-authentication" account: its stored session token is
+ * stale/revoked, so the session can't be activated (getSession throws or returns null). Drop the
+ * dead entry from the cookie and send the user to re-login for THIS identity, resuming any live
+ * ceremony — a device user_code takes precedence (device_<code>), else an allowlisted OIDC/SAML
+ * requestId — so the original flow still completes after they sign back in. The loginName is
+ * pre-filled so the user re-authenticates the exact account they picked.
+ */
+async function reauthRedirect(
+  entry: SessionEntry,
+  cookieSessions: SessionEntry[],
+  requestId: string | undefined,
+  userCode: string | undefined
+): Promise<AccountActionOutcome> {
+  const ceremony: Record<string, string | undefined> = userCode
+    ? { requestId: `device_${userCode}` }
+    : isAllowedRequestId(requestId)
+      ? { requestId }
+      : {};
+  const location = paths.login.index({ ...ceremony, loginName: entry.loginName });
+  const pruned = removeSession(cookieSessions, entry.id);
+  return { kind: 'redirect', location, setCookie: await serializeSessions(pruned) };
+}
+
 /**
  * Switch the active account: validate input, look up the cookie entry, re-fetch fresh session
  * state for an accurate nextStep determination, touch the entry to most-recent, and redirect to
- * the resolved next path with the updated cookie. Provider failures map to typed errors exactly
- * as the route did (missing session → SESSION_EXPIRED 400; provider throw → PROVIDER_ERROR 500).
+ * the resolved next path with the updated cookie. A dead/stale session (getSession throws or
+ * returns null) is recovered by routing the user to re-login (see reauthRedirect) instead of a
+ * dead-end error; only a transient backend failure during load, or a failure while RESOLVING the
+ * next path, maps to PROVIDER_ERROR 500.
  */
 export async function switchAccount(
   provider: AuthProvider,
@@ -446,16 +488,38 @@ export async function switchAccount(
   const entry = byId(cookieSessions, sessionId);
   if (!entry) return { kind: 'error', error: 'NOT_FOUND', status: 404 };
 
-  // Re-fetch fresh session state for an accurate nextStep determination
+  // Load the live session FIRST. A "Needs re-authentication" account has a stale/revoked token,
+  // so getSession throws (or returns null) — that is NOT a server error. Drop the dead entry and
+  // route the user to re-login for this identity (resuming any live ceremony) instead of a
+  // dead-end 500. Only genuinely transient backend failures keep surfacing as PROVIDER_ERROR.
+  let freshSession: Session | null;
+  try {
+    freshSession = await provider.getSession(entry.id, entry.token);
+  } catch (err) {
+    const reason = err instanceof ProviderError ? err.code : 'UNKNOWN';
+    if (err instanceof ProviderError && !SWITCH_TRANSIENT_CODES.has(err.code)) {
+      logAuthEvent('account_switch', 'failure', { sessionId, reason, recovery: 'reauth' });
+      return reauthRedirect(entry, cookieSessions, requestId, userCode);
+    }
+    logAuthEvent('account_switch', 'failure', { sessionId, reason });
+    return { kind: 'error', error: 'PROVIDER_ERROR', status: 500 };
+  }
+
+  if (!freshSession) {
+    // Session no longer exists provider-side → same re-auth recovery as a stale token.
+    logAuthEvent('account_switch', 'failure', {
+      sessionId,
+      reason: 'SESSION_GONE',
+      recovery: 'reauth',
+    });
+    return reauthRedirect(entry, cookieSessions, requestId, userCode);
+  }
+
+  // Resolve the continuation destination. A throw HERE is a genuine backend failure (the session
+  // itself loaded fine), so it stays a PROVIDER_ERROR 500.
   let nextPath: string;
   let userId: string;
   try {
-    const freshSession = await provider.getSession(entry.id, entry.token);
-    if (!freshSession) {
-      logAuthEvent('account_switch', 'failure', { sessionId });
-      return { kind: 'error', error: 'SESSION_EXPIRED', status: 400 };
-    }
-
     userId = freshSession.user?.id ?? entry.loginName;
     // On switch, resolve to the continuation/signed-in destination and suppress
     // ONLY the step-6 skippable MFA-setup nudge. Forced MFA + real challenges still route.
@@ -465,8 +529,11 @@ export async function switchAccount(
       suppressMfaSetupNudge: true,
       requestId,
     });
-  } catch {
-    logAuthEvent('account_switch', 'failure', { sessionId });
+  } catch (err) {
+    logAuthEvent('account_switch', 'failure', {
+      sessionId,
+      reason: err instanceof ProviderError ? err.code : 'UNKNOWN',
+    });
     return { kind: 'error', error: 'PROVIDER_ERROR', status: 500 };
   }
 
