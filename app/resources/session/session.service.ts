@@ -275,6 +275,67 @@ async function resolveNextPath(
  * needs-re-auth card), and return the EnrichedAccount list. Empty cookie / empty live set both
  * resolve to an empty list (no redirect loop) — the route renders the empty state.
  */
+/**
+ * Build the EnrichedAccount card for ONE live cookie entry from the pre-fetched per-request maps
+ * (provider sessions, login settings per org, auth methods per userId). A session the provider has
+ * no data for degrades to a "needs re-authentication" card. Synchronous: every lookup is an
+ * in-memory map read (the RPCs were batched by listAccounts into the maps).
+ */
+function enrichSessionEntry(
+  entry: SessionEntry,
+  maps: {
+    providerMap: Map<string, Session>;
+    settingsMap: Map<string | undefined, LoginSettings>;
+    authMethodsMap: Map<string, AuthMethod[]>;
+  }
+): EnrichedAccount {
+  const pSession = maps.providerMap.get(entry.id);
+
+  // Default (degraded) card if the provider has no data for this session.
+  if (!pSession) {
+    return {
+      sessionId: entry.id,
+      loginName: entry.loginName,
+      organization: entry.organization,
+      displayName: undefined,
+      nextPath: '/login',
+      isActive: false,
+    };
+  }
+
+  const userId = pSession.user?.id ?? '';
+  const loginSettings = maps.settingsMap.get(entry.organization) ?? DEFAULT_LOGIN_SETTINGS;
+  // Read enrolled methods from the per-request map (one RPC per distinct userId); a userId absent
+  // from the map (e.g. no resolved user) yields the same empty-list default as before.
+  const enrolledMethods = userId
+    ? (maps.authMethodsMap.get(userId) ?? ([] as AuthMethod[]))
+    : ([] as AuthMethod[]);
+  const userVerified = pSession.factors.passkey?.userVerified ?? false;
+
+  const nextPath = nextStepWithParams({
+    factors: pSession.factors,
+    settings: loginSettings,
+    enrolledMethods,
+    loginName: entry.loginName,
+    userVerified,
+    mfaInitSkippedAt: pSession.user?.mfaInitSkippedAt ?? null,
+    // Display-only enrichment: do NOT thread the cookie-baked requestId (a long-expired OIDC/SAML
+    // id) — it would bake a stale, misleading id into nextPath. The LIVE ceremony id is supplied
+    // separately to switchAccount → resolveNextPath at switch time.
+    requestId: undefined,
+    organization: entry.organization,
+  });
+
+  return {
+    sessionId: entry.id,
+    loginName: entry.loginName,
+    organization: entry.organization,
+    displayName: pSession.user?.displayName,
+    nextPath,
+    isActive: entry.loginName === pSession.user?.loginName,
+  };
+}
+
 export async function listAccounts(
   provider: AuthProvider,
   request: Request
@@ -331,59 +392,10 @@ export async function listAccounts(
     })
   );
 
-  // For each live cookie entry, build an EnrichedAccount. Per-session failures are tolerated
-  // gracefully (renders needs-re-auth card).
-  return Promise.all(
-    liveSessions.map(async (entry): Promise<EnrichedAccount> => {
-      const pSession = providerMap.get(entry.id);
-
-      // Default (degraded) card if provider has no data for this session
-      if (!pSession) {
-        return {
-          sessionId: entry.id,
-          loginName: entry.loginName,
-          organization: entry.organization,
-          displayName: undefined,
-          nextPath: '/login',
-          isActive: false,
-        };
-      }
-
-      const userId = pSession.user?.id ?? '';
-      const loginSettings = settingsMap.get(entry.organization) ?? DEFAULT_LOGIN_SETTINGS;
-
-      // Read enrolled methods from the per-request map (one RPC per distinct userId
-      // above) instead of re-issuing a call here. A userId absent from the map (e.g. no
-      // resolved user) yields the same empty-list default as before.
-      const enrolledMethods = userId
-        ? (authMethodsMap.get(userId) ?? ([] as AuthMethod[]))
-        : ([] as AuthMethod[]);
-
-      const userVerified = pSession.factors.passkey?.userVerified ?? false;
-
-      const nextPath = nextStepWithParams({
-        factors: pSession.factors,
-        settings: loginSettings,
-        enrolledMethods,
-        loginName: entry.loginName,
-        userVerified,
-        mfaInitSkippedAt: pSession.user?.mfaInitSkippedAt ?? null,
-        // Display-only enrichment: do NOT thread the cookie-baked requestId (a long-expired
-        // OIDC/SAML id) — it would bake a stale, misleading id into nextPath. The LIVE ceremony id
-        // is supplied separately to switchAccount → resolveNextPath at switch time.
-        requestId: undefined,
-        organization: entry.organization,
-      });
-
-      return {
-        sessionId: entry.id,
-        loginName: entry.loginName,
-        organization: entry.organization,
-        displayName: pSession.user?.displayName,
-        nextPath,
-        isActive: entry.loginName === pSession.user?.loginName,
-      };
-    })
+  // Build each EnrichedAccount from the batched maps. Per-session failures degrade gracefully
+  // (enrichSessionEntry renders a needs-re-auth card). Synchronous map — all RPCs were batched above.
+  return liveSessions.map((entry) =>
+    enrichSessionEntry(entry, { providerMap, settingsMap, authMethodsMap })
   );
 }
 
