@@ -107,9 +107,10 @@ export async function runSsoAction(
   // P6 Task 9: LDAP-type IdPs use a dedicated credential-entry screen instead of
   // an external IdP redirect. Route to /sso/ldap with the idpId and any flow params.
   if (idpTypeToSlug(target.type) === 'ldap') {
-    // Account-linking via LDAP is not yet supported — guard it here so the user
-    // gets a clear error rather than a silent plain sign-in.
-    // TODO: wire LDAP link via retrieveIdpIntent information + addIdpLink
+    // Account-linking via LDAP is intentionally unsupported — guard it here so the user gets a
+    // clear error rather than a silent plain sign-in. (A future implementation would wire the link
+    // via retrieveIdpIntent information + addIdpLink; the error redirect is the documented dead-end
+    // until then.)
     if (payload.linkOnly === 'true') {
       return { kind: 'redirect', location: `/sso/ldap/error?reason=ldap-link-unsupported` };
     }

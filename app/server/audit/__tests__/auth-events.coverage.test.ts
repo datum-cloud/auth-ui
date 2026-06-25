@@ -96,8 +96,13 @@ const SHARED_FACTORY_PATHS: Record<string, string | string[]> = {
   // (incl. the account_switch / account_remove / logout / post_login_* logAuthEvent calls) to the
   // session domain service. The routes are now thin provider→service→*OutcomeToResponse
   // translators. Registered here so the delegation + registry checks resolve those events at their
-  // new call site in resources/session/session.service.ts.
-  'session.service.ts': join(RESOURCES_DIR, 'session/session.service.ts'),
+  // new call site in resources/session/session.service.ts. The /logout slice (its `logout`
+  // logAuthEvent calls) was extracted to session-logout.service.ts (re-exported by
+  // session.service.ts), so both modules are registered.
+  'session.service.ts': [
+    join(RESOURCES_DIR, 'session/session.service.ts'),
+    join(RESOURCES_DIR, 'session/session-logout.service.ts'),
+  ],
   // Pass 2: the SSO routes (sso/index.tsx loader+action, sso/ldap.tsx action, and the
   // sso/provider/callback.tsx loader) delegate their business logic (incl. the idp_start /
   // idp.signin / idp.link / idp.link.denied / idp.link.start / idp.unlink / ldap_signin

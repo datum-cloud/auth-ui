@@ -17,7 +17,7 @@ export const csrf = new CSRF({ cookie: csrfCookie, formDataKey: CSRF_FORM_KEY })
 
 // Fix 7: loader helper returns [token, cookie | null] as the library emits.
 // Route convention: skip Set-Cookie when the second element is null (token already in cookie).
-// ADAPTATION (remix-utils 8.8): commitToken returns readonly [string, string | null] —
+// ADAPTATION (remix-utils 9.x): commitToken returns readonly [string, string | null] —
 // the second element is null when the cookie already exists with the same token.
 export async function getCsrfToken(request: Request): Promise<[string, string | null]> {
   const [token, cookieHeader] = await csrf.commitToken(request);

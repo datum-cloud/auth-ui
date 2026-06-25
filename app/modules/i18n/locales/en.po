@@ -13,7 +13,7 @@ msgstr ""
 "Plural-Forms: \n"
 
 #. placeholder {0}: attempts.count
-#: app/routes/login/password.tsx:158
+#: app/routes/login/password.tsx:157
 msgid "{0, plural, one {# attempt remaining.} other {# attempts remaining.}}"
 msgstr "{0, plural, one {# attempt remaining.} other {# attempts remaining.}}"
 
@@ -191,7 +191,7 @@ msgstr "Continue"
 msgid "Continue with your provider"
 msgstr "Continue with your provider"
 
-#: app/routes/login/password.tsx:106
+#: app/routes/login/password.tsx:105
 msgid "Could not verify password"
 msgstr "Could not verify password"
 
@@ -302,8 +302,8 @@ msgstr "Enter your authenticator code"
 msgid "Enter your email code"
 msgstr "Enter your email code"
 
-#: app/routes/login/password.tsx:126
-#: app/routes/login/password.tsx:143
+#: app/routes/login/password.tsx:125
+#: app/routes/login/password.tsx:142
 msgid "Enter your password"
 msgstr "Enter your password"
 
@@ -315,7 +315,7 @@ msgstr "Enter your SMS code"
 msgid "Finish creating your account"
 msgstr "Finish creating your account"
 
-#: app/routes/login/password.tsx:189
+#: app/routes/login/password.tsx:188
 msgid "Forgot password?"
 msgstr "Forgot password?"
 
@@ -432,7 +432,7 @@ msgstr "Phone"
 msgid "Phone sign-in isn't available — use your email or username."
 msgstr "Phone sign-in isn't available — use your email or username."
 
-#: app/routes/login/password.tsx:177
+#: app/routes/login/password.tsx:176
 #: app/utils/errors/auth-error-messages.tsx:27
 msgid "Please check your input and try again."
 msgstr "Please check your input and try again."
@@ -530,13 +530,13 @@ msgstr "Set up security key"
 msgid "Set up SMS one-time code"
 msgstr "Set up SMS one-time code"
 
-#: app/routes/login/password.tsx:182
+#: app/routes/login/password.tsx:181
 #: app/routes/signup/index.tsx:286
 #: app/routes/sso/ldap.tsx:82
 msgid "Sign in"
 msgstr "Sign in"
 
-#: app/routes/login/password.tsx:171
+#: app/routes/login/password.tsx:170
 #: app/routes/logout/success.tsx:22
 #: app/utils/errors/auth-error-recovery.tsx:47
 msgid "Sign in again"
@@ -815,7 +815,7 @@ msgstr "You're almost done! <0>{loginName}</0>"
 msgid "You've been signed out"
 msgstr "You've been signed out"
 
-#: app/routes/login/password.tsx:153
+#: app/routes/login/password.tsx:152
 msgid "Your account is temporarily locked after too many attempts."
 msgstr "Your account is temporarily locked after too many attempts."
 
@@ -839,7 +839,7 @@ msgstr "Your password has expired. Please reset it to continue."
 msgid "Your session has ended and you've been securely signed out of Datum. You can safely close this tab, or sign back in any time to pick up where you left off."
 msgstr "Your session has ended and you've been securely signed out of Datum. You can safely close this tab, or sign back in any time to pick up where you left off."
 
-#: app/routes/login/password.tsx:169
+#: app/routes/login/password.tsx:168
 #: app/utils/errors/auth-error-messages.tsx:56
 msgid "Your session has expired."
 msgstr "Your session has expired."

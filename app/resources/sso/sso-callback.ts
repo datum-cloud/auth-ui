@@ -13,6 +13,7 @@ import {
   serializeSessions,
 } from '@/modules/auth/session/cookie';
 import { serializeLastUsedLogin } from '@/modules/auth/session/last-used-login';
+import { clearReauthIntent, readReauthIntent } from '@/modules/auth/session/reauth-intent';
 import { ProviderError } from '@/modules/auth/types';
 import type { IdpIntentResult } from '@/modules/auth/types';
 import { authorizeHandbackTarget, ssoErrorRedirect } from '@/resources/shared/next-step-params';
@@ -75,6 +76,13 @@ export async function processIdpCallback(
   // every createSession userAgent below (no first-session gap); fingerprintCookie is
   // null on reuse and rides out on the redirect that finalizes the sign-in.
   const [fingerprintId, fingerprintCookie] = getOrCreateFingerprintId(request);
+
+  // RE-AUTH cleanup: if a re-auth intent is in flight, every terminal branch below that
+  // establishes a session (sign-in handles its own clear + mismatch check inside
+  // signInWithIdpIntent; link / auto-link / auto-create / link-needs-auth use this) must clear the
+  // marker. Otherwise a stale intent would gate a later unrelated login within its 10-min window
+  // (e.g. the link-needs-auth → /login → password step would false-mismatch the link target).
+  const reauthClear = (await readReauthIntent(request)) ? await clearReauthIntent() : undefined;
 
   // Wrap the intent-fetch + session-resolution + decision block so a transient
   // ProviderError redirects to the branded error page and emits a failure audit event instead
@@ -265,6 +273,7 @@ export async function processIdpCallback(
           setCookie: await serializeSessions(next),
           lastUsedCookie,
           fingerprintCookie: fingerprintCookie ?? undefined,
+          reauthClearCookie: reauthClear,
         };
       } catch (err) {
         if (err instanceof ProviderError) {
@@ -297,7 +306,13 @@ export async function processIdpCallback(
       const qs = new URLSearchParams({ loginName: decision.email, notice: 'link-existing' });
       if (requestId) qs.set('requestId', requestId);
       if (organization) qs.set('organization', organization);
-      return { kind: 'redirect', location: `/login?${qs.toString()}` };
+      // Clear any in-flight re-auth intent: this redirects to /login for a DIFFERENT (link-target)
+      // identity, which would otherwise false-mismatch at the password step and abort the link flow.
+      return {
+        kind: 'redirect',
+        location: `/login?${qs.toString()}`,
+        reauthClearCookie: reauthClear,
+      };
     }
 
     case 'auto-create': {
@@ -334,6 +349,7 @@ export async function processIdpCallback(
           setCookie: await serializeSessions(result.sessions),
           lastUsedCookie,
           fingerprintCookie: fingerprintCookie ?? undefined,
+          reauthClearCookie: reauthClear,
         };
       } catch (err) {
         if (err instanceof ProviderError) {

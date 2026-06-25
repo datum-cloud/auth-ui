@@ -62,6 +62,11 @@ export function cspDirectives(isDev: boolean, frameAncestors: readonly string[] 
     // is intentionally dropped here. Mirrors datum cloud-portal (app/server/entry.ts:
     // "Allow inline styles for third-party widgets"). script-src stays strict
     // (NONCE + 'strict-dynamic') — that is the real XSS boundary; style injection is low-risk.
+    // ACCEPTED RISK: 'unsafe-inline' styles theoretically allow CSS-selector exfiltration of
+    // attribute values (e.g. input[value^="a"]{background:url(...)}); accepted because (a) it
+    // requires an existing HTML/attribute-injection primitive, which script-src + output encoding
+    // already prevent, and (b) the CSS-in-JS dependency leaves no nonce-able alternative today.
+    // Revisit if Radix/sonner ship CSP-nonce support.
     styleSrc: ["'self'", "'unsafe-inline'"],
     imgSrc: ["'self'", 'data:', 'https:'],
     // Fathom analytics beacons POST to https://cdn.usefathom.com — without this

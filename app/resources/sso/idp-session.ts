@@ -17,7 +17,7 @@ import {
   sessionEntryFromSession,
   serializeSessions,
 } from '@/modules/auth/session/cookie';
-import { clearReauthIntent, readReauthIntent } from '@/modules/auth/session/reauth-intent';
+import { checkReauthIntent } from '@/modules/auth/session/reauth-intent';
 import type { Session, User } from '@/modules/auth/types';
 import { authorizeHandbackTarget } from '@/resources/shared/next-step-params';
 import { paths } from '@/routes/paths';
@@ -139,28 +139,30 @@ export async function signInWithIdpIntent(
   // behavior-identical while saving one RPC per sign-in.
   const loginName = fallbackLoginName ?? '';
 
-  // RE-AUTH identity guard. When this sign-in was started to re-authenticate a specific account
-  // (the `reauth-intent` cookie carries that loginName), verify the account that ACTUALLY
-  // authenticated is the same one. The IdP-vouched `idpUserName` (= loginName here) is compared
-  // against the stored intent — apples-to-apples, since the cookie also stores idpUserName for IdP
-  // accounts. On MISMATCH we do NOT continue the ceremony as the wrong identity and we do NOT drop
-  // the account being re-authenticated: keep both and bounce to the picker so the user chooses.
-  // (A rare cross-method false mismatch only adds a picker step — never loses data.) This is the
-  // hard guard; the IdP-side login_hint is only best-effort pre-selection.
-  const reauthFor = await readReauthIntent(request);
-  const isReauthMismatch = reauthFor !== null && loginName !== reauthFor;
+  // RE-AUTH identity guard (shared across all factors via checkReauthIntent). When this sign-in
+  // was started to re-authenticate a specific account (the `reauth-intent` cookie carries that
+  // loginName), verify the account that ACTUALLY authenticated is the same one — the IdP-vouched
+  // `idpUserName` (= loginName here) is compared case-insensitively against the stored intent. On
+  // MISMATCH we do NOT continue the ceremony as the wrong identity and do NOT drop the account
+  // being re-authenticated: keep both and bounce to the picker so the user chooses. (A rare
+  // cross-method false mismatch only adds a picker step — never loses data.) This is the hard
+  // guard; the IdP-side login_hint is only best-effort pre-selection.
+  const reauth = await checkReauthIntent(request, loginName);
 
   const entries = await readSessions(request);
   const withNew = addSession(
     entries,
     sessionEntryFromSession(session, { loginName, organization, requestId })
   );
-  // On a MATCHING re-auth, drop the stale/dead entry we kept for this identity (the fresh session
-  // supersedes it) so the picker doesn't show a duplicate. On a mismatch, keep every entry.
+  // On a MATCHING re-auth, drop the stale/dead entry we kept for this identity so the picker
+  // doesn't show a duplicate. The filter keeps the just-created session (e.id === session.id) and
+  // every entry for a DIFFERENT identity; it drops only prior entries that share this identity
+  // (loginName+organization) — in practice just the one dead entry reauthRedirect preserved.
   const finalEntries =
-    reauthFor !== null && !isReauthMismatch
+    reauth.intent !== null && !reauth.mismatch
       ? withNew.filter(
-          (e) => e.id === session.id || !(e.loginName === loginName && e.organization === organization)
+          (e) =>
+            e.id === session.id || !(e.loginName === loginName && e.organization === organization)
         )
       : withNew;
 
@@ -172,12 +174,9 @@ export async function signInWithIdpIntent(
   // requestIds intentionally never reach here as /authorize (they go via /signed-in).
   // On a re-auth MISMATCH, override that: route to the account picker (don't complete the ceremony
   // as the unintended identity), carrying the live requestId so the user can resume from there.
-  const target = isReauthMismatch
+  const target = reauth.mismatch
     ? paths.accounts({ reauthMismatch: '1', ...(requestId ? { requestId } : {}) })
     : authorizeHandbackTarget(requestId, session.id);
 
-  // Clear the intent marker once a re-auth resolves (match or mismatch) so it can't gate a later login.
-  const reauthClearCookie = reauthFor !== null ? await clearReauthIntent() : undefined;
-
-  return { setCookie, target, reauthClearCookie };
+  return { setCookie, target, reauthClearCookie: reauth.clearCookie };
 }

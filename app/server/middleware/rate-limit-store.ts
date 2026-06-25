@@ -45,6 +45,10 @@ const IN_MEMORY_SWEEP_THRESHOLD = 10_000;
 interface Bucket {
   count: number;
   windowStart: number;
+  // The window this bucket was created under. Recorded PER bucket so the memory sweep expires each
+  // key by its own window — correct even if a single store is ever shared across limiters with
+  // different windowMs (the default is one store per limiter, but the seam allows sharing).
+  windowMs: number;
 }
 
 /**
@@ -61,15 +65,17 @@ export class InMemoryRateLimitStore implements RateLimitStore {
   }
 
   incr(key: string, windowMs: number, nowMs: number = Date.now()): RateLimitIncrResult {
-    // Sweep expired buckets when the Map exceeds the soft cap to bound memory usage.
+    // Sweep expired buckets when the Map exceeds the soft cap to bound memory usage. Each bucket
+    // expires by its OWN recorded window, not the caller's, so the sweep is correct under a shared
+    // store too.
     if (this.buckets.size > IN_MEMORY_SWEEP_THRESHOLD) {
       for (const [k, b] of this.buckets) {
-        if (nowMs - b.windowStart >= windowMs) this.buckets.delete(k);
+        if (nowMs - b.windowStart >= b.windowMs) this.buckets.delete(k);
       }
     }
     const b = this.buckets.get(key);
     if (!b || nowMs - b.windowStart >= windowMs) {
-      this.buckets.set(key, { count: 1, windowStart: nowMs });
+      this.buckets.set(key, { count: 1, windowStart: nowMs, windowMs });
       return { count: 1, resetAt: nowMs + windowMs };
     }
     b.count += 1;

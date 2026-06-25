@@ -29,7 +29,11 @@ function opts(fallbackLoginName: string, requestId = 'oidc_x') {
 describe('signInWithIdpIntent — re-auth identity guard', () => {
   it('no re-auth intent → normal /authorize hand-back, no clear cookie', async () => {
     const provider = new FakeAuthProvider({});
-    const r = await signInWithIdpIntent(provider, await reqWithReauth(null), opts('alice@acme.test'));
+    const r = await signInWithIdpIntent(
+      provider,
+      await reqWithReauth(null),
+      opts('alice@acme.test')
+    );
     expect(r.target).toContain('/authorize');
     expect(r.target).toContain('requestId=oidc_x');
     expect(r.reauthClearCookie).toBeUndefined();
@@ -46,6 +50,18 @@ describe('signInWithIdpIntent — re-auth identity guard', () => {
     expect(r.target).not.toContain('reauthMismatch');
     expect(r.reauthClearCookie).toBeTruthy();
     expect(r.reauthClearCookie).toContain('reauth-intent=');
+  });
+
+  it('matches case-insensitively (IdP may return a different casing than stored)', async () => {
+    const provider = new FakeAuthProvider({});
+    const r = await signInWithIdpIntent(
+      provider,
+      await reqWithReauth('Alice@ACME.test'),
+      opts('alice@acme.test')
+    );
+    // Case-only difference is a MATCH, not a mismatch → continues the ceremony.
+    expect(r.target).toContain('/authorize');
+    expect(r.target).not.toContain('reauthMismatch');
   });
 
   it('mismatched re-auth → bounces to /accounts (reauthMismatch), keeps both, clears the intent', async () => {

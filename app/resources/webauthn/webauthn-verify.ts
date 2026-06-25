@@ -19,6 +19,8 @@
  */
 import { requestWebAuthnChallenge, verifyWebAuthnAssertion } from './webauthn.service';
 import { readSessions, serializeSessions } from '@/modules/auth/session/cookie';
+import { checkReauthIntent } from '@/modules/auth/session/reauth-intent';
+import { paths } from '@/routes/paths';
 import { providerForRequest } from '@/server/auth-context.server';
 import { getCsrfToken, assertCsrf } from '@/server/csrf';
 import { data, redirect, type ActionFunctionArgs, type LoaderFunctionArgs } from 'react-router';
@@ -152,9 +154,23 @@ export function createWebAuthnVerifyHandlers(cfg: WebAuthnVerifyConfig) {
       return data({ error: result.error }, { status });
     }
 
-    return redirect(result.target, {
-      headers: { 'set-cookie': await serializeSessions(result.sessions) },
-    });
+    const headers = new Headers();
+    headers.append('set-cookie', await serializeSessions(result.sessions));
+
+    // RE-AUTH identity guard (passkey / security-key) — shared checkReauthIntent so every factor
+    // agrees. When this verify is re-authenticating a specific account, confirm the identity that
+    // authenticated matches it (case-insensitive); clear the intent marker either way. On a
+    // MISMATCH, don't continue the ceremony as the wrong identity — keep both accounts and bounce
+    // to the picker. This closes the gap where passkey/security-key re-auth bypassed the check.
+    const reauth = await checkReauthIntent(request, loginName);
+    if (reauth.clearCookie) headers.append('set-cookie', reauth.clearCookie);
+    if (reauth.mismatch) {
+      const params = new URLSearchParams({ reauthMismatch: '1' });
+      if (requestId) params.set('requestId', requestId);
+      return redirect(`${paths.accounts()}?${params.toString()}`, { headers });
+    }
+
+    return redirect(result.target, { headers });
   }
 
   return { loader, action };

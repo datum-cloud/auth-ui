@@ -72,7 +72,7 @@ export default function SplitLayout({
               {/* Intrinsic 232×290 raster line-art. width/height pin the aspect ratio so
                   the absolutely-positioned panel reserves space and never shifts layout (CLS).
                   object-contain keeps the line-art crisp/uncropped while it scales down into the
-                  115px box. TODO(design): replace with a vector (SVG) or AVIF source — a designer
+                  115px box. Design note (asset pending): replace with a vector (SVG) or AVIF source — a designer
                   asset is still needed; this raster is the only source that currently exists. */}
               <img
                 src={assetUrl('/images/illustration-2.svg')}
@@ -132,7 +132,7 @@ export default function SplitLayout({
             </div>
 
             {/* 95×38 signature raster at ~1× in a 96px-wide slot. width/height pin the box
-                (CLS) and object-contain keeps the strokes crisp without stretching. TODO(design): a
+                (CLS) and object-contain keeps the strokes crisp without stretching. Design note (asset pending): a
                 vector (SVG) signature is still needed — only this low-res raster currently exists. */}
             <img
               src={assetUrl('/images/zac-sign.png')}
@@ -148,7 +148,7 @@ export default function SplitLayout({
         <div className="absolute right-0 bottom-0 z-0 max-w-[500px] md:max-w-[800px]">
           {/* Intrinsic 707×155 raster line-art stretched into a fluid box up to 800px wide,
               so it currently upscales (soft). width/height pin the aspect ratio for CLS; object-contain
-              avoids the crop/extra blur object-cover introduced. TODO(design): replace with a vector
+              avoids the crop/extra blur object-cover introduced. Design note (asset pending): replace with a vector
               (SVG) or higher-res AVIF source — a designer asset is still needed to render crisply at
               the 800px display width; the 707px raster is the only source that exists today. */}
           <img

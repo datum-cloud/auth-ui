@@ -26,15 +26,14 @@ import {
   byId,
   type SessionEntry,
 } from '@/modules/auth/session/cookie';
+import { serializeReauthIntent } from '@/modules/auth/session/reauth-intent';
 import type { Session, AuthMethod, LoginSettings, ProviderErrorCode } from '@/modules/auth/types';
 import { ProviderError } from '@/modules/auth/types';
-import { serializeReauthIntent } from '@/modules/auth/session/reauth-intent';
 import { isAllowedRequestId } from '@/resources/authorize';
 import { deviceDecision } from '@/resources/device';
 import { postLoginDestinationWithSource } from '@/resources/login/post-login-destination';
 import { nextStepWithParams } from '@/resources/shared/next-step-params';
 import { paths } from '@/routes/paths';
-import { env } from '@/server/infra/env.server';
 import { logAuthEvent, hashActor } from '@/server/observability';
 import { data, redirect } from 'react-router';
 import { z } from 'zod';
@@ -369,7 +368,10 @@ export async function listAccounts(
         loginName: entry.loginName,
         userVerified,
         mfaInitSkippedAt: pSession.user?.mfaInitSkippedAt ?? null,
-        requestId: entry.requestId,
+        // Display-only enrichment: do NOT thread the cookie-baked requestId (a long-expired
+        // OIDC/SAML id) — it would bake a stale, misleading id into nextPath. The LIVE ceremony id
+        // is supplied separately to switchAccount → resolveNextPath at switch time.
+        requestId: undefined,
         organization: entry.organization,
       });
 
@@ -397,8 +399,14 @@ export const switchSchema = z.object({
   requestId: z.string().optional(),
   // Device-grant "change account" sub-flow: when present, the switch returns to the device
   // consent screen (/device/authorize?user_code=...) with the newly-active account, so the
-  // user reviews and authorizes — instead of the normal post-login destination.
-  userCode: z.string().optional(),
+  // user reviews and authorizes — instead of the normal post-login destination. Bounded to the
+  // OAuth device user_code shape (alphanumeric + - / _) so a malformed value can't pollute the
+  // device_<code> requestId or the redirect.
+  userCode: z
+    .string()
+    .max(64)
+    .regex(/^[A-Za-z0-9_-]+$/)
+    .optional(),
 });
 
 export const removeSchema = z.object({
@@ -409,8 +417,13 @@ export const removeSchema = z.object({
   requestId: z.string().optional(),
   // Device-grant "change account" sub-flow: preserve the stable user_code on the redirect back
   // to /accounts (mirrors requestId for OIDC/SAML) so removing an account mid-device-grant keeps
-  // the device context — a subsequent switch/add still returns to /device/authorize.
-  userCode: z.string().optional(),
+  // the device context — a subsequent switch/add still returns to /device/authorize. Bounded to
+  // the OAuth device user_code shape so a malformed value can't be reflected onto the redirect.
+  userCode: z
+    .string()
+    .max(64)
+    .regex(/^[A-Za-z0-9_-]+$/)
+    .optional(),
 });
 
 export type AccountActionError =
@@ -593,12 +606,13 @@ export async function removeAccount(
 
   // Carry the live ceremony context back onto /accounts so a mid-ceremony remove keeps the flow.
   // Device grant (user_code) takes precedence over an OIDC/SAML requestId — the two are mutually
-  // exclusive in practice, but the device sub-flow is keyed on user_code.
+  // exclusive in practice, but the device sub-flow is keyed on user_code. Build every branch
+  // through the typed paths.accounts() registry (no hand-rolled URL strings).
   const location = userCode
     ? paths.accounts({ user_code: userCode })
     : isAllowedRequestId(requestId)
-      ? `/accounts?requestId=${encodeURIComponent(requestId)}`
-      : '/accounts';
+      ? paths.accounts({ requestId })
+      : paths.accounts();
 
   return { kind: 'redirect', location, setCookie: await serializeSessions(updated) };
 }
@@ -630,149 +644,14 @@ export function accountActionOutcomeToResponse(outcome: AccountActionOutcome) {
 }
 
 // ─── /logout — single-session logout orchestration ───────────────────────────
-
-/**
- * Typed outcome of the /logout action. The route turns it into a Response via
- * `logoutOutcomeToResponse`: a redirect carrying the updated (post-removal) sessions cookie.
- */
-export interface LogoutOutcome {
-  location: string;
-  setCookie: string;
-}
-
-/** Parse the comma-separated POST_LOGOUT_ALLOWLIST env into a list of origins. */
-function parsePostLogoutAllowlist(raw: string | undefined): string[] {
-  return (raw ?? '')
-    .split(',')
-    .map((s) => s.trim())
-    .filter(Boolean);
-}
-
-/**
- * Validate the post-logout destination for the OIDC logout handshake (hop 3→4).
- *
- * Accepts either query param Zitadel may use: `post_logout_redirect` (the value it
- * appends when bouncing end_session → /id/logout) or `post_logout_redirect_uri`.
- *
- * Fail-closed open-redirect guard:
- *   • absolute URL → allowed ONLY if its origin is in POST_LOGOUT_ALLOWLIST
- *   • relative paths (e.g. Zitadel's default "/logout/done") → rejected; caller falls
- *     back to /logout/success (the actual signed-out page in this login UI)
- *   • anything else / missing → null (caller falls back to /logout/success)
- *
- * `allowlist` is injectable so unit tests exercise both branches without mutating env.
- */
-export function validatePostLogoutRedirect(
-  request: Request,
-  allowlist: string[] = parsePostLogoutAllowlist(env.POST_LOGOUT_ALLOWLIST)
-): string | null {
-  const params = new URL(request.url).searchParams;
-  const target = params.get('post_logout_redirect') ?? params.get('post_logout_redirect_uri');
-  if (!target) return null;
-
-  // Only honor an allowlisted ABSOLUTE RP URL. Relative paths — notably Zitadel's default
-  // `/logout/done`, which is NOT a route in this login UI (its signed-out page is
-  // /logout/success) — are rejected so the caller falls back to /logout/success.
-  try {
-    const origin = new URL(target).origin; // throws for relative paths → rejected
-    return allowlist.includes(origin) ? target : null;
-  } catch {
-    return null;
-  }
-}
-
-/**
- * Orchestrate a single-session logout. Reads the cookie, signs the most-recent (active) session
- * out provider-side (best-effort: an unreachable provider must not strand the user — local
- * sign-out MUST always succeed because the cookie is the UI's source of truth), removes only that
- * entry from the cookie, then resolves the post-logout destination.
- *
- * Residual-session guard: when residual sessions remain after the single-session removal, redirect to
- * /accounts (forces explicit account selection) instead of /logout/success — otherwise
- * authorize.tsx could silently reuse mostRecent() of the residuals and re-sign-in the user with
- * no interaction. When no residual sessions remain, /logout/success is correct.
- */
-export async function performLogout(
-  provider: AuthProvider,
-  request: Request
-): Promise<LogoutOutcome> {
-  const sessions = await readSessions(request);
-  const active = mostRecent(sessions); // the cookie's active entry (if any)
-
-  if (active) {
-    // deleteSession may throw if the session is already gone on the provider side (e.g.
-    // expired, or a transport error). Wrap in try/catch — on failure emit an audit event
-    // but CONTINUE clearing the local cookie and redirecting. Local sign-out MUST always
-    // succeed: the cookie is the source of truth for the UI and an unreachable provider must
-    // not leave the user stuck on /signed-in.
-    try {
-      await provider.deleteSession(active.id, active.token);
-      logAuthEvent('logout', 'success', {
-        actor: hashActor(active.loginName),
-        sessionId: active.id,
-      });
-    } catch (err) {
-      // reason distinguishes transport outages from stale sessions in ops triage (no tokens logged)
-      logAuthEvent('logout', 'failure', {
-        sessionId: active.id,
-        reason: err instanceof Error ? err.message : String(err),
-      });
-      // fall through — clear cookie + redirect regardless
-    }
-  }
-
-  // removeSession takes a string ID; only call it when active exists.
-  const next = active ? removeSession(sessions, active.id) : sessions;
-
-  const explicitTarget = validatePostLogoutRedirect(request);
-  const hasResidualSessions = next.length > 0;
-  const target = explicitTarget ?? (hasResidualSessions ? '/accounts' : '/logout/success');
-
-  return { location: target, setCookie: await serializeSessions(next) };
-}
-
-/** Turn a LogoutOutcome into the Response the /logout route returns. */
-export function logoutOutcomeToResponse(outcome: LogoutOutcome) {
-  return redirect(outcome.location, { headers: { 'set-cookie': outcome.setCookie } });
-}
-
-/**
- * Complete a Zitadel-initiated OIDC logout (the end_session → /id/logout?logout_token handshake).
- *
- * Global SSO logout: deletes EVERY v2 session in the cookie (not just the active one) so no
- * residual session can be silently reused by /authorize, then clears the whole `sessions` cookie.
- * deleteSession is best-effort per entry: an already-terminated (NOT_FOUND) or unreachable session
- * must not strand the user — the cookie is cleared and the redirect issued regardless.
- *
- * Destination: an allowlist-validated `post_logout_redirect` (the value Zitadel forwarded from the
- * RP), else the local /logout/success page. The validation is the open-redirect guard.
- */
-export async function completeOidcLogout(
-  provider: AuthProvider,
-  request: Request
-): Promise<LogoutOutcome> {
-  const sessions = await readSessions(request);
-
-  await Promise.all(
-    sessions.map(async (entry) => {
-      try {
-        await provider.deleteSession(entry.id, entry.token);
-        logAuthEvent('logout', 'success', {
-          actor: hashActor(entry.loginName),
-          sessionId: entry.id,
-        });
-      } catch (err) {
-        logAuthEvent('logout', 'failure', {
-          sessionId: entry.id,
-          reason: err instanceof Error ? err.message : String(err),
-        });
-        // best-effort: continue clearing + redirecting
-      }
-    })
-  );
-
-  const target = validatePostLogoutRedirect(request) ?? '/logout/success';
-  return { location: target, setCookie: await serializeSessions([]) };
-}
+// Extracted to session-logout.service.ts to keep this file under the size ceiling. Re-exported
+// here so the barrel and existing direct importers (logout tests) are unchanged.
+export {
+  performLogout,
+  logoutOutcomeToResponse,
+  completeOidcLogout,
+  validatePostLogoutRedirect,
+} from './session-logout.service';
+export type { LogoutOutcome } from './session-logout.service';
 
 export type { SessionEntry };

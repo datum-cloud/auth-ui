@@ -7,7 +7,7 @@
 // `replicas: 1` (or use sticky sessions). Do not scale this Deployment horizontally without the
 // shared store. The store seam is pluggable (see rate-limit-store.ts); the DEFAULT (env unset)
 // path is byte-identical to the original embedded Map, so CI / the fitness gate need no Redis.
-import { InMemoryRateLimitStore } from '@/server/middleware/rate-limit-store';
+import { InMemoryRateLimitStore, type RateLimitStore } from '@/server/middleware/rate-limit-store';
 import { createRateLimit } from '@/server/net';
 import { hashActor } from '@/server/observability';
 import type { Context, MiddlewareHandler } from 'hono';
@@ -26,23 +26,26 @@ export interface RateLimitResult {
  * path is intentionally a follow-up; the seam exists here and is unit-tested today.
  */
 export class RateLimiter {
-  private store: InMemoryRateLimitStore;
+  // Typed to the RateLimitStore INTERFACE (not the concrete in-memory class) so the Redis adapter
+  // is a real injection seam. `check` is synchronous, so it requires a synchronous store; an async
+  // (Redis) store must be driven by an async middleware variant via selectRateLimitStore, not here.
+  private store: RateLimitStore;
 
   constructor(
     private opts: { limit: number; windowMs: number },
-    store: InMemoryRateLimitStore = new InMemoryRateLimitStore()
+    store: RateLimitStore = new InMemoryRateLimitStore()
   ) {
     this.store = store;
   }
 
   check(key: string, nowMs: number): RateLimitResult {
-    // The default in-memory adapter is synchronous; cast is safe for the only adapter wired
-    // into this sync path. An async (Redis) store would be selected via selectRateLimitStore
-    // in an async middleware variant, not here.
-    const { count, resetAt } = this.store.incr(key, this.opts.windowMs, nowMs) as {
-      count: number;
-      resetAt: number;
-    };
+    const result = this.store.incr(key, this.opts.windowMs, nowMs);
+    // Narrow the union return (sync result | Promise) instead of an unsafe cast: the sync limiter
+    // requires a synchronous store. A Promise here means an async store was wrongly injected.
+    if (result instanceof Promise) {
+      throw new Error('RateLimiter.check requires a synchronous RateLimitStore (got async)');
+    }
+    const { count, resetAt } = result;
     if (count <= this.opts.limit) {
       return { allowed: true, retryAfterMs: 0 };
     }

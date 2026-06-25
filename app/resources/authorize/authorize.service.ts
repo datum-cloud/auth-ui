@@ -50,6 +50,24 @@ const DEAD_SESSION_CODES: ReadonlySet<ProviderError['code']> = new Set([
 const FRESH_LOGIN_WINDOW_MS = 2 * 60 * 1000; // 2 minutes
 
 /**
+ * The effective anti-forgery freshness window for a prompt=login hand-back. Defaults to the fixed
+ * FRESH_LOGIN_WINDOW_MS (redirect-latency allowance), but an org configured with a STRICTER
+ * `passwordCheckLifetimeMs` tightens it — so a strict org's policy is honored even on the gate's
+ * pass path (which finalizes without re-running nextStep). It only ever tightens; an unset or
+ * longer policy keeps the 2-minute window. Settings-read failure degrades to the fixed window.
+ */
+async function freshLoginWindowMs(
+  provider: AuthProvider,
+  entry: { organization?: string }
+): Promise<number> {
+  const settings = await provider.getLoginSettings(entry.organization).catch(() => undefined);
+  const lifetime = settings?.passwordCheckLifetimeMs;
+  return typeof lifetime === 'number' && lifetime > 0
+    ? Math.min(FRESH_LOGIN_WINDOW_MS, lifetime)
+    : FRESH_LOGIN_WINDOW_MS;
+}
+
+/**
  * A typed description of what the /authorize loader resolved to. The route (and the
  * `outcomeToResponse` translator below) turn this into a redirect/JSON Response. Keeping
  * the cookie payload and status as data — not a constructed Response — makes the whole
@@ -313,7 +331,7 @@ async function resolveOidc(
       // harmless (picking your own live session), so the gate is scoped to prompt=login.
       const mustReauth =
         authRequest.prompt.includes('login') &&
-        !primaryFresh(gate.session.factors, nowMs, FRESH_LOGIN_WINDOW_MS);
+        !primaryFresh(gate.session.factors, nowMs, await freshLoginWindowMs(provider, entry));
       if (!mustReauth) return runCallback(provider, rawId, entry);
       // else: stale prompt=login → do NOT finalize; fall through to decideAuthorize below.
     }
@@ -327,7 +345,8 @@ async function resolveOidc(
   });
 
   if (decision.target === 'callback') {
-    const entry = byId(list, decision.params?.sessionId ?? '');
+    if (!decision.params?.sessionId) return { kind: 'error-redirect', code: 'no_session' };
+    const entry = byId(list, decision.params.sessionId);
     if (!entry) return { kind: 'error-redirect', code: 'no_session' };
     // Validate liveness BEFORE reuse (same self-heal as the explicit-sessionId path above). No
     // freshness gate here: for prompt=login decideAuthorize returns target '/login', never
