@@ -1,8 +1,9 @@
 {
   "include": ["**/*.ts", "**/*.tsx", ".react-router/types/**/*"],
+  "exclude": ["cypress/**"],
   "compilerOptions": {
     "lib": ["DOM", "DOM.Iterable", "ES2023"],
-    "types": ["@react-router/node", "vite/client", "@types/bun", "vitest/globals"],
+    "types": ["@react-router/node", "vite/client", "@types/bun"],
     "target": "ES2023",
     "module": "ESNext",
     "moduleResolution": "bundler",

@@ -72,11 +72,16 @@ jobs:
           key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lock', '**/package.json') }}
       - run: bun install --frozen-lockfile
       - run: bun run typecheck
+      - run: bun run typecheck:cypress
 
   unit-tests:
-    name: Unit Tests
+    name: Unit Tests (component)
     needs: install
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2]
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
       - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
@@ -86,7 +91,20 @@ jobs:
           path: ${{ env.BUN_CACHE }}
           key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lock', '**/package.json') }}
       - run: bun install --frozen-lockfile
-      - run: bun run test:unit
+      - run: bunx cypress install
+      - run: CYPRESS=true bunx cypress run --component
+        env:
+          SPLIT: ${{ strategy.job-total }}
+          SPLIT_INDEX: ${{ strategy.job-index }}
+      - if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: component-artifacts-${{ github.run_id }}-shard-${{ matrix.shard }}
+          path: |
+            cypress/videos
+            cypress/screenshots
+          retention-days: 7
+          if-no-files-found: warn
 
   i18n-check:
     name: i18n Catalogs Fresh
@@ -265,7 +283,7 @@ jobs:
               run_id: runId,
             });
             const testJobs = jobs.jobs.filter(j =>
-              j.name === 'Unit Tests' || j.name.startsWith('E2E')
+              j.name.startsWith('Unit Tests') || j.name.startsWith('E2E')
             );
             const statusEmoji = (c) => {
               if (!c || c === 'skipped') return '⏭️';

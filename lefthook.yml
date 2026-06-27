@@ -21,9 +21,9 @@ pre-commit:
         CI: '1'
       run: bunx lingui extract --clean && bunx lingui compile --typescript && git add app/modules/i18n/locales/
       auto_add: true
-    unit:
-      # Runs the full vitest suite whenever any TS/TSX is staged so a broken test
-      # (e.g. an assertion left stale by a component change) can't be committed.
-      glob: '*.{ts,tsx}'
-      run: bun run test:unit
+    typecheck:cypress:
+      # Fast Cypress spec typecheck — runs in ~2s, catches import/type errors in
+      # cypress/**/*.ts before they reach CI. Full component suite runs in CI only.
+      glob: 'cypress/**/*.{ts,tsx}'
+      run: bunx tsc -p cypress/tsconfig.json --noEmit
       stage_fixed: false

@@ -20,5 +20,13 @@ export default tseslint.config(
     files: ['**/__tests__/**', '**/*.test.{ts,tsx}'],
     rules: { 'no-console': 'off' },
   },
+  // Chai property-chain assertions (`.to.be.null`, `.to.be.undefined`, etc.) are
+  // side-effecting getters, not function calls.  ESLint's no-unused-expressions rule
+  // cannot distinguish them from truly dead expressions, so we disable it for Cypress
+  // spec files where every `expect(…).to.be.<prop>` is intentional.
+  {
+    files: ['cypress/**/*.cy.{ts,tsx}', 'cypress/**/*.spec.{ts,tsx}'],
+    rules: { '@typescript-eslint/no-unused-expressions': 'off' },
+  },
   { ignores: ['build/', '.react-router/', 'app/modules/i18n/locales/'] },
 );

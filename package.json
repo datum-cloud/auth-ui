@@ -13,17 +13,17 @@
     "format": "bunx prettier --write \"**/*.{js,jsx,ts,tsx,json,css,md}\"",
     "prepare": "lefthook install || true",
     "typecheck": "bunx react-router typegen && tsc",
+    "typecheck:cypress": "tsc -p cypress/tsconfig.json --noEmit",
     "i18n:extract": "lingui extract --clean",
     "i18n:compile": "lingui compile --typescript",
-    "test:unit": "vitest run",
-    "test:unit:watch": "vitest",
+    "test:unit": "CYPRESS=true cypress run --component",
+    "test:unit:debug": "CYPRESS=true cypress open --component",
     "test:e2e": "start-server-and-test 'bun run dev' http-get://localhost:3000/healthz 'bunx cypress run'",
     "test:e2e:fast": "bun run build && AUTH_PROVIDER=fake start-server-and-test 'bun run start' http-get://localhost:3000/healthz 'bunx cypress run --spec cypress/e2e/core-signin.cy.ts'",
     "test:acceptance": "bunx cypress run --spec acceptance/core-signin.acceptance.cy.ts",
     "size": "size-limit",
     "lint:boundaries": "depcruise app --config .dependency-cruiser.cjs",
-    "lint:cycles": "madge --circular --extensions ts,tsx app",
-    "test:coverage": "vitest run --coverage"
+    "lint:cycles": "madge --circular --extensions ts,tsx app"
   },
   "dependencies": {
     "@conform-to/react": "1.19.4",
@@ -69,7 +69,16 @@
   },
   "size-limit": [
     {
-      "name": "first-load JS (gzip)",
+      "name": "landing page (gzip)",
+      "path": [
+        "build/client/assets/entry.client-*.js",
+        "build/client/assets/root-*.js"
+      ],
+      "limit": "150 KB",
+      "gzip": true
+    },
+    {
+      "name": "app page (gzip)",
       "path": [
         "build/client/assets/entry.client-*.js",
         "build/client/assets/root-*.js",
@@ -88,19 +97,19 @@
     "@react-router/dev": "^7.18.0",
     "@size-limit/file": "^12.1.0",
     "@tailwindcss/vite": "^4.3.1",
-    "@testing-library/jest-dom": "^6.9.1",
-    "@testing-library/react": "^16.3.2",
+    "@testing-library/cypress": "^10.1.3",
     "@trivago/prettier-plugin-sort-imports": "^6.0.2",
     "@types/bun": "^1.3.14",
     "@types/react": "^19.2.17",
     "@types/react-dom": "^19.2.3",
-    "@vitest/coverage-v8": "^4.1.9",
+    "@vitejs/plugin-react": "^5.2.0",
     "axe-core": "^4.12.1",
     "cypress": "^15.18.0",
     "cypress-axe": "^1.7.0",
+    "cypress-split": "^1.25.0",
+    "cypress-vite": "1.10.0",
     "dependency-cruiser": "^17.4.3",
     "eslint": "^10.5.0",
-    "happy-dom": "^20.10.6",
     "lefthook": "^2.1.9",
     "madge": "^8.0.0",
     "prettier": "^3.8.4",
@@ -111,7 +120,6 @@
     "typescript": "^6.0.3",
     "typescript-eslint": "^8.62.0",
     "vite": "^8.1.0",
-    "vite-plugin-babel-macros": "^1.0.6",
-    "vitest": "^4.1.9"
+    "vite-plugin-babel-macros": "^1.0.6"
   }
 }

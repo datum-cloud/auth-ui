@@ -1,41 +1,12 @@
+import { type TransportEnv, resolveServiceUrl } from './transport.util';
 import type { DescService } from '@bufbuild/protobuf';
 import { createClientFor } from '@zitadel/client';
 import { createServerTransport as libCreateServerTransport } from '@zitadel/client/node';
 import { createHash } from 'node:crypto';
 
-export interface TransportEnv {
-  ZITADEL_API_URL?: string;
-  ZITADEL_CUSTOM_REQUEST_HEADERS?: string;
-  // Fail-closed allowlist for x-zitadel-forward-host.
-  // Unset or empty array = reject ALL forward-host overrides.
-  trustedForwardHosts?: string[];
-}
-
-// Normalise a host value to an https:// URL (strips trailing slashes for comparison).
-function normalizeForwardHost(raw: string): string {
-  const with_scheme =
-    raw.startsWith('http://') || raw.startsWith('https://') ? raw : `https://${raw}`;
-  return with_scheme.replace(/\/+$/, '');
-}
-
-// Forward-host header accepted ONLY if its https-normalized value
-// is in the trustedForwardHosts allowlist. Unset/empty list → reject all.
-export function resolveServiceUrl(headers: Headers, env: TransportEnv): string {
-  const forwarded = headers.get('x-zitadel-forward-host');
-  if (forwarded) {
-    const normalized = normalizeForwardHost(forwarded);
-    const trusted = (env.trustedForwardHosts ?? []).map(normalizeForwardHost);
-    if (trusted.length > 0 && trusted.includes(normalized)) {
-      return normalized;
-    }
-    // Not in allowlist (or list is empty) — fall through to env URL, not forward host.
-    // Throw the same generic error so the caller cannot distinguish "not trusted" from
-    // "no URL configured" (no information leakage about the allowlist).
-    throw new Error('Zitadel service URL could not be determined');
-  }
-  if (env.ZITADEL_API_URL) return env.ZITADEL_API_URL;
-  throw new Error('Zitadel service URL could not be determined');
-}
+// Re-export so callers that import from this module keep working unchanged.
+export type { TransportEnv };
+export { resolveServiceUrl };
 
 // Bound the caches and key on a token FINGERPRINT, never the raw
 // token. Fingerprinting means a rotated token misses the cache (no stale-client reuse); the

@@ -1,12 +1,20 @@
+import { runAuditCoverage } from './cypress/support/audit-coverage';
+import { registerNodeTasks } from './cypress/support/node/tasks';
 import { defineConfig } from 'cypress';
+import cypressSplit from 'cypress-split';
 import { randomUUID } from 'node:crypto';
 import { deflateRawSync } from 'node:zlib';
+
+process.env.CYPRESS = 'true';
 
 export default defineConfig({
   e2e: {
     setupNodeEvents(on) {
       on('task', {
+        // Governance: static-analysis scanner for logAuthEvent coverage, registry, and PII guard.
+        auditCoverage: () => runAuditCoverage(),
         log: (msg) => {
+          // eslint-disable-next-line no-console
           console.log(msg);
           return null;
         },
@@ -113,5 +121,22 @@ export default defineConfig({
     // acceptance/ added so `bunx cypress run --spec acceptance/...` resolves the file;
     // describe.skip keeps the suite from running until real Zitadel is wired.
     specPattern: ['cypress/e2e/**/*.cy.{js,jsx,ts,tsx}', 'acceptance/**/*.cy.{js,jsx,ts,tsx}'],
+  },
+  component: {
+    devServer: {
+      framework: 'react',
+      bundler: 'vite',
+    },
+    viewportWidth: 1280,
+    viewportHeight: 720,
+    supportFile: 'cypress/support/component.tsx',
+    specPattern: 'cypress/component/**/*.{cy,spec}.{js,jsx,ts,tsx}',
+    setupNodeEvents(on, config) {
+      cypressSplit(on, config);
+      // Node-spec harness: runs cookie/session/audit-dependent service logic in real Bun via
+      // cy.task('callService', scenario). See cypress/support/node/* and §7 of the conversion recipe.
+      registerNodeTasks(on);
+      return config;
+    },
   },
 });
