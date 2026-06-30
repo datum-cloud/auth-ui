@@ -4,7 +4,7 @@
 // joinLinkedIdps is the pure link↔active-IdP join + dedupe — imported from the module (not the
 // heavy barrel) so the browser bundle stays light; runs browser-side with Chai.
 import type { IdpLink, IdProvider } from '@/modules/auth/types';
-import { joinLinkedIdps } from '@/resources/sso/sso-management';
+import { joinLinkedIdps, linkableProviders } from '@/resources/sso/sso-management';
 
 const GOOGLE: IdProvider = {
   id: 'idp-google',
@@ -70,5 +70,58 @@ describe('joinLinkedIdps — 755-M6 join + dedupe', () => {
 
   it('returns an empty array when there are no links', () => {
     expect(joinLinkedIdps([], [GOOGLE, GITHUB])).to.deep.equal([]);
+  });
+});
+
+describe('joinLinkedIdps — per-identity dedupe (multi-identity mode)', () => {
+  it('keeps two identities of the SAME provider as separate rows when perIdentity=true', () => {
+    const a = linkOf('idp-github', 'gh-a', 'a-handle');
+    const b = linkOf('idp-github', 'gh-c', 'c-handle');
+    const out = joinLinkedIdps([a, b], [GITHUB], true);
+    expect(out).to.have.length(2);
+    expect(out.map((v) => v.idpUserId)).to.deep.equal(['gh-a', 'gh-c']);
+    expect(out.every((v) => v.name === 'GitHub')).to.equal(true);
+  });
+
+  it('still collapses exact-duplicate identity rows (partial-link residue) when perIdentity=true', () => {
+    const dup = linkOf('idp-github', 'gh-a', 'a-handle');
+    const out = joinLinkedIdps([dup, { ...dup }], [GITHUB], true);
+    expect(out).to.have.length(1);
+    expect(out[0].idpUserId).to.equal('gh-a');
+  });
+
+  it('per-provider dedupe (perIdentity=false / default) is unchanged — same idpId collapses', () => {
+    const out = joinLinkedIdps(
+      [linkOf('idp-github', 'gh-a'), linkOf('idp-github', 'gh-c')],
+      [GITHUB],
+      false
+    );
+    expect(out).to.have.length(1);
+    expect(out[0].idpUserId).to.equal('gh-a');
+  });
+});
+
+describe('linkableProviders — env-gated link options', () => {
+  it('returns ALL active providers when allowMulti=true (always offer another)', () => {
+    const linked = joinLinkedIdps([linkOf('idp-github', 'gh-a')], [GITHUB], true);
+    const out = linkableProviders([GOOGLE, GITHUB], linked, true);
+    expect(out.map((p) => p.id)).to.deep.equal(['idp-google', 'idp-github']);
+  });
+
+  it('filters out already-linked providers when allowMulti=false (legacy one-per-provider)', () => {
+    const linked = joinLinkedIdps([linkOf('idp-github', 'gh-a')], [GITHUB], false);
+    const out = linkableProviders([GOOGLE, GITHUB], linked, false);
+    expect(out.map((p) => p.id)).to.deep.equal(['idp-google']);
+  });
+
+  it('returns all active providers when nothing is linked (either mode)', () => {
+    expect(linkableProviders([GOOGLE, GITHUB], [], true).map((p) => p.id)).to.deep.equal([
+      'idp-google',
+      'idp-github',
+    ]);
+    expect(linkableProviders([GOOGLE, GITHUB], [], false).map((p) => p.id)).to.deep.equal([
+      'idp-google',
+      'idp-github',
+    ]);
   });
 });

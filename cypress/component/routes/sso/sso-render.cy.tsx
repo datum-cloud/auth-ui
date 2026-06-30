@@ -83,7 +83,7 @@ describe('SsoIndex — AuthFormFields csrf adoption', () => {
     userId: 'u1',
     loginName: 'you@acme.test',
     linked: [{ idpId: 'g', idpUserId: 'gx', idpUserName: 'Google You' }],
-    unlinked: [{ id: 'gh', name: 'GitHub' }],
+    linkable: [{ id: 'gh', name: 'GitHub' }],
     allowUnlink: true,
   };
 

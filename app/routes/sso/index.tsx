@@ -66,7 +66,7 @@ export async function action({ request }: ActionFunctionArgs, deps: SsoActionDep
 // ---------------------------------------------------------------------------
 
 export default function SsoPage() {
-  const { csrfToken, loginName, linked, unlinked, allowUnlink } = useLoaderData<typeof loader>();
+  const { csrfToken, loginName, linked, linkable, allowUnlink } = useLoaderData<typeof loader>();
 
   return (
     <AuthCard
@@ -136,16 +136,16 @@ export default function SsoPage() {
 
         {/* Divider between the connected list and the available-to-link list — only
             when both are present so a single-section page has no dangling rule. */}
-        {linked.length > 0 && unlinked.length > 0 ? <Separator /> : null}
+        {linked.length > 0 && linkable.length > 0 ? <Separator /> : null}
 
         {/* Unlinked / available IdPs */}
-        {unlinked.length > 0 ? (
+        {linkable.length > 0 ? (
           <section className="flex flex-col gap-3">
             <h2 className="text-foreground text-sm font-medium">
               <Trans>Available accounts to link</Trans>
             </h2>
             <ul className="flex flex-col gap-2">
-              {unlinked.map((idp: IdProvider) => (
+              {linkable.map((idp: IdProvider) => (
                 <li key={idp.id}>
                   {/* RRForm: auto-adds ?index → posts to the sso index action. */}
                   <RRForm method="post">

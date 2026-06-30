@@ -1,6 +1,6 @@
 // app/resources/sso/sso-management.ts
 //
-// /sso loader business logic: list linked/unlinked IdPs for the session user.
+// /sso loader business logic: list linked IdPs + linkable providers for the session user.
 // Extracted from sso.service.ts. Pure-internal decomposition — the
 // `resolveSsoManagement` signature + `SsoManagementData`/`SsoManagementResult`
 // shapes are unchanged and re-exported through the sso barrel.
@@ -30,7 +30,7 @@ export interface SsoManagementData {
   userId: string;
   loginName: string | null;
   linked: LinkedIdpView[];
-  unlinked: IdProvider[];
+  linkable: IdProvider[];
   allowUnlink: boolean;
 }
 
@@ -42,13 +42,21 @@ export interface SsoManagementData {
  * link that errored mid-ceremony could leave two rows for one IdP). First occurrence wins.
  * Exported for unit testing the join + dedupe in isolation from the loader's I/O.
  */
-export function joinLinkedIdps(links: IdpLink[], active: IdProvider[]): LinkedIdpView[] {
+export function joinLinkedIdps(
+  links: IdpLink[],
+  active: IdProvider[],
+  perIdentity = false
+): LinkedIdpView[] {
   const byId = new Map<string, IdProvider>(active.map((p) => [p.id, p]));
   const seen = new Set<string>();
   const out: LinkedIdpView[] = [];
   for (const link of links) {
-    if (seen.has(link.idpId)) continue; // dedupe by idpId — first occurrence wins
-    seen.add(link.idpId);
+    // perIdentity (multi-identity mode): dedupe on the full identity (idpId:idpUserId) so every
+    // distinct identity gets a row while still collapsing partial-link residue (the SAME identity
+    // duplicated mid-ceremony). Default (per-provider): dedupe on idpId — legacy one row per IdP.
+    const key = perIdentity ? `${link.idpId}:${link.idpUserId}` : link.idpId;
+    if (seen.has(key)) continue; // first occurrence wins
+    seen.add(key);
     const provider = byId.get(link.idpId);
     out.push(
       provider
@@ -59,6 +67,21 @@ export function joinLinkedIdps(links: IdpLink[], active: IdProvider[]): LinkedId
   return out;
 }
 
+/**
+ * Providers offered in the "link an account" section. With multi-identity linking ON every active
+ * provider is offered (you can always add another identity); with it OFF a provider is offered only
+ * when no link for it exists yet (legacy one-per-provider).
+ */
+export function linkableProviders(
+  active: IdProvider[],
+  linked: LinkedIdpView[],
+  allowMulti: boolean
+): IdProvider[] {
+  if (allowMulti) return [...active];
+  const linkedIds = new Set(linked.map((l) => l.idpId));
+  return active.filter((p) => !linkedIds.has(p.id));
+}
+
 export type SsoManagementResult =
   | { kind: 'redirect'; location: string }
   | { kind: 'data'; data: SsoManagementData; setCookie: string | null };
@@ -66,7 +89,9 @@ export type SsoManagementResult =
 /**
  * /sso loader logic. Lists the active IdPs, resolves the ceremony session (guarding a
  * transient ProviderError into a service_unavailable redirect), and shapes the
- * linked/unlinked split. Returns a redirect to /login when there is no session user.
+ * linked list + linkable providers (env.ALLOW_IDP_LINK_ANY_EMAIL gates multi-identity:
+ * per-identity rows + all providers offered when on; legacy one-per-provider when off).
+ * Returns a redirect to /login when there is no session user.
  *
  * `getCsrfToken` is injected so the route can wire the request-scoped CSRF token without
  * the service depending on the server CSRF module directly.
@@ -103,11 +128,10 @@ export async function resolveSsoManagement(
     return { kind: 'redirect', location: '/login' };
   }
 
-  // listIdpLinks now returns IdpLink[] — no cast needed.
+  const allowMulti = env.ALLOW_IDP_LINK_ANY_EMAIL;
   const links = await provider.listIdpLinks(userId);
-  // Join links ↔ active IdPs by idpId to attach {name,type,logoUrl} and dedupe.
-  const linked = joinLinkedIdps(links, active);
-  const linkedIds = new Set(linked.map((l) => l.idpId));
+  // Join links ↔ active IdPs; per-identity rows when multi-identity linking is on.
+  const linked = joinLinkedIdps(links, active, allowMulti);
 
   return {
     kind: 'data',
@@ -116,7 +140,8 @@ export async function resolveSsoManagement(
       userId,
       loginName: session?.user?.loginName ?? null,
       linked,
-      unlinked: active.filter((p) => !linkedIds.has(p.id)),
+      // Multi on → offer every provider (add another); off → only providers with no link yet.
+      linkable: linkableProviders(active, linked, allowMulti),
       allowUnlink: env.ALLOW_IDP_UNLINK,
     },
     setCookie: csrf.setCookie,
