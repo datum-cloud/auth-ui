@@ -37,24 +37,27 @@ describe('SplitLayout — 755-M3 side-panel imagery (CLS + crispness)', () => {
       .and('have.class', 'object-contain');
   });
 
-  it('gives the signature explicit dimensions + object-contain', () => {
+  it('gives the signature a fixed box + mask-contain (no CLS, crisp)', () => {
     mountLayout();
-    imgBySrcTail('images/zac-sign.svg')
-      .should('have.attr', 'width', '95')
-      .and('have.attr', 'height', '38')
-      .and('have.class', 'object-contain');
+    // The signature is now a CSS-masked <span> (recoloured per theme), not an <img>: its box
+    // is pinned by fixed w-24/h-[38px] classes and the asset rides in mask-image.
+    cy.get('[style*="zac-sign.svg"]')
+      .should('exist')
+      .and('have.class', 'w-24')
+      .and('have.class', 'h-[38px]');
+    cy.get('[style*="zac-sign.svg"]')
+      .should('have.attr', 'style')
+      .and('match', /mask-size:\s*contain/i);
   });
 
-  it('keeps every queryable decorative side-panel image dimensioned (CLS guard)', () => {
+  it('keeps every decorative side-panel image dimensioned (CLS guard)', () => {
     mountLayout();
-    for (const tail of [
-      'images/illustration-1.svg',
-      'images/illustration-2.svg',
-      'images/zac-sign.svg',
-    ]) {
+    for (const tail of ['images/illustration-1.svg', 'images/illustration-2.svg']) {
       imgBySrcTail(tail).invoke('attr', 'width').should('exist');
       imgBySrcTail(tail).invoke('attr', 'height').should('exist');
     }
+    // Signature: a masked <span>, dimensioned by utility classes rather than width/height attrs.
+    cy.get('[style*="zac-sign.svg"]').should('have.class', 'w-24').and('have.class', 'h-[38px]');
   });
 });
 
