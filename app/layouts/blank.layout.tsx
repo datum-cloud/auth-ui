@@ -14,7 +14,7 @@ export default function BlankLayout({
   return (
     <div
       className={cn(
-        'bg-background relative flex min-h-screen w-full flex-col p-3 sm:p-4 md:px-[41px] md:py-8',
+        'bg-background relative flex min-h-screen w-full flex-col p-3 sm:p-4 md:px-[41px] md:py-8 dark:bg-[#132336]',
         className
       )}>
       <div className="mb-6 flex items-center justify-between">

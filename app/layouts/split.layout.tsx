@@ -16,10 +16,12 @@ export default function SplitLayout({
   children: React.ReactNode;
   branding?: BrandingTheme | null;
 }) {
+  const signatureUrl = assetUrl('/images/zac-sign.svg');
+
   return (
     <div className="grid min-h-svh lg:grid-cols-2">
       {/* Left panel is the login form.*/}
-      <div className="dark:bg-background relative flex min-h-screen w-full flex-col bg-white p-3 sm:p-4 md:px-[41px] md:py-8">
+      <div className="relative flex min-h-screen w-full flex-col bg-white p-3 sm:p-4 md:px-[41px] md:py-8 dark:bg-[#19293B]">
         <div className="flex items-center justify-between">
           <BrandLogo branding={branding} />
         </div>
@@ -52,7 +54,7 @@ export default function SplitLayout({
       {/* Right panel is a marketing / branding panel.*/}
       <aside
         aria-label="Datum overview"
-        className="bg-background dark:bg-background/50 relative hidden min-h-screen w-full flex-col p-3 sm:p-4 md:flex md:px-[41px] md:py-8">
+        className="bg-background relative hidden min-h-screen w-full flex-col p-3 sm:p-4 md:flex md:px-[41px] md:py-8 dark:bg-[#132336]">
         <div className="flex items-center justify-end">
           <LinkButton
             type="quaternary"
@@ -62,7 +64,8 @@ export default function SplitLayout({
             as={Link}
             href="https://www.datum.net/docs"
             target="_blank"
-            rel="noopener noreferrer">
+            rel="noopener noreferrer"
+            className="dark:border-quaternary">
             Documentation
           </LinkButton>
         </div>
@@ -88,15 +91,17 @@ export default function SplitLayout({
               />
             </div>
 
-            <div className="text-muted-foreground stretch leading-6">
+            <div className="text-muted-foreground stretch dark:text-card-quaternary leading-6">
               <Trans>
                 Using Datum requires setting up a billing account, but to help you explore without
                 cost, we add{' '}
                 {/* The lime credit chip (aurora-moss #e6f59f) is a fixed brand accent that
                     stays light in BOTH themes, so it pins dark text (midnight-fjord) explicitly —
                     text-foreground would flip to light on dark and become unreadable on lime. */}
-                <span className="bg-[#e6f59f] px-0.5 font-semibold text-[#0c1d31]">$50 USD</span> in
-                credit on signup.
+                <span className="dark:text-secondary bg-[#e6f59f] px-0.5 font-semibold text-[#0c1d31] dark:bg-[#4D6356]">
+                  $50 USD
+                </span>{' '}
+                in credit on signup.
               </Trans>
               <span className="block h-4" />
               <Trans>
@@ -129,25 +134,37 @@ export default function SplitLayout({
                 />
                 <AvatarFallback>ZS</AvatarFallback>
               </Avatar>
-              <span className="text-muted-foreground leading-4">Zac Smith</span>
+              <span className="text-muted-foreground dark:text-card-quaternary leading-4">
+                Zac Smith
+              </span>
               {/* Full-opacity --muted-foreground (not /80). At 12px the /80 alpha composites
                   to ≈3.8:1 on the cream panel (fails WCAG AA); full opacity clears ≈6:1 in light and
                   keeps dark mode's own muted token. */}
-              <span className="text-muted-foreground text-xs">Co-founder and CEO</span>
+              <span className="text-muted-foreground dark:text-card-quaternary text-xs">
+                Co-founder and CEO
+              </span>
             </div>
 
-            {/* 95×38 signature raster (raster wrapped in SVG) at ~1× in a 96px-wide slot.
-                width/height pin the box (CLS) and object-contain keeps the strokes crisp without
-                stretching. dark:invert flips the dark ink to light so the signature reads on the
-                dark panel — the right call here since it is a single-colour mark (no real dark
-                asset needed). Design note (asset pending): a true vector signature is still wanted. */}
-            <img
-              src={assetUrl('/images/zac-sign.svg')}
-              alt=""
+            {/* 95×38 signature (transparent-RGBA raster wrapped in SVG) recoloured via CSS mask:
+                the asset's alpha is the stencil and background-color paints it, so the single-colour
+                mark takes an exact hue per theme — #060606 ink in light (matches the source raster)
+                and #e6ede0 in dark so it reads on the dark panel. A mask beats filter:invert here
+                because invert only flips pixels and can never land on a specific colour. w-24/h-[38px]
+                pin the box (CLS) and mask-size:contain keeps the strokes crisp. The -webkit- prefixes
+                cover Safari. Design note (asset pending): a true vector signature is still wanted. */}
+            <span
               aria-hidden="true"
-              width={95}
-              height={38}
-              className="h-[38px] w-24 object-contain dark:invert"
+              className="inline-block h-[38px] w-24 bg-[#060606] dark:bg-[#e6ede0]"
+              style={{
+                maskImage: `url(${signatureUrl})`,
+                WebkitMaskImage: `url(${signatureUrl})`,
+                maskRepeat: 'no-repeat',
+                WebkitMaskRepeat: 'no-repeat',
+                maskPosition: 'center',
+                WebkitMaskPosition: 'center',
+                maskSize: 'contain',
+                WebkitMaskSize: 'contain',
+              }}
             />
           </div>
         </div>
