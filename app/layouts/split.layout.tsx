@@ -1,7 +1,7 @@
 import { BrandLogo } from '@/components/brand-logo/brand-logo';
 import { ThemedImage } from '@/components/themed-image/themed-image';
 import type { BrandingTheme } from '@/modules/auth/types';
-import { assetUrl } from '@/utils/asset-url';
+import { assetUrl, darkAssetUrl } from '@/utils/asset-url';
 import { Avatar, AvatarFallback, AvatarImage } from '@datum-cloud/datum-ui/avatar';
 import { LinkButton } from '@datum-cloud/datum-ui/button';
 import { Icon } from '@datum-cloud/datum-ui/icons';
@@ -75,10 +75,11 @@ export default function SplitLayout({
                   object-contain keeps the line-art crisp/uncropped while it scales down into the
                   115px box. Design note (asset pending): replace with a vector (SVG) or AVIF source — a designer
                   asset is still needed; this raster is the only source that currently exists.
-                  Dark mode (#9C7979 rose line-art on the dark panel): the seam is wired — once
-                  /images/illustration-2.dark.svg exists, pass dark={darkAssetUrl('/images/illustration-2.svg')}. */}
+                  Dark mode swaps to illustration-2.dark.svg, recolored to the lime brand
+                  accent (#e6f59f); the dark source is optimistic and falls back to light if absent. */}
               <ThemedImage
                 light={assetUrl('/images/illustration-2.svg')}
+                dark={darkAssetUrl('/images/illustration-2.svg')}
                 alt=""
                 aria-hidden="true"
                 width={232}
