@@ -118,7 +118,7 @@ export default function SplitLayout({
                 <AvatarImage
                   alt="Zac Smith"
                   src={assetUrl('/images/zac-avatar.png')}
-                  srcSet={`${assetUrl('/images/zac-avatar.png')} 2x`}
+                  srcSet={`${assetUrl('/images/zac-avatar.png')} 3x`}
                   width={40}
                   height={40}
                 />
@@ -135,7 +135,7 @@ export default function SplitLayout({
                 (CLS) and object-contain keeps the strokes crisp without stretching. Design note (asset pending): a
                 vector (SVG) signature is still needed — only this low-res raster currently exists. */}
             <img
-              src={assetUrl('/images/zac-sign.png')}
+              src={assetUrl('/images/zac-sign.svg')}
               alt=""
               aria-hidden="true"
               width={95}
