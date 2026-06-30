@@ -340,3 +340,57 @@ describe('env schema — MAXMIND_ACCOUNT_ID (optional, device fingerprinting)', 
     });
   });
 });
+
+// ── ALLOW_IDP_AUTO_LINK (default false; fail-closed) ──────────────────────────
+describe('env schema — ALLOW_IDP_AUTO_LINK (default false, fail-closed)', () => {
+  it("coerces the exact string 'true' to true", () => {
+    callService({
+      fn: 'envSchemaFull',
+      parseEnvRaw: { ...BASE, ALLOW_IDP_AUTO_LINK: 'true' },
+    }).then((v) => {
+      expect((v.outcome.data as Record<string, unknown>).ALLOW_IDP_AUTO_LINK).to.equal(true);
+    });
+  });
+
+  it("coerces '1' (not the literal 'true') to false", () => {
+    callService({
+      fn: 'envSchemaFull',
+      parseEnvRaw: { ...BASE, ALLOW_IDP_AUTO_LINK: '1' },
+    }).then((v) => {
+      expect((v.outcome.data as Record<string, unknown>).ALLOW_IDP_AUTO_LINK).to.equal(false);
+    });
+  });
+
+  it('defaults to false when unset (fail-closed)', () => {
+    callService({ fn: 'envSchemaFull', parseEnvRaw: { ...BASE } }).then((v) => {
+      expect((v.outcome.data as Record<string, unknown>).ALLOW_IDP_AUTO_LINK).to.equal(false);
+    });
+  });
+});
+
+// ── ALLOW_IDP_LINK_ANY_EMAIL (default true; opt-out with 'false') ─────────────
+describe('env schema — ALLOW_IDP_LINK_ANY_EMAIL (default true)', () => {
+  it('defaults to true when unset', () => {
+    callService({ fn: 'envSchemaFull', parseEnvRaw: { ...BASE } }).then((v) => {
+      expect((v.outcome.data as Record<string, unknown>).ALLOW_IDP_LINK_ANY_EMAIL).to.equal(true);
+    });
+  });
+
+  it("coerces the exact string 'false' to false (restores POSTURE B2)", () => {
+    callService({
+      fn: 'envSchemaFull',
+      parseEnvRaw: { ...BASE, ALLOW_IDP_LINK_ANY_EMAIL: 'false' },
+    }).then((v) => {
+      expect((v.outcome.data as Record<string, unknown>).ALLOW_IDP_LINK_ANY_EMAIL).to.equal(false);
+    });
+  });
+
+  it("treats any non-'false' value (e.g. 'true') as true", () => {
+    callService({
+      fn: 'envSchemaFull',
+      parseEnvRaw: { ...BASE, ALLOW_IDP_LINK_ANY_EMAIL: 'true' },
+    }).then((v) => {
+      expect((v.outcome.data as Record<string, unknown>).ALLOW_IDP_LINK_ANY_EMAIL).to.equal(true);
+    });
+  });
+});

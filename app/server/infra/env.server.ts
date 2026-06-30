@@ -77,6 +77,25 @@ const schema = z
       .string()
       .optional()
       .transform((v) => v === 'true'),
+    // Whether to AUTO-LINK an external IdP identity into an existing same-email account on the
+    // LOGIN/REGISTER flow (no explicit link ceremony). Defaults to false (fail-closed): a
+    // same-email collision becomes a hard `account-exists` error and the owner must link the IdP
+    // from the signed-in /sso screen instead. Only the exact string 'true' re-enables the legacy
+    // path (auto-link when the IdP email is verified + the account is passwordless; otherwise
+    // link-needs-auth). Mirrors the ALLOW_IDP_UNLINK coercion.
+    ALLOW_IDP_AUTO_LINK: z
+      .string()
+      .optional()
+      .transform((v) => v === 'true'),
+    // Whether the EXPLICIT SSO link ceremony may attach a FRESH external identity regardless of
+    // its email address. Defaults to TRUE (product requirement): a signed-in user can link any
+    // Google/GitHub identity to their own account, and email-ownership is enforced later at
+    // email-update time on the backend. Set to the exact string 'false' to RESTORE the strict
+    // POSTURE B2 gate (the IdP-verified email must already be owned by the session user).
+    ALLOW_IDP_LINK_ANY_EMAIL: z
+      .string()
+      .optional()
+      .transform((v) => v !== 'false'),
     // CSP `frame-ancestors` override. Unset ⇒ 'none' (secure default — the auth UI is
     // not embeddable; X-Frame-Options: DENY is kept in lock-step). Set to a space/comma-
     // separated allowlist of full origins (e.g. "https://staging.portal.example.com") in
