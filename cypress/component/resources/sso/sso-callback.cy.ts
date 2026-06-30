@@ -528,7 +528,9 @@ describe('processIdpCallback — fresh-identity link ceremony (Req 2)', () => {
       slug: 'google',
       // default env → ALLOW_IDP_LINK_ANY_EMAIL is TRUE: the B2 owner-resolution lookup short-circuits.
       seed: {}, // fresh provider; the session user is injected via liveSessions (no user store entry needed)
-      liveSessions: [{ id: 's1', token: 't1', user: { id: 'u-sess', loginName: 'owner@datum.test' } }],
+      liveSessions: [
+        { id: 's1', token: 't1', user: { id: 'u-sess', loginName: 'owner@datum.test' } },
+      ],
       idpIntent: FRESH_VERIFIED_LINK,
       // recordCalls spies provider.findUser. With any-email ON the B2 owner lookup
       // (sso-callback.ts:144-153) is gated behind `!allowLinkAnyEmail` and never runs, so the spy
@@ -555,7 +557,9 @@ describe('processIdpCallback — fresh-identity link ceremony (Req 2)', () => {
       env: { ALLOW_IDP_LINK_ANY_EMAIL: 'false' }, // restore the strict POSTURE B2 gate (B2 enforced)
       // The verified email 'fresh@idp.test' is owned by u-other — NOT the session user (u-sess).
       seed: { users: [{ id: 'u-other', loginName: 'fresh@idp.test', displayName: 'Other Owner' }] },
-      liveSessions: [{ id: 's1', token: 't1', user: { id: 'u-sess', loginName: 'owner@datum.test' } }],
+      liveSessions: [
+        { id: 's1', token: 't1', user: { id: 'u-sess', loginName: 'owner@datum.test' } },
+      ],
       idpIntent: FRESH_VERIFIED_LINK,
       request: {
         url: CB('google', 'id=intent-link&token=tok-link&link=true'),
