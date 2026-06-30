@@ -39,7 +39,7 @@ describe('SplitLayout — 755-M3 side-panel imagery (CLS + crispness)', () => {
 
   it('gives the signature explicit dimensions + object-contain', () => {
     mountLayout();
-    imgBySrcTail('images/zac-sign.png')
+    imgBySrcTail('images/zac-sign.svg')
       .should('have.attr', 'width', '95')
       .and('have.attr', 'height', '38')
       .and('have.class', 'object-contain');
@@ -50,7 +50,7 @@ describe('SplitLayout — 755-M3 side-panel imagery (CLS + crispness)', () => {
     for (const tail of [
       'images/illustration-1.svg',
       'images/illustration-2.svg',
-      'images/zac-sign.png',
+      'images/zac-sign.svg',
     ]) {
       imgBySrcTail(tail).invoke('attr', 'width').should('exist');
       imgBySrcTail(tail).invoke('attr', 'height').should('exist');
