@@ -1,6 +1,7 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
 import { AuthFormFields } from '@/components/auth-form/auth-form-fields';
 import { IdpIcon } from '@/components/idp-icon/idp-icon';
+import { inferIdpType } from '@/modules/auth/idp-detect';
 import { slugify } from '@/modules/auth/idp-slug';
 import type { IdProvider } from '@/modules/auth/types';
 import {
@@ -96,8 +97,11 @@ export default function SsoPage() {
                       Falls back to the bare IdP user name / id when the provider is no longer
                       active. Icon is non-interactive — no nested-interactive a11y violation. */}
                   <span className="flex min-w-0 items-center gap-3">
+                    {/* `type` is only joined in when the IdP is still active; for a deactivated
+                        provider it's undefined and the bare GitHub handle would fall back to the
+                        mail glyph. inferIdpType recovers GITHUB from the username shape. */}
                     <IdpIcon
-                      type={link.type}
+                      type={link.type ?? inferIdpType(link.idpUserName)}
                       name={link.name || link.idpUserName || link.idpId}
                       logoUrl={link.logoUrl}
                     />

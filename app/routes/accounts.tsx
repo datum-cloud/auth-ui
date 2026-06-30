@@ -3,6 +3,7 @@ import { AuthFormFields } from '@/components/auth-form/auth-form-fields';
 import { FormError } from '@/components/form-error/form-error';
 import { IdpIcon } from '@/components/idp-icon/idp-icon';
 import { useAuthActionError } from '@/hooks/use-auth-action-error';
+import { inferIdpType } from '@/modules/auth/idp-detect';
 import { isAllowedRequestId } from '@/resources/authorize';
 import {
   listAccounts,
@@ -138,8 +139,10 @@ export default function AccountPicker() {
                   <button
                     type="submit"
                     className="hover:bg-muted/50 focus-visible:ring-ring flex w-full items-center gap-2 rounded-l-lg p-3 text-left transition-colors focus-visible:ring-2 focus-visible:outline-none">
+                    {/* idpType is absent for deactivated/unknown providers; recover GITHUB from a
+                        handle-shaped loginName so it doesn't fall back to the mail glyph. */}
                     <IdpIcon
-                      type={account.idpType}
+                      type={account.idpType ?? inferIdpType(account.loginName)}
                       name={account.displayName ?? account.loginName}
                     />
                     <span className="flex min-w-0 flex-col">
