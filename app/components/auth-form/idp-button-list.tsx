@@ -1,7 +1,8 @@
 import { AuthFormFields } from '@/components/auth-form/auth-form-fields';
 import { LastUsedBadge } from '@/components/auth-form/last-used-badge';
+import { ThemedImage } from '@/components/themed-image/themed-image';
 import type { IdProvider } from '@/modules/auth/types';
-import { assetUrl } from '@/utils/asset-url';
+import { assetUrl, darkAssetUrl } from '@/utils/asset-url';
 import { Button } from '@datum-cloud/datum-ui/button';
 import { cn } from '@datum-cloud/datum-ui/utils';
 import { Trans } from '@lingui/react/macro';
@@ -33,35 +34,44 @@ export function IdpButtonList({
 }: IdpButtonListProps): React.JSX.Element {
   return (
     <div className="flex flex-col gap-3">
-      {idps.map((idp) => (
-        <RRForm key={idp.id} method="post">
-          <AuthFormFields csrf={csrf} requestId={requestId} organization={organization} />
-          <input type="hidden" name="intent" value="idp" />
-          <input type="hidden" name="idpId" value={idp.id} />
-          <Button
-            size="large"
-            className={cn(relative && 'relative', 'h-13 gap-3')}
-            type="quaternary"
-            theme="outline"
-            block
-            htmlType="submit"
-            loading={submittingIdpId === idp.id}
-            iconPosition="left"
-            icon={
-              <img
-                src={assetUrl(`/images/idps/${idp.name.toLowerCase().replace(/\s+/g, '-')}.png`)}
-                alt={idp.name}
-                aria-hidden="true"
-                className="size-4 object-contain"
-              />
-            }>
-            <Trans>{idp.name}</Trans>
-            {lastUsedLogin !== undefined && (
-              <LastUsedBadge active={lastUsedLogin === `idp:${idp.id}`} />
-            )}
-          </Button>
-        </RRForm>
-      ))}
+      {idps.map((idp) => {
+        const mark = `/images/idps/${idp.name.toLowerCase().replace(/\s+/g, '-')}.png`;
+        return (
+          <RRForm key={idp.id} method="post">
+            <AuthFormFields csrf={csrf} requestId={requestId} organization={organization} />
+            <input type="hidden" name="intent" value="idp" />
+            <input type="hidden" name="idpId" value={idp.id} />
+            <Button
+              size="large"
+              className={cn(relative && 'relative', 'h-13 gap-3')}
+              type="quaternary"
+              theme="outline"
+              block
+              htmlType="submit"
+              loading={submittingIdpId === idp.id}
+              iconPosition="left"
+              icon={
+                // Span wrapper keeps the Button's `icon` slot a single element; the optimistic
+                // `dark` source (<provider>.dark.png) auto-activates when it ships, else falls
+                // back to the light mark.
+                <span className="flex size-4 shrink-0 items-center justify-center">
+                  <ThemedImage
+                    light={assetUrl(mark)}
+                    dark={darkAssetUrl(mark)}
+                    alt={idp.name}
+                    aria-hidden="true"
+                    className="size-4 object-contain"
+                  />
+                </span>
+              }>
+              <Trans>{idp.name}</Trans>
+              {lastUsedLogin !== undefined && (
+                <LastUsedBadge active={lastUsedLogin === `idp:${idp.id}`} />
+              )}
+            </Button>
+          </RRForm>
+        );
+      })}
     </div>
   );
 }

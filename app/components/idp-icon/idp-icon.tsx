@@ -1,4 +1,5 @@
-import { assetUrl } from '@/utils/asset-url';
+import { ThemedImage } from '@/components/themed-image/themed-image';
+import { assetUrl, darkAssetUrl } from '@/utils/asset-url';
 import { Icon } from '@datum-cloud/datum-ui/icons';
 import { MailIcon } from 'lucide-react';
 
@@ -10,6 +11,9 @@ import { MailIcon } from 'lucide-react';
  * accessible name inside an enclosing interactive control — avoids the
  * nested-interactive axe violation when rendered inside the account-switch button
  * or the SSO unlink row. Shared by /id/sso and /id/accounts.
+ *
+ * Bundled marks pass a `dark` source via the `.dark` suffix convention: it's optimistic, so
+ * `<provider>.dark.png` auto-activates when it ships and falls back to the light mark until then.
  */
 export function IdpIcon({
   type,
@@ -23,8 +27,9 @@ export function IdpIcon({
   const t = (type ?? '').toUpperCase();
   if (t === 'GOOGLE') {
     return (
-      <img
-        src={assetUrl(`/images/idps/google.png`)}
+      <ThemedImage
+        light={assetUrl(`/images/idps/google.png`)}
+        dark={darkAssetUrl(`/images/idps/google.png`)}
         alt="Google"
         aria-hidden
         width={20}
@@ -35,8 +40,9 @@ export function IdpIcon({
   }
   if (t === 'GITHUB' || t === 'GITHUB_ES') {
     return (
-      <img
-        src={assetUrl(`/images/idps/github.png`)}
+      <ThemedImage
+        light={assetUrl(`/images/idps/github.png`)}
+        dark={darkAssetUrl(`/images/idps/github.png`)}
         alt="GitHub"
         aria-hidden
         width={20}

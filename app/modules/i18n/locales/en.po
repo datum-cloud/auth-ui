@@ -19,7 +19,7 @@ msgstr "{0, plural, one {# attempt remaining.} other {# attempts remaining.}}"
 
 #. placeholder {0}: idp.name
 #. placeholder {0}: r.label
-#: app/components/auth-form/idp-button-list.tsx:58
+#: app/components/auth-form/idp-button-list.tsx:67
 #: app/routes/setup/mfa.tsx:184
 msgid "{0}"
 msgstr "{0}"
@@ -126,7 +126,7 @@ msgstr "Back"
 msgid "Back to sign in"
 msgstr "Back to sign in"
 
-#: app/layouts/split.layout.tsx:30
+#: app/layouts/split.layout.tsx:31
 msgid "By continuing, you agree to Datum's <0>Terms of Service</0> and <1>Privacy Policy</1>, and to receive periodic emails with updates."
 msgstr "By continuing, you agree to Datum's <0>Terms of Service</0> and <1>Privacy Policy</1>, and to receive periodic emails with updates."
 
@@ -437,7 +437,7 @@ msgstr "Phone sign-in isn't available — use your email or username."
 msgid "Please check your input and try again."
 msgstr "Please check your input and try again."
 
-#: app/layouts/split.layout.tsx:98
+#: app/layouts/split.layout.tsx:101
 msgid "Prefer a demo instead? Just <0>reach out</0>."
 msgstr "Prefer a demo instead? Just <0>reach out</0>."
 
@@ -598,7 +598,7 @@ msgstr "Something went wrong. Please try again."
 msgid "Start over"
 msgstr "Start over"
 
-#: app/layouts/split.layout.tsx:110
+#: app/layouts/split.layout.tsx:113
 msgid "Thanks,"
 msgstr "Thanks,"
 
@@ -688,7 +688,7 @@ msgstr "Use your security key to verify your identity."
 msgid "Username"
 msgstr "Username"
 
-#: app/layouts/split.layout.tsx:88
+#: app/layouts/split.layout.tsx:91
 msgid "Using Datum requires setting up a billing account, but to help you explore without cost, we add <0>$50 USD</0> in credit on signup."
 msgstr "Using Datum requires setting up a billing account, but to help you explore without cost, we add <0>$50 USD</0> in credit on signup."
 

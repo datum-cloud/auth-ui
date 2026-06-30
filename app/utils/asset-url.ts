@@ -6,3 +6,11 @@
  */
 export const assetUrl = (path: string): string =>
   `${import.meta.env.BASE_URL}${path.replace(/^\//, '')}`;
+
+/**
+ * Resolve the dark-theme variant of a public asset using the `.dark` suffix convention:
+ * `/images/x.svg` → `<base>/images/x.dark.svg`. Pair with `<ThemedImage dark={...}>`.
+ * Leaves the path unchanged (aside from the base prefix) when it has no file extension.
+ */
+export const darkAssetUrl = (path: string): string =>
+  assetUrl(path.replace(/(\.[^./]+)$/, '.dark$1'));

@@ -1,4 +1,5 @@
 import { BrandLogo } from '@/components/brand-logo/brand-logo';
+import { ThemedImage } from '@/components/themed-image/themed-image';
 import type { BrandingTheme } from '@/modules/auth/types';
 import { assetUrl } from '@/utils/asset-url';
 import { Avatar, AvatarFallback, AvatarImage } from '@datum-cloud/datum-ui/avatar';
@@ -73,9 +74,11 @@ export default function SplitLayout({
                   the absolutely-positioned panel reserves space and never shifts layout (CLS).
                   object-contain keeps the line-art crisp/uncropped while it scales down into the
                   115px box. Design note (asset pending): replace with a vector (SVG) or AVIF source — a designer
-                  asset is still needed; this raster is the only source that currently exists. */}
-              <img
-                src={assetUrl('/images/illustration-2.svg')}
+                  asset is still needed; this raster is the only source that currently exists.
+                  Dark mode (#9C7979 rose line-art on the dark panel): the seam is wired — once
+                  /images/illustration-2.dark.svg exists, pass dark={darkAssetUrl('/images/illustration-2.svg')}. */}
+              <ThemedImage
+                light={assetUrl('/images/illustration-2.svg')}
                 alt=""
                 aria-hidden="true"
                 width={232}
@@ -114,7 +117,8 @@ export default function SplitLayout({
               <Avatar className="mb-2 size-10 rounded-lg">
                 {/* 80×80 source rendered into a 40px (size-10) slot — the existing source is
                     already 2× DPR. The 2x density descriptor declares that intent so retina screens
-                    render the avatar crisply; width/height reserve the 40px box (CLS). */}
+                    render the avatar crisply; width/height reserve the 40px box (CLS). A photo, so it
+                    is theme-independent — no light/dark variant needed. */}
                 <AvatarImage
                   alt="Zac Smith"
                   src={assetUrl('/images/zac-avatar.png')}
@@ -131,16 +135,18 @@ export default function SplitLayout({
               <span className="text-muted-foreground text-xs">Co-founder and CEO</span>
             </div>
 
-            {/* 95×38 signature raster at ~1× in a 96px-wide slot. width/height pin the box
-                (CLS) and object-contain keeps the strokes crisp without stretching. Design note (asset pending): a
-                vector (SVG) signature is still needed — only this low-res raster currently exists. */}
+            {/* 95×38 signature raster (raster wrapped in SVG) at ~1× in a 96px-wide slot.
+                width/height pin the box (CLS) and object-contain keeps the strokes crisp without
+                stretching. dark:invert flips the dark ink to light so the signature reads on the
+                dark panel — the right call here since it is a single-colour mark (no real dark
+                asset needed). Design note (asset pending): a true vector signature is still wanted. */}
             <img
               src={assetUrl('/images/zac-sign.svg')}
               alt=""
               aria-hidden="true"
               width={95}
               height={38}
-              className="h-[38px] w-24 object-contain"
+              className="h-[38px] w-24 object-contain dark:invert"
             />
           </div>
         </div>
@@ -150,9 +156,11 @@ export default function SplitLayout({
               so it currently upscales (soft). width/height pin the aspect ratio for CLS; object-contain
               avoids the crop/extra blur object-cover introduced. Design note (asset pending): replace with a vector
               (SVG) or higher-res AVIF source — a designer asset is still needed to render crisply at
-              the 800px display width; the 707px raster is the only source that exists today. */}
-          <img
-            src={assetUrl('/images/illustration-1.svg')}
+              the 800px display width; the 707px raster is the only source that exists today.
+              Dark mode (#0C1D31 navy line-art on the dark panel): the seam is wired — once
+              /images/illustration-1.dark.svg exists, pass dark={darkAssetUrl('/images/illustration-1.svg')}. */}
+          <ThemedImage
+            light={assetUrl('/images/illustration-1.svg')}
             alt=""
             aria-hidden="true"
             width={707}
