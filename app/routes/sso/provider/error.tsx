@@ -17,6 +17,14 @@ const REASONS: Record<string, React.ReactNode> = {
   // signin_failed fallthrough below.
   'identity-linked-elsewhere': <Trans>That identity belongs to a different account.</Trans>,
   'creation-disabled': <Trans>No account was found and sign-up is not available.</Trans>,
+  // Surfaced on the login/register flow when an unlinked IdP's email matches an existing account
+  // and ALLOW_IDP_AUTO_LINK is off — no silent linking; the owner links it from /sso while signed in.
+  'account-exists': (
+    <Trans>
+      An account with this email already exists. Sign in to that account, then link this provider
+      from your account settings.
+    </Trans>
+  ),
   // Surfaced by sso.tsx when an LDAP IdP is used for account linking.
   'ldap-link-unsupported': (
     <Trans>

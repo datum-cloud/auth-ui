@@ -50,6 +50,7 @@ describe('processIdpCallback — existing same-email account auto-link (Task-3)'
     callService({
       fn: 'processIdpCallback',
       slug: 'google',
+      env: { ALLOW_IDP_AUTO_LINK: 'true' }, // legacy behavior under test
       seed: { users: [{ id: 'u1', loginName: 'you@gmail.com', displayName: 'You User' }] },
       idpIntent: REGISTER_INTENT_VERIFIED,
       request: { url: CB() },
@@ -64,6 +65,7 @@ describe('processIdpCallback — existing same-email account auto-link (Task-3)'
     callService({
       fn: 'processIdpCallback',
       slug: 'google',
+      env: { ALLOW_IDP_AUTO_LINK: 'true' }, // legacy behavior under test
       seed: {
         users: [{ id: 'u1', loginName: 'you@gmail.com', displayName: 'You User' }],
         authMethods: { u1: ['password'] },
@@ -127,6 +129,7 @@ describe('processIdpCallback — existing same-email account auto-link (Task-3)'
     callService({
       fn: 'processIdpCallback',
       slug: 'google',
+      env: { ALLOW_IDP_AUTO_LINK: 'true' }, // legacy behavior under test
       seed: { users: [{ id: 'u1', loginName: 'you@gmail.com', displayName: 'You User' }] },
       idpIntent: REGISTER_INTENT_VERIFIED,
       request: { url: CB('google', 'id=intent-1&token=tok-1&requestId=oidc_ceremony') },
@@ -159,6 +162,7 @@ describe('processIdpCallback — account-link-by-email observability log (PII-sa
     callService({
       fn: 'processIdpCallback',
       slug: 'google',
+      env: { ALLOW_IDP_AUTO_LINK: 'true' }, // legacy behavior under test
       seed: {
         users: [{ id: 'u1', loginName: 'you@gmail.com', displayName: 'You User' }],
         authMethods: { u1: ['password'] },
@@ -181,6 +185,7 @@ describe('processIdpCallback — account-link-by-email observability log (PII-sa
     callService({
       fn: 'processIdpCallback',
       slug: 'google',
+      env: { ALLOW_IDP_AUTO_LINK: 'true' }, // legacy behavior under test
       seed: { users: [{ id: 'u1', loginName: 'you@gmail.com', displayName: 'You User' }] },
       idpIntent: REGISTER_INTENT_VERIFIED,
       request: { url: CB() },
@@ -199,6 +204,7 @@ describe('processIdpCallback — mark email verified on auto-link (Task-6)', () 
     callService({
       fn: 'processIdpCallback',
       slug: 'google',
+      env: { ALLOW_IDP_AUTO_LINK: 'true' }, // legacy behavior under test
       seed: { users: [{ id: 'u1', loginName: 'you@gmail.com', displayName: 'You User' }] },
       idpIntent: REGISTER_INTENT_VERIFIED,
       request: { url: CB() },
@@ -231,6 +237,7 @@ describe('processIdpCallback — mark email verified on auto-link (Task-6)', () 
     callService({
       fn: 'processIdpCallback',
       slug: 'google',
+      env: { ALLOW_IDP_AUTO_LINK: 'true' }, // legacy behavior under test
       seed: { users: [{ id: 'u3', loginName: 'you@gmail.com', displayName: 'You User' }] },
       idpIntent: REGISTER_INTENT_VERIFIED,
       failMarkEmailVerified: true,
@@ -289,6 +296,7 @@ describe('processIdpCallback — last-used-login Set-Cookie', () => {
     callService({
       fn: 'processIdpCallback',
       slug: 'google',
+      env: { ALLOW_IDP_AUTO_LINK: 'true' }, // legacy behavior under test
       seed: { users: [{ id: 'u-autolink', loginName: 'you@gmail.com', displayName: 'You User' }] },
       idpIntent: {
         userId: null,
@@ -325,6 +333,7 @@ describe('processIdpCallback — last-used-login Set-Cookie', () => {
     callService({
       fn: 'processIdpCallback',
       slug: 'google',
+      env: { ALLOW_IDP_AUTO_LINK: 'true' }, // legacy behavior under test
       seed: {
         users: [{ id: 'u-lna', loginName: 'you@gmail.com', displayName: 'You User' }],
         authMethods: { 'u-lna': ['password'] },
@@ -368,6 +377,7 @@ describe('processIdpCallback — 755-J1 link failure reason mapping', () => {
     callService({
       fn: 'processIdpCallback',
       slug: 'google',
+      env: { ALLOW_IDP_AUTO_LINK: 'true' }, // legacy auto-link path under test (Step-5 catch)
       seed: { users: [{ id: 'u1', loginName: 'you@gmail.com', displayName: 'You User' }] },
       idpIntent: AUTOLINK_INTENT,
       addIdpLinkError: 'ALREADY_EXISTS',
@@ -387,6 +397,7 @@ describe('processIdpCallback — 755-J1 link failure reason mapping', () => {
     callService({
       fn: 'processIdpCallback',
       slug: 'google',
+      env: { ALLOW_IDP_AUTO_LINK: 'true' }, // legacy auto-link path under test (Step-5 catch)
       seed: { users: [{ id: 'u1', loginName: 'you@gmail.com', displayName: 'You User' }] },
       idpIntent: AUTOLINK_INTENT,
       addIdpLinkError: 'FAILED_PRECONDITION',
@@ -447,6 +458,7 @@ describe('processIdpCallback — redundant getUser dropped', () => {
     callService({
       fn: 'processIdpCallback',
       slug: 'google',
+      env: { ALLOW_IDP_AUTO_LINK: 'true' }, // legacy behavior under test
       seed: { users: [{ id: 'u1', loginName: 'you@gmail.com', displayName: 'You User' }] },
       idpIntent: {
         userId: null,
@@ -460,6 +472,100 @@ describe('processIdpCallback — redundant getUser dropped', () => {
       expect(o.kind).to.equal('redirect');
       expect(o.setCookie ?? '').to.include('sessions=');
       expect((v.calls?.getUser ?? []).length).to.equal(0);
+    });
+  });
+});
+
+describe('processIdpCallback — same-email collision hard error (default: ALLOW_IDP_AUTO_LINK off)', () => {
+  it('redirects to the SSO error page with reason=account-exists instead of auto-linking', () => {
+    callService({
+      fn: 'processIdpCallback',
+      slug: 'google',
+      seed: { users: [{ id: 'u1', loginName: 'you@gmail.com', displayName: 'You User' }] },
+      idpIntent: REGISTER_INTENT_VERIFIED,
+      request: { url: CB() },
+    }).then((v) => {
+      expect(v.response?.status).to.equal(302);
+      expect(v.response?.location ?? '').to.include('/sso/google/error?reason=account-exists');
+      expect(v.response?.setCookie ?? '').to.not.include('sessions=');
+    });
+  });
+
+  it('errors account-exists even when the existing account has a password (no link-needs-auth)', () => {
+    callService({
+      fn: 'processIdpCallback',
+      slug: 'google',
+      seed: {
+        users: [{ id: 'u1', loginName: 'you@gmail.com', displayName: 'You User' }],
+        authMethods: { u1: ['password'] },
+      },
+      idpIntent: REGISTER_INTENT_VERIFIED,
+      request: { url: CB() },
+    }).then((v) => {
+      expect(v.response?.location ?? '').to.include('reason=account-exists');
+      expect(v.response?.location ?? '').to.not.include('notice=link-existing');
+    });
+  });
+});
+
+describe('processIdpCallback — fresh-identity link ceremony (Req 2)', () => {
+  // A FRESH external identity (intent.userId == null) attached to the ACTIVE session user via
+  // ?link=true — the Req-2 wiring (sso-callback.ts:144-153) that the existing already-MAPPED link
+  // test (intent.userId='u2') never exercises. Session seeding mirrors the 'session-user
+  // resolution' block: liveSessions seeds the provider so getSession(recent.id, recent.token)
+  // resolves a user, and request.sessions signs the matching `sessions` cookie the loader reads.
+  // The verified draft email ('fresh@idp.test') deliberately DIFFERS from the session user's email
+  // ('owner@datum.test') so the owner-resolution branch is meaningfully distinguishable.
+  const FRESH_VERIFIED_LINK: Scenario['idpIntent'] = {
+    userId: null,
+    information: { idpId: 'idp-g', idpUserId: 'g-fresh', idpUserName: 'fresh@idp.test' },
+    draft: { email: 'fresh@idp.test', firstName: 'Fresh', lastName: 'Id', emailVerified: true },
+  };
+
+  it('links a fresh verified identity to the session user and SKIPS owner findUser (default: any-email ON)', () => {
+    callService({
+      fn: 'processIdpCallback',
+      slug: 'google',
+      // default env → ALLOW_IDP_LINK_ANY_EMAIL is TRUE: the B2 owner-resolution lookup short-circuits.
+      seed: {}, // fresh provider; the session user is injected via liveSessions (no user store entry needed)
+      liveSessions: [{ id: 's1', token: 't1', user: { id: 'u-sess', loginName: 'owner@datum.test' } }],
+      idpIntent: FRESH_VERIFIED_LINK,
+      // recordCalls spies provider.findUser. With any-email ON the B2 owner lookup
+      // (sso-callback.ts:144-153) is gated behind `!allowLinkAnyEmail` and never runs, so the spy
+      // sees ZERO calls — the direct proof of the short-circuit. (No `inspect.findUser` here: the
+      // post-call inspect read would itself invoke findUser and pollute the recorded count.)
+      recordCalls: ['findUser'],
+      request: {
+        url: CB('google', 'id=intent-link&token=tok-link&link=true'),
+        sessions: [{ id: 's1', token: 't1', loginName: 'owner@datum.test' }],
+      },
+    }).then((v) => {
+      expect(v.response?.status).to.equal(302);
+      expect(isSignedInOrAuthorize(v.response?.location ?? '')).to.equal(true);
+      expect(v.response?.setCookie ?? '').to.include('sessions=');
+      // Owner-resolution findUser short-circuited by the `!allowLinkAnyEmail` guard.
+      expect((v.calls?.findUser ?? []).length).to.equal(0);
+    });
+  });
+
+  it('denies the link when the verified email is owned by a DIFFERENT user (env any-email OFF → POSTURE B2)', () => {
+    callService({
+      fn: 'processIdpCallback',
+      slug: 'google',
+      env: { ALLOW_IDP_LINK_ANY_EMAIL: 'false' }, // restore the strict POSTURE B2 gate (B2 enforced)
+      // The verified email 'fresh@idp.test' is owned by u-other — NOT the session user (u-sess).
+      seed: { users: [{ id: 'u-other', loginName: 'fresh@idp.test', displayName: 'Other Owner' }] },
+      liveSessions: [{ id: 's1', token: 't1', user: { id: 'u-sess', loginName: 'owner@datum.test' } }],
+      idpIntent: FRESH_VERIFIED_LINK,
+      request: {
+        url: CB('google', 'id=intent-link&token=tok-link&link=true'),
+        sessions: [{ id: 's1', token: 't1', loginName: 'owner@datum.test' }],
+      },
+    }).then((v) => {
+      expect(v.response?.status).to.equal(302);
+      // B2: linkEmailOwnerUserId (u-other) !== sessionUserId (u-sess) → access-denied; no link, no cookie.
+      expect(v.response?.location ?? '').to.include('/sso/google/error?reason=access-denied');
+      expect(v.response?.setCookie ?? '').to.not.include('sessions=');
     });
   });
 });

@@ -21,7 +21,15 @@ function intentOf(
   } as IdpIntentResult;
 }
 
-const base = { link: false, sessionUserId: null, creationAllowed: true } as const;
+const base = {
+  link: false,
+  sessionUserId: null,
+  creationAllowed: true,
+  allowAutoLink: true, // existing existing-account cases assert the legacy auto-link/link-needs-auth path
+  allowLinkAnyEmail: true, // irrelevant on the link=false path; present for type-completeness
+} as const;
+// Link-ceremony cases assert strict POSTURE B2 — any-email linking OFF.
+const linkBase = { allowAutoLink: false, allowLinkAnyEmail: false } as const;
 const LINK = { idpId: 'idp-g', idpUserId: 'g-1', idpUserName: 'you@gmail.com' };
 
 describe('decideIdpCallback — existing-account handling', () => {
@@ -74,6 +82,7 @@ const linked: IdpIntentResult = { information: baseInfo, userId: 'u1', draft: nu
 describe('decideIdpCallback — link-ceremony and creation-disabled guards', () => {
   it('link request whose session user matches → kind "link"', () => {
     const d = decideIdpCallback({
+      ...linkBase,
       intent: linked,
       link: true,
       sessionUserId: 'u1',
@@ -88,6 +97,7 @@ describe('decideIdpCallback — link-ceremony and creation-disabled guards', () 
 
   it('link request whose session user differs → kind "error" reason "access-denied"', () => {
     const d = decideIdpCallback({
+      ...linkBase,
       intent: linked,
       link: true,
       sessionUserId: 'other',
@@ -98,6 +108,7 @@ describe('decideIdpCallback — link-ceremony and creation-disabled guards', () 
 
   it('not found and creation disabled → kind "error" reason "creation-disabled"', () => {
     const d = decideIdpCallback({
+      ...linkBase,
       intent: intentOf(),
       link: false,
       sessionUserId: null,
@@ -128,6 +139,7 @@ const FRESH_LINK = { idpId: 'idp-g', idpUserId: 'g-fresh', idpUserName: 'you@gma
 describe('decideIdpCallback — 755-J2 fresh-identity link (POSTURE B2)', () => {
   it('links the fresh identity into the SESSION user when the verified email owner is that user', () => {
     const d = decideIdpCallback({
+      ...linkBase,
       intent: freshLinkIntent({ emailVerified: true }),
       link: true,
       sessionUserId: 'u1',
@@ -139,6 +151,7 @@ describe('decideIdpCallback — 755-J2 fresh-identity link (POSTURE B2)', () => 
 
   it('access-denied when the verified email is owned by a DIFFERENT account', () => {
     const d = decideIdpCallback({
+      ...linkBase,
       intent: freshLinkIntent({ emailVerified: true }),
       link: true,
       sessionUserId: 'u1',
@@ -150,6 +163,7 @@ describe('decideIdpCallback — 755-J2 fresh-identity link (POSTURE B2)', () => 
 
   it('access-denied when no Datum account owns the verified email (owner null)', () => {
     const d = decideIdpCallback({
+      ...linkBase,
       intent: freshLinkIntent({ emailVerified: true }),
       link: true,
       sessionUserId: 'u1',
@@ -161,6 +175,7 @@ describe('decideIdpCallback — 755-J2 fresh-identity link (POSTURE B2)', () => 
 
   it('access-denied when the IdP did NOT verify the email (no proof of ownership)', () => {
     const d = decideIdpCallback({
+      ...linkBase,
       intent: freshLinkIntent({ emailVerified: false }),
       link: true,
       sessionUserId: 'u1',
@@ -172,6 +187,7 @@ describe('decideIdpCallback — 755-J2 fresh-identity link (POSTURE B2)', () => 
 
   it('context-missing when there is neither an intent user NOR a session user', () => {
     const d = decideIdpCallback({
+      ...linkBase,
       intent: freshLinkIntent({ emailVerified: true }),
       link: true,
       sessionUserId: null,
@@ -184,10 +200,17 @@ describe('decideIdpCallback — 755-J2 fresh-identity link (POSTURE B2)', () => 
   it('already-mapped link (intent.userId present) still requires session === intent user', () => {
     const mapped: IdpIntentResult = { userId: 'u1', information: FRESH_LINK, draft: null };
     expect(
-      decideIdpCallback({ intent: mapped, link: true, sessionUserId: 'u1', creationAllowed: true })
+      decideIdpCallback({
+        ...linkBase,
+        intent: mapped,
+        link: true,
+        sessionUserId: 'u1',
+        creationAllowed: true,
+      })
     ).to.deep.equal({ kind: 'link', userId: 'u1', link: FRESH_LINK });
     expect(
       decideIdpCallback({
+        ...linkBase,
         intent: mapped,
         link: true,
         sessionUserId: 'other',
@@ -195,5 +218,91 @@ describe('decideIdpCallback — 755-J2 fresh-identity link (POSTURE B2)', () => 
         linkEmailOwnerUserId: 'other',
       })
     ).to.deep.equal({ kind: 'error', reason: 'access-denied' });
+  });
+});
+
+// ── Req 1 · same-email collision is a hard error when auto-link is OFF ──────────
+describe('decideIdpCallback — same-email hard error (allowAutoLink=false)', () => {
+  it('errors account-exists when a same-email account exists (verified, passwordless)', () => {
+    const d = decideIdpCallback({
+      ...base,
+      allowAutoLink: false,
+      intent: intentOf({ emailVerified: true }),
+      existingAccount: { userId: 'u1', hasPassword: false },
+    });
+    expect(d).to.deep.equal({ kind: 'error', reason: 'account-exists' });
+  });
+
+  it('errors account-exists even when the existing account has a password', () => {
+    const d = decideIdpCallback({
+      ...base,
+      allowAutoLink: false,
+      intent: intentOf({ emailVerified: true }),
+      existingAccount: { userId: 'u1', hasPassword: true },
+    });
+    expect(d).to.deep.equal({ kind: 'error', reason: 'account-exists' });
+  });
+
+  it('still auto-creates when NO same-email account exists', () => {
+    const d = decideIdpCallback({
+      ...base,
+      allowAutoLink: false,
+      intent: intentOf(),
+      existingAccount: null,
+    });
+    expect(d.kind).to.equal('auto-create');
+  });
+});
+
+// ── Req 2 · fresh identity links regardless of email when any-email is ON ───────
+describe('decideIdpCallback — email-agnostic link (allowLinkAnyEmail=true)', () => {
+  it('links a fresh identity into the session user even when the email owner differs', () => {
+    const d = decideIdpCallback({
+      intent: freshLinkIntent({ emailVerified: true }),
+      link: true,
+      sessionUserId: 'u1',
+      creationAllowed: true,
+      allowAutoLink: false,
+      allowLinkAnyEmail: true,
+      linkEmailOwnerUserId: 'other', // ignored when any-email is on
+    });
+    expect(d).to.deep.equal({ kind: 'link', userId: 'u1', link: FRESH_LINK });
+  });
+
+  it('links a fresh identity even when the IdP did NOT verify the email', () => {
+    const d = decideIdpCallback({
+      intent: freshLinkIntent({ emailVerified: false }),
+      link: true,
+      sessionUserId: 'u1',
+      creationAllowed: true,
+      allowAutoLink: false,
+      allowLinkAnyEmail: true,
+    });
+    expect(d).to.deep.equal({ kind: 'link', userId: 'u1', link: FRESH_LINK });
+  });
+
+  it('still requires a session user (context-missing) with any-email on', () => {
+    const d = decideIdpCallback({
+      intent: freshLinkIntent({ emailVerified: true }),
+      link: true,
+      sessionUserId: null,
+      creationAllowed: true,
+      allowAutoLink: false,
+      allowLinkAnyEmail: true,
+    });
+    expect(d).to.deep.equal({ kind: 'error', reason: 'context-missing' });
+  });
+
+  it('still rejects grabbing an already-mapped identity owned by another user', () => {
+    const mapped = { userId: 'u9', information: FRESH_LINK, draft: null } as IdpIntentResult;
+    const d = decideIdpCallback({
+      intent: mapped,
+      link: true,
+      sessionUserId: 'u1',
+      creationAllowed: true,
+      allowAutoLink: false,
+      allowLinkAnyEmail: true,
+    });
+    expect(d).to.deep.equal({ kind: 'error', reason: 'access-denied' });
   });
 });

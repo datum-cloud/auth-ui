@@ -22,6 +22,7 @@ import { deriveIdpProfileName } from '@/resources/sso/derive-idp-name';
 import { decideIdpCallback } from '@/resources/sso/idp-callback';
 import { signInWithIdpIntent, requestScopedProviderReads } from '@/resources/sso/idp-session';
 import type { SsoOutcome } from '@/resources/sso/sso-outcome';
+import { env } from '@/server/infra/env.server';
 import { logAuthEvent } from '@/server/observability';
 import { getOrCreateFingerprintId, userAgentFromRequest } from '@/server/user-agent';
 import { providerErrorCode } from '@/utils/errors/auth-error';
@@ -60,6 +61,11 @@ export async function processIdpCallback(
   const url = new URL(request.url);
   const parsed = CallbackQuery.safeParse(Object.fromEntries(url.searchParams));
   const slug = slugParam ?? 'idp';
+
+  // Account-linking policy flags (read once at the orchestration boundary; the pure
+  // decideIdpCallback receives them as booleans and never imports env).
+  const allowAutoLink = env.ALLOW_IDP_AUTO_LINK;
+  const allowLinkAnyEmail = env.ALLOW_IDP_LINK_ANY_EMAIL;
 
   // DI: tests can inject retrieveIdpIntent; production delegates to the resolved provider.
   const doRetrieveIdpIntent =
@@ -117,27 +123,32 @@ export async function processIdpCallback(
 
     const [sessionUserId, settings] = await Promise.all([sessionUserIdP, settingsP]);
 
-    // Resolve a same-email account ONLY on the register path (not linked, not a link
-    // ceremony, creation allowed, draft present) — keeps the lookup off the sign-in path.
+    // Resolve a same-email account ONLY on the register path (not linked, not a link ceremony,
+    // creation allowed, draft present) — keeps the lookup off the sign-in path.
     let existingAccount: { userId: string; hasPassword: boolean } | null = null;
     if (link !== 'true' && !intent.userId && settings.allowRegister && intent.draft?.email) {
       const existing = await provider.findUser(intent.draft.email, organization);
       if (existing) {
-        const methods = await provider.listAuthMethods(existing.id);
-        existingAccount = {
-          userId: existing.id,
-          hasPassword: methods.includes('password'),
-        };
+        // hasPassword only changes the decision when auto-link is enabled; skip the extra RPC
+        // when ALLOW_IDP_AUTO_LINK is off (existence alone yields the account-exists hard error).
+        const hasPassword = allowAutoLink
+          ? (await provider.listAuthMethods(existing.id)).includes('password')
+          : false;
+        existingAccount = { userId: existing.id, hasPassword };
       }
     }
 
-    // POSTURE B2: for the link+FRESH-identity case (link ceremony, Zitadel has no
-    // mapping yet → intent.userId == null) resolve the Datum account that OWNS the IdP's
-    // verified email. decideIdpCallback only links the fresh identity into the session user
-    // when this owner IS the session user (mirror of the register-path findUser above — the
-    // lookup is scoped to exactly this case so the plain link + sign-in paths pay nothing).
+    // POSTURE B2: only when ALLOW_IDP_LINK_ANY_EMAIL is OFF do we resolve the Datum account that
+    // OWNS the IdP's verified email (link+fresh-identity case). When any-email linking is on, the
+    // decision ignores the owner, so the lookup is skipped entirely.
     let linkEmailOwnerUserId: string | null = null;
-    if (link === 'true' && !intent.userId && intent.draft?.emailVerified && intent.draft.email) {
+    if (
+      !allowLinkAnyEmail &&
+      link === 'true' &&
+      !intent.userId &&
+      intent.draft?.emailVerified &&
+      intent.draft.email
+    ) {
       const owner = await provider.findUser(intent.draft.email, organization);
       linkEmailOwnerUserId = owner?.id ?? null;
     }
@@ -149,6 +160,8 @@ export async function processIdpCallback(
       creationAllowed: settings.allowRegister,
       existingAccount,
       linkEmailOwnerUserId,
+      allowAutoLink,
+      allowLinkAnyEmail,
     });
     // Account-link-by-email decision: a fresh external IdP whose verified email matches an
     // existing account. Logged (PII-safe) so this new "sign in to link" / silent-auto-link path

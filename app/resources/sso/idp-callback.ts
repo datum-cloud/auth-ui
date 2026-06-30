@@ -15,6 +15,13 @@ export interface IdpCallbackInput {
   // it — never trusted from the client. Optional so the already-linked link path and the
   // register path need not compute it.
   linkEmailOwnerUserId?: string | null;
+  // Req 1 flag (env.ALLOW_IDP_AUTO_LINK). When false, a login/register same-email collision is a
+  // hard `account-exists` error instead of auto-link / link-needs-auth. Resolved at the orchestration
+  // boundary; never read from env here (keeps this module pure / browser-testable).
+  allowAutoLink: boolean;
+  // Req 2 flag (env.ALLOW_IDP_LINK_ANY_EMAIL). When true, the explicit link ceremony attaches a fresh
+  // identity to the session user regardless of email (POSTURE B2 owner check skipped).
+  allowLinkAnyEmail: boolean;
 }
 
 export type IdpDecision =
@@ -23,7 +30,10 @@ export type IdpDecision =
   | { kind: 'auto-link'; userId: string; link: IdpLink } // safe link to an existing account
   | { kind: 'link-needs-auth'; email: string } // exists but must authenticate first
   | { kind: 'auto-create'; draft: IdpUserDraft; link: IdpLink }
-  | { kind: 'error'; reason: 'access-denied' | 'creation-disabled' | 'context-missing' };
+  | {
+      kind: 'error';
+      reason: 'access-denied' | 'creation-disabled' | 'context-missing' | 'account-exists';
+    };
 
 function toLink(intent: IdpIntentResult): IdpLink {
   const { idpId, idpUserId, idpUserName } = intent.information;
@@ -37,6 +47,8 @@ export function decideIdpCallback({
   creationAllowed,
   existingAccount,
   linkEmailOwnerUserId,
+  allowAutoLink,
+  allowLinkAnyEmail,
 }: IdpCallbackInput): IdpDecision {
   // ── Linking ceremony (?link=true) ──────────────────────────────────────────────
   //
@@ -66,13 +78,13 @@ export function decideIdpCallback({
     // No session at all ⇒ we have no link target and no equality to assert.
     if (!sessionUserId) return { kind: 'error', reason: 'context-missing' };
 
-    // The IdP must have verified the email — an unverified email is not proof of ownership.
-    // A fresh identity with no/unverified email can never satisfy the owner check below.
-    if (!intent.draft?.emailVerified) return { kind: 'error', reason: 'access-denied' };
+    // ALLOW_IDP_LINK_ANY_EMAIL: a signed-in user may link any fresh identity to their OWN account
+    // regardless of email. Email-ownership is enforced later at email-update time on the backend.
+    if (allowLinkAnyEmail) return { kind: 'link', userId: sessionUserId, link: toLink(intent) };
 
-    // The verified IdP email must already belong to the SESSION user. If a DIFFERENT Datum
-    // account owns it (or — defensively — no resolved owner), linking would let the session
-    // user absorb an identity tied to someone else's email → access-denied.
+    // POSTURE B2 (any-email OFF): the IdP must have verified the email, and that verified email
+    // must already belong to the SESSION user, before we link it.
+    if (!intent.draft?.emailVerified) return { kind: 'error', reason: 'access-denied' };
     if (linkEmailOwnerUserId !== sessionUserId) return { kind: 'error', reason: 'access-denied' };
 
     return { kind: 'link', userId: sessionUserId, link: toLink(intent) };
@@ -92,8 +104,12 @@ export function decideIdpCallback({
 
   // A same-email account already exists but this IdP isn't linked to it.
   if (existingAccount && draftEmail) {
-    // Safe to link automatically ONLY when the IdP vouches for the email AND there is no
-    // password to take over (a magic-link squatter could never sign in anyway).
+    // ALLOW_IDP_AUTO_LINK off (default): never link automatically — surface a hard error. The
+    // owner links the IdP deliberately from the signed-in /sso management screen instead.
+    if (!allowAutoLink) return { kind: 'error', reason: 'account-exists' };
+
+    // Auto-link enabled: safe ONLY when the IdP vouches for the email AND there is no password to
+    // take over (a magic-link squatter could never sign in anyway).
     if (draft.emailVerified && !existingAccount.hasPassword) {
       return { kind: 'auto-link', userId: existingAccount.userId, link: toLink(intent) };
     }
