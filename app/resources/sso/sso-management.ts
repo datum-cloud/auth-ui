@@ -101,6 +101,20 @@ export function canUnlinkIdp(
   return otherIdpRemains || authMethods.includes('password') || authMethods.includes('passkey');
 }
 
+/**
+ * Stamp each linked row with `unlinkable` for the UI (so it can disable the sole-method row). Reads
+ * the user's auth methods once; kept separate so the loader calls it ONLY when unlink is enabled.
+ */
+async function stampUnlinkable(
+  provider: AuthProvider,
+  userId: string,
+  links: IdpLink[],
+  linked: LinkedIdpView[]
+): Promise<LinkedIdpView[]> {
+  const authMethods = await provider.listAuthMethods(userId);
+  return linked.map((l) => ({ ...l, unlinkable: canUnlinkIdp(l, links, authMethods) }));
+}
+
 export type SsoManagementResult =
   | { kind: 'redirect'; location: string }
   | { kind: 'data'; data: SsoManagementData; setCookie: string | null };
@@ -153,11 +167,11 @@ export async function resolveSsoManagement(
   const linked = joinLinkedIdps(links, active, allowMulti);
 
   // Login-method-aware unlink guard: stamp each row so the UI can disable the sole-method one.
-  const authMethods = await provider.listAuthMethods(userId);
-  const linkedStamped = linked.map((l) => ({
-    ...l,
-    unlinkable: canUnlinkIdp(l, links, authMethods),
-  }));
+  // Only when unlink is enabled — the stamp is never rendered otherwise, so skip the extra
+  // provider round-trip (and its failure surface) when the feature is off.
+  const linkedStamped = env.ALLOW_IDP_UNLINK
+    ? await stampUnlinkable(provider, userId, links, linked)
+    : linked;
 
   return {
     kind: 'data',

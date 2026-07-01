@@ -165,6 +165,8 @@ describe('SsoIndex — unlink guard: dialog confirm + disabled sole sign-in meth
     cy.get('input[name="intent"][value="unlink"]').should('exist');
     cy.get('input[name="idpId"][value="gh"]').should('exist');
     cy.get('input[name="linkedUserId"][value="gh-1"]').should('exist');
+    // …and exposes an enabled submit button to complete the unlink (the "Confirm submits" path).
+    cy.get('button[type="submit"]').contains('Unlink').should('exist').and('not.be.disabled');
   });
 });
 

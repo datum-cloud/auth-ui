@@ -78,6 +78,8 @@ export async function runSsoAction(
     const session = recent ? await provider.getSession(recent.id, recent.token) : null;
     const userId = session?.user?.id;
     if (!userId) {
+      // Session expired/absent (CSRF already asserted upstream) — keep the probe observable.
+      logAuthEvent('idp.unlink', 'failure', { reason: 'no_session' });
       return { kind: 'response', response: new Response(null) }; // never trust a form userId
     }
 
@@ -107,7 +109,12 @@ export async function runSsoAction(
       });
     } catch (err) {
       if (err instanceof ProviderError) {
-        logAuthEvent('idp.unlink', 'failure', { userId, reason: err.code });
+        logAuthEvent('idp.unlink', 'failure', {
+          userId,
+          idpId: payload.idpId,
+          linkedUserId: payload.linkedUserId,
+          reason: err.code,
+        });
         return { kind: 'data', payload: { error: 'provider_error' }, status: 502 };
       }
       throw err; // unknown → root ErrorBoundary
