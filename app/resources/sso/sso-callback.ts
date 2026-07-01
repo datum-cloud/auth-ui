@@ -45,6 +45,9 @@ export const CallbackQuery = z.object({
   // Attacker-controllable from the callback URL; POSTURE B2 is fail-closed against a wrong org, but
   // cap the length as defense-in-depth (Zitadel org ids are short numeric strings).
   organization: z.string().max(64).optional(),
+  // MaxMind device-fingerprint token captured client-side and threaded through the OAuth
+  // round-trip (see idp-return-urls.ts) so it can be attached to the resulting session's metadata.
+  deviceTrackingToken: z.string().optional(),
 });
 
 /**
@@ -78,7 +81,7 @@ export async function processIdpCallback(
     return { kind: 'redirect', location: ssoErrorRedirect(slug, 'context-missing') };
   }
 
-  const { id, token, link, requestId, organization } = parsed.data;
+  const { id, token, link, requestId, organization, deviceTrackingToken } = parsed.data;
 
   // Ensure the fingerprintId cookie exists for this browser. The SAME minted id feeds
   // every createSession userAgent below (no first-session gap); fingerprintCookie is
@@ -231,6 +234,7 @@ export async function processIdpCallback(
           organization,
           fallbackLoginName: intent.information.idpUserName,
           userAgent: userAgentFromRequest(request, fingerprintId),
+          deviceTrackingToken,
         }));
       } catch (err) {
         const reason = err instanceof Error ? err.message : 'unknown';
@@ -383,6 +387,7 @@ export async function processIdpCallback(
           idpIntentToken: token,
           emailVerified: intent.draft?.emailVerified ?? false,
           userAgent: userAgentFromRequest(request, fingerprintId),
+          deviceTrackingToken,
         });
         const lastUsedCookie = await serializeLastUsedLogin(`idp:${decision.link.idpId}`);
         return {

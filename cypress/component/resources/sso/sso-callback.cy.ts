@@ -74,6 +74,24 @@ describe('processIdpCallback — existing same-email account auto-link (Task-3)'
       expect(found?.emailVerified).to.equal(true);
     });
   });
+
+  it('forwards a deviceTrackingToken on the callback URL to the new session as MaxMind metadata (IdP fraud-signal parity)', () => {
+    callService({
+      fn: 'processIdpCallback',
+      slug: 'google',
+      seed: {},
+      idpIntent: REGISTER_INTENT_VERIFIED,
+      request: { url: CB('google', 'id=intent-1&token=tok-1&deviceTrackingToken=mm-idp-token-1') },
+      inspect: { lastCreateSessionOpts: true },
+    }).then((v) => {
+      expect(v.response?.status).to.equal(302);
+      expect(isSignedInOrAuthorize(v.response?.location ?? '')).to.equal(true);
+      const opts = v.inspect?.lastCreateSessionOpts as {
+        metadata?: Record<string, unknown>;
+      } | null;
+      expect(opts?.metadata?.['maxmind/tracking-token']).to.equal('mm-idp-token-1');
+    });
+  });
 });
 
 describe('processIdpCallback — account-link-by-email observability log (PII-safe)', () => {
@@ -97,6 +115,34 @@ describe('processIdpCallback — account-link-by-email observability log (PII-sa
       expect(needsAuth?.existingHasPassword).to.equal(true);
       expect(link.length).to.be.greaterThan(0);
       expect(JSON.stringify(link)).to.not.include('you@gmail.com');
+    });
+  });
+});
+
+describe('processIdpCallback — sign-in path MaxMind fraud-signal parity', () => {
+  // Mirrors the auto-create test above — the sign-in path (an ALREADY-linked IdP identity,
+  // intent.userId present) must forward deviceTrackingToken to the resulting session's metadata
+  // exactly like a fresh registration does, via signInWithIdpIntent's own deviceTrackingToken opt.
+  it('forwards a deviceTrackingToken on the callback URL to the session on a returning-user sign-in', () => {
+    callService({
+      fn: 'processIdpCallback',
+      slug: 'google',
+      seed: { users: [{ id: 'u-signin', loginName: 'linked@idp.test', displayName: 'Linked' }] },
+      idpIntent: {
+        userId: 'u-signin',
+        information: { idpId: 'idp-g', idpUserId: 'g-linked', idpUserName: 'linked@idp.test' },
+        draft: null,
+      },
+      request: {
+        url: CB('google', 'id=intent-si&token=tok-si&deviceTrackingToken=mm-idp-token-signin'),
+      },
+      inspect: { lastCreateSessionOpts: true },
+    }).then((v) => {
+      expect(v.response?.status).to.equal(302);
+      const opts = v.inspect?.lastCreateSessionOpts as {
+        metadata?: Record<string, unknown>;
+      } | null;
+      expect(opts?.metadata?.['maxmind/tracking-token']).to.equal('mm-idp-token-signin');
     });
   });
 });

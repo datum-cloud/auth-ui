@@ -21,4 +21,13 @@ describe('idpReturnUrls', () => {
       'http://localhost:3000/id/sso/google/callback?requestId=oidc_V2_123&organization=org-1'
     );
   });
+
+  it('carries the deviceTrackingToken so the callback can attach it to the session (IdP fraud-signal parity)', () => {
+    const { success } = idpReturnUrls('http://localhost:3000', 'google', {
+      deviceTrackingToken: 'mm-token-abc',
+    });
+    expect(success).to.equal(
+      'http://localhost:3000/id/sso/google/callback?deviceTrackingToken=mm-token-abc'
+    );
+  });
 });

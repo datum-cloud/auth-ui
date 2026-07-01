@@ -75,3 +75,23 @@ describe('runSsoAction — IdP start: organization must be threaded into idpRetu
     });
   });
 });
+
+describe('runSsoAction — IdP start: deviceTrackingToken must be threaded into idpReturnUrls', () => {
+  it('sso start threads deviceTrackingToken into the IdP success return URL (MaxMind fraud-signal parity)', () => {
+    callService({
+      fn: 'runSsoAction',
+      provider: 'singleton',
+      env: { PUBLIC_ORIGIN },
+      recordCalls: ['startIdpIntent'],
+      request: {
+        url: BASE,
+        form: { intent: 'start', provider: 'google', deviceTrackingToken: 'mm-token-xyz' },
+      },
+    }).then((v) => {
+      const calls = v.calls?.startIdpIntent ?? [];
+      expect(calls.length).to.equal(1);
+      const urls = calls[0][1] as { success: string; failure: string };
+      expect(urls.success).to.include('deviceTrackingToken=mm-token-xyz');
+    });
+  });
+});

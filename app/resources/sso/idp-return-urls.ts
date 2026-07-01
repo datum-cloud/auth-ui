@@ -24,6 +24,11 @@ export interface IdpReturnOpts {
   organization?: string;
   /** Account-linking flow (sets `?link=true` for the callback). */
   link?: boolean;
+  /**
+   * MaxMind device-fingerprint token captured client-side, forwarded through the OAuth
+   * round-trip so it can be attached to the resulting session's metadata.
+   */
+  deviceTrackingToken?: string;
 }
 
 /**
@@ -40,6 +45,7 @@ export function idpReturnUrls(
   if (opts?.link) query.set('link', 'true');
   if (opts?.requestId) query.set('requestId', opts.requestId);
   if (opts?.organization) query.set('organization', opts.organization);
+  if (opts?.deviceTrackingToken) query.set('deviceTrackingToken', opts.deviceTrackingToken);
   const qs = query.toString();
   return {
     success: `${base}/callback${qs ? `?${qs}` : ''}`,

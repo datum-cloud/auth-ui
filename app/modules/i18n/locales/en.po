@@ -19,7 +19,7 @@ msgstr "{0, plural, one {# attempt remaining.} other {# attempts remaining.}}"
 
 #. placeholder {0}: idp.name
 #. placeholder {0}: r.label
-#: app/components/auth-form/idp-button-list.tsx:67
+#: app/components/auth-form/idp-button-list.tsx:81
 #: app/routes/setup/mfa.tsx:184
 msgid "{0}"
 msgstr "{0}"

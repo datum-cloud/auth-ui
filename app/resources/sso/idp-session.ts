@@ -20,6 +20,7 @@ import {
 import { checkReauthIntent } from '@/modules/auth/session/reauth-intent';
 import type { Session, User } from '@/modules/auth/types';
 import { authorizeHandbackTarget } from '@/resources/shared/next-step-params';
+import { MAXMIND_TRACKING_TOKEN_METADATA_KEY } from '@/resources/signup/signup.service';
 import { paths } from '@/routes/paths';
 
 // ── Request-scoped provider-read cache ─────────────────────────────
@@ -98,6 +99,8 @@ export interface SignInWithIdpIntentOpts {
    */
   fallbackLoginName?: string;
   userAgent?: SessionOpts['userAgent'];
+  /** MaxMind device-fingerprint token captured client-side; attached as session metadata. */
+  deviceTrackingToken?: string;
 }
 
 export interface SignInWithIdpIntentResult {
@@ -125,11 +128,15 @@ export async function signInWithIdpIntent(
     organization,
     fallbackLoginName,
     userAgent,
+    deviceTrackingToken,
   } = opts;
 
+  const metadata = deviceTrackingToken
+    ? { [MAXMIND_TRACKING_TOKEN_METADATA_KEY]: deviceTrackingToken }
+    : undefined;
   const session = await provider.createSession(
     { idpIntent: { idpIntentId, idpIntentToken } },
-    { requestId, orgId: organization, userId, userAgent }
+    { requestId, orgId: organization, userId, metadata, userAgent }
   );
 
   // The post-create getUser(userId) lookup is elided. The only value it read was

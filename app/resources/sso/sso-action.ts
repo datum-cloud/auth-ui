@@ -49,6 +49,7 @@ const SsoActionSchema = z.discriminatedUnion('intent', [
       .regex(/^[a-zA-Z0-9_-]{1,64}$/),
     organization: z.string().optional(),
     linkOnly: z.string().optional(),
+    deviceTrackingToken: z.string().optional(),
   }),
 ]);
 
@@ -152,6 +153,7 @@ export async function runSsoAction(
   const { success, failure } = idpReturnUrls(origin, slug, {
     link: payload.linkOnly === 'true',
     organization: payload.organization || undefined,
+    deviceTrackingToken: payload.deviceTrackingToken,
   });
 
   // Guard startIdpIntent — on ProviderError redirect to the SSO error page

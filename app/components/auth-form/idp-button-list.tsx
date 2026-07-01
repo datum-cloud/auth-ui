@@ -2,10 +2,12 @@ import { AuthFormFields } from '@/components/auth-form/auth-form-fields';
 import { LastUsedBadge } from '@/components/auth-form/last-used-badge';
 import { ThemedImage } from '@/components/themed-image/themed-image';
 import type { IdProvider } from '@/modules/auth/types';
+import { readMaxMindTrackingToken } from '@/modules/fraud/maxmind-tracker';
 import { assetUrl, darkAssetUrl } from '@/utils/asset-url';
 import { Button } from '@datum-cloud/datum-ui/button';
 import { cn } from '@datum-cloud/datum-ui/utils';
 import { Trans } from '@lingui/react/macro';
+import { useEffect, useState } from 'react';
 import { Form as RRForm } from 'react-router';
 
 // The IdP sign-in/sign-up button list shared by /login and /signup: one POST form per
@@ -32,6 +34,15 @@ export function IdpButtonList({
   relative = false,
   lastUsedLogin,
 }: IdpButtonListProps): React.JSX.Element {
+  // MaxMind mirrors the captured device-fingerprint token into sessionStorage asynchronously
+  // (see modules/fraud/maxmind-tracker) — read it client-side only (post-mount) so SSR and the
+  // hydration render both start without the field, avoiding a hydration mismatch. Threaded onto
+  // the IdP start form so the callback can attach it to the resulting session's metadata.
+  const [deviceTrackingToken, setDeviceTrackingToken] = useState<string | undefined>(undefined);
+  useEffect(() => {
+    setDeviceTrackingToken(readMaxMindTrackingToken());
+  }, []);
+
   return (
     <div className="flex flex-col gap-3">
       {idps.map((idp) => {
@@ -41,6 +52,9 @@ export function IdpButtonList({
             <AuthFormFields csrf={csrf} requestId={requestId} organization={organization} />
             <input type="hidden" name="intent" value="idp" />
             <input type="hidden" name="idpId" value={idp.id} />
+            {deviceTrackingToken && (
+              <input type="hidden" name="deviceTrackingToken" value={deviceTrackingToken} />
+            )}
             <Button
               size="large"
               className={cn(relative && 'relative', 'h-13 gap-3')}

@@ -32,7 +32,7 @@ import { logAuthEvent, hashActor } from '@/server/observability';
  * fraud service consumes. The backend allowlists metadata keys — keep this in sync with
  * the Go-side metadataAnnotationKeys allowlist or the token is silently dropped.
  */
-const MAXMIND_TRACKING_TOKEN_METADATA_KEY = 'maxmind/tracking-token';
+export const MAXMIND_TRACKING_TOKEN_METADATA_KEY = 'maxmind/tracking-token';
 
 // ── shared result shapes ──────────────────────────────────────────────────────
 
@@ -87,6 +87,8 @@ export interface SignupIdpLinkInput {
   idpUserName: string;
   /** When true the IdP has vouched for the email — create the user already-verified. */
   emailVerified?: boolean;
+  /** MaxMind device-fingerprint token captured client-side; attached as session metadata. */
+  deviceTrackingToken?: string;
   /** Zitadel session userAgent metadata (Device/Location in cloud-portal). */
   userAgent?: SessionOpts['userAgent'];
 }
@@ -119,9 +121,12 @@ export async function registerAndLinkIdp(
     emailVerified: input.emailVerified ?? false,
   });
   await provider.addIdpLink(user.id, idpLink);
+  const sessionMetadata = input.deviceTrackingToken
+    ? { [MAXMIND_TRACKING_TOKEN_METADATA_KEY]: input.deviceTrackingToken }
+    : undefined;
   const session = await provider.createSession(
     { idpIntent: { idpIntentId: input.idpIntentId, idpIntentToken: input.idpIntentToken } },
-    { orgId: organization, requestId, userId: user.id, userAgent }
+    { orgId: organization, requestId, userId: user.id, metadata: sessionMetadata, userAgent }
   );
   const sessions = addSession(
     list,
