@@ -147,12 +147,13 @@ describe('SsoIndex — unlink guard: dialog confirm + disabled sole sign-in meth
   it('disables the Unlink control for the sole-method (unlinkable:false) row', () => {
     mountRoute(SsoIndex, 'sso-index', '/sso', '/sso', loaderData);
     cy.contains('Linked accounts').should('exist');
-    cy.get('button:disabled').contains('Unlink').should('exist');
+    // Inert via aria-disabled (kept focusable for a11y), not the native `disabled` attribute.
+    cy.get('button[aria-disabled="true"]').contains('Unlink').should('exist');
   });
 
   it('renders an enabled Unlink trigger for an unlinkable row', () => {
     mountRoute(SsoIndex, 'sso-index', '/sso', '/sso', loaderData);
-    cy.get('button:not(:disabled)').contains('Unlink').should('exist');
+    cy.get('button:not([aria-disabled="true"])').contains('Unlink').should('exist');
   });
 
   it('keeps the unlink confirm form out of the DOM until the dialog is opened', () => {
@@ -160,7 +161,7 @@ describe('SsoIndex — unlink guard: dialog confirm + disabled sole sign-in meth
     cy.contains('Linked accounts').should('exist');
     // The unlink form lives inside the confirm Dialog (Radix unmounts content while closed).
     cy.get('input[name="intent"][value="unlink"]').should('not.exist');
-    cy.get('button:not(:disabled)').contains('Unlink').click();
+    cy.get('button:not([aria-disabled="true"])').contains('Unlink').click();
     // Once opened, the confirm form carries the unlink intent + the target row's ids.
     cy.get('input[name="intent"][value="unlink"]').should('exist');
     cy.get('input[name="idpId"][value="gh"]').should('exist');

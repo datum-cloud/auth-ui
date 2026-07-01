@@ -116,7 +116,7 @@ msgstr "Authorize device"
 msgid "Authorizing as"
 msgstr "Authorizing as"
 
-#: app/routes/sso/index.tsx:216
+#: app/routes/sso/index.tsx:218
 msgid "Available accounts to link"
 msgstr "Available accounts to link"
 
@@ -565,7 +565,7 @@ msgstr "Sign in with LDAP"
 #: app/routes/logout/index.tsx:47
 #: app/routes/logout/index.tsx:53
 #: app/routes/signed-in.tsx:97
-#: app/routes/sso/index.tsx:254
+#: app/routes/sso/index.tsx:256
 msgid "Sign out"
 msgstr "Sign out"
 
@@ -655,7 +655,7 @@ msgstr "This device was not granted access. You may close this window."
 msgid "This directory account can't be linked here yet. Sign in with your password instead."
 msgstr "This directory account can't be linked here yet. Sign in with your password instead."
 
-#: app/routes/sso/index.tsx:180
+#: app/routes/sso/index.tsx:182
 msgid "This is your only sign-in method"
 msgstr "This is your only sign-in method"
 
@@ -681,7 +681,7 @@ msgstr "Two-factor verification"
 
 #: app/routes/sso/index.tsx:94
 #: app/routes/sso/index.tsx:113
-#: app/routes/sso/index.tsx:188
+#: app/routes/sso/index.tsx:191
 msgid "Unlink"
 msgstr "Unlink"
 

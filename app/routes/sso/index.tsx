@@ -174,20 +174,22 @@ export default function SsoPage() {
                     </span>
                     {allowUnlink ? (
                       link.unlinkable === false ? (
-                        // Sole primary sign-in method — unlink would lock the user out. Disabled +
-                        // tooltip. The disabled button is wrapped in a focusable span so the tooltip
-                        // still fires on hover/focus (disabled controls don't emit pointer events).
+                        // Sole primary sign-in method — unlink would lock the user out. Rendered
+                        // inert via aria-disabled (NOT the native `disabled` attribute) so it stays
+                        // focusable, announces as a disabled button (WCAG 4.1.2 Name/Role/Value), and
+                        // still fires the pointer/focus events the Tooltip trigger needs. onClick is a
+                        // no-op guard; there is no form or dialog here, so the row can't be unlinked.
                         <Tooltip message={<Trans>This is your only sign-in method</Trans>}>
-                          <span tabIndex={0}>
-                            <Button
-                              type="secondary"
-                              theme="outline"
-                              htmlType="button"
-                              size="small"
-                              disabled>
-                              <Trans>Unlink</Trans>
-                            </Button>
-                          </span>
+                          <Button
+                            type="secondary"
+                            theme="outline"
+                            htmlType="button"
+                            size="small"
+                            aria-disabled="true"
+                            className="cursor-not-allowed opacity-50"
+                            onClick={(e) => e.preventDefault()}>
+                            <Trans>Unlink</Trans>
+                          </Button>
                         </Tooltip>
                       ) : (
                         <UnlinkConfirmDialog
