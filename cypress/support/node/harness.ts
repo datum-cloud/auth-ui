@@ -66,6 +66,7 @@ import {
   completeOidcLogout,
   type SignedInConfig,
 } from '@/resources/session';
+import { resolveOrg } from '@/resources/shared/resolve-org';
 // ── signup / verify services (batch 8e) ──
 import {
   registerAndLinkIdp,
@@ -1994,6 +1995,15 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
             issues: result.error.issues.map((i) => ({ path: i.path, message: i.message })),
           };
         }
+        break;
+      }
+
+      // resolveOrg precedence probe (org-first / default-org fallback). The env pin
+      // (ZITADEL_DEFAULT_ORG_ID) is set per-scenario via `env` (applied before app modules load),
+      // and each cy.task is a fresh Bun process so the module-level default-org cache starts clean.
+      case 'resolveOrgProbe': {
+        const org = await resolveOrg(provider, s.resolveOrgInput?.urlOrg);
+        outcome = { org: org ?? null };
         break;
       }
 

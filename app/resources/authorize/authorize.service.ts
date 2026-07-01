@@ -21,8 +21,12 @@ import {
   type SessionEntry,
 } from '@/modules/auth/session/cookie';
 import { ProviderError, type Session } from '@/modules/auth/types';
-import { decideAuthorize } from '@/resources/authorize/authorize-decision';
+import {
+  decideAuthorize,
+  deriveOrganizationFromScopes,
+} from '@/resources/authorize/authorize-decision';
 import { primaryFresh } from '@/resources/shared/lifetimes';
+import { resolveOrg } from '@/resources/shared/resolve-org';
 import { logAuthEvent } from '@/server/observability';
 import { type AuthErrorCode, providerErrorCode } from '@/utils/errors/auth-error';
 import { redirect } from 'react-router';
@@ -338,10 +342,16 @@ async function resolveOidc(
   }
 
   const recent = mostRecent(list);
+  // Org-first / default-org fallback: when the OIDC request carries no org-id scope, resolve the
+  // instance default org (env pin → provider default) so the bootstrap redirect (/login, /signup,
+  // /accounts) still threads `organization` and the login renders the real org's IdPs instead of
+  // the INSTANCE/default context. An explicit scope org always wins (resolveOrg is org-first).
+  const organization = await resolveOrg(provider, deriveOrganizationFromScopes(authRequest.scopes));
   const decision = decideAuthorize({
     authRequest,
     hasSessions: list.length > 0,
     validSessionId: recent?.id,
+    organization,
   });
 
   if (decision.target === 'callback') {

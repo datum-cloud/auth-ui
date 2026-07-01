@@ -117,6 +117,13 @@ export interface AuthProvider {
   getPasswordComplexity(orgId?: string): Promise<PasswordComplexity | undefined>;
   getActiveIdPs(orgId?: string): Promise<IdProvider[]>; // P4
   // getLegalSupport removed — it had zero callers (dead port method).
+  /**
+   * The instance Default Organization id, or null when the provider exposes no default. Used by the
+   * org-first / default-org fallback (`resolveOrg`) so a login without an explicit org still lands
+   * on the real instance org's IdPs/branding instead of the INSTANCE/default context. The result is
+   * stable for the life of the instance, so callers memoize it.
+   */
+  getDefaultOrg(): Promise<string | null>;
 
   // users
   findUser(identifier: string, orgId?: string): Promise<User | null>;

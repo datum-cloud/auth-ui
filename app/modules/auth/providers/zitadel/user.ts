@@ -78,6 +78,27 @@ export function findOrgByDomain(
   });
 }
 
+export function getDefaultOrg(ctx: ZitadelCtx): Promise<string | null> {
+  // Instance Default Organization lookup (org-first / default-org fallback). Filters
+  // OrganizationService.ListOrganizations by the instance defaultQuery and returns the first
+  // match's id. Reuses the same OrganizationService client as findOrgByDomain.
+  //   filter SearchQuery.query = { case: 'defaultQuery', value: {} }  (OrganizationDefaultQuery)
+  //   response ListOrganizationsResponse { result: Organization[] }  (Organization.id: string)
+  const orgs = ctx.svc(OrganizationService);
+  return ctx.call(async () => {
+    const req = create(ListOrganizationsRequestSchema, {
+      queries: [
+        create(OrgSearchQuerySchema, {
+          query: { case: 'defaultQuery', value: {} },
+        }),
+      ],
+    });
+    const resp = await orgs.listOrganizations(req);
+    const result = resp.result ?? [];
+    return result[0]?.id ?? null;
+  });
+}
+
 export function getUser(ctx: ZitadelCtx, id: string): Promise<User | null> {
   const users = ctx.svc(UserService);
   return ctx.call(async () => {

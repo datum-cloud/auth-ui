@@ -77,6 +77,9 @@ export class ZitadelAuthProvider implements AuthProvider {
   getActiveIdPs(orgId?: string): Promise<IdProvider[]> {
     return settings.getActiveIdPs(this.ctx, orgId);
   }
+  getDefaultOrg(): Promise<string | null> {
+    return user.getDefaultOrg(this.ctx);
+  }
 
   // users
   findUser(identifier: string, orgId?: string): Promise<User | null> {

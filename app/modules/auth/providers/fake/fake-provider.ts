@@ -71,6 +71,12 @@ interface Seed {
   idpIntents?: Record<string, IdpIntentResult>; // P4: pre-seeded intent results keyed by intentId
   settingsByOrg?: Record<string, Partial<LoginSettings>>; // P5: per-org setting overrides (e.g. forceMfa)
   orgDomains?: Record<string, string>; // P2 domain discovery: email domain → orgId
+  /**
+   * Instance Default Organization id returned by getDefaultOrg (the org-first / default-org
+   * fallback). Defaults to a stable fake id ('org-default-fake'); seed `null` to exercise the
+   * "no default org → INSTANCE/default context" last-resort branch.
+   */
+  defaultOrgId?: string | null;
 
   deviceAuths?: DeviceAuthSeed[]; // P6: device authorization requests keyed by userCode
   samlRequests?: SamlRequestSeed[]; // P6: SAML auth requests
@@ -104,6 +110,7 @@ export class FakeAuthProvider implements AuthProvider {
   private idpLinks = new Map<string, IdpLink[]>(); // P4: userId → links
   private settingsByOrg: Record<string, Partial<LoginSettings>>; // P5: per-org overrides
   private orgDomains: Record<string, string>; // P2 domain discovery: email domain → orgId
+  private defaultOrgId: string | null; // instance Default Organization (org-first fallback)
   private enrolled = new Map<string, Set<AuthMethod>>(); // P5: dynamically enrolled methods (merged with seeded authMethods)
   private mfaSkippedAt = new Map<string, string>(); // P5: userId → ISO timestamp of last skip
   private issuedOtpEmailCodes = new Map<string, string>(); // sessionId → returnCode issued for that session
@@ -139,6 +146,8 @@ export class FakeAuthProvider implements AuthProvider {
     this.idpIntents = seed.idpIntents ?? {}; // P4
     this.settingsByOrg = seed.settingsByOrg ?? {}; // P5
     this.orgDomains = seed.orgDomains ?? {}; // P2 domain discovery
+    // Stable fake default org unless the seed pins one (or `null` for the no-default branch).
+    this.defaultOrgId = seed.defaultOrgId !== undefined ? seed.defaultOrgId : 'org-default-fake';
     this.deviceAuthSeeds = seed.deviceAuths ?? []; // P6
     this.samlRequestSeeds = seed.samlRequests ?? []; // P6
     this.ldapUserSeeds = seed.ldapUsers ?? []; // P6
@@ -190,6 +199,10 @@ export class FakeAuthProvider implements AuthProvider {
 
   async getActiveIdPs(_orgId?: string): Promise<IdProvider[]> {
     return this.idps;
+  }
+
+  async getDefaultOrg(): Promise<string | null> {
+    return this.defaultOrgId;
   }
 
   // ─── users ────────────────────────────────────────────────────────────────────
@@ -630,6 +643,10 @@ export class FakeAuthProvider implements AuthProvider {
   }
   setLoginDefaultRedirectUri(uri: string | undefined): void {
     this.loginDefaultRedirectUri = uri;
+  }
+  // Override the instance Default Organization getDefaultOrg returns (null ⇒ no default org).
+  setDefaultOrg(id: string | null): void {
+    this.defaultOrgId = id;
   }
   // P2 domain discovery: flip the BASE allowDomainDiscovery flag (getLoginSettings(undefined)).
   // Mirrors setLoginDefaultRedirectUri — a deterministic seam for the resolveIdentifier ON test,

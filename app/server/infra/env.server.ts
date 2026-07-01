@@ -29,6 +29,11 @@ const schema = z
     // no extra headers. (Renamed from the fork's `CUSTOM_REQUEST_HEADERS` — Zitadel-only,
     // so it now carries the ZITADEL_ prefix like the other transport vars.)
     ZITADEL_CUSTOM_REQUEST_HEADERS: z.string().optional(),
+    // Optional ops pin for the org-first / default-org fallback (resolveOrg). When set, a login
+    // without an explicit `?organization=` (or OIDC org-id scope) uses THIS org id instead of
+    // calling the provider's getDefaultOrg. Unset (default) ⇒ resolveOrg falls back to the
+    // provider's instance Default Organization. No default value.
+    ZITADEL_DEFAULT_ORG_ID: z.string().optional(),
     // Fallback destination after a standalone login (e.g. when no ?redirect param
     // is present). Optional — unset in dev/test; the route supplies its own default.
     DEFAULT_APP_URL: z.url().optional(),

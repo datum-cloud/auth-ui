@@ -24,6 +24,14 @@ export interface AuthorizeInput {
   authRequest: AuthRequest;
   hasSessions: boolean;
   validSessionId?: string;
+  /**
+   * The effective organization, pre-resolved by the impure caller (resolveOidc → resolveOrg:
+   * scope-org → env pin → provider default org). When provided it OVERRIDES the scope-derived org,
+   * so a default-org fallback threads `organization` into the /login (and /signup, /accounts)
+   * redirect even when the OIDC request carried no org-id scope. Omitted ⇒ this stays pure and
+   * derives the org from scopes exactly as before (unchanged behaviour for existing callers/tests).
+   */
+  organization?: string;
 }
 
 // target 'callback' means: call createCallback(validSessionId); 'error' carries .error.
@@ -31,8 +39,10 @@ export function decideAuthorize({
   authRequest,
   hasSessions,
   validSessionId,
+  organization,
 }: AuthorizeInput): AuthorizeDecision {
-  const org = deriveOrganizationFromScopes(authRequest.scopes);
+  // Pre-resolved org (default-org fallback) wins; else derive from scopes (legacy behaviour).
+  const org = organization ?? deriveOrganizationFromScopes(authRequest.scopes);
   const baseParams = org ? { organization: org } : undefined;
 
   if (authRequest.prompt.includes('create')) return { target: '/signup', params: baseParams };

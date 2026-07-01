@@ -27,6 +27,7 @@ const PORT_METHODS = [
   'getBranding',
   'getPasswordComplexity',
   'getActiveIdPs',
+  'getDefaultOrg',
   'findUser',
   'findOrgByDomain',
   'getUser',

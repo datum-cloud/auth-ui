@@ -31,6 +31,9 @@ export interface ScenarioSeed {
     { id: string; clientId?: string; scopes: string[]; prompt: string[]; loginHint?: string }
   >;
   settingsByOrg?: Record<string, Record<string, unknown>>;
+  /** Instance Default Organization getDefaultOrg returns (org-first fallback). Default
+   *  'org-default-fake' in the fake; pass `null` for the "no default org" last-resort branch. */
+  defaultOrgId?: string | null;
   deviceAuths?: Array<{ userCode: string; id: string; appName?: string; scope: string[] }>;
   samlRequests?: Array<{ id: string; clientId: string; binding: 'redirect' | 'post' }>;
 }
@@ -184,6 +187,10 @@ export type ServiceFn =
   // env.server._envSchema — comprehensive Zod schema validation. Returns full
   // { success, data?, issues? } so specs can assert any field without re-implementing the schema.
   | 'envSchemaFull'
+  // resolveOrg precedence probe (org-first / default-org fallback). Runs node-side because the
+  // env pin (ZITADEL_DEFAULT_ORG_ID) is stubbed to `{}` in the browser bundle; here the REAL env
+  // schema is loaded, so the env branch is reachable. Returns { org: string | null }.
+  | 'resolveOrgProbe'
   // Hono /metrics route pinning test — unauthenticated GET returns 200 + metric name.
   | 'serverMetrics'
   // ── routes/login handlers (batch 13b) ────────────────────────────────────────
@@ -281,6 +288,8 @@ export interface Scenario {
   startIdpIntentError?: ProviderErrorCode;
   /** Raw env object fed to the REAL _envSchema (the `parseEnv` fn). */
   parseEnvRaw?: Record<string, string>;
+  /** Input for the `resolveOrgProbe` fn — the explicit URL/scope org (or omit for the fallback). */
+  resolveOrgInput?: { urlOrg?: string };
 
   // ── mfa / otp / webauthn services (batch 8d) ───────────────────────────────
   /** Ctx for chooseMfaMethod / resolveMfaPicker / resolveMfaSetup (loginName + threaded params).
@@ -337,6 +346,12 @@ export interface Scenario {
     | 'getUser'
     | 'startIdpIntent'
     | 'addIdpLink'
+    // org-first / default-org fallback: capture the org arg threaded into the settings/IdP reads
+    // and whether the provider default-org lookup ran.
+    | 'getLoginSettings'
+    | 'getBranding'
+    | 'getActiveIdPs'
+    | 'getDefaultOrg'
     // 8d: capture the provider sequence/args the mfa/otp/webauthn services drive.
     | 'updateSession'
     | 'passkeyRegisterLink'

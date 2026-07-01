@@ -21,6 +21,7 @@ import {
   isPhoneLike,
   makeLoginIdentifierClientSchema,
 } from '@/resources/login/login.schema';
+import { resolveOrg } from '@/resources/shared/resolve-org';
 import { paths } from '@/routes/paths';
 import { providerForRequest } from '@/server/auth-context.server';
 import { loaderCsrf, assertCsrf } from '@/server/csrf';
@@ -55,7 +56,13 @@ export async function loader({ request }: LoaderFunctionArgs) {
     return redirect(`${paths.authorize()}${url.search}`);
   }
 
-  const organization = url.searchParams.get('organization') ?? undefined;
+  // Org-first with a default-org fallback: an explicit `?organization=` wins, else the env pin,
+  // else the provider's instance Default Organization. Without this the org came back undefined and
+  // the loader rendered the INSTANCE/default IdPs instead of the real org's IdPs.
+  const organization = await resolveOrg(
+    provider,
+    url.searchParams.get('organization') ?? undefined
+  );
   const [settings, branding, idps] = await Promise.all([
     provider.getLoginSettings(organization),
     provider.getBranding(organization),
