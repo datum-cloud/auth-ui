@@ -3,8 +3,8 @@
 // Component (no-mount) port of app/resources/sso/__tests__/sso-management.test.ts (755-M6).
 // joinLinkedIdps is the pure link↔active-IdP join + dedupe — imported from the module (not the
 // heavy barrel) so the browser bundle stays light; runs browser-side with Chai.
-import type { IdpLink, IdProvider } from '@/modules/auth/types';
-import { joinLinkedIdps, linkableProviders } from '@/resources/sso/sso-management';
+import type { AuthMethod, IdpLink, IdProvider } from '@/modules/auth/types';
+import { canUnlinkIdp, joinLinkedIdps, linkableProviders } from '@/resources/sso/sso-management';
 
 const GOOGLE: IdProvider = {
   id: 'idp-google',
@@ -123,5 +123,35 @@ describe('linkableProviders — env-gated link options', () => {
       'idp-google',
       'idp-github',
     ]);
+  });
+});
+
+describe('canUnlinkIdp — login-method-aware lockout guard', () => {
+  const gh = linkOf('idp-github', 'gh-1', 'a-handle');
+  const goog = linkOf('idp-google', 'g-1', 'you@gmail.com');
+
+  it('allows unlink when ANOTHER IdP link remains', () => {
+    expect(canUnlinkIdp(gh, [gh, goog], [] as AuthMethod[])).to.equal(true);
+  });
+
+  it('allows unlink of the only IdP when a password exists', () => {
+    expect(canUnlinkIdp(gh, [gh], ['idp', 'password'])).to.equal(true);
+  });
+
+  it('allows unlink of the only IdP when a passkey exists', () => {
+    expect(canUnlinkIdp(gh, [gh], ['idp', 'passkey'])).to.equal(true);
+  });
+
+  it('BLOCKS unlink of the only IdP with no password/passkey (would lock out)', () => {
+    expect(canUnlinkIdp(gh, [gh], ['idp'])).to.equal(false);
+  });
+
+  it('BLOCKS when only second factors remain (totp/otp are not primary)', () => {
+    expect(canUnlinkIdp(gh, [gh], ['idp', 'totp', 'otp_email'])).to.equal(false);
+  });
+
+  it('matches the "other link" on idpId AND idpUserId (a second identity of the same provider counts)', () => {
+    const gh2 = linkOf('idp-github', 'gh-2', 'c-handle');
+    expect(canUnlinkIdp(gh, [gh, gh2], ['idp'])).to.equal(true);
   });
 });

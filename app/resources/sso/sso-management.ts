@@ -7,7 +7,7 @@
 import type { AuthProvider } from '@/modules/auth/auth-provider';
 import { readSessions, mostRecent } from '@/modules/auth/session/cookie';
 import { ProviderError } from '@/modules/auth/types';
-import type { IdpLink, IdProvider } from '@/modules/auth/types';
+import type { AuthMethod, IdpLink, IdProvider } from '@/modules/auth/types';
 import { getActiveIdPs } from '@/resources/sso/idp-providers';
 import { env } from '@/server/infra/env.server';
 
@@ -24,6 +24,7 @@ export interface LinkedIdpView extends IdpLink {
   name?: string;
   type?: string;
   logoUrl?: string;
+  unlinkable?: boolean;
 }
 
 export interface SsoManagementData {
@@ -81,6 +82,23 @@ export function linkableProviders(
   if (allowMulti) return [...active];
   const linkedIds = new Set(linked.map((l) => l.idpId));
   return active.filter((p) => !linkedIds.has(p.id));
+}
+
+/**
+ * Login-method-aware lockout guard. Safe to unlink `target` iff the user keeps at least one
+ * PRIMARY sign-in method afterward — another IdP link, a password, or a passkey. Second factors
+ * (totp/u2f/otp_sms/otp_email) can't sign in alone and do NOT count. Pure — no I/O; the action
+ * re-runs it server-side (never trust the client's disabled state).
+ */
+export function canUnlinkIdp(
+  target: IdpLink,
+  allLinks: IdpLink[],
+  authMethods: AuthMethod[]
+): boolean {
+  const otherIdpRemains = allLinks.some(
+    (l) => !(l.idpId === target.idpId && l.idpUserId === target.idpUserId)
+  );
+  return otherIdpRemains || authMethods.includes('password') || authMethods.includes('passkey');
 }
 
 export type SsoManagementResult =
