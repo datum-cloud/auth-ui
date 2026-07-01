@@ -85,6 +85,7 @@ export default function SplitLayout({
                 dark={darkAssetUrl('/images/illustration-2.svg')}
                 alt=""
                 aria-hidden="true"
+                loading="lazy"
                 width={232}
                 height={290}
                 className="size-auto w-full object-contain"
@@ -129,6 +130,7 @@ export default function SplitLayout({
                   alt="Zac Smith"
                   src={assetUrl('/images/zac-avatar.png')}
                   srcSet={`${assetUrl('/images/zac-avatar.png')} 3x`}
+                  loading="lazy"
                   width={40}
                   height={40}
                 />
@@ -181,6 +183,7 @@ export default function SplitLayout({
             light={assetUrl('/images/illustration-1.svg')}
             alt=""
             aria-hidden="true"
+            loading="lazy"
             width={707}
             height={155}
             className="size-auto w-full object-contain"

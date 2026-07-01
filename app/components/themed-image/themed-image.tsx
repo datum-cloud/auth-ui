@@ -1,4 +1,5 @@
 import { cn } from '@datum-cloud/datum-ui/utils';
+import { useCallback } from 'react';
 
 export interface ThemedImageProps extends Omit<React.ImgHTMLAttributes<HTMLImageElement>, 'src'> {
   /** Light-theme source. Also the SSR + fallback source. */
@@ -37,11 +38,16 @@ export function ThemedImage({
   // Degrade the dark copy to `light` exactly once on failure. The ref catches a load error
   // that fired during SSR (before React attached onError); onError catches client-side ones.
   // The data-flag both prevents a loop when `light` is also unavailable and avoids re-firing.
-  const degradeToLight = (img: HTMLImageElement | null): void => {
-    if (!img || img.dataset.themedFallback || !img.complete || img.naturalWidth > 0) return;
-    img.dataset.themedFallback = 'true';
-    img.src = light;
-  };
+  // Stabilized on `light` so React doesn't tear down + re-run the ref every render (a changed ref
+  // callback fires with null then the element); it re-runs only when the light source changes.
+  const degradeToLight = useCallback(
+    (img: HTMLImageElement | null): void => {
+      if (!img || img.dataset.themedFallback || !img.complete || img.naturalWidth > 0) return;
+      img.dataset.themedFallback = 'true';
+      img.src = light;
+    },
+    [light]
+  );
 
   return (
     <>

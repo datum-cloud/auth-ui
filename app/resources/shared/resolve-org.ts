@@ -15,7 +15,8 @@ import { env } from '@/server/infra/env.server';
 // Module-level memo of the provider's instance Default Organization. It is STABLE for the life of
 // the process, so one lookup serves every request. A `null` result (provider returned no default)
 // is deliberately NOT cached — the next call retries, so a transient miss never pins us to the
-// instance/default context permanently.
+// instance/default context permanently. Tradeoff: in the rare deployment with no default org AND no
+// ZITADEL_DEFAULT_ORG_ID pin, every resolveOrg re-hits getDefaultOrg — set the env pin there.
 let cachedDefaultOrg: string | null = null;
 
 /**

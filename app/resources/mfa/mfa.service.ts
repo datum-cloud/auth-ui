@@ -127,13 +127,19 @@ export async function chooseMfaMethod(
 
   const entry = byLoginName(sessions, loginName, organization);
   if (!entry) {
-    logAuthEvent('mfa_method_chosen', 'failure', { loginName, reason: 'session_expired' });
+    logAuthEvent('mfa_method_chosen', 'failure', {
+      actor: hashActor(loginName),
+      reason: 'session_expired',
+    });
     return { ok: false, error: 'SESSION_EXPIRED' };
   }
 
   const parsed = secondFactorMethodSchema.safeParse(formEntries);
   if (!parsed.success) {
-    logAuthEvent('mfa_method_chosen', 'failure', { loginName, reason: 'invalid_input' });
+    logAuthEvent('mfa_method_chosen', 'failure', {
+      actor: hashActor(loginName),
+      reason: 'invalid_input',
+    });
     return { ok: false, error: 'INVALID_INPUT' };
   }
 

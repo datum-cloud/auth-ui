@@ -42,7 +42,9 @@ export const CallbackQuery = z.object({
   token: z.string().min(1),
   link: z.string().optional(),
   requestId: z.string().optional(),
-  organization: z.string().optional(),
+  // Attacker-controllable from the callback URL; POSTURE B2 is fail-closed against a wrong org, but
+  // cap the length as defense-in-depth (Zitadel org ids are short numeric strings).
+  organization: z.string().max(64).optional(),
 });
 
 /**
@@ -340,6 +342,9 @@ export async function processIdpCallback(
 
     case 'link-needs-auth': {
       logAuthEvent('idp.link.denied', 'failure', { reason: 'account-exists', requestId });
+      // Accepted PII tradeoff: the IdP-vouched email pre-fills the "sign in to link" form, so it
+      // rides in the /login redirect (Location header, browser history, proxy logs). Fine for UX;
+      // swap to an opaque one-time token if strict PII minimization becomes a requirement.
       const qs = new URLSearchParams({ loginName: decision.email, notice: 'link-existing' });
       if (requestId) qs.set('requestId', requestId);
       if (organization) qs.set('organization', organization);

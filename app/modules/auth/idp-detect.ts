@@ -18,5 +18,8 @@ const GITHUB_HANDLE = /^[a-z\d](?:[a-z\d]|-(?=[a-z\d])){0,38}$/i;
 
 export function inferIdpType(username?: string | null): string | undefined {
   if (!username) return undefined;
+  // An all-digit string is almost certainly an opaque provider subject id (e.g. a Google OIDC
+  // `sub`), not a GitHub handle — don't mis-badge it as GitHub; fall back to the generic glyph.
+  if (/^\d+$/.test(username)) return undefined;
   return GITHUB_HANDLE.test(username) ? 'GITHUB' : undefined;
 }

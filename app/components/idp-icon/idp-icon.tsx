@@ -17,10 +17,10 @@ import { MailIcon } from 'lucide-react';
  */
 export function IdpIcon({
   type,
-  name,
   logoUrl,
 }: {
   type?: string;
+  /** Accepted for call-site symmetry; the icon is decorative (aria-hidden) so it isn't rendered. */
   name?: string;
   logoUrl?: string;
 }) {
@@ -30,7 +30,7 @@ export function IdpIcon({
       <ThemedImage
         light={assetUrl(`/images/idps/google.png`)}
         dark={darkAssetUrl(`/images/idps/google.png`)}
-        alt="Google"
+        alt=""
         aria-hidden
         width={20}
         height={20}
@@ -43,7 +43,7 @@ export function IdpIcon({
       <ThemedImage
         light={assetUrl(`/images/idps/github.png`)}
         dark={darkAssetUrl(`/images/idps/github.png`)}
-        alt="GitHub"
+        alt=""
         aria-hidden
         width={20}
         height={20}
@@ -60,7 +60,6 @@ export function IdpIcon({
   return (
     <span
       aria-hidden
-      aria-label={name ?? 'Datum'}
       className="bg-muted text-muted-foreground flex size-5 shrink-0 items-center justify-center rounded">
       <Icon icon={MailIcon} size={16} />
     </span>

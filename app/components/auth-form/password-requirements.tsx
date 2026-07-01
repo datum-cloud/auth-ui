@@ -23,11 +23,7 @@ export function PasswordRequirements({
   const rules = passwordRules(policy);
 
   return (
-    <ul
-      aria-label="Password requirements"
-      // polite: announce a requirement becoming satisfied without interrupting typing.
-      aria-live="polite"
-      className="flex flex-col gap-1 text-sm">
+    <ul aria-label="Password requirements" className="flex flex-col gap-1 text-sm">
       {rules.map((rule) => {
         const met = rule.test(value);
         return (
@@ -35,6 +31,9 @@ export function PasswordRequirements({
             key={rule.id}
             data-rule={rule.id}
             data-met={met}
+            // polite live region PER ROW: announce a single requirement flipping satisfied without
+            // re-reading the whole list on every keystroke (which a list-level aria-live can do).
+            aria-live="polite"
             className={[
               'flex items-center gap-2',
               met ? 'text-foreground' : 'text-muted-foreground',

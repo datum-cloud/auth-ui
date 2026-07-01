@@ -58,7 +58,7 @@ export function IdpButtonList({
                   <ThemedImage
                     light={assetUrl(mark)}
                     dark={darkAssetUrl(mark)}
-                    alt={idp.name}
+                    alt=""
                     aria-hidden="true"
                     className="size-4 object-contain"
                   />

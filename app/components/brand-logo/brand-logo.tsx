@@ -14,7 +14,9 @@ import { Link } from 'react-router';
 //     on dark via useTheme (SSR-safe, brand fallback before hydration).
 export function BrandLogo({ branding }: { branding?: BrandingTheme | null }): React.JSX.Element {
   return (
-    <Link to="/">
+    // When an org logo is shown the image is decorative (aria-hidden), so the link needs its own
+    // accessible name; the Datum fallback gets its name from <ThemedLogo.Flat aria-label="Datum">.
+    <Link to="/" aria-label={branding?.logoUrl ? 'Home' : undefined}>
       {branding?.logoUrl ? (
         <ThemedImage
           light={branding.logoUrl}

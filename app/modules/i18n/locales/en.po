@@ -445,7 +445,7 @@ msgstr "Phone sign-in isn't available — use your email or username."
 msgid "Please check your input and try again."
 msgstr "Please check your input and try again."
 
-#: app/layouts/split.layout.tsx:107
+#: app/layouts/split.layout.tsx:108
 msgid "Prefer a demo instead? Just <0>reach out</0>."
 msgstr "Prefer a demo instead? Just <0>reach out</0>."
 
@@ -606,7 +606,7 @@ msgstr "Something went wrong. Please try again."
 msgid "Start over"
 msgstr "Start over"
 
-#: app/layouts/split.layout.tsx:119
+#: app/layouts/split.layout.tsx:120
 msgid "Thanks,"
 msgstr "Thanks,"
 
@@ -710,7 +710,7 @@ msgstr "Use your security key to verify your identity."
 msgid "Username"
 msgstr "Username"
 
-#: app/layouts/split.layout.tsx:95
+#: app/layouts/split.layout.tsx:96
 msgid "Using Datum requires setting up a billing account, but to help you explore without cost, we add <0>$50 USD</0> in credit on signup."
 msgstr "Using Datum requires setting up a billing account, but to help you explore without cost, we add <0>$50 USD</0> in credit on signup."
 

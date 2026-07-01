@@ -380,7 +380,9 @@ export async function verifyLoginPassword(
   const userId = session.user?.id ?? '';
   const [methods, settings] = await Promise.all([
     provider.listAuthMethods(userId),
-    provider.getLoginSettings(organization),
+    // Org-first, consistent with mfa/otp/webauthn: resolve to the default org when unset so the
+    // policy/next-step routing matches the org's login settings, not the instance defaults.
+    provider.getLoginSettings(await resolveOrg(provider, organization)),
   ]);
 
   // TOKEN ROTATION — write the (potentially rotated) token back to the ceremony entry.
