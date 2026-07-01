@@ -93,14 +93,15 @@ const schema = z
       .optional()
       .transform((v) => v === 'true'),
     // Whether the EXPLICIT SSO link ceremony may attach a FRESH external identity regardless of
-    // its email address. Defaults to TRUE (product requirement): a signed-in user can link any
-    // Google/GitHub identity to their own account, and email-ownership is enforced later at
-    // email-update time on the backend. Set to the exact string 'false' to RESTORE the strict
-    // POSTURE B2 gate (the IdP-verified email must already be owned by the session user).
+    // its email address. Defaults to FALSE (fail-closed — mirrors ALLOW_IDP_UNLINK): only the exact
+    // string 'true' enables it. When on, a signed-in user can link any Google/GitHub identity to
+    // their own account (email-ownership is enforced later at email-update time on the backend);
+    // when unset/off the strict POSTURE B2 gate applies (the IdP-verified email must already be
+    // owned by the session user). Enable per-environment via infra env.
     ALLOW_IDP_LINK_ANY_EMAIL: z
       .string()
       .optional()
-      .transform((v) => v !== 'false'),
+      .transform((v) => v === 'true'),
     // CSP `frame-ancestors` override. Unset ⇒ 'none' (secure default — the auth UI is
     // not embeddable; X-Frame-Options: DENY is kept in lock-step). Set to a space/comma-
     // separated allowlist of full origins (e.g. "https://staging.portal.example.com") in

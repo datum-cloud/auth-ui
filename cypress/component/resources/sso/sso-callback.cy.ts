@@ -522,11 +522,11 @@ describe('processIdpCallback — fresh-identity link ceremony (Req 2)', () => {
     draft: { email: 'fresh@idp.test', firstName: 'Fresh', lastName: 'Id', emailVerified: true },
   };
 
-  it('links a fresh verified identity to the session user and SKIPS owner findUser (default: any-email ON)', () => {
+  it('links a fresh verified identity to the session user and SKIPS owner findUser (any-email ON)', () => {
     callService({
       fn: 'processIdpCallback',
       slug: 'google',
-      // default env → ALLOW_IDP_LINK_ANY_EMAIL is TRUE: the B2 owner-resolution lookup short-circuits.
+      env: { ALLOW_IDP_LINK_ANY_EMAIL: 'true' }, // any-email ON → the B2 owner-resolution lookup short-circuits.
       seed: {}, // fresh provider; the session user is injected via liveSessions (no user store entry needed)
       liveSessions: [
         { id: 's1', token: 't1', user: { id: 'u-sess', loginName: 'owner@datum.test' } },
