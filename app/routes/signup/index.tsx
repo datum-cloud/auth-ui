@@ -8,6 +8,7 @@ import SplitLayout from '@/layouts/split.layout';
 import { MaxMindTracker, readMaxMindTrackingToken } from '@/modules/fraud/maxmind-tracker';
 import { startIdpIntent } from '@/resources/login';
 import { loginIdpSchema } from '@/resources/login/login.schema';
+import { resolveOrg } from '@/resources/shared/resolve-org';
 import {
   decideAfterSignupIdentifier,
   decideSignupIdpIntent,
@@ -43,9 +44,12 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const organization = url.searchParams.get('organization') ?? undefined;
   const requestId = url.searchParams.get('requestId') ?? undefined;
 
+  // Org-first: an explicit org wins, else the default org (old app's `organization ?? getDefaultOrg()`).
+  // getActiveIdPs is owned by the SSO/idp-providers pass, so its raw org is left untouched here.
+  const settingsOrg = await resolveOrg(provider, organization);
   const [settings, branding, idps] = await Promise.all([
-    provider.getLoginSettings(organization),
-    provider.getBranding(organization),
+    provider.getLoginSettings(settingsOrg),
+    provider.getBranding(settingsOrg),
     provider.capabilities.externalIdp ? provider.getActiveIdPs(organization) : Promise.resolve([]),
   ]);
 

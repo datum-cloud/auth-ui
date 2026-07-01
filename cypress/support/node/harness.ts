@@ -79,10 +79,13 @@ import {
   processIdpCallback,
   submitLdapCredentials,
   runSsoAction,
+  resolveSsoLink,
+  resolveSsoManagement,
   outcomeToResponse as ssoOutcomeToResponse,
   type CallbackLoaderDeps,
   type SsoActionDeps,
 } from '@/resources/sso';
+import { getActiveIdPs } from '@/resources/sso/idp-providers';
 import { signInWithIdpIntent } from '@/resources/sso/idp-session';
 import { dispatchEmailCode, resendEmailCode, submitEmailCode } from '@/resources/verify';
 import {
@@ -310,6 +313,13 @@ function buildProvider(s: Scenario): FakeAuthProvider {
         changedAt: DEFAULT_CHANGE_TS,
       };
     }) as FakeAuthProvider['getSession'];
+  }
+  if (s.passwordComplexity) {
+    // Drive the org password-complexity policy the password-setting routes fetch. The org arg is
+    // still forwarded so a recordCalls:['getPasswordComplexity'] scenario can assert the resolved org.
+    const policy = s.passwordComplexity;
+    provider.getPasswordComplexity = (async () =>
+      policy) as FakeAuthProvider['getPasswordComplexity'];
   }
   if (s.failMarkEmailVerified) {
     provider.markEmailVerified = (async () => {
@@ -599,6 +609,27 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
         const o = await runSsoAction(provider, request, buildForm(sr.form), deps);
         outcome = o;
         response = await serializeResponse(ssoOutcomeToResponse(o));
+        break;
+      }
+      case 'resolveSsoLink': {
+        // IdP-DISPLAY flow: resolveSsoLink reads a real Request (org from `?organization=`) and the
+        // seeded fake provider. recordCalls captures the org threaded into getActiveIdPs.
+        outcome = await resolveSsoLink(provider, request);
+        break;
+      }
+      case 'resolveSsoManagement': {
+        // /sso management IdP-DISPLAY flow. csrf is a stub token — the getActiveIdPs read runs
+        // before CSRF is consumed, and the no-session case still records the org arg.
+        outcome = await resolveSsoManagement(provider, request, {
+          token: 'harness-csrf',
+          setCookie: null,
+        });
+        break;
+      }
+      case 'activeIdPsProbe': {
+        // The idp-providers wrapper choke point directly: assert the org threaded into the port.
+        const idps = await getActiveIdPs(provider, s.resolveOrgInput?.urlOrg);
+        outcome = { count: idps.length };
         break;
       }
       // ── mfa / otp / webauthn services (batch 8d) ──────────────────────────

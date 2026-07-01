@@ -1,3 +1,5 @@
+import type { PasswordComplexity } from '@/modules/auth/types';
+import { passwordComplexityField } from '@/resources/schemas/password-complexity';
 import { withPasswordMatch } from '@/resources/schemas/password-match';
 import { z } from 'zod';
 
@@ -24,9 +26,15 @@ export const registerClientSchema = registerSchema.pick({
 
 // Composes the shared withPasswordMatch refinement — same field names (password/
 // confirm), same path, same "Passwords must match" copy the inline refinement emitted.
-export const signupPasswordSchema = withPasswordMatch(
-  z.object({ password: z.string().min(8), confirm: z.string().min(8) })
-);
+// POLICY-DRIVEN: the password field is built from the org's fetched `PasswordComplexity`
+// (the loader/action thread it in via `<name>For`); the default keeps legacy min-8/no-classes.
+export function signupPasswordSchemaFor(policy?: PasswordComplexity) {
+  return withPasswordMatch(
+    z.object({ password: passwordComplexityField(policy), confirm: z.string().min(1) })
+  );
+}
+
+export const signupPasswordSchema = signupPasswordSchemaFor();
 
 // Screen 1 (/signup): collect just the email identifier (name is parsed from it).
 export const signupIdentifierSchema = z.object({

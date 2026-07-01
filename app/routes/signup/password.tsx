@@ -2,13 +2,15 @@ import { AuthCard } from '@/components/auth-card/auth-card';
 import { AuthCeremony } from '@/components/auth-ceremony/auth-ceremony';
 import { SubmitButton } from '@/components/auth-form/auth-form';
 import { AuthFormFields } from '@/components/auth-form/auth-form-fields';
+import { PasswordRequirements } from '@/components/auth-form/password-requirements';
 import { useAuthActionError } from '@/hooks/use-auth-action-error';
 import { TrackOnMount } from '@/modules/analytics/fathom';
 import { readSessions, serializeSessions } from '@/modules/auth/session/cookie';
 import { MaxMindTracker, readMaxMindTrackingToken } from '@/modules/fraud/maxmind-tracker';
 import { genericCheckYourEmail } from '@/resources/schemas/check-your-email.schema';
+import { resolveOrg } from '@/resources/shared/resolve-org';
 import { registerWithPassword } from '@/resources/signup';
-import { signupPasswordSchema } from '@/resources/signup/signup.schema';
+import { signupPasswordSchemaFor } from '@/resources/signup/signup.schema';
 import { providerForRequest } from '@/server/auth-context.server';
 import { loaderCsrf, assertCsrf } from '@/server/csrf';
 import { requireEmailVerification } from '@/server/env';
@@ -18,7 +20,7 @@ import { userAgentFromRequest } from '@/server/user-agent';
 import { actionError } from '@/utils/errors/auth-error';
 import { Form } from '@datum-cloud/datum-ui/form';
 import { Trans, useLingui } from '@lingui/react/macro';
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import {
   data,
   redirect,
@@ -36,16 +38,24 @@ export const meta: MetaFunction = () => [{ title: 'Set a password' }];
 export async function loader({ request }: LoaderFunctionArgs) {
   const url = new URL(request.url);
   const { csrfToken, headers } = await loaderCsrf(request);
+  const rawOrg = url.searchParams.get('organization') ?? undefined;
+  // Fetch the org's password-complexity policy so the form renders the requirement checklist and
+  // validates against it (org-first, default-org fallback via resolveOrg).
+  const provider = providerForRequest(request);
+  const passwordComplexity = await provider.getPasswordComplexity(
+    await resolveOrg(provider, rawOrg)
+  );
   return data(
     {
       csrfToken,
       loginName: url.searchParams.get('loginName') ?? '',
       firstName: url.searchParams.get('firstName') ?? '',
       lastName: url.searchParams.get('lastName') ?? '',
-      organization: url.searchParams.get('organization') ?? undefined,
+      organization: rawOrg,
       requestId: url.searchParams.get('requestId') ?? undefined,
       deviceTrackingToken: url.searchParams.get('deviceTrackingToken') ?? '',
       maxmindAccountId: env.MAXMIND_ACCOUNT_ID ?? '',
+      passwordComplexity,
     },
     { headers }
   );
@@ -57,7 +67,11 @@ export async function action({ request }: ActionFunctionArgs) {
   await assertCsrf(request, form);
 
   const fields = Object.fromEntries(form);
-  const parsed = signupPasswordSchema.safeParse(fields);
+  // Re-fetch the policy on POST (never trust the client) so the server validation reflects the
+  // same org complexity rules the form advertised.
+  const rawOrg = fields.organization ? String(fields.organization) : undefined;
+  const policy = await provider.getPasswordComplexity(await resolveOrg(provider, rawOrg));
+  const parsed = signupPasswordSchemaFor(policy).safeParse(fields);
   if (!parsed.success) return data({ error: 'INVALID_INPUT' as const }, { status: 400 });
 
   // SECURITY: the service builds the verify-mail URL template from a TRUSTED origin
@@ -106,8 +120,11 @@ export default function SignupPassword() {
     requestId,
     deviceTrackingToken,
     maxmindAccountId,
+    passwordComplexity,
   } = useLoaderData<typeof loader>();
   const deviceTokenRef = useRef<HTMLInputElement>(null);
+  // Client schema mirrors the fetched policy so inline validation matches the checklist + server.
+  const schema = useMemo(() => signupPasswordSchemaFor(passwordComplexity), [passwordComplexity]);
 
   // The hidden input is seeded (defaultValue) with the token handed off in the URL so
   // it survives even with JS disabled. When MaxMindTracker mirrors a fresh token into
@@ -159,7 +176,7 @@ export default function SignupPassword() {
         description={<Trans>You'll need to set a password to complete your signup.</Trans>}
         error={errorMessage}>
         <Form.Root
-          schema={signupPasswordSchema}
+          schema={schema}
           formComponent={RRForm}
           method="POST"
           defaultValues={{ password: '', confirm: '' }}
@@ -182,6 +199,7 @@ export default function SignupPassword() {
           <Form.Field name="password" label={t`Password`} required>
             <Form.Input type="password" autoComplete="new-password" autoFocus />
           </Form.Field>
+          <PasswordRequirements policy={passwordComplexity} />
           <Form.Field name="confirm" label={t`Confirm password`} required>
             <Form.Input type="password" autoComplete="new-password" />
           </Form.Field>

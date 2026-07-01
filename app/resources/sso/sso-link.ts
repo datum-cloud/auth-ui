@@ -8,6 +8,7 @@ import type { AuthProvider } from '@/modules/auth/auth-provider';
 import { slugToProvider } from '@/modules/auth/idp-slug';
 import { readSessions, mostRecent } from '@/modules/auth/session/cookie';
 import type { IdProvider } from '@/modules/auth/types';
+import { getActiveIdPs } from '@/resources/sso/idp-providers';
 import { idpReturnUrls } from '@/resources/sso/idp-return-urls';
 import { trustedAppOrigin } from '@/server/infra/app-origin.server';
 import { logAuthEvent } from '@/server/observability';
@@ -81,9 +82,9 @@ export async function resolveSsoLink(
 
   // (c) No session → render sign-in-required prompt
   if (!session?.user?.id) {
-    const active = provider.capabilities.externalIdp
-      ? await provider.getActiveIdPs(organization)
-      : [];
+    // Org-first / default-org fallback via the shared choke point: entering /sso/link with no
+    // `?organization=` now renders the org's IdPs (default org) instead of the INSTANCE/default set.
+    const active = await getActiveIdPs(provider, organization);
     // Validate returnTo against the same-origin allowlist before it reaches the prompt
     // (defense-in-depth: today it is the request's own path, but pinning it here closes the
     // open-redirect class regardless of how the value is sourced).
@@ -104,9 +105,9 @@ export async function resolveSsoLink(
   }
 
   // (a) Session + specific provider → start link intent and redirect
-  const active = provider.capabilities.externalIdp
-    ? await provider.getActiveIdPs(organization)
-    : [];
+  // Org-first / default-org fallback via the shared choke point (same as the no-session branch):
+  // the linkable providers must come from the org's IdPs, not the INSTANCE/default set.
+  const active = await getActiveIdPs(provider, organization);
   const target = slugToProvider(wantedSlug, active);
   if (!target) {
     return { kind: 'redirect', location: '/sso' };

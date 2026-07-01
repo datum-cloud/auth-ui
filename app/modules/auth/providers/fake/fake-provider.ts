@@ -81,6 +81,13 @@ interface Seed {
   deviceAuths?: DeviceAuthSeed[]; // P6: device authorization requests keyed by userCode
   samlRequests?: SamlRequestSeed[]; // P6: SAML auth requests
   ldapUsers?: LdapUserSeed[]; // P6: LDAP credential fixtures
+
+  /**
+   * The password-complexity policy getPasswordComplexity returns. Configurable so tests can drive
+   * the policy-driven password rules (e.g. requiresSymbol=true). Defaults to min 8 / no required
+   * character classes — the legacy behaviour the forms assumed before the policy was wired in.
+   */
+  passwordComplexity?: PasswordComplexity;
 }
 
 export class FakeAuthProvider implements AuthProvider {
@@ -117,6 +124,7 @@ export class FakeAuthProvider implements AuthProvider {
   private deviceAuthSeeds: DeviceAuthSeed[]; // P6
   private samlRequestSeeds: SamlRequestSeed[]; // P6
   private ldapUserSeeds: LdapUserSeed[]; // P6
+  private passwordComplexity: PasswordComplexity; // configurable complexity policy fixture
   private authorizedDevices = new Set<string>(); // P6: deviceAuthId → authorized
   // Fake-only: per-session outcome scripts for getSession/createCallback (see FakeOutcomeScript).
   private sessionResults = new Map<string, FakeOutcomeScript>();
@@ -151,6 +159,13 @@ export class FakeAuthProvider implements AuthProvider {
     this.deviceAuthSeeds = seed.deviceAuths ?? []; // P6
     this.samlRequestSeeds = seed.samlRequests ?? []; // P6
     this.ldapUserSeeds = seed.ldapUsers ?? []; // P6
+    this.passwordComplexity = seed.passwordComplexity ?? {
+      minLength: 8,
+      requiresUppercase: false,
+      requiresLowercase: false,
+      requiresNumber: false,
+      requiresSymbol: false,
+    };
   }
 
   // ─── settings ────────────────────────────────────────────────────────────────
@@ -186,13 +201,8 @@ export class FakeAuthProvider implements AuthProvider {
   }
 
   async getPasswordComplexity(_orgId?: string): Promise<PasswordComplexity | undefined> {
-    return {
-      minLength: 8,
-      requiresUppercase: false,
-      requiresLowercase: false,
-      requiresNumber: false,
-      requiresSymbol: false,
-    };
+    // Returns the configurable fixture (seed.passwordComplexity), defaulting to min 8 / no classes.
+    return this.passwordComplexity;
   }
 
   // getLegalSupport removed from the port (zero callers) — dropped here too.

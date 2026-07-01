@@ -122,6 +122,12 @@ export type ServiceFn =
   | 'signInWithIdpIntent'
   | 'submitLdapCredentials'
   | 'runSsoAction'
+  // sso IdP-DISPLAY flows: org-first / default-org fallback probes. Each reads a real Request +
+  // seeded fake provider node-side so recordCalls can capture the org threaded into getActiveIdPs
+  // (empty org → the resolved default org, not undefined → the INSTANCE/default IdPs).
+  | 'resolveSsoLink'
+  | 'resolveSsoManagement'
+  | 'activeIdPsProbe'
   // ── mfa / otp / webauthn services (batch 8d) ──
   // All read a SessionEntry[] / OtpSessionEntry directly and emit REAL audit (logAuthEvent →
   // console.log), so they run node-side: the browser bundle stubs observability to a no-op.
@@ -270,6 +276,15 @@ export interface Scenario {
   failDeleteSession?: boolean;
   /** getSession returns a session with a CONTROLLABLE password.verifiedAt (freshness gate). */
   freshness?: { sessionId: string; token: string; verifiedAtMs: number };
+  /** Override getPasswordComplexity on the built provider (the cy.task equivalent of an org policy
+   *  configured in Zitadel) so the password-setting routes' policy-driven rules can be exercised. */
+  passwordComplexity?: {
+    minLength: number;
+    requiresUppercase: boolean;
+    requiresLowercase: boolean;
+    requiresNumber: boolean;
+    requiresSymbol: boolean;
+  };
 
   // ── sso callback / sign-in / action (batch 8b) ─────────────────────────────
   /** IdP provider slug for processIdpCallback (e.g. 'google'). */
@@ -352,6 +367,8 @@ export interface Scenario {
     | 'getBranding'
     | 'getActiveIdPs'
     | 'getDefaultOrg'
+    // password-complexity policy: capture the org arg threaded into getPasswordComplexity.
+    | 'getPasswordComplexity'
     // 8d: capture the provider sequence/args the mfa/otp/webauthn services drive.
     | 'updateSession'
     | 'passkeyRegisterLink'

@@ -8,6 +8,7 @@ import { TrackOnMount } from '@/modules/analytics/fathom';
 import { requestPasswordReset } from '@/resources/password';
 import { resetRequestSchema, resetRequestClientSchema } from '@/resources/password/password.schema';
 import { genericCheckYourEmail } from '@/resources/schemas/check-your-email.schema';
+import { resolveOrg } from '@/resources/shared/resolve-org';
 import { providerForRequest } from '@/server/auth-context.server';
 import { loaderCsrf, assertCsrf } from '@/server/csrf';
 import { trustedAppOrigin } from '@/server/infra/app-origin.server';
@@ -35,7 +36,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const { csrfToken, headers } = await loaderCsrf(request);
   const organization = url.searchParams.get('organization') ?? undefined;
   const provider = providerForRequest(request);
-  const branding = await provider.getBranding(organization);
+  // Org-first: an explicit org wins, else the default org (old app's `organization ?? getDefaultOrg()`).
+  const branding = await provider.getBranding(await resolveOrg(provider, organization));
   return data(
     {
       csrfToken,

@@ -5,6 +5,7 @@ import { BackLink } from '@/components/back-link/back-link';
 import { useAuthActionError } from '@/hooks/use-auth-action-error';
 import { readSessions, serializeSessions } from '@/modules/auth/session/cookie';
 import { genericCheckYourEmail } from '@/resources/schemas/check-your-email.schema';
+import { resolveOrg } from '@/resources/shared/resolve-org';
 import {
   passwordFirstHandoff,
   registerPasskeyFirst,
@@ -46,8 +47,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const requestId = url.searchParams.get('requestId') ?? undefined;
   const deviceTrackingToken = url.searchParams.get('deviceTrackingToken') ?? undefined;
 
+  // Org-first: an explicit org wins, else the default org (old app's `organization ?? getDefaultOrg()`).
+  // getActiveIdPs is owned by the SSO/idp-providers pass, so its raw org is left untouched here.
   const [settings, idps] = await Promise.all([
-    provider.getLoginSettings(organization),
+    provider.getLoginSettings(await resolveOrg(provider, organization)),
     provider.capabilities.externalIdp ? provider.getActiveIdPs(organization) : Promise.resolve([]),
   ]);
   const view = resolveSignupView(settings, idps, env.AUTH_EMAIL_DELIVERY_ENABLED);

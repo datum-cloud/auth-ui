@@ -8,6 +8,7 @@ import type { AuthProvider } from '@/modules/auth/auth-provider';
 import { readSessions, mostRecent } from '@/modules/auth/session/cookie';
 import { ProviderError } from '@/modules/auth/types';
 import type { IdpLink, IdProvider } from '@/modules/auth/types';
+import { getActiveIdPs } from '@/resources/sso/idp-providers';
 import { env } from '@/server/infra/env.server';
 
 // ── /sso loader ─────────────────────────────────────────────────────────────────
@@ -104,9 +105,9 @@ export async function resolveSsoManagement(
   const url = new URL(request.url);
   const organization = url.searchParams.get('organization') ?? undefined;
 
-  const active = provider.capabilities.externalIdp
-    ? await provider.getActiveIdPs(organization)
-    : [];
+  // Org-first / default-org fallback via the shared choke point: the /sso management screen must
+  // list + join against the org's IdPs (default org when no `?organization=`), not the INSTANCE set.
+  const active = await getActiveIdPs(provider, organization);
 
   const entries = await readSessions(request);
   const recent = mostRecent(entries);

@@ -2,6 +2,8 @@
 //
 // cy.task port of app/routes/login/__tests__/notice-link-existing.test.ts.
 // The /login loader threads notice=link-existing from the URL into its returned data.
+// NOTE: an explicit ?organization is threaded so the loader RENDERS — a bare /login now
+// redirects (A1 org-first thread-in) before returning data, which would hide dataBody.
 import { callService } from '../../../support/node/call-service';
 
 describe('login/index loader — notice passthrough', () => {
@@ -10,7 +12,7 @@ describe('login/index loader — notice passthrough', () => {
       fn: 'loginLoader',
       provider: 'singleton',
       request: {
-        url: 'http://localhost/id/login?loginName=you%40gmail.com&notice=link-existing',
+        url: 'http://localhost/id/login?loginName=you%40gmail.com&notice=link-existing&organization=org1',
       },
     }).then((v) => {
       expect(v.response?.isResponse).to.equal(false);
@@ -22,7 +24,7 @@ describe('login/index loader — notice passthrough', () => {
     callService({
       fn: 'loginLoader',
       provider: 'singleton',
-      request: { url: 'http://localhost/id/login' },
+      request: { url: 'http://localhost/id/login?organization=org1' },
     }).then((v) => {
       expect(v.response?.isResponse).to.equal(false);
       const notice = (v.response?.dataBody as Record<string, unknown> | undefined)?.notice ?? null;

@@ -59,10 +59,21 @@ export async function loader({ request }: LoaderFunctionArgs) {
   // Org-first with a default-org fallback: an explicit `?organization=` wins, else the env pin,
   // else the provider's instance Default Organization. Without this the org came back undefined and
   // the loader rendered the INSTANCE/default IdPs instead of the real org's IdPs.
-  const organization = await resolveOrg(
-    provider,
-    url.searchParams.get('organization') ?? undefined
-  );
+  const rawOrg = url.searchParams.get('organization') ?? undefined;
+  const organization = await resolveOrg(provider, rawOrg);
+
+  // A1 thread-in: the downstream ceremony screens read the RAW ?organization off their own context,
+  // so a bare /login (no ?organization) would run instance/default for the whole ceremony after
+  // screen 1. When the param was ABSENT and resolveOrg produced a concrete id, redirect to the same
+  // URL with `?organization=<id>` added so the org threads into every downstream screen at once
+  // (mirrors how /authorize threads it). LOOP GUARD: only redirect when the param was absent AND
+  // resolveOrg returned a real id — never when it is already present, never when it resolves to
+  // undefined (no default org → the instance/default context stays the last resort).
+  if (rawOrg === undefined && organization !== undefined) {
+    url.searchParams.set('organization', organization);
+    return redirect(`${paths.login.index()}${url.search}`);
+  }
+
   const [settings, branding, idps] = await Promise.all([
     provider.getLoginSettings(organization),
     provider.getBranding(organization),
@@ -156,8 +167,10 @@ export async function action({ request }: ActionFunctionArgs) {
   if (!parsed.success) return data({ error: 'INVALID_INPUT' }, { status: 400 });
   const { loginName, requestId, organization } = parsed.data;
 
-  // Strict phone rejection (server-side) when the org disables phone login.
-  const settings = await provider.getLoginSettings(organization);
+  // Strict phone rejection (server-side) when the org disables phone login. Org-first: an explicit
+  // org wins (resolveOrg preserves it — A1's thread-in normally guarantees one here), else the
+  // default org — matching the old app's `organization ?? getDefaultOrg()` on every settings read.
+  const settings = await provider.getLoginSettings(await resolveOrg(provider, organization));
   if (resolveIdentifierField(settings).rejectPhone && isPhoneLike(loginName)) {
     return data({ error: 'PHONE_LOGIN_DISABLED' }, { status: 400 });
   }

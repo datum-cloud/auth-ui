@@ -142,3 +142,115 @@ describe('password/change action', () => {
     });
   });
 });
+
+// ─── password/new + change — org password-complexity policy ────────────────────
+//
+// Each loader fetches provider.getPasswordComplexity(resolveOrg(...)) and returns the policy; the
+// action re-fetches it and drives the schema so the SERVER validation is policy-driven.
+
+const SYMBOL_POLICY = {
+  minLength: 12,
+  requiresUppercase: false,
+  requiresLowercase: false,
+  requiresNumber: false,
+  requiresSymbol: true,
+};
+
+describe('password/new loader — complexity policy', () => {
+  it('returns the fetched policy AND fetches it with the ?organization from the reset link', () => {
+    callService({
+      fn: 'passwordNewLoader',
+      passwordComplexity: SYMBOL_POLICY,
+      recordCalls: ['getPasswordComplexity'],
+      request: { url: `${NEW_BASE}?code=abc&userId=u1&organization=acme` },
+    }).then((v) => {
+      const body = v.response!.dataBody as Record<string, unknown>;
+      expect(body.passwordComplexity).to.deep.equal(SYMBOL_POLICY);
+      expect(v.calls?.getPasswordComplexity?.[0]?.[0]).to.equal('acme');
+    });
+  });
+});
+
+describe('password/new action — policy-driven validation', () => {
+  it('rejects a symbol-less password (400 INVALID_INPUT) when the policy requiresSymbol', () => {
+    // preSendPasswordReset seeds a matching reset code; the symbol rule is what fails here.
+    callService({
+      fn: 'passwordNewAction',
+      provider: 'singleton',
+      passwordComplexity: SYMBOL_POLICY,
+      request: {
+        url: NEW_BASE,
+        csrf: true,
+        form: {
+          preSendPasswordReset: 'u-reset',
+          userId: 'u-reset',
+          code: 'reset-u-reset',
+          password: 'NoSymbolHere1',
+          confirm: 'NoSymbolHere1',
+        },
+      },
+    }).then((v) => {
+      const status = v.response!.isResponse ? v.response!.status : (v.response!.dataStatus ?? 200);
+      expect(status).to.equal(400);
+      expect((v.response!.dataBody as Record<string, unknown>).error).to.equal('INVALID_INPUT');
+    });
+  });
+});
+
+describe('password/change loader — complexity policy', () => {
+  it('fetches the policy with the active session org and returns it', () => {
+    callService({
+      fn: 'passwordChangeLoader',
+      passwordComplexity: SYMBOL_POLICY,
+      recordCalls: ['getPasswordComplexity'],
+      request: {
+        url: CHANGE_BASE,
+        sessions: [{ id: 's1', token: 't1', loginName: 'a@acme.test', organization: 'acme' }],
+      },
+    }).then((v) => {
+      const body = v.response!.dataBody as Record<string, unknown>;
+      expect(body.passwordComplexity).to.deep.equal(SYMBOL_POLICY);
+      // Org-first: the active session's organization is threaded into getPasswordComplexity.
+      expect(v.calls?.getPasswordComplexity?.[0]?.[0]).to.equal('acme');
+    });
+  });
+});
+
+describe('password/change action — policy-driven validation', () => {
+  it('rejects a symbol-less password at schema time (INVALID_INPUT) when policy requiresSymbol', () => {
+    // A ≥minLength symbol-less password isolates the symbol rule: it fails the policy schema BEFORE
+    // the session lookup, so the error is INVALID_INPUT (not SESSION_EXPIRED — see control below).
+    callService({
+      fn: 'passwordChangeAction',
+      provider: 'singleton',
+      passwordComplexity: SYMBOL_POLICY,
+      request: {
+        url: CHANGE_BASE,
+        csrf: true,
+        form: { sessionId: 's', password: 'NoSymbolHere1', confirm: 'NoSymbolHere1' },
+      },
+    }).then((v) => {
+      const status = v.response!.isResponse ? v.response!.status : (v.response!.dataStatus ?? 200);
+      expect(status).to.equal(400);
+      expect((v.response!.dataBody as Record<string, unknown>).error).to.equal('INVALID_INPUT');
+    });
+  });
+
+  it('control: the SAME password passes the schema under the default policy (→ SESSION_EXPIRED)', () => {
+    // No requiresSymbol → the password clears the schema, so the failure moves to the missing
+    // session. Proves the INVALID_INPUT above came from the POLICY, not an unrelated rule.
+    callService({
+      fn: 'passwordChangeAction',
+      provider: 'singleton',
+      request: {
+        url: CHANGE_BASE,
+        csrf: true,
+        form: { sessionId: 's', password: 'NoSymbolHere1', confirm: 'NoSymbolHere1' },
+      },
+    }).then((v) => {
+      const status = v.response!.isResponse ? v.response!.status : (v.response!.dataStatus ?? 200);
+      expect(status).to.equal(400);
+      expect((v.response!.dataBody as Record<string, unknown>).error).to.equal('SESSION_EXPIRED');
+    });
+  });
+});

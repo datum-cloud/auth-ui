@@ -8,10 +8,13 @@
 // Every function is pure in the sense that it takes a provider + plain inputs and
 // returns a typed result; no Request parsing, no CSRF, no cookie I/O lives here.
 import type { AuthProvider } from '@/modules/auth/auth-provider';
+import type { PasswordComplexity } from '@/modules/auth/types';
 import { ProviderError } from '@/modules/auth/types';
 import {
   changePasswordSchema,
+  changePasswordSchemaFor,
   newPasswordSchema,
+  newPasswordSchemaFor,
   resetRequestSchema,
 } from '@/resources/password/password.schema';
 import { verifyUrlTemplate } from '@/resources/verify/verify-url-template';
@@ -91,9 +94,12 @@ export type SubmitNewPasswordResult =
  */
 export async function submitNewPassword(
   provider: AuthProvider,
-  formEntries: Record<string, unknown>
+  formEntries: Record<string, unknown>,
+  // The org's fetched complexity policy (the route resolves the org + fetches it, then threads it
+  // in) so the SERVER validation matches the policy-driven UI. Omitted → legacy min-8/no-classes.
+  policy?: PasswordComplexity
 ): Promise<SubmitNewPasswordResult> {
-  const parsed = newPasswordSchema.safeParse(formEntries);
+  const parsed = newPasswordSchemaFor(policy).safeParse(formEntries);
   if (!parsed.success) return { ok: false, error: 'INVALID_INPUT' };
 
   const { code, userId, password, requestId } = parsed.data;
@@ -152,9 +158,12 @@ export interface ActiveSession {
 export async function changePassword(
   provider: AuthProvider,
   formEntries: Record<string, unknown>,
-  resolveSession: (sessionId: string) => ActiveSession | undefined
+  resolveSession: (sessionId: string) => ActiveSession | undefined,
+  // See submitNewPassword: the org complexity policy the route resolved + fetched, so the SERVER
+  // validation matches the policy-driven UI. Omitted → legacy min-8/no-classes.
+  policy?: PasswordComplexity
 ): Promise<ChangePasswordResult> {
-  const parsed = changePasswordSchema.safeParse(formEntries);
+  const parsed = changePasswordSchemaFor(policy).safeParse(formEntries);
   if (!parsed.success) return { ok: false, error: 'INVALID_INPUT' };
   const { sessionId, password, requestId } = parsed.data;
 

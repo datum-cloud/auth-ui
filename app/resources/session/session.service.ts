@@ -33,6 +33,7 @@ import { isAllowedRequestId } from '@/resources/authorize';
 import { deviceDecision } from '@/resources/device';
 import { postLoginDestinationWithSource } from '@/resources/login/post-login-destination';
 import { nextStepWithParams } from '@/resources/shared/next-step-params';
+import { resolveOrg } from '@/resources/shared/resolve-org';
 import { paths } from '@/routes/paths';
 import { logAuthEvent, hashActor } from '@/server/observability';
 import { data, redirect } from 'react-router';
@@ -113,7 +114,8 @@ export async function resolveSignedIn(
 
   type Settings = Awaited<ReturnType<typeof provider.getLoginSettings>>;
   const [settings, isAdmin] = await Promise.all([
-    provider.getLoginSettings(recent.organization).catch((err) => {
+    // Org-first: the session's org wins, else the default org (old app's `organization ?? getDefaultOrg()`).
+    provider.getLoginSettings(recent.organization ?? (await resolveOrg(provider))).catch((err) => {
       // Surface transient backend failure in the audit trail; behavior
       // (graceful degradation to env/none) is unchanged.
       logAuthEvent('post_login_settings', 'failure', {
@@ -244,7 +246,10 @@ async function resolveNextPath(
     userId
       ? provider.listAuthMethods(userId).catch(() => [] as AuthMethod[])
       : Promise.resolve([] as AuthMethod[]),
-    provider.getLoginSettings(entry.organization).catch(() => DEFAULT_LOGIN_SETTINGS),
+    // Org-first: the session's org wins, else the default org (old app's `organization ?? getDefaultOrg()`).
+    provider
+      .getLoginSettings(entry.organization ?? (await resolveOrg(provider)))
+      .catch(() => DEFAULT_LOGIN_SETTINGS),
   ]);
 
   const userVerified = session.factors.passkey?.userVerified ?? false;
@@ -366,7 +371,11 @@ export async function listAccounts(
   const settingsMap = new Map<string | undefined, LoginSettings>();
   await Promise.all(
     [...distinctOrgs].map(async (org) => {
-      const settings = await provider.getLoginSettings(org).catch(() => DEFAULT_LOGIN_SETTINGS);
+      // Org-first: the session's org wins, else the default org (old app's `organization ?? getDefaultOrg()`).
+      // The map stays KEYED by the raw org so the synchronous enrichSessionEntry lookup still matches.
+      const settings = await provider
+        .getLoginSettings(org ?? (await resolveOrg(provider)))
+        .catch(() => DEFAULT_LOGIN_SETTINGS);
       settingsMap.set(org, settings);
     })
   );

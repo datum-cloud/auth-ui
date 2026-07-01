@@ -11,6 +11,7 @@ import { checkReauthIntent } from '@/modules/auth/session/reauth-intent';
 import { verifyLoginPassword } from '@/resources/login';
 import { attemptsRemaining } from '@/resources/login/login-view';
 import { loginPasswordSchema, loginPasswordClientSchema } from '@/resources/login/login.schema';
+import { resolveOrg } from '@/resources/shared/resolve-org';
 import { redirectToLogin } from '@/routes/login-bounce';
 import { paths } from '@/routes/paths';
 import { providerForRequest } from '@/server/auth-context.server';
@@ -35,7 +36,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const url = new URL(request.url);
   const organization = url.searchParams.get('organization') ?? undefined;
   const provider = providerForRequest(request);
-  const settings = await provider.getLoginSettings(organization);
+  // Org-first: an explicit org wins, else the default org (old app's `organization ?? getDefaultOrg()`).
+  const settings = await provider.getLoginSettings(await resolveOrg(provider, organization));
   const { csrfToken, headers } = await loaderCsrf(request);
   return data({ csrfToken, hidePasswordReset: settings.hidePasswordReset === true }, { headers });
 }

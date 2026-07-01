@@ -9,6 +9,7 @@ import { idpTypeToSlug, slugify } from '@/modules/auth/idp-slug';
 import { readSessions, mostRecent } from '@/modules/auth/session/cookie';
 import { ProviderError } from '@/modules/auth/types';
 import { ssoErrorRedirect } from '@/resources/shared/next-step-params';
+import { getActiveIdPs } from '@/resources/sso/idp-providers';
 import { idpReturnUrls } from '@/resources/sso/idp-return-urls';
 import type { SsoOutcome } from '@/resources/sso/sso-outcome';
 import { trustedAppOrigin } from '@/server/infra/app-origin.server';
@@ -98,7 +99,9 @@ export async function runSsoAction(
   }
 
   // intent === 'start'
-  const activeIdPs = await provider.getActiveIdPs(payload.organization || undefined);
+  // Org-first / default-org fallback via the shared choke point: an explicit form `organization`
+  // wins; an empty one falls back to the default org (was undefined → the INSTANCE/default IdPs).
+  const activeIdPs = await getActiveIdPs(provider, payload.organization || undefined);
   const target = activeIdPs.find(
     (p) => p.id === payload.provider || slugify(p.name) === payload.provider
   );

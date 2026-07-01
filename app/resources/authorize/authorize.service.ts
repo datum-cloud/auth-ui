@@ -64,7 +64,10 @@ async function freshLoginWindowMs(
   provider: AuthProvider,
   entry: { organization?: string }
 ): Promise<number> {
-  const settings = await provider.getLoginSettings(entry.organization).catch(() => undefined);
+  // Org-first: the session's org wins, else the default org (old app's `organization ?? getDefaultOrg()`).
+  const settings = await provider
+    .getLoginSettings(entry.organization ?? (await resolveOrg(provider)))
+    .catch(() => undefined);
   const lifetime = settings?.passwordCheckLifetimeMs;
   return typeof lifetime === 'number' && lifetime > 0
     ? Math.min(FRESH_LOGIN_WINDOW_MS, lifetime)

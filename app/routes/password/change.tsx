@@ -1,17 +1,20 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
 import { SubmitButton } from '@/components/auth-form/auth-form';
 import { AuthFormFields } from '@/components/auth-form/auth-form-fields';
+import { PasswordRequirements } from '@/components/auth-form/password-requirements';
 import { BackLink } from '@/components/back-link/back-link';
 import { FormError } from '@/components/form-error/form-error';
 import { useAuthActionError } from '@/hooks/use-auth-action-error';
 import { readSessions, mostRecent, byId } from '@/modules/auth/session/cookie';
 import { changePassword } from '@/resources/password';
-import { changePasswordClientSchema } from '@/resources/password/password.schema';
+import { changePasswordClientSchemaFor } from '@/resources/password/password.schema';
+import { resolveOrg } from '@/resources/shared/resolve-org';
 import { providerForRequest } from '@/server/auth-context.server';
 import { loaderCsrf, assertCsrf } from '@/server/csrf';
 import { actionError } from '@/utils/errors/auth-error';
 import { Form } from '@datum-cloud/datum-ui/form';
 import { Trans, useLingui } from '@lingui/react/macro';
+import { useMemo } from 'react';
 import {
   data,
   redirect,
@@ -32,12 +35,19 @@ export async function loader({ request }: LoaderFunctionArgs) {
   // Resolve the active ceremony session so the form can carry its id and show whose
   // password is being changed. The session token never leaves the server cookie.
   const active = mostRecent(await readSessions(request));
+  // Fetch the org's complexity policy (org-first from the active session, default-org fallback) so
+  // the change-password form shows + validates against the same rules the provider enforces.
+  const provider = providerForRequest(request);
+  const passwordComplexity = await provider.getPasswordComplexity(
+    await resolveOrg(provider, active?.organization)
+  );
   return data(
     {
       csrfToken,
       sessionId: active?.id ?? '',
       loginName: active?.loginName ?? '',
       requestId: url.searchParams.get('requestId') ?? undefined,
+      passwordComplexity,
     },
     { headers }
   );
@@ -53,8 +63,14 @@ export async function action({ request }: ActionFunctionArgs) {
   // dispatches changePasswordWithSession, and maps ProviderError → typed errors.
   const sessions = await readSessions(request);
   try {
-    const result = await changePassword(provider, Object.fromEntries(form), (sessionId) =>
-      byId(sessions, sessionId)
+    // Re-fetch the policy on POST (never trust the client) from the active session's org.
+    const rawOrg = mostRecent(sessions)?.organization;
+    const policy = await provider.getPasswordComplexity(await resolveOrg(provider, rawOrg));
+    const result = await changePassword(
+      provider,
+      Object.fromEntries(form),
+      (sessionId) => byId(sessions, sessionId),
+      policy
     );
     if (result.ok) return redirect(result.target);
     return data({ error: result.error }, { status: 400 });
@@ -64,10 +80,15 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function PasswordChange() {
-  const { csrfToken, sessionId, loginName, requestId } = useLoaderData<typeof loader>();
+  const { csrfToken, sessionId, loginName, requestId, passwordComplexity } =
+    useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
   const { t } = useLingui();
+  const schema = useMemo(
+    () => changePasswordClientSchemaFor(passwordComplexity),
+    [passwordComplexity]
+  );
 
   // Inline-only error surface: the action error renders in a <FormError> (role="alert")
   // inside the form — no toast.
@@ -76,7 +97,7 @@ export default function PasswordChange() {
   return (
     <AuthCard title={<Trans>Change your password</Trans>}>
       <Form.Root
-        schema={changePasswordClientSchema}
+        schema={schema}
         formComponent={RRForm}
         method="POST"
         defaultValues={{ password: '', confirm: '' }}
@@ -88,6 +109,7 @@ export default function PasswordChange() {
         <Form.Field name="password" label={t`New password`} required>
           <Form.Input type="password" autoFocus autoComplete="new-password" />
         </Form.Field>
+        <PasswordRequirements policy={passwordComplexity} />
         <Form.Field name="confirm" label={t`Confirm password`} required>
           <Form.Input type="password" autoComplete="new-password" />
         </Form.Field>

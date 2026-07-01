@@ -21,6 +21,7 @@ import type { AuthProvider } from '@/modules/auth/auth-provider';
 import { byLoginName, type SessionEntry } from '@/modules/auth/session/cookie';
 import type { AuthMethod, LoginSettings, ProviderCapabilities } from '@/modules/auth/types';
 import { nextStepFromSession, threadParams } from '@/resources/shared/next-step-params';
+import { resolveOrg } from '@/resources/shared/resolve-org';
 import { logAuthEvent, hashActor } from '@/server/observability';
 import { z } from 'zod';
 
@@ -72,9 +73,10 @@ export async function resolveMfaPicker(
   const user = await provider.findUser(loginName, organization);
   if (!user) return { kind: 'redirect', target: '/login' };
 
+  // Org-first: an explicit org wins, else the default org (old app's `organization ?? getDefaultOrg()`).
   const [allMethods, settings] = await Promise.all([
     provider.listAuthMethods(user.id),
-    provider.getLoginSettings(organization),
+    provider.getLoginSettings(await resolveOrg(provider, organization)),
   ]);
 
   // Filter to enrolled 2nd-factor methods only (password/passkey/idp excluded).
@@ -264,7 +266,8 @@ export async function resolveMfaSetup(
   if (!user) return { kind: 'redirect', target: '/login' };
 
   const capabilities = provider.capabilities;
-  const settings = await provider.getLoginSettings(organization);
+  // Org-first: an explicit org wins, else the default org (old app's `organization ?? getDefaultOrg()`).
+  const settings = await provider.getLoginSettings(await resolveOrg(provider, organization));
   const offerableKeys = offerableSetupRoutes(capabilities, settings);
 
   return { kind: 'setup', offerableKeys };
@@ -341,9 +344,10 @@ export async function recordMfaSetupSkip(
     return { ok: false, error: 'SESSION_EXPIRED' };
   }
 
+  // Org-first: an explicit org wins, else the default org (old app's `organization ?? getDefaultOrg()`).
   const [methods, settings] = await Promise.all([
     provider.listAuthMethods(userId),
-    provider.getLoginSettings(organization),
+    provider.getLoginSettings(await resolveOrg(provider, organization)),
   ]);
 
   const target = nextStepFromSession({

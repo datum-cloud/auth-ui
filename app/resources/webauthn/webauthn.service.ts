@@ -23,6 +23,7 @@ import {
   nextStepFromSession as sharedNextStepFromSession,
   threadParams,
 } from '@/resources/shared/next-step-params';
+import { resolveOrg } from '@/resources/shared/resolve-org';
 import { logAuthEvent, hashActor } from '@/server/observability';
 
 // ── shared: derive the post-ceremony next step from a session ─────────────────
@@ -217,9 +218,10 @@ export async function verifyWebAuthnAssertion(
   });
 
   const userId = session.user?.id ?? '';
+  // Org-first: an explicit org wins, else the default org (old app's `organization ?? getDefaultOrg()`).
   const [methods, settings] = await Promise.all([
     provider.listAuthMethods(userId),
-    provider.getLoginSettings(organization),
+    provider.getLoginSettings(await resolveOrg(provider, organization)),
   ]);
 
   const target = nextStepFromSession({
@@ -489,9 +491,10 @@ async function verifyEnrollment(
   const session = await provider.getSession(entry.id, entry.token);
   if (!session) return { ok: false, error: 'SESSION_EXPIRED' };
 
+  // Org-first: an explicit org wins, else the default org (old app's `organization ?? getDefaultOrg()`).
   const [methods, settings] = await Promise.all([
     provider.listAuthMethods(userId),
-    provider.getLoginSettings(organization),
+    provider.getLoginSettings(await resolveOrg(provider, organization)),
   ]);
 
   const target = nextStepFromSession({

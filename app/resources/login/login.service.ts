@@ -25,6 +25,7 @@ import { ProviderError } from '@/modules/auth/types';
 import { decideAfterIdentifier } from '@/resources/login/login-decision';
 import { isEmailLike } from '@/resources/login/login.schema';
 import { nextStepFromSession, threadParams } from '@/resources/shared/next-step-params';
+import { resolveOrg } from '@/resources/shared/resolve-org';
 import { idpReturnUrls } from '@/resources/sso/idp-return-urls';
 import { paths } from '@/routes/paths';
 import { logAuthEvent, hashActor } from '@/server/observability';
@@ -197,7 +198,10 @@ export async function resolveIdentifier(
         // Single auto-redirect IdP: the discovered org disallows password but exposes exactly
         // one external IdP → route straight to that IdP intent (skip the identifier/password screen).
         const orgSettings = await provider.getLoginSettings(org);
-        const idps = await provider.getActiveIdPs(org);
+        // Org-first / default-org fallback for completeness: `org` is already the discovered org
+        // here, so resolveOrg is a pass-through, but routing every getActiveIdPs-for-display read
+        // through it keeps the org-resolution policy in one place.
+        const idps = await provider.getActiveIdPs(await resolveOrg(provider, org));
         if (!orgSettings.allowPassword && orgSettings.allowExternalIdp && idps.length === 1) {
           logAuthEvent('identifier', 'success', { actor: hashActor(loginName) });
           const idpParams = new URLSearchParams({

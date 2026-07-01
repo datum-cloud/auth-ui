@@ -21,6 +21,7 @@ import { ProviderError } from '@/modules/auth/types';
 import { otpCodeSchema, otpDeliveryCodeSchema } from '@/resources/mfa/mfa.schema';
 import { otpEmailUrlTemplate } from '@/resources/otp/otp-email-url-template';
 import { nextStepWithParams, threadParams } from '@/resources/shared/next-step-params';
+import { resolveOrg } from '@/resources/shared/resolve-org';
 import { logAuthEvent } from '@/server/observability';
 import { z } from 'zod';
 
@@ -228,9 +229,10 @@ export async function submitOtpCode(
   );
 
   const userId = session.user?.id ?? '';
+  // Org-first: an explicit org wins, else the default org (old app's `organization ?? getDefaultOrg()`).
   const [methods, settings] = await Promise.all([
     provider.listAuthMethods(userId),
-    provider.getLoginSettings(organization),
+    provider.getLoginSettings(await resolveOrg(provider, organization)),
   ]);
 
   const target = nextStepWithParams({
@@ -328,9 +330,10 @@ export async function enrollTotp(
   const session = await provider.getSession(entry.id, entry.token);
   if (!session) return { ok: false, error: 'SESSION_EXPIRED' };
 
+  // Org-first: an explicit org wins, else the default org (old app's `organization ?? getDefaultOrg()`).
   const [methods, settings] = await Promise.all([
     provider.listAuthMethods(userId),
-    provider.getLoginSettings(organization),
+    provider.getLoginSettings(await resolveOrg(provider, organization)),
   ]);
 
   const target = nextStepWithParams({

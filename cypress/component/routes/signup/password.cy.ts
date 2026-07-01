@@ -171,3 +171,93 @@ describe('signup/password — action: real provider happy path', () => {
     });
   });
 });
+
+// ── Loader: org password-complexity policy ──────────────────────────────────────
+//
+// The loader fetches provider.getPasswordComplexity(resolveOrg(provider, ?organization)) and returns
+// the policy so the form can render the checklist + validate against it.
+
+const SYMBOL_POLICY = {
+  minLength: 12,
+  requiresUppercase: false,
+  requiresLowercase: false,
+  requiresNumber: false,
+  requiresSymbol: true,
+};
+
+describe('signup/password — loader: password-complexity policy', () => {
+  it('returns the fetched policy AND fetches it with the explicit ?organization', () => {
+    callService({
+      fn: 'signupPasswordLoader',
+      provider: 'singleton',
+      passwordComplexity: SYMBOL_POLICY,
+      recordCalls: ['getPasswordComplexity'],
+      request: { url: 'http://localhost/id/signup/password?organization=acme' },
+    }).then((v) => {
+      const body = v.response?.dataBody as Record<string, unknown> | undefined;
+      expect(body?.passwordComplexity).to.deep.equal(SYMBOL_POLICY);
+      // Explicit org wins in resolveOrg → threaded into getPasswordComplexity.
+      expect(v.calls?.getPasswordComplexity?.[0]?.[0]).to.equal('acme');
+    });
+  });
+
+  it('falls back to the default org when ?organization is absent (resolveOrg)', () => {
+    callService({
+      fn: 'signupPasswordLoader',
+      provider: 'singleton',
+      recordCalls: ['getPasswordComplexity'],
+      request: { url: 'http://localhost/id/signup/password' },
+    }).then((v) => {
+      // No explicit org → resolveOrg falls back to the fake's instance default org.
+      expect(v.calls?.getPasswordComplexity?.[0]?.[0]).to.equal('org-default-fake');
+    });
+  });
+});
+
+// ── Action: policy-driven validation ────────────────────────────────────────────
+
+describe('signup/password — action: policy-driven password rules', () => {
+  const identity = { loginName: 'jane@example.com', firstName: 'Jane', lastName: 'Doe' };
+
+  it('rejects a symbol-less password (400) when the policy requiresSymbol', () => {
+    callService({
+      fn: 'signupPasswordAction',
+      provider: 'singleton',
+      passwordComplexity: SYMBOL_POLICY,
+      request: {
+        url: 'http://localhost/id/signup/password',
+        csrf: true,
+        form: { ...identity, password: 'NoSymbolHere1', confirm: 'NoSymbolHere1' },
+      },
+    }).then((v) => {
+      const status = v.response?.isResponse ? v.response.status : v.response?.dataStatus;
+      expect(status).to.equal(400);
+      const body = v.response?.dataBody as Record<string, unknown> | undefined;
+      expect(body?.error).to.equal('INVALID_INPUT');
+    });
+  });
+
+  it('accepts the SAME symbol-less password when the policy does NOT require a symbol', () => {
+    // Control: identical input, default policy (no required classes) → proceeds past validation.
+    callService({
+      fn: 'signupPasswordAction',
+      provider: 'singleton',
+      env: { AUTH_EMAIL_DELIVERY_ENABLED: 'true' },
+      request: {
+        url: 'http://localhost/id/signup/password',
+        csrf: true,
+        form: {
+          ...identity,
+          loginName: 'nosymbolok@example.com',
+          password: 'NoSymbolHere1',
+          confirm: 'NoSymbolHere1',
+        },
+      },
+    }).then((v) => {
+      const status = v.response?.isResponse
+        ? (v.response.status ?? 200)
+        : (v.response?.dataStatus ?? 200);
+      expect(status).to.be.within(200, 399);
+    });
+  });
+});

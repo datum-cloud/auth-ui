@@ -2,6 +2,7 @@ import { useLoginContext } from '@/hooks/use-login-context';
 import SplitLayout from '@/layouts/split.layout';
 import { decideAfterIdentifier } from '@/resources/login/login-decision';
 import { readCeremonyParams } from '@/resources/shared/ceremony-params';
+import { resolveOrg } from '@/resources/shared/resolve-org';
 import { redirectToLogin } from '@/routes/login-bounce';
 import { paths } from '@/routes/paths';
 import { providerForRequest } from '@/server/auth-context.server';
@@ -26,10 +27,13 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
   // The method chooser is a branded screen — thread getBranding through so SplitLayout
   // renders the org logo, mirroring /login and /signup. Fetched in parallel with the rest.
+  // Org-first: an explicit org wins, else the default org (matches the old app's
+  // `organization ?? getDefaultOrg()`). findUser above stays instance-wide by design.
+  const settingsOrg = await resolveOrg(provider, organization);
   const [methods, settings, branding] = await Promise.all([
     provider.listAuthMethods(user.id),
-    provider.getLoginSettings(organization),
-    provider.getBranding(organization),
+    provider.getLoginSettings(settingsOrg),
+    provider.getBranding(settingsOrg),
   ]);
 
   // Compute available primary sign-in methods using the same policy gates as
