@@ -1,31 +1,38 @@
 // cypress/component/routes/login/default-org-fallback.cy.ts
 //
-// The login loader (app/routes/login/index.tsx) resolves the org org-first with a default-org
-// fallback. A1 (org-first thread-in): a bare /login (no ?organization) now REDIRECTS to the same
-// URL with `?organization=<resolved default>` added, so the org threads into every downstream
-// ceremony screen at once (mirrors how /authorize threads it) instead of running instance/default
-// after screen 1. Node-bound: the loader reads the real provider singleton + signed cookies;
-// recordCalls captures the org arg each provider read received.
+// Tests that the login loader does NOT redirect-inject the default org into the URL
+// on a bare /login (no ?organization=). The default org fallback is DISPLAY-ONLY:
+// resolveOrg still runs to scope branding/settings/IdPs reads, but the result is
+// never written back into the URL. The ceremony org (what reaches findUser) stays
+// explicitly undefined for a bare /login, enabling instance-wide user lookup.
 import { callService } from '../../../support/node/call-service';
 
-describe('login loader — A1 org-first thread-in + default-org fallback', () => {
-  it('bare /login (no ?organization) → 302 that ADDS ?organization=<default org>, before any settings read', () => {
+describe('login loader — default-org fallback is display-only (no URL injection)', () => {
+  it('bare /login (no ?organization=) → NO redirect; settings/branding/IdPs loaded for default org', () => {
     callService({
       fn: 'loginLoader',
       provider: 'singleton',
       request: { url: 'http://localhost/id/login' },
       recordCalls: ['getDefaultOrg', 'getLoginSettings', 'getBranding', 'getActiveIdPs'],
     }).then((v) => {
-      expect(v.response?.isResponse).to.equal(true);
-      expect(v.response?.status).to.equal(302);
-      const loc = v.response?.location ?? '';
-      expect(loc).to.contain('/login');
-      expect(loc).to.contain('organization=org-default-fake');
-      // resolveOrg consulted the provider default exactly once; the settings/branding/IdP reads
-      // happen on the REDIRECTED request (which now carries the org), NOT on this one.
+      // no injecting redirect — the bare URL must NOT produce a 302
+      expect(v.response?.isResponse ?? false).to.equal(false);
+      const status = v.response?.status ?? 200;
+      expect(status).to.not.equal(302);
+
+      // resolveOrg still consults the default org exactly once (for display reads)
       expect(v.calls?.getDefaultOrg).to.have.length(1);
-      expect(v.calls?.getLoginSettings ?? []).to.have.length(0);
-      expect(v.calls?.getBranding ?? []).to.have.length(0);
+
+      // display reads now happen on THIS request, scoped to the default org
+      expect(v.calls?.getLoginSettings).to.have.length(1);
+      expect((v.calls?.getLoginSettings ?? [])[0]?.[0]).to.equal('org-default-fake');
+      expect(v.calls?.getBranding).to.have.length(1);
+      expect(v.calls?.getActiveIdPs).to.have.length(1);
+      expect((v.calls?.getActiveIdPs ?? [])[0]?.[0]).to.equal('org-default-fake');
+
+      // IdPs are present in the loader data (singleton seeds Google + GitHub + LDAP)
+      const idps = (v.response?.dataBody as { idps?: unknown[] } | undefined)?.idps ?? [];
+      expect(idps.length).to.be.greaterThan(0);
     });
   });
 });

@@ -56,28 +56,19 @@ export async function loader({ request }: LoaderFunctionArgs) {
     return redirect(`${paths.authorize()}${url.search}`);
   }
 
-  // Org-first with a default-org fallback: an explicit `?organization=` wins, else the env pin,
-  // else the provider's instance Default Organization. Without this the org came back undefined and
-  // the loader rendered the INSTANCE/default IdPs instead of the real org's IdPs.
-  const rawOrg = url.searchParams.get('organization') ?? undefined;
-  const organization = await resolveOrg(provider, rawOrg);
-
-  // A1 thread-in: the downstream ceremony screens read the RAW ?organization off their own context,
-  // so a bare /login (no ?organization) would run instance/default for the whole ceremony after
-  // screen 1. When the param was ABSENT and resolveOrg produced a concrete id, redirect to the same
-  // URL with `?organization=<id>` added so the org threads into every downstream screen at once
-  // (mirrors how /authorize threads it). LOOP GUARD: only redirect when the param was absent AND
-  // resolveOrg returned a real id — never when it is already present, never when it resolves to
-  // undefined (no default org → the instance/default context stays the last resort).
-  if (rawOrg === undefined && organization !== undefined) {
-    url.searchParams.set('organization', organization);
-    return redirect(`${paths.login.index()}${url.search}`);
-  }
+  // Org-first with a default-org fallback for DISPLAY reads only. An explicit `?organization=`
+  // wins, else the env pin, else the provider's instance Default Organization. The resolved
+  // `displayOrg` is used ONLY for branding/settings/IdP display reads on this request — it is
+  // NEVER injected back into the URL and NEVER reaches findUser. The ceremony org (what downstream
+  // screens and findUser receive) comes exclusively from the raw `?organization=` the user arrived
+  // with, keeping instance-wide user lookup intact for users outside the default org.
+  const rawOrg = url.searchParams.get('organization') ?? undefined; // explicit org (or undefined)
+  const displayOrg = await resolveOrg(provider, rawOrg); // default-org fallback — display reads ONLY
 
   const [settings, branding, idps] = await Promise.all([
-    provider.getLoginSettings(organization),
-    provider.getBranding(organization),
-    provider.capabilities.externalIdp ? provider.getActiveIdPs(organization) : Promise.resolve([]),
+    provider.getLoginSettings(displayOrg),
+    provider.getBranding(displayOrg),
+    provider.capabilities.externalIdp ? provider.getActiveIdPs(displayOrg) : Promise.resolve([]),
   ]);
   // CSRF assembly + last-used read are independent (local cookie/crypto, no network) — run in parallel.
   const [{ csrfToken, headers }, lastUsedLogin] = await Promise.all([
