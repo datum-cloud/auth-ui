@@ -159,8 +159,9 @@ export async function action({ request }: ActionFunctionArgs) {
   const { loginName, requestId, organization } = parsed.data;
 
   // Strict phone rejection (server-side) when the org disables phone login. Org-first: an explicit
-  // org wins (resolveOrg preserves it — A1's thread-in normally guarantees one here), else the
-  // default org — matching the old app's `organization ?? getDefaultOrg()` on every settings read.
+  // org wins (resolveOrg preserves it), else the default org — matching the old app's
+  // `organization ?? getDefaultOrg()` on every settings read. This is a display/policy read, so the
+  // default-org fallback is intentional here — unlike the user-lookup path, which stays explicit-only.
   const settings = await provider.getLoginSettings(await resolveOrg(provider, organization));
   if (resolveIdentifierField(settings).rejectPhone && isPhoneLike(loginName)) {
     return data({ error: 'PHONE_LOGIN_DISABLED' }, { status: 400 });
