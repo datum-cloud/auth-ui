@@ -45,12 +45,13 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const requestId = url.searchParams.get('requestId') ?? undefined;
 
   // Org-first: an explicit org wins, else the default org (old app's `organization ?? getDefaultOrg()`).
-  // getActiveIdPs is owned by the SSO/idp-providers pass, so its raw org is left untouched here.
+  // The IdP list is a display read — like getLoginSettings/getBranding it uses the default-org
+  // fallback, not the raw URL org (which is undefined on a bare signup).
   const settingsOrg = await resolveOrg(provider, organization);
   const [settings, branding, idps] = await Promise.all([
     provider.getLoginSettings(settingsOrg),
     provider.getBranding(settingsOrg),
-    provider.capabilities.externalIdp ? provider.getActiveIdPs(organization) : Promise.resolve([]),
+    provider.capabilities.externalIdp ? provider.getActiveIdPs(settingsOrg) : Promise.resolve([]),
   ]);
 
   const { csrfToken, headers } = await loaderCsrf(request);

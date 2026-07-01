@@ -48,10 +48,12 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const deviceTrackingToken = url.searchParams.get('deviceTrackingToken') ?? undefined;
 
   // Org-first: an explicit org wins, else the default org (old app's `organization ?? getDefaultOrg()`).
-  // getActiveIdPs is owned by the SSO/idp-providers pass, so its raw org is left untouched here.
+  // The IdP list is a display read — like getLoginSettings it uses the default-org fallback,
+  // not the raw URL org (which is undefined on a bare signup).
+  const settingsOrg = await resolveOrg(provider, organization);
   const [settings, idps] = await Promise.all([
-    provider.getLoginSettings(await resolveOrg(provider, organization)),
-    provider.capabilities.externalIdp ? provider.getActiveIdPs(organization) : Promise.resolve([]),
+    provider.getLoginSettings(settingsOrg),
+    provider.capabilities.externalIdp ? provider.getActiveIdPs(settingsOrg) : Promise.resolve([]),
   ]);
   const view = resolveSignupView(settings, idps, env.AUTH_EMAIL_DELIVERY_ENABLED);
 

@@ -60,7 +60,7 @@ msgstr "Add your phone number as a second factor. We will send a one-time code v
 msgid "Additional verification is required to continue."
 msgstr "Additional verification is required to continue."
 
-#: app/routes/signup/index.tsx:288
+#: app/routes/signup/index.tsx:289
 msgid "Already have an account?"
 msgstr "Already have an account?"
 
@@ -148,7 +148,7 @@ msgid "Change your password"
 msgstr "Change your password"
 
 #: app/routes/password/reset.tsx:98
-#: app/routes/signup/method.tsx:223
+#: app/routes/signup/method.tsx:225
 #: app/routes/signup/password.tsx:160
 msgid "Check your email"
 msgstr "Check your email"
@@ -192,7 +192,7 @@ msgstr "Connected accounts"
 
 #: app/routes/device/index.tsx:73
 #: app/routes/login/index.tsx:346
-#: app/routes/signup/index.tsx:273
+#: app/routes/signup/index.tsx:274
 msgid "Continue"
 msgstr "Continue"
 
@@ -212,7 +212,7 @@ msgstr "Couldn't complete sign-in. Return to your application and try again."
 msgid "Couldn't sign in"
 msgstr "Couldn't sign in"
 
-#: app/routes/signup/index.tsx:200
+#: app/routes/signup/index.tsx:201
 msgid "Create a new account"
 msgstr "Create a new account"
 
@@ -240,8 +240,8 @@ msgstr "Device denied"
 
 #: app/routes/login/index.tsx:222
 #: app/routes/login/index.tsx:319
-#: app/routes/signup/index.tsx:234
-#: app/routes/signup/index.tsx:259
+#: app/routes/signup/index.tsx:235
+#: app/routes/signup/index.tsx:260
 msgid "Email"
 msgstr "Email"
 
@@ -251,7 +251,7 @@ msgstr "Email code"
 
 #: app/routes/login/index.tsx:355
 #: app/routes/login/method.tsx:117
-#: app/routes/signup/method.tsx:266
+#: app/routes/signup/method.tsx:268
 msgid "Email me a sign-in link"
 msgstr "Email me a sign-in link"
 
@@ -320,7 +320,7 @@ msgstr "Enter your password"
 msgid "Enter your SMS code"
 msgstr "Enter your SMS code"
 
-#: app/routes/signup/method.tsx:245
+#: app/routes/signup/method.tsx:247
 msgid "Finish creating your account"
 msgstr "Finish creating your account"
 
@@ -328,7 +328,7 @@ msgstr "Finish creating your account"
 msgid "Forgot password?"
 msgstr "Forgot password?"
 
-#: app/routes/signup/index.tsx:197
+#: app/routes/signup/index.tsx:198
 msgid "Get started"
 msgstr "Get started"
 
@@ -462,7 +462,7 @@ msgstr "Register a passkey using your device's biometric sensor or PIN to sign i
 msgid "Register passkey"
 msgstr "Register passkey"
 
-#: app/routes/signup/index.tsx:206
+#: app/routes/signup/index.tsx:207
 msgid "Registration is currently unavailable. Please contact your administrator."
 msgstr "Registration is currently unavailable. Please contact your administrator."
 
@@ -505,7 +505,7 @@ msgstr "Service temporarily unavailable. Please try again."
 msgid "Session active"
 msgstr "Session active"
 
-#: app/routes/signup/method.tsx:302
+#: app/routes/signup/method.tsx:304
 #: app/routes/signup/password.tsx:175
 msgid "Set a password"
 msgstr "Set a password"
@@ -540,7 +540,7 @@ msgid "Set up SMS one-time code"
 msgstr "Set up SMS one-time code"
 
 #: app/routes/login/password.tsx:183
-#: app/routes/signup/index.tsx:290
+#: app/routes/signup/index.tsx:291
 #: app/routes/sso/ldap.tsx:82
 msgid "Sign in"
 msgstr "Sign in"
@@ -694,7 +694,7 @@ msgstr "Unlink {providerLabel}?"
 msgid "Use a different account"
 msgstr "Use a different account"
 
-#: app/routes/signup/method.tsx:284
+#: app/routes/signup/method.tsx:286
 msgid "Use a passkey"
 msgstr "Use a passkey"
 
@@ -775,7 +775,7 @@ msgstr "We've sent a password reset link to <0>{0}</0>"
 
 #. placeholder {0}: (actionData as { email: string }).email
 #. placeholder {0}: actionData.email
-#: app/routes/signup/method.tsx:225
+#: app/routes/signup/method.tsx:227
 #: app/routes/signup/password.tsx:162
 msgid "We've sent a verification link to <0>{0}</0>"
 msgstr "We've sent a verification link to <0>{0}</0>"
@@ -830,7 +830,7 @@ msgstr "You'll be asked to sign in before authorizing."
 msgid "You'll need to set a password to complete your signup."
 msgstr "You'll need to set a password to complete your signup."
 
-#: app/routes/signup/method.tsx:247
+#: app/routes/signup/method.tsx:249
 msgid "You're almost done! <0>{loginName}</0>"
 msgstr "You're almost done! <0>{loginName}</0>"
 
