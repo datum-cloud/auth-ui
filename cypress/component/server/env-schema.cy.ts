@@ -394,3 +394,30 @@ describe('env schema — ALLOW_IDP_LINK_ANY_EMAIL (default false, fail-closed)',
     });
   });
 });
+
+// ── ALLOW_IDP_UNLINK (default false, fail-closed; opt-in with 'true') ─────────────
+describe('env schema — ALLOW_IDP_UNLINK (default false, fail-closed)', () => {
+  it('defaults to false when unset', () => {
+    callService({ fn: 'envSchemaFull', parseEnvRaw: { ...BASE } }).then((v) => {
+      expect((v.outcome.data as Record<string, unknown>).ALLOW_IDP_UNLINK).to.equal(false);
+    });
+  });
+
+  it("coerces the exact string 'true' to true (enables unlink)", () => {
+    callService({
+      fn: 'envSchemaFull',
+      parseEnvRaw: { ...BASE, ALLOW_IDP_UNLINK: 'true' },
+    }).then((v) => {
+      expect((v.outcome.data as Record<string, unknown>).ALLOW_IDP_UNLINK).to.equal(true);
+    });
+  });
+
+  it("treats any non-'true' value (e.g. '1') as false (fail-closed)", () => {
+    callService({
+      fn: 'envSchemaFull',
+      parseEnvRaw: { ...BASE, ALLOW_IDP_UNLINK: '1' },
+    }).then((v) => {
+      expect((v.outcome.data as Record<string, unknown>).ALLOW_IDP_UNLINK).to.equal(false);
+    });
+  });
+});

@@ -488,6 +488,9 @@ describe('processIdpCallback — same-email collision hard error (default: ALLOW
       expect(v.response?.status).to.equal(302);
       expect(v.response?.location ?? '').to.include('/sso/google/error?reason=account-exists');
       expect(v.response?.setCookie ?? '').to.not.include('sessions=');
+      // The hard-reject path is audited (PII-safe: reason + requestId only, never the email).
+      expect(hasAudit(v.audit, 'idp.link.denied', 'failure')).to.equal(true);
+      expect(JSON.stringify(v.audit)).to.not.include('you@gmail.com');
     });
   });
 
@@ -570,6 +573,12 @@ describe('processIdpCallback — fresh-identity link ceremony (Req 2)', () => {
       // B2: linkEmailOwnerUserId (u-other) !== sessionUserId (u-sess) → access-denied; no link, no cookie.
       expect(v.response?.location ?? '').to.include('/sso/google/error?reason=access-denied');
       expect(v.response?.setCookie ?? '').to.not.include('sessions=');
+      // The idp_link_decision diagnostic must actually FIRE on a link decision — the registry
+      // presence check alone can't prove emission. PII-safe: booleans + opaque ids, no email.
+      expect(v.audit.some((e) => e.event === 'idp_link_decision')).to.equal(true);
+      expect(JSON.stringify(v.audit.filter((e) => e.event === 'idp_link_decision'))).to.not.include(
+        '@'
+      );
     });
   });
 });

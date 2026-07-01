@@ -171,6 +171,63 @@ describe('SsoIndex — unlink guard: dialog confirm + disabled sole sign-in meth
   });
 });
 
+describe('SsoIndex — allowUnlink:false suppresses all unlink controls', () => {
+  it('renders no Unlink control when the env gate is off (allowUnlink:false)', () => {
+    mountRoute(SsoIndex, 'sso-index', '/sso', '/sso', {
+      csrfToken: 'csrf-mgmt',
+      userId: 'u1',
+      loginName: 'you@acme.test',
+      linked: [
+        {
+          idpId: 'g',
+          idpUserId: 'g-1',
+          idpUserName: 'you@gmail.com',
+          name: 'Google',
+          type: 'GOOGLE',
+          unlinkable: false,
+        },
+      ],
+      linkable: [],
+      allowUnlink: false,
+    });
+    cy.contains('Linked accounts').should('exist');
+    cy.contains('button', 'Unlink').should('not.exist');
+  });
+});
+
+describe('SsoIndex — multi-identity display (two identities of one provider)', () => {
+  it('renders a row per identity when two links share an idpId', () => {
+    mountRoute(SsoIndex, 'sso-index', '/sso', '/sso', {
+      csrfToken: 'csrf-mgmt',
+      userId: 'u1',
+      loginName: 'you@acme.test',
+      linked: [
+        {
+          idpId: 'gh',
+          idpUserId: 'gh-a',
+          idpUserName: 'handle-a',
+          name: 'GitHub',
+          type: 'GITHUB',
+          unlinkable: true,
+        },
+        {
+          idpId: 'gh',
+          idpUserId: 'gh-b',
+          idpUserName: 'handle-b',
+          name: 'GitHub',
+          type: 'GITHUB',
+          unlinkable: true,
+        },
+      ],
+      linkable: [],
+      allowUnlink: true,
+    });
+    cy.contains('Linked accounts').should('exist');
+    cy.contains('handle-a').should('exist');
+    cy.contains('handle-b').should('exist');
+  });
+});
+
 // ── sso/provider/error ────────────────────────────────────────────────────────
 
 describe('SsoError — typed paths.login.index() emits the byte-frozen login URL', () => {
