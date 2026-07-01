@@ -116,7 +116,7 @@ msgstr "Authorize device"
 msgid "Authorizing as"
 msgstr "Authorizing as"
 
-#: app/routes/sso/index.tsx:145
+#: app/routes/sso/index.tsx:220
 msgid "Available accounts to link"
 msgstr "Available accounts to link"
 
@@ -133,6 +133,10 @@ msgstr "Back to sign in"
 #: app/layouts/split.layout.tsx:33
 msgid "By continuing, you agree to Datum's <0>Terms of Service</0> and <1>Privacy Policy</1>, and to receive periodic emails with updates."
 msgstr "By continuing, you agree to Datum's <0>Terms of Service</0> and <1>Privacy Policy</1>, and to receive periodic emails with updates."
+
+#: app/routes/sso/index.tsx:108
+msgid "Cancel"
+msgstr "Cancel"
 
 #: app/routes/password/change.tsx:119
 msgid "Change password"
@@ -181,7 +185,7 @@ msgstr "Confirm new password"
 msgid "Confirm password"
 msgstr "Confirm password"
 
-#: app/routes/sso/index.tsx:89
+#: app/routes/sso/index.tsx:147
 msgid "Connected accounts"
 msgstr "Connected accounts"
 
@@ -343,7 +347,7 @@ msgstr "Link expired"
 msgid "Link your account"
 msgstr "Link your account"
 
-#: app/routes/sso/index.tsx:73
+#: app/routes/sso/index.tsx:131
 msgid "Linked accounts"
 msgstr "Linked accounts"
 
@@ -561,7 +565,7 @@ msgstr "Sign in with LDAP"
 #: app/routes/logout/index.tsx:47
 #: app/routes/logout/index.tsx:53
 #: app/routes/signed-in.tsx:97
-#: app/routes/sso/index.tsx:183
+#: app/routes/sso/index.tsx:258
 msgid "Sign out"
 msgstr "Sign out"
 
@@ -651,6 +655,14 @@ msgstr "This device was not granted access. You may close this window."
 msgid "This directory account can't be linked here yet. Sign in with your password instead."
 msgstr "This directory account can't be linked here yet. Sign in with your password instead."
 
+#: app/routes/sso/index.tsx:184
+msgid "This is your only sign-in method"
+msgstr "This is your only sign-in method"
+
+#: app/routes/sso/index.tsx:100
+msgid "This removes it as a sign-in method for your account."
+msgstr "This removes it as a sign-in method for your account."
+
 #: app/routes/signup/complete.tsx:89
 msgid "This sign-in link is invalid or has expired."
 msgstr "This sign-in link is invalid or has expired."
@@ -667,9 +679,15 @@ msgstr "Too many attempts. Please wait a moment and try again."
 msgid "Two-factor verification"
 msgstr "Two-factor verification"
 
-#: app/routes/sso/index.tsx:127
+#: app/routes/sso/index.tsx:94
+#: app/routes/sso/index.tsx:117
+#: app/routes/sso/index.tsx:192
 msgid "Unlink"
 msgstr "Unlink"
+
+#: app/routes/sso/index.tsx:99
+msgid "Unlink {providerLabel}?"
+msgstr "Unlink {providerLabel}?"
 
 #: app/routes/device/authorize.tsx:129
 msgid "Use a different account"
@@ -775,7 +793,7 @@ msgid "You are signed in as <0>{loginName}</0>"
 msgstr "You are signed in as <0>{loginName}</0>"
 
 #. placeholder {0}: loginName && ( <> Logged in as <span className="font-medium">{loginName}</span>. </> )
-#: app/routes/sso/index.tsx:75
+#: app/routes/sso/index.tsx:133
 msgid "You can link multiple accounts to your Datum account. {0}"
 msgstr "You can link multiple accounts to your Datum account. {0}"
 

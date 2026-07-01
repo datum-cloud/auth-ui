@@ -90,10 +90,13 @@ describe('SsoIndex — AuthFormFields csrf adoption', () => {
   it('every management form carries a byte-frozen csrf hidden input (name="csrf")', () => {
     mountRoute(SsoIndex, 'sso-index', '/sso', '/sso', loaderData);
     cy.contains('Linked accounts').should('exist');
+    // The unlink form now lives inside the confirm Dialog (Radix unmounts content while closed),
+    // so open it to bring the unlink csrf input into the DOM alongside the link + sign-out forms.
+    cy.get('button:not(:disabled)').contains('Unlink').click();
+    cy.get('input[name="csrf"]').should('have.length.gte', 3);
     cy.get('input[name="csrf"]').each(($el) => {
       expect($el.val()).to.equal('csrf-mgmt');
     });
-    cy.get('input[name="csrf"]').should('have.length.gte', 3);
   });
 
   it('renders loginName as a plain paragraph (not an IdentityBadge)', () => {
@@ -107,6 +110,61 @@ describe('SsoIndex — AuthFormFields csrf adoption', () => {
     mountRoute(SsoIndex, 'sso-index', '/sso', '/sso', loaderData);
     cy.contains('Linked accounts').should('exist');
     cy.get('form[action="/id/logout?index"]').should('exist');
+  });
+});
+
+// ── sso/index — unlink guard (confirm dialog + disabled sole-method row) ────────
+
+describe('SsoIndex — unlink guard: dialog confirm + disabled sole sign-in method', () => {
+  const loaderData = {
+    csrfToken: 'csrf-mgmt',
+    userId: 'u1',
+    loginName: 'you@acme.test',
+    linked: [
+      // unlinkable:true → enabled trigger opening a confirm dialog
+      {
+        idpId: 'gh',
+        idpUserId: 'gh-1',
+        idpUserName: 'a-handle',
+        name: 'GitHub',
+        type: 'GITHUB',
+        unlinkable: true,
+      },
+      // unlinkable:false → sole primary sign-in method → disabled + tooltip (no form)
+      {
+        idpId: 'g',
+        idpUserId: 'g-1',
+        idpUserName: 'you@gmail.com',
+        name: 'Google',
+        type: 'GOOGLE',
+        unlinkable: false,
+      },
+    ],
+    linkable: [],
+    allowUnlink: true,
+  };
+
+  it('disables the Unlink control for the sole-method (unlinkable:false) row', () => {
+    mountRoute(SsoIndex, 'sso-index', '/sso', '/sso', loaderData);
+    cy.contains('Linked accounts').should('exist');
+    cy.get('button:disabled').contains('Unlink').should('exist');
+  });
+
+  it('renders an enabled Unlink trigger for an unlinkable row', () => {
+    mountRoute(SsoIndex, 'sso-index', '/sso', '/sso', loaderData);
+    cy.get('button:not(:disabled)').contains('Unlink').should('exist');
+  });
+
+  it('keeps the unlink confirm form out of the DOM until the dialog is opened', () => {
+    mountRoute(SsoIndex, 'sso-index', '/sso', '/sso', loaderData);
+    cy.contains('Linked accounts').should('exist');
+    // The unlink form lives inside the confirm Dialog (Radix unmounts content while closed).
+    cy.get('input[name="intent"][value="unlink"]').should('not.exist');
+    cy.get('button:not(:disabled)').contains('Unlink').click();
+    // Once opened, the confirm form carries the unlink intent + the target row's ids.
+    cy.get('input[name="intent"][value="unlink"]').should('exist');
+    cy.get('input[name="idpId"][value="gh"]').should('exist');
+    cy.get('input[name="linkedUserId"][value="gh-1"]').should('exist');
   });
 });
 

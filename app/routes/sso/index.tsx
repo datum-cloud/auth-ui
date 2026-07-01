@@ -13,8 +13,11 @@ import {
 import { providerForRequest } from '@/server/auth-context.server';
 import { getCsrfToken, assertCsrf } from '@/server/csrf';
 import { Button } from '@datum-cloud/datum-ui/button';
+import { Dialog } from '@datum-cloud/datum-ui/dialog';
 import { Separator } from '@datum-cloud/datum-ui/separator';
+import { Tooltip } from '@datum-cloud/datum-ui/tooltip';
 import { Trans } from '@lingui/react/macro';
+import { useState } from 'react';
 import {
   data,
   redirect,
@@ -65,6 +68,61 @@ export async function action({ request }: ActionFunctionArgs, deps: SsoActionDep
 // Component
 // ---------------------------------------------------------------------------
 
+interface UnlinkConfirmDialogProps {
+  providerLabel: string;
+  idpId: string;
+  linkedUserId: string;
+  csrfToken: string;
+}
+
+/**
+ * Confirm-before-unlink dialog for a single connected account. The destructive submit lives
+ * inside the dialog so a stray click can't remove a sign-in method; Cancel closes it. Controlled
+ * open state because the datum-ui Dialog exposes no Close primitive — Cancel flips `open` itself.
+ */
+function UnlinkConfirmDialog({
+  providerLabel,
+  idpId,
+  linkedUserId,
+  csrfToken,
+}: UnlinkConfirmDialogProps) {
+  const [open, setOpen] = useState(false);
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog.Trigger asChild>
+        <Button type="secondary" theme="outline" htmlType="button" size="small">
+          <Trans>Unlink</Trans>
+        </Button>
+      </Dialog.Trigger>
+      <Dialog.Content>
+        <Dialog.Header
+          title={<Trans>Unlink {providerLabel}?</Trans>}
+          description={<Trans>This removes it as a sign-in method for your account.</Trans>}
+        />
+        <Dialog.Footer>
+          <Button
+            type="secondary"
+            theme="outline"
+            htmlType="button"
+            onClick={() => setOpen(false)}>
+            <Trans>Cancel</Trans>
+          </Button>
+          {/* RRForm auto-adds ?index → POST reaches the sso index action. */}
+          <RRForm method="post">
+            <AuthFormFields csrf={csrfToken} />
+            <input type="hidden" name="intent" value="unlink" />
+            <input type="hidden" name="idpId" value={idpId} />
+            <input type="hidden" name="linkedUserId" value={linkedUserId} />
+            <Button type="primary" theme="solid" htmlType="submit">
+              <Trans>Unlink</Trans>
+            </Button>
+          </RRForm>
+        </Dialog.Footer>
+      </Dialog.Content>
+    </Dialog>
+  );
+}
+
 export default function SsoPage() {
   const { csrfToken, loginName, linked, linkable, allowUnlink } = useLoaderData<typeof loader>();
 
@@ -89,47 +147,64 @@ export default function SsoPage() {
               <Trans>Connected accounts</Trans>
             </h2>
             <ul className="flex flex-col gap-2">
-              {linked.map((link) => (
-                <li
-                  key={`${link.idpId}-${link.idpUserId}`}
-                  className="flex h-13 items-center justify-between gap-3 rounded-md border px-4">
-                  {/* Provider icon + name badge (joined from the active-IdP list).
-                      Falls back to the bare IdP user name / id when the provider is no longer
-                      active. Icon is non-interactive — no nested-interactive a11y violation. */}
-                  <span className="flex min-w-0 items-center gap-3">
-                    {/* `type` is only joined in when the IdP is still active; for a deactivated
-                        provider it's undefined and the bare GitHub handle would fall back to the
-                        mail glyph. inferIdpType recovers GITHUB from the username shape. */}
-                    <IdpIcon
-                      type={link.type ?? inferIdpType(link.idpUserName)}
-                      name={link.name || link.idpUserName || link.idpId}
-                      logoUrl={link.logoUrl}
-                    />
-                    <span className="flex min-w-0 flex-col">
-                      <span className="text-foreground truncate text-sm">
-                        {link.name || link.idpUserName || link.idpId}
+              {linked.map((link) => {
+                // Hoisted for reuse (icon + name row) and so Lingui's <Trans> interpolates a plain
+                // identifier rather than a member/logical expression in the dialog title.
+                const providerLabel = link.name || link.idpUserName || link.idpId;
+                return (
+                  <li
+                    key={`${link.idpId}-${link.idpUserId}`}
+                    className="flex h-13 items-center justify-between gap-3 rounded-md border px-4">
+                    {/* Provider icon + name badge (joined from the active-IdP list).
+                        Falls back to the bare IdP user name / id when the provider is no longer
+                        active. Icon is non-interactive — no nested-interactive a11y violation. */}
+                    <span className="flex min-w-0 items-center gap-3">
+                      {/* `type` is only joined in when the IdP is still active; for a deactivated
+                          provider it's undefined and the bare GitHub handle would fall back to the
+                          mail glyph. inferIdpType recovers GITHUB from the username shape. */}
+                      <IdpIcon
+                        type={link.type ?? inferIdpType(link.idpUserName)}
+                        name={providerLabel}
+                        logoUrl={link.logoUrl}
+                      />
+                      <span className="flex min-w-0 flex-col">
+                        <span className="text-foreground truncate text-sm">{providerLabel}</span>
+                        {link.idpUserName && link.name ? (
+                          <span className="text-muted-foreground truncate text-xs">
+                            {link.idpUserName}
+                          </span>
+                        ) : null}
                       </span>
-                      {link.idpUserName && link.name ? (
-                        <span className="text-muted-foreground truncate text-xs">
-                          {link.idpUserName}
-                        </span>
-                      ) : null}
                     </span>
-                  </span>
-                  {allowUnlink ? (
-                    // RRForm auto-adds ?index → POST reaches the sso index action.
-                    <RRForm method="post">
-                      <AuthFormFields csrf={csrfToken} />
-                      <input type="hidden" name="intent" value="unlink" />
-                      <input type="hidden" name="idpId" value={link.idpId} />
-                      <input type="hidden" name="linkedUserId" value={link.idpUserId} />
-                      <Button type="secondary" theme="outline" htmlType="submit" size="small">
-                        <Trans>Unlink</Trans>
-                      </Button>
-                    </RRForm>
-                  ) : null}
-                </li>
-              ))}
+                    {allowUnlink ? (
+                      link.unlinkable === false ? (
+                        // Sole primary sign-in method — unlink would lock the user out. Disabled +
+                        // tooltip. The disabled button is wrapped in a focusable span so the tooltip
+                        // still fires on hover/focus (disabled controls don't emit pointer events).
+                        <Tooltip message={<Trans>This is your only sign-in method</Trans>}>
+                          <span tabIndex={0}>
+                            <Button
+                              type="secondary"
+                              theme="outline"
+                              htmlType="button"
+                              size="small"
+                              disabled>
+                              <Trans>Unlink</Trans>
+                            </Button>
+                          </span>
+                        </Tooltip>
+                      ) : (
+                        <UnlinkConfirmDialog
+                          providerLabel={providerLabel}
+                          idpId={link.idpId}
+                          linkedUserId={link.idpUserId}
+                          csrfToken={csrfToken}
+                        />
+                      )
+                    ) : null}
+                  </li>
+                );
+              })}
             </ul>
           </section>
         ) : null}
