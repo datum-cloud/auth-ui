@@ -72,7 +72,18 @@ export function cspDirectives(isDev: boolean, frameAncestors: readonly string[] 
     // Fathom analytics beacons POST to https://cdn.usefathom.com — without this
     // connect-src entry the browser blocks them. script-src needs no change:
     // 'strict-dynamic' already trusts scripts injected by our nonce'd bundle.
-    connectSrc: ["'self'", 'https://cdn.usefathom.com', ...(isDev ? ['ws:'] : [])],
+    // MaxMind's device.js (loaded via MaxMindTracker) submits the fingerprint exchange to a
+    // rotating set of regional endpoints under mmapiws.com (e.g. d-ipv6.mmapiws.com) — a fixed
+    // hostname isn't enough, hence the wildcard. Without both entries the script loads (script-src
+    // is unaffected) but every one of its own network calls is silently blocked, so no cookie/token
+    // is ever captured — this was diagnosed live via a browser CSP violation on staging.
+    connectSrc: [
+      "'self'",
+      'https://cdn.usefathom.com',
+      'https://device.maxmind.com',
+      'https://*.mmapiws.com',
+      ...(isDev ? ['ws:'] : []),
+    ],
     // Secure default 'none' (the auth UI is not embeddable). Override per-environment
     // via FRAME_ANCESTORS (parsed by resolveFrameAncestors) when an embed is required,
     // e.g. a staging portal. X-Frame-Options in appSecureHeaders is reconciled to match.

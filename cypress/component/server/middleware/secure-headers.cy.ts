@@ -14,6 +14,12 @@ describe('cspDirectives', () => {
     expect(csp.connectSrc).not.to.include('ws:');
   });
 
+  it('allows the MaxMind fingerprint-submission domains in connectSrc (device.js posts to a rotating *.mmapiws.com endpoint)', () => {
+    const csp = cspDirectives(false);
+    expect(csp.connectSrc).to.include('https://device.maxmind.com');
+    expect(csp.connectSrc).to.include('https://*.mmapiws.com');
+  });
+
   it("defaults frameAncestors to 'none' when no override is provided", () => {
     expect(cspDirectives(false).frameAncestors).to.deep.equal(["'none'"]);
     expect(cspDirectives(true).frameAncestors).to.deep.equal(["'none'"]);
