@@ -329,6 +329,9 @@ export const REQUIRED_EVENTS = [
   'idp.link.denied',
   'idp.link.start',
   'idp.unlink',
+  // Diagnostic decision-trace for the explicit link ceremony (PII-safe booleans; snake_case
+  // per the P5+ convention). Emitted in sso-callback.ts to explain link access-denied outcomes.
+  'idp_link_decision',
   // --- MFA methods ---
   'mfa_method_chosen',
   'mfa_totp',

@@ -182,6 +182,30 @@ export async function processIdpCallback(
         idpId: intent.information?.idpId,
       });
     }
+
+    // Diagnostic (PII-safe): trace WHY an explicit link ceremony resolved as it did, so staging
+    // logs explain an access-denied without guesswork. Only on the link path (link=true), which is
+    // low volume. Surfaces the flag + the shape discriminators — read it as:
+    //   intentMapped=true, intentMatchesSession=false  → Shape 1: identity already linked elsewhere
+    //   intentMapped=false, allowLinkAnyEmail=false     → Shape 2 B2: emailVerified / owner checks
+    //   allowLinkAnyEmail=true                          → fresh identity should link (never denied)
+    // NO email/loginName VALUES are logged (audit PII guard) — only booleans + idpId + reason.
+    if (link === 'true') {
+      logAuthEvent('idp_link_decision', decision.kind === 'error' ? 'failure' : 'success', {
+        requestId,
+        idpId: intent.information?.idpId,
+        decision: decision.kind,
+        reason: decision.kind === 'error' ? decision.reason : undefined,
+        allowLinkAnyEmail,
+        intentMapped: intent.userId != null, // false ⇒ fresh identity (Shape 2)
+        intentMatchesSession: intent.userId != null && intent.userId === sessionUserId,
+        sessionPresent: sessionUserId != null,
+        emailVerified: intent.draft?.emailVerified ?? false,
+        emailOwnerResolved: linkEmailOwnerUserId != null,
+        emailOwnerMatchesSession:
+          linkEmailOwnerUserId != null && linkEmailOwnerUserId === sessionUserId,
+      });
+    }
   } catch (err) {
     if (err instanceof ProviderError) {
       deps.onAuthEvent?.('idp.signin', 'failure');
