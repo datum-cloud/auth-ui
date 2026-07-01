@@ -21,6 +21,131 @@ function run(s: Scenario): Cypress.Chainable<Verdict> {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Default-org resolution — register paths (bare flow, no organization= in URL)
+//
+// On a bare signup (no ?organization= in the URL) raw `organization` is undefined.
+// Each register service must resolve the default org via resolveOrg and pass it as
+// orgId to provider.register() (and createSession). The fake does NOT throw on
+// undefined orgId, so we assert the ARG to get a genuine RED before the fix.
+// RED: orgId === undefined. GREEN: orgId === 'org-default-fake'.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('registerAndLinkIdp — default-org resolution on bare flow (no organization)', () => {
+  it('calls register with the resolved default org (not undefined) when organization is omitted', () => {
+    run({
+      fn: 'registerAndLinkIdp',
+      request: { url: `${BASE_URL}/signup` },
+      provider: 'singleton',
+      // No organization in signupInput → bare flow
+      signupInput: {
+        email: 'idp-bare@test.com',
+        firstName: 'Idp',
+        lastName: 'Bare',
+        idpIntentId: 'intent-bare',
+        idpIntentToken: 'tok-bare',
+        idpId: 'idp-g',
+        idpUserId: 'g-bare',
+        idpUserName: 'idp-bare@test.com',
+      },
+      recordCalls: ['register'],
+    }).then((verdict) => {
+      expect(verdict.ok, verdict.error ?? '').to.be.true;
+      const registerCalls = (verdict.calls?.['register'] ?? []) as Array<[Record<string, unknown>]>;
+      expect(registerCalls.length, 'register was called').to.be.greaterThan(0);
+      const registerInput = registerCalls[0][0];
+      expect(
+        registerInput.orgId,
+        'orgId must be the resolved default org, not undefined'
+      ).to.equal('org-default-fake');
+    });
+  });
+});
+
+describe('registerPasskeyFirst — default-org resolution on bare flow (no organization)', () => {
+  it('calls register with the resolved default org (not undefined) when organization is omitted', () => {
+    run({
+      fn: 'registerPasskeyFirst',
+      request: { url: `${BASE_URL}/signup` },
+      provider: 'singleton',
+      signupInput: {
+        email: 'passkey-bare@test.com',
+        firstName: 'Passkey',
+        lastName: 'Bare',
+        requireVerification: false,
+        origin: ORIGIN,
+        // No organization → bare flow
+      },
+      recordCalls: ['register'],
+    }).then((verdict) => {
+      expect(verdict.ok, verdict.error ?? '').to.be.true;
+      const registerCalls = (verdict.calls?.['register'] ?? []) as Array<[Record<string, unknown>]>;
+      expect(registerCalls.length, 'register was called').to.be.greaterThan(0);
+      const registerInput = registerCalls[0][0];
+      expect(
+        registerInput.orgId,
+        'orgId must be the resolved default org, not undefined'
+      ).to.equal('org-default-fake');
+    });
+  });
+});
+
+describe('registerWithPassword — default-org resolution on bare flow (no organization)', () => {
+  it('calls register with the resolved default org (not undefined) when organization is omitted', () => {
+    run({
+      fn: 'registerWithPassword',
+      request: { url: `${BASE_URL}/signup/password` },
+      provider: 'singleton',
+      signupInput: {
+        email: 'pw-bare@test.com',
+        firstName: 'Pw',
+        lastName: 'Bare',
+        password: 'hunter2hunter2',
+        requireVerification: false,
+        origin: ORIGIN,
+        // No organization → bare flow
+      },
+      recordCalls: ['register'],
+    }).then((verdict) => {
+      expect(verdict.ok, verdict.error ?? '').to.be.true;
+      const registerCalls = (verdict.calls?.['register'] ?? []) as Array<[Record<string, unknown>]>;
+      expect(registerCalls.length, 'register was called').to.be.greaterThan(0);
+      const registerInput = registerCalls[0][0];
+      expect(
+        registerInput.orgId,
+        'orgId must be the resolved default org, not undefined'
+      ).to.equal('org-default-fake');
+    });
+  });
+});
+
+describe('registerEmailLinkSignup — default-org resolution on bare flow (no organization)', () => {
+  it('calls register with the resolved default org (not undefined) when organization is omitted', () => {
+    run({
+      fn: 'registerEmailLinkSignup',
+      request: { url: `${BASE_URL}/signup` },
+      provider: 'singleton',
+      signupInput: {
+        email: 'emaillink-bare@test.com',
+        firstName: 'Email',
+        lastName: 'Bare',
+        origin: ORIGIN,
+        // No organization → bare flow
+      },
+      recordCalls: ['register'],
+    }).then((verdict) => {
+      expect(verdict.ok, verdict.error ?? '').to.be.true;
+      const registerCalls = (verdict.calls?.['register'] ?? []) as Array<[Record<string, unknown>]>;
+      expect(registerCalls.length, 'register was called').to.be.greaterThan(0);
+      const registerInput = registerCalls[0][0];
+      expect(
+        registerInput.orgId,
+        'orgId must be the resolved default org, not undefined'
+      ).to.equal('org-default-fake');
+    });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // registerEmailLinkSignup — enumeration safety
 // ─────────────────────────────────────────────────────────────────────────────
 

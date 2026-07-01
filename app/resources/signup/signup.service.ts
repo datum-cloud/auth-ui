@@ -18,6 +18,7 @@ import {
 } from '@/modules/auth/session/cookie';
 import { ProviderError } from '@/modules/auth/types';
 import { authorizeHandbackTarget } from '@/resources/shared/next-step-params';
+import { resolveOrg } from '@/resources/shared/resolve-org';
 import { postRegisterStep } from '@/resources/signup/post-register';
 import {
   verifyUrlTemplate,
@@ -108,6 +109,11 @@ export async function registerAndLinkIdp(
   input: SignupIdpLinkInput
 ): Promise<SignupRedirectResult> {
   const { email, firstName, lastName, organization, requestId, userAgent } = input;
+  // Resolve the effective registration org — org-first (explicit orgId from the ceremony URL),
+  // then ZITADEL_DEFAULT_ORG_ID env pin, then the provider's instance Default Organization.
+  // Raw `organization` is undefined on a bare (no ?organization=) flow, causing Zitadel's
+  // FAILED_PRECONDITION on addHumanUser when no org is supplied to register().
+  const registrationOrg = await resolveOrg(provider, organization);
   const idpLink = {
     idpId: input.idpId,
     idpUserId: input.idpUserId,
@@ -117,7 +123,7 @@ export async function registerAndLinkIdp(
     email,
     firstName,
     lastName,
-    orgId: organization,
+    orgId: registrationOrg,
     emailVerified: input.emailVerified ?? false,
   });
   await provider.addIdpLink(user.id, idpLink);
@@ -126,7 +132,7 @@ export async function registerAndLinkIdp(
     : undefined;
   const session = await provider.createSession(
     { idpIntent: { idpIntentId: input.idpIntentId, idpIntentToken: input.idpIntentToken } },
-    { orgId: organization, requestId, userId: user.id, metadata: sessionMetadata, userAgent }
+    { orgId: registrationOrg, requestId, userId: user.id, metadata: sessionMetadata, userAgent }
   );
   const sessions = addSession(
     list,
@@ -298,10 +304,16 @@ export async function registerPasskeyFirst(
   input: PasskeyFirstRegisterInput
 ): Promise<PasskeyFirstRegisterResult> {
   const { email, firstName, lastName, organization, requestId, origin } = input;
+  // Resolve the effective registration org — org-first (explicit orgId from the ceremony URL),
+  // then ZITADEL_DEFAULT_ORG_ID env pin, then the provider's instance Default Organization.
+  // Raw `organization` is undefined on a bare (no ?organization=) flow, causing Zitadel's
+  // FAILED_PRECONDITION on addHumanUser when no org is supplied to register().
+  // createSession in runEnumerationSafeRegister also receives the resolved org via `organization`.
+  const registrationOrg = await resolveOrg(provider, organization);
 
   return runEnumerationSafeRegister(provider, list, {
     email,
-    organization,
+    organization: registrationOrg,
     requestId,
     deviceTrackingToken: input.deviceTrackingToken,
     userAgent: input.userAgent,
@@ -315,12 +327,12 @@ export async function registerPasskeyFirst(
             email,
             firstName,
             lastName,
-            orgId: organization,
+            orgId: registrationOrg,
             verifyUrlTemplate: verifyUrlTemplate({ origin, requestId }),
           })
-        : provider.register({ email, firstName, lastName, orgId: organization }),
+        : provider.register({ email, firstName, lastName, orgId: registrationOrg }),
     noVerifySuccessAudit: () =>
-      logAuthEvent('signup.requested', 'success', { actor: hashActor(email), organization }),
+      logAuthEvent('signup.requested', 'success', { actor: hashActor(email), organization: registrationOrg }),
   });
 }
 
@@ -363,6 +375,12 @@ export async function registerWithPassword(
   input: RegisterWithPasswordInput
 ): Promise<RegisterWithPasswordResult> {
   const { email, firstName, lastName, password, organization, requestId, origin } = input;
+  // Resolve the effective registration org — org-first (explicit orgId from the ceremony URL),
+  // then ZITADEL_DEFAULT_ORG_ID env pin, then the provider's instance Default Organization.
+  // Raw `organization` is undefined on a bare (no ?organization=) flow, causing Zitadel's
+  // FAILED_PRECONDITION on addHumanUser when no org is supplied to register().
+  // createSession in runEnumerationSafeRegister also receives the resolved org via `organization`.
+  const registrationOrg = await resolveOrg(provider, organization);
 
   // Steer the verification mail's link back to OUR /verify route (raw provider
   // placeholders, filled by Zitadel). requestId rides along so the post-verify step
@@ -372,7 +390,7 @@ export async function registerWithPassword(
 
   return runEnumerationSafeRegister(provider, list, {
     email,
-    organization,
+    organization: registrationOrg,
     requestId,
     deviceTrackingToken: input.deviceTrackingToken,
     userAgent: input.userAgent,
@@ -385,7 +403,7 @@ export async function registerWithPassword(
         firstName,
         lastName,
         password,
-        orgId: organization,
+        orgId: registrationOrg,
         verifyUrlTemplate: tmpl,
       }),
     // Distinct audit from the passkey path: 'signup.created' carrying userId, hashing loginName.
@@ -430,12 +448,17 @@ export async function registerEmailLinkSignup(
   input: EmailLinkSignupInput
 ): Promise<SignupSentResult> {
   const { email, firstName, lastName, organization, requestId, origin } = input;
+  // Resolve the effective registration org — org-first (explicit orgId from the ceremony URL),
+  // then ZITADEL_DEFAULT_ORG_ID env pin, then the provider's instance Default Organization.
+  // Raw `organization` is undefined on a bare (no ?organization=) flow, causing Zitadel's
+  // FAILED_PRECONDITION on addHumanUser when no org is supplied to register().
+  const registrationOrg = await resolveOrg(provider, organization);
   try {
     await provider.register({
       email,
       firstName,
       lastName,
-      orgId: organization,
+      orgId: registrationOrg,
       verifyUrlTemplate: signupCompleteUrlTemplate({ origin, requestId, organization }),
     });
   } catch (error) {
