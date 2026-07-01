@@ -101,13 +101,14 @@ export async function action({ request }: ActionFunctionArgs) {
   if (form.get('intent') === 'idp') {
     const parsed = loginIdpSchema.safeParse(Object.fromEntries(form));
     if (!parsed.success) return data({ error: 'INVALID_INPUT' as const }, { status: 400 });
-    const { idpId, requestId, organization } = parsed.data;
+    const { idpId, requestId, organization, deviceTrackingToken } = parsed.data;
     try {
       const result = await startIdpIntent(provider, {
         idpId,
         origin: trustedAppOrigin(request),
         requestId,
         organization,
+        deviceTrackingToken,
       });
       // The pure decider maps the service result onto the Decision union.
       const decision = decideSignupIdpIntent(result);

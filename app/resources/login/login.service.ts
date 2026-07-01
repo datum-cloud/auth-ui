@@ -68,6 +68,8 @@ export interface StartIdpInput {
    * is the real guard, this only improves the picker UX.
    */
   reauthHint?: string;
+  /** MaxMind device-fingerprint token captured client-side; attached as session metadata. */
+  deviceTrackingToken?: string;
 }
 
 export type StartIdpError = 'IDP_UNAVAILABLE';
@@ -82,10 +84,14 @@ export type StartIdpResult = { ok: true; authUrl: string } | { ok: false; error:
  */
 export async function startIdpIntent(
   provider: AuthProvider,
-  { idpId, origin, requestId, organization, reauthHint }: StartIdpInput
+  { idpId, origin, requestId, organization, reauthHint, deviceTrackingToken }: StartIdpInput
 ): Promise<StartIdpResult> {
   const slug = idpTypeToSlug(idpId) ?? idpId;
-  const { success, failure } = idpReturnUrls(origin, slug, { requestId, organization });
+  const { success, failure } = idpReturnUrls(origin, slug, {
+    requestId,
+    organization,
+    deviceTrackingToken,
+  });
   const result = await provider.startIdpIntent(idpId, { success, failure });
   if (!result.authUrl) {
     logAuthEvent('idp_start', 'failure', { idpId, reason: 'no_auth_url' });

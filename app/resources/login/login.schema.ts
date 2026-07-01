@@ -19,6 +19,9 @@ export const loginIdpSchema = z.object({
   idpId: z.string().min(1),
   requestId: z.string().regex(REQUEST_ID_PATTERN).optional(),
   organization: z.string().optional(),
+  // MaxMind device-fingerprint token captured client-side; forwarded through the IdP
+  // round-trip so the resulting session carries fraud-tracking metadata.
+  deviceTrackingToken: z.string().optional(),
 });
 
 // Client-side validation subset for the /login identifier form; advisory only

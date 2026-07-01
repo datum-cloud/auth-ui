@@ -33,4 +33,22 @@ describe('login IdP start: return URLs must use PUBLIC_ORIGIN, not request Host'
     expect(successUrl.startsWith(`${PUBLIC_ORIGIN}/id/sso/`)).to.equal(true);
     expect(successUrl).not.to.contain('evil.example');
   });
+
+  // Both /login and /signup's "Sign in with Google" buttons call this same startIdpIntent —
+  // deviceTrackingToken must ride the success URL exactly like requestId/organization already do,
+  // or the MaxMind fraud-tracking token captured client-side never reaches the /sso callback.
+  it('threads deviceTrackingToken onto the success URL when provided', async () => {
+    const fake = makeProvider();
+    const spy = cy.spy(fake, 'startIdpIntent');
+
+    await startIdpIntent(fake, {
+      idpId: GOOGLE_IDP_ID,
+      origin: PUBLIC_ORIGIN,
+      deviceTrackingToken: 'mm-token-xyz',
+    });
+
+    const [, urls] = spy.args[0];
+    const successUrl: string = (urls as { success: string; failure: string }).success;
+    expect(successUrl).to.contain('deviceTrackingToken=mm-token-xyz');
+  });
 });

@@ -100,7 +100,7 @@ export async function action({ request }: ActionFunctionArgs) {
   if (form.get('intent') === 'idp') {
     const parsed = loginIdpSchema.safeParse(Object.fromEntries(form));
     if (!parsed.success) return data({ error: 'INVALID_INPUT' }, { status: 400 });
-    const { idpId, requestId, organization } = parsed.data;
+    const { idpId, requestId, organization, deviceTrackingToken } = parsed.data;
     // RE-AUTH: when this login is re-authenticating a specific account, pass its loginName as a
     // best-effort login_hint so the IdP pre-selects it. The callback's identity check is the guard.
     const reauthHint = await readReauthIntent(request);
@@ -110,6 +110,7 @@ export async function action({ request }: ActionFunctionArgs) {
       requestId,
       organization,
       reauthHint: reauthHint ?? undefined,
+      deviceTrackingToken,
     });
     if (!result.ok) return data({ error: result.error }, { status: 502 });
     // The authUrl is the provider's IdP-start URL; requestId + organization are threaded
