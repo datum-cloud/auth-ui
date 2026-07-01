@@ -332,6 +332,12 @@ function buildProvider(s: Scenario): FakeAuthProvider {
       throw new ProviderError(code, `scripted addIdpLink ${String(code)}`);
     }) as FakeAuthProvider['addIdpLink'];
   }
+  if (s.registerError) {
+    const code = s.registerError as ConstructorParameters<typeof ProviderError>[0];
+    provider.register = (async () => {
+      throw new ProviderError(code, `scripted register ${String(code)}`);
+    }) as FakeAuthProvider['register'];
+  }
 
   // ── 8d overrides ────────────────────────────────────────────────────────────
   if (s.failFindUser) {

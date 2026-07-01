@@ -25,6 +25,16 @@ const REASONS: Record<string, React.ReactNode> = {
       from your account settings.
     </Trans>
   ),
+  // ALREADY_EXISTS on auto-create (755-K1) — the same-email collision pre-check missed a real
+  // account (loginName != email) and the duplicate reached Zitadel before being rejected. Reuses
+  // the account-exists copy (same guidance, same fix) as a DISTINCT reason so it stays
+  // distinguishable in redirects/logs from the pre-check's own account-exists hard-block.
+  'registration-conflict': (
+    <Trans>
+      An account with this email already exists. Sign in to that account, then link this provider
+      from your account settings.
+    </Trans>
+  ),
   // Surfaced by sso.tsx when an LDAP IdP is used for account linking.
   'ldap-link-unsupported': (
     <Trans>

@@ -16,7 +16,12 @@ import {
   AddHumanUserRequestSchema,
 } from '@zitadel/proto/zitadel/user/v2/user_service_pb';
 
-// mirror fork searchUsers loginName path (Phase 1: exact loginName; email/phone fallback is Phase 2+)
+// 755-K1: identifier may be an exact Zitadel loginName (most callers — login/mfa/otp/webauthn
+// resolve whatever the user typed) OR a plain email (sso-callback.ts's same-email collision
+// check, fed intent.draft.email from the IdP). loginName != email whenever an org's domain policy
+// suffixes loginName, so an OR-combined query is required — a loginName-only match would silently
+// miss real accounts for the email-based callers, defeating the collision check that guards
+// against a duplicate registration reaching Zitadel and failing with ALREADY_EXISTS.
 export function findUser(
   ctx: ZitadelCtx,
   identifier: string,
@@ -27,8 +32,23 @@ export function findUser(
     const queries = [
       create(SearchQuerySchema, {
         query: {
-          case: 'loginNameQuery',
-          value: { loginName: identifier, method: TextQueryMethod.EQUALS },
+          case: 'orQuery',
+          value: {
+            queries: [
+              create(SearchQuerySchema, {
+                query: {
+                  case: 'loginNameQuery',
+                  value: { loginName: identifier, method: TextQueryMethod.EQUALS },
+                },
+              }),
+              create(SearchQuerySchema, {
+                query: {
+                  case: 'emailQuery',
+                  value: { emailAddress: identifier, method: TextQueryMethod.EQUALS },
+                },
+              }),
+            ],
+          },
         },
       }),
     ];

@@ -69,6 +69,7 @@ msgid "An account with this email already exists — sign in to continue."
 msgstr "An account with this email already exists — sign in to continue."
 
 #: app/routes/sso/provider/error.tsx:23
+#: app/routes/sso/provider/error.tsx:33
 msgid "An account with this email already exists. Sign in to that account, then link this provider from your account settings."
 msgstr "An account with this email already exists. Sign in to that account, then link this provider from your account settings."
 
@@ -126,7 +127,7 @@ msgstr "Available accounts to link"
 msgid "Back"
 msgstr "Back"
 
-#: app/routes/sso/provider/error.tsx:61
+#: app/routes/sso/provider/error.tsx:71
 msgid "Back to sign in"
 msgstr "Back to sign in"
 
@@ -203,11 +204,11 @@ msgstr "Continue with your provider"
 msgid "Could not verify password"
 msgstr "Could not verify password"
 
-#: app/routes/sso/provider/error.tsx:38
+#: app/routes/sso/provider/error.tsx:48
 msgid "Couldn't complete sign-in. Return to your application and try again."
 msgstr "Couldn't complete sign-in. Return to your application and try again."
 
-#: app/routes/sso/provider/error.tsx:52
+#: app/routes/sso/provider/error.tsx:62
 msgid "Couldn't sign in"
 msgstr "Couldn't sign in"
 
@@ -593,7 +594,7 @@ msgstr "SMS one-time code"
 msgid "SMS OTP"
 msgstr "SMS OTP"
 
-#: app/routes/sso/provider/error.tsx:47
+#: app/routes/sso/provider/error.tsx:57
 msgid "Something went wrong with <0>{provider}</0>."
 msgstr "Something went wrong with <0>{provider}</0>."
 
@@ -651,7 +652,7 @@ msgstr "This device code is invalid or has expired."
 msgid "This device was not granted access. You may close this window."
 msgstr "This device was not granted access. You may close this window."
 
-#: app/routes/sso/provider/error.tsx:30
+#: app/routes/sso/provider/error.tsx:40
 msgid "This directory account can't be linked here yet. Sign in with your password instead."
 msgstr "This directory account can't be linked here yet. Sign in with your password instead."
 

@@ -168,6 +168,32 @@ describe('processIdpCallback — 755-J1 link failure reason mapping', () => {
   });
 });
 
+describe('processIdpCallback — 755-K1 auto-create failure reason mapping', () => {
+  // Real-world bug: findUser's same-email pre-check only matches Zitadel's exact loginName, so an
+  // org whose loginName differs from the raw email (the Zitadel domain-suffix default) never finds
+  // a real collision — decideIdpCallback falls through to auto-create believing the user is new,
+  // and Zitadel's own addHumanUser then correctly rejects the duplicate with ALREADY_EXISTS. The
+  // auto-create catch block must not collapse that into the generic, actionable-less signin_failed
+  // the same way the sibling `link` branch already avoids doing for its own ALREADY_EXISTS case.
+  it('maps ALREADY_EXISTS from a fresh registration to a clear reason (not signin_failed)', () => {
+    callService({
+      fn: 'processIdpCallback',
+      slug: 'google',
+      seed: {}, // no existing users — decision routes to auto-create, mirroring the missed collision
+      idpIntent: REGISTER_INTENT_VERIFIED,
+      registerError: 'ALREADY_EXISTS',
+      request: { url: CB() },
+    }).then((v) => {
+      expect(v.response?.status).to.equal(302);
+      const loc = v.response?.location ?? '';
+      expect(loc).to.include('/sso/google/error');
+      expect(loc).to.include('reason=registration-conflict');
+      expect(loc).to.not.include('reason=signin_failed');
+      expect(hasAudit(v.audit, 'idp.register', 'failure')).to.equal(true);
+    });
+  });
+});
+
 describe('processIdpCallback — same-email collision hard error (default: ALLOW_IDP_AUTO_LINK off)', () => {
   it('redirects to the SSO error page with reason=account-exists instead of auto-linking', () => {
     callService({

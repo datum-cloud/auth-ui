@@ -397,9 +397,15 @@ export async function processIdpCallback(
         if (err instanceof ProviderError) {
           deps.onAuthEvent?.('idp.register', 'failure');
           logAuthEvent('idp.register', 'failure', { reason: err.code, requestId });
+          // 755-K1: ALREADY_EXISTS here means the same-email collision pre-check (findUser)
+          // missed a real account — mirrors the `link` branch's ALREADY_EXISTS handling above
+          // (a distinct reason, not the generic providerErrorCode() signin_failed fallback) so
+          // the user learns an account already exists instead of hitting a dead end.
+          const reason =
+            err.code === 'ALREADY_EXISTS' ? 'registration-conflict' : providerErrorCode(err.code);
           return {
             kind: 'redirect',
-            location: ssoErrorRedirect(slug, providerErrorCode(err.code)),
+            location: ssoErrorRedirect(slug, reason),
           };
         }
         throw err; // unknown → root ErrorBoundary

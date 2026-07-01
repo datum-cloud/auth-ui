@@ -297,6 +297,8 @@ export interface Scenario {
   failMarkEmailVerified?: boolean;
   /** addIdpLink throws ProviderError(code) — 755-J1 link-failure reason mapping. */
   addIdpLinkError?: ProviderErrorCode;
+  /** register throws ProviderError(code) — auto-create registration-failure reason mapping. */
+  registerError?: ProviderErrorCode;
   /** Opts for signInWithIdpIntent (the LDAP/callback shared sign-in helper). */
   signInOpts?: ScenarioSignInOpts;
   /** runSsoAction DI startIdpIntent rejects with ProviderError(code) — handled (no 500). */

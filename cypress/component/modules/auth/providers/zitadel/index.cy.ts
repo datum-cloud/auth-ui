@@ -67,6 +67,30 @@ describe('ZitadelAuthProvider — method surface & pure branching', () => {
       expect(err).to.be.instanceOf(ProviderError);
     }
   });
+
+  // 755-K1: findUser is called with an email address (sso-callback.ts's same-email collision
+  // check) but only ever queried Zitadel by exact loginName. When an org's domain policy suffixes
+  // loginName (the Zitadel default), loginName !== email, so the query silently finds nothing even
+  // though a real account with that email exists — the collision check is defeated and a duplicate
+  // registration attempt reaches Zitadel, which then rejects it with ALREADY_EXISTS.
+  it('findUser searches Zitadel by email (emailQuery), not just an exact loginName match', async () => {
+    type Query = { query?: { case?: string; value?: { queries?: Query[] } } };
+    let captured: { queries?: Query[] } | undefined;
+    stubClient({
+      listUsers: async (req: typeof captured) => {
+        captured = req;
+        return { result: [] };
+      },
+    });
+    await provider().findUser('someone@example.com', 'org-1');
+    // Flatten one level: the loginName/email queries are OR-combined so they still AND with the
+    // separate organizationIdQuery entry, rather than being flat siblings in the top-level array.
+    const flattened = (captured?.queries ?? []).flatMap((q) =>
+      q.query?.case === 'orQuery' ? (q.query.value?.queries ?? []) : [q]
+    );
+    const cases = flattened.map((q) => q.query?.case);
+    expect(cases).to.include('emailQuery');
+  });
 });
 
 // ── isInstanceAdmin ────────────────────────────────────────────────────────────
