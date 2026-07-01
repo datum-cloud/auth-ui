@@ -345,11 +345,10 @@ async function resolveOidc(
   }
 
   const recent = mostRecent(list);
-  // Org-first / default-org fallback: when the OIDC request carries no org-id scope, resolve the
-  // instance default org (env pin → provider default) so the bootstrap redirect (/login, /signup,
-  // /accounts) still threads `organization` and the login renders the real org's IdPs instead of
-  // the INSTANCE/default context. An explicit scope org always wins (resolveOrg is org-first).
-  const organization = await resolveOrg(provider, deriveOrganizationFromScopes(authRequest.scopes));
+  // Explicit-only org threading: pass the org derived from the OIDC scope verbatim. The
+  // default-org fallback (env pin → provider default) is a /login display concern; threading
+  // it here caused users outside the default org to be hidden by the scoped findUser call.
+  const organization = deriveOrganizationFromScopes(authRequest.scopes);
   const decision = decideAuthorize({
     authRequest,
     hasSessions: list.length > 0,

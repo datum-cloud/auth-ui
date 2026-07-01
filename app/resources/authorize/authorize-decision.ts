@@ -25,11 +25,10 @@ export interface AuthorizeInput {
   hasSessions: boolean;
   validSessionId?: string;
   /**
-   * The effective organization, pre-resolved by the impure caller (resolveOidc → resolveOrg:
-   * scope-org → env pin → provider default org). When provided it OVERRIDES the scope-derived org,
-   * so a default-org fallback threads `organization` into the /login (and /signup, /accounts)
-   * redirect even when the OIDC request carried no org-id scope. Omitted ⇒ this stays pure and
-   * derives the org from scopes exactly as before (unchanged behaviour for existing callers/tests).
+   * The explicit org derived from the OIDC scope (`urn:zitadel:iam:org:id:<id>`), pre-extracted
+   * by the caller (resolveOidc → deriveOrganizationFromScopes). Threaded verbatim into the
+   * bootstrap redirect; never overridden with a default-org fallback here. Omitted when the
+   * request carries no org-id scope, in which case no `organization=` param is added.
    */
   organization?: string;
 }
@@ -41,8 +40,8 @@ export function decideAuthorize({
   validSessionId,
   organization,
 }: AuthorizeInput): AuthorizeDecision {
-  // Pre-resolved org (default-org fallback) wins; else derive from scopes (legacy behaviour).
-  const org = organization ?? deriveOrganizationFromScopes(authRequest.scopes);
+  // The caller passes the explicit scope-derived org (or undefined); thread it verbatim.
+  const org = organization;
   const baseParams = org ? { organization: org } : undefined;
 
   if (authRequest.prompt.includes('create')) return { target: '/signup', params: baseParams };
