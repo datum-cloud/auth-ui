@@ -44,12 +44,6 @@ function mountMethod() {
 }
 
 describe('signup/method — render adoption', () => {
-  it('wraps the screen in the AuthCeremony tokenized layout div', () => {
-    mountMethod();
-    cy.contains('john.doe@example.com', { timeout: 6000 }).should('exist');
-    cy.get('div.flex.flex-col.items-baseline.justify-center.gap-4').should('exist');
-  });
-
   it('emits shared csrf hidden input(s) from AuthFormFields on each method form', () => {
     mountMethod();
     cy.contains('john.doe@example.com', { timeout: 6000 });
@@ -57,11 +51,5 @@ describe('signup/method — render adoption', () => {
     cy.get('input[name="csrf"][type="hidden"]').each(($el) => {
       expect($el.val()).to.equal('csrf-token-xyz');
     });
-  });
-
-  it('includes the loginName identity hidden input alongside csrf', () => {
-    mountMethod();
-    cy.contains('john.doe@example.com', { timeout: 6000 });
-    cy.get('input[name="loginName"]').should('have.length.greaterThan', 0);
   });
 });

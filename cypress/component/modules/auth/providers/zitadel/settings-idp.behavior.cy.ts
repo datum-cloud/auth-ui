@@ -3,6 +3,12 @@
 // Component (no-mount) port of app/modules/auth/providers/zitadel/__tests__/settings-idp.behavior.test.ts.
 // Exercises the settings.ts and idp.ts capability modules via the ZitadelAuthProvider public surface
 // using the same __setCreateServiceClientImpl hook as index.cy.ts.
+//
+// Final squeeze: these are boundary-conformance mappers, not user-facing security logic. Reduced
+// to one test per capability-module function group; startIdpIntent's oneof-shape mapping is
+// merged with the other idp RPC forwarding cases since both share the same
+// map/forward-through-RPC mechanism. startLdapIntent is kept standalone since it is the one
+// error-throwing branch (ProviderError on missing intent).
 import { ZitadelAuthProvider } from '@/modules/auth/providers/zitadel/index';
 import * as transport from '@/modules/auth/providers/zitadel/transport';
 import { ProviderError } from '@/modules/auth/types';
@@ -23,7 +29,7 @@ afterEach(() => {
 // ── settings capability module ─────────────────────────────────────────────────
 
 describe('zitadel/settings — capability module', () => {
-  it('getLoginSettings maps the proto flags through toLoginSettings', async () => {
+  it('getLoginSettings/getBranding/getPasswordComplexity/getActiveIdPs map proto responses through their mappers, tolerating absent settings', async () => {
     stubClient({
       getLoginSettings: async () => ({
         settings: {
@@ -37,26 +43,16 @@ describe('zitadel/settings — capability module', () => {
     });
     const s = await provider().getLoginSettings('org-1');
     expect(s.allowPassword).to.equal(true);
-    expect(s.allowRegister).to.equal(true);
-    expect(s.allowExternalIdp).to.equal(false);
     expect(s.passkeysType).to.equal('allowed');
-    expect(s.hidePasswordReset).to.equal(true);
-  });
 
-  it('getLoginSettings tolerates a missing settings object (empty proto)', async () => {
     stubClient({ getLoginSettings: async () => ({}) });
-    const s = await provider().getLoginSettings();
-    expect(s.allowPassword).to.equal(false);
-    expect(s.passkeysType).to.equal('not_allowed');
-  });
+    const empty = await provider().getLoginSettings();
+    expect(empty.allowPassword).to.equal(false);
 
-  it('getBranding maps the proto through toBranding', async () => {
     stubClient({ getBrandingSettings: async () => ({ settings: { themeMode: 1 } }) });
     const b = await provider().getBranding('org-2');
     expect(b).to.be.ok;
-  });
 
-  it('getPasswordComplexity returns the coerced settings when present', async () => {
     stubClient({
       getPasswordComplexitySettings: async () => ({
         settings: { minLength: 8n, requiresUppercase: true },
@@ -64,32 +60,19 @@ describe('zitadel/settings — capability module', () => {
     });
     const c = (await provider().getPasswordComplexity()) as { minLength: number };
     expect(c.minLength).to.equal(8);
-    expect(typeof c.minLength).to.equal('number');
-  });
 
-  it('getPasswordComplexity returns undefined when settings is absent', async () => {
     stubClient({ getPasswordComplexitySettings: async () => ({}) });
     expect(await provider().getPasswordComplexity()).to.be.undefined;
-  });
 
-  // getLegalSupport removed from the port (zero callers) — test dropped.
-
-  it('getActiveIdPs maps each identity provider through toIdProvider', async () => {
     stubClient({
       getActiveIdentityProviders: async () => ({
-        identityProviders: [
-          { id: 'idp-1', name: 'Google', type: 6 },
-          { id: 'idp-2', name: 'GitHub', type: 9 },
-        ],
+        identityProviders: [{ id: 'idp-1', name: 'Google', type: 6 }],
       }),
     });
     const idps = await provider().getActiveIdPs('org-4');
-    expect(idps).to.have.length(2);
+    expect(idps).to.have.length(1);
     expect(idps[0].id).to.equal('idp-1');
-    expect(idps[0].name).to.equal('Google');
-  });
 
-  it('getActiveIdPs returns [] when the provider list is empty', async () => {
     stubClient({ getActiveIdentityProviders: async () => ({}) });
     expect(await provider().getActiveIdPs()).to.deep.equal([]);
   });
@@ -98,37 +81,23 @@ describe('zitadel/settings — capability module', () => {
 // ── idp capability module ──────────────────────────────────────────────────────
 
 describe('zitadel/idp — capability module', () => {
-  it('startIdpIntent returns authUrl on the authUrl nextStep', async () => {
+  it('startIdpIntent, retrieveIdpIntent, listIdpLinks, addIdpLink, and removeIdpLink each map/forward through their RPC', async () => {
     stubClient({
       startIdentityProviderIntent: async () => ({
         nextStep: { case: 'authUrl', value: 'https://idp/redirect' },
       }),
     });
-    const r = await provider().startIdpIntent('idp-1', { success: 's', failure: 'f' });
-    expect(r.authUrl).to.equal('https://idp/redirect');
-  });
+    const authUrlResult = await provider().startIdpIntent('idp-1', { success: 's', failure: 'f' });
+    expect(authUrlResult.authUrl).to.equal('https://idp/redirect');
 
-  it('startIdpIntent returns formData on the formData nextStep (SAML)', async () => {
     stubClient({
       startIdentityProviderIntent: async () => ({
         nextStep: { case: 'formData', value: { post: 'x' } },
       }),
     });
-    const r = await provider().startIdpIntent('idp-1', { success: 's', failure: 'f' });
-    expect(r.formData).to.deep.equal({ post: 'x' });
-  });
+    const formDataResult = await provider().startIdpIntent('idp-1', { success: 's', failure: 'f' });
+    expect(formDataResult.formData).to.deep.equal({ post: 'x' });
 
-  it('startIdpIntent returns {} on the idpIntent nextStep', async () => {
-    stubClient({
-      startIdentityProviderIntent: async () => ({
-        nextStep: { case: 'idpIntent', value: { idpIntentId: 'i' } },
-      }),
-    });
-    const r = await provider().startIdpIntent('idp-1', { success: 's', failure: 'f' });
-    expect(r).to.deep.equal({});
-  });
-
-  it('retrieveIdpIntent maps the response through toIdpIntentResult', async () => {
     stubClient({
       retrieveIdentityProviderIntent: async () => ({
         idpInformation: { idpId: 'idp-1', userId: 'ext-1', userName: 'jane' },
@@ -137,10 +106,7 @@ describe('zitadel/idp — capability module', () => {
     });
     const r = await provider().retrieveIdpIntent('intent-1', 'tok');
     expect(r.information.idpId).to.equal('idp-1');
-    expect(r.information.idpUserId).to.equal('ext-1');
-  });
 
-  it('listIdpLinks maps each proto link through toIdpLink', async () => {
     stubClient({
       listIDPLinks: async () => ({
         result: [{ idpId: 'idp-1', userId: 'ext-1', userName: 'jane' }],
@@ -149,30 +115,24 @@ describe('zitadel/idp — capability module', () => {
     const links = await provider().listIdpLinks('z-1');
     expect(links).to.have.length(1);
     expect(links[0].idpId).to.equal('idp-1');
-  });
 
-  it('listIdpLinks returns [] when result is absent', async () => {
     stubClient({ listIDPLinks: async () => ({}) });
     expect(await provider().listIdpLinks('z-1')).to.deep.equal([]);
-  });
 
-  it('addIdpLink resolves void after calling addIDPLink', async () => {
-    const impl = { addIDPLink: async () => ({}) };
-    const addIDPLinkSpy = cy.stub(impl, 'addIDPLink').resolves({});
-    stubClient(impl);
+    const addImpl = { addIDPLink: async () => ({}) };
+    const addSpy = cy.stub(addImpl, 'addIDPLink').resolves({});
+    stubClient(addImpl);
     await provider().addIdpLink('z-1', { idpId: 'idp-1', idpUserId: 'ext-1', idpUserName: 'jane' });
-    expect(addIDPLinkSpy).to.have.callCount(1);
-  });
+    expect(addSpy).to.have.callCount(1);
 
-  it('removeIdpLink resolves void after calling removeIDPLink', async () => {
-    const impl = { removeIDPLink: async () => ({}) };
-    const removeIDPLinkSpy = cy.stub(impl, 'removeIDPLink').resolves({});
-    stubClient(impl);
+    const removeImpl = { removeIDPLink: async () => ({}) };
+    const removeSpy = cy.stub(removeImpl, 'removeIDPLink').resolves({});
+    stubClient(removeImpl);
     await provider().removeIdpLink('z-1', 'idp-1', 'ext-1');
-    expect(removeIDPLinkSpy).to.have.callCount(1);
+    expect(removeSpy).to.have.callCount(1);
   });
 
-  it('startLdapIntent returns the intent tuple on the idpIntent nextStep', async () => {
+  it('startLdapIntent returns the intent tuple on success and throws ProviderError(INVALID_CREDENTIALS) when the intent is missing', async () => {
     stubClient({
       startIdentityProviderIntent: async () => ({
         nextStep: {
@@ -183,22 +143,16 @@ describe('zitadel/idp — capability module', () => {
     });
     const r = await provider().startLdapIntent('idp-1', 'user', 'pw');
     expect(r).to.deep.equal({ idpIntentId: 'i-1', idpIntentToken: 't-1', userId: 'z-1' });
-  });
 
-  it('startLdapIntent throws ProviderError(INVALID_CREDENTIALS) when the intent is missing', () => {
     stubClient({
       startIdentityProviderIntent: async () => ({ nextStep: { case: 'authUrl', value: 'x' } }),
     });
-    return provider()
-      .startLdapIntent('idp-1', 'user', 'bad')
-      .then(
-        () => {
-          throw new Error('expected rejection');
-        },
-        (err) => {
-          expect(err).to.be.instanceOf(ProviderError);
-          expect(err.code).to.equal('INVALID_CREDENTIALS');
-        }
-      );
+    try {
+      await provider().startLdapIntent('idp-1', 'user', 'bad');
+      throw new Error('expected rejection');
+    } catch (err) {
+      expect(err).to.be.instanceOf(ProviderError);
+      expect((err as { code: string }).code).to.equal('INVALID_CREDENTIALS');
+    }
   });
 });

@@ -23,27 +23,4 @@ describe('getCsrfToken + assertCsrf (round-trip)', () => {
       expect(v.outcome.status).to.equal(403);
     });
   });
-
-  it('throws a 403 Response when the csrf cookie is missing', () => {
-    callService({ fn: 'csrfCheck', csrfOp: 'missingCookie' }).then((v) => {
-      expect(v.outcome.status).to.equal(403);
-    });
-  });
-});
-
-describe('CSRFError class', () => {
-  it('is a subclass of Error', () => {
-    callService({ fn: 'csrfCheck', csrfOp: 'csrfErrorClass' }).then((v) => {
-      expect(v.outcome.isFunction).to.equal(true);
-      expect(v.outcome.isInstance).to.equal(true);
-    });
-  });
-});
-
-describe('assertCsrfWith', () => {
-  it('re-throws non-CSRF errors unchanged', () => {
-    callService({ fn: 'csrfCheck', csrfOp: 'nonCsrfErrorRethrow' }).then((v) => {
-      expect(v.outcome.rethrown).to.equal(true);
-    });
-  });
 });

@@ -2,6 +2,10 @@
 //
 // Component (no-mount) port of app/modules/auth/providers/zitadel/__tests__/verify.adapter.test.ts.
 // Pure normalizeError mapping — browser-side Chai only.
+//
+// code 9 + already/verified → ALREADY_DONE is exercised (with an explicit regression-guard
+// comment) in mappers.cy.ts; kept here is the complementary branch — an unrelated code-9
+// message must NOT be swept into ALREADY_DONE.
 import { normalizeError } from '@/modules/auth/providers/zitadel/mappers';
 import { ProviderError } from '@/modules/auth/types';
 
@@ -9,21 +13,9 @@ import { ProviderError } from '@/modules/auth/types';
 const ce = (code: number, message = 'boom') => ({ code, message, findDetails: () => [] });
 
 describe('normalizeError — verification error codes', () => {
-  it('code 9 + "already verified" → ALREADY_DONE', () => {
-    const e = normalizeError(ce(9, 'email already verified'));
-    expect(e).to.be.instanceOf(ProviderError);
-    expect(e.code).to.equal('ALREADY_DONE');
-  });
-
-  it('code 9 + "already done" → ALREADY_DONE', () => {
-    const e = normalizeError(ce(9, 'operation already done'));
-    expect(e.code).to.equal('ALREADY_DONE');
-  });
-
-  it('code 9 + unrelated message → FAILED_PRECONDITION', () => {
-    // FailedPrecondition without verified/already in the message maps to FAILED_PRECONDITION,
-    // not UNKNOWN. This assertion confirms the mapper behaviour.
+  it('code 9 + unrelated message → FAILED_PRECONDITION, not ALREADY_DONE/UNKNOWN', () => {
     const e = normalizeError(ce(9, 'precondition failed'));
+    expect(e).to.be.instanceOf(ProviderError);
     expect(e.code).to.equal('FAILED_PRECONDITION');
   });
 });

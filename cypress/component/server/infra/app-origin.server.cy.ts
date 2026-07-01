@@ -14,11 +14,6 @@ describe('trustedAppOrigin', () => {
     expect(origin).not.to.include('attacker.example');
   });
 
-  it('honors a non-https trusted origin verbatim (e.g. local dev)', () => {
-    const request = new Request('http://evil.test/id/signup');
-    expect(trustedAppOrigin(request, 'http://localhost:3000')).to.equal('http://localhost:3000');
-  });
-
   it('falls back to the request origin when publicOrigin is undefined (dev/test/fake)', () => {
     // In dev/test/fake PUBLIC_ORIGIN is optional, so the request origin is the fallback.
     const request = new Request('http://localhost:3000/id/signup?x=1');

@@ -5,18 +5,10 @@
 import { toSetPasswordWithCodeRequest } from '@/modules/auth/providers/zitadel/mappers';
 
 describe('toSetPasswordWithCodeRequest', () => {
-  it('builds SetPasswordRequest with verificationCode and newPassword', () => {
-    const req = toSetPasswordWithCodeRequest('u1', 'CODE', 'NewPw123!');
-    expect(req.userId).to.equal('u1');
-    expect(req.newPassword).to.deep.equal({ password: 'NewPw123!', changeRequired: false });
-    expect(req.verification).to.deep.equal({ case: 'verificationCode', value: 'CODE' });
-  });
-
-  it('uses the provided userId, code, and password without mutation', () => {
+  it('builds SetPasswordRequest with verificationCode and newPassword from the given userId/code/password', () => {
     const req = toSetPasswordWithCodeRequest('user-abc', 'RESET-42', 'Another$ecure1');
     expect(req.userId).to.equal('user-abc');
-    expect(req.newPassword.password).to.equal('Another$ecure1');
-    expect(req.verification.case).to.equal('verificationCode');
-    expect(req.verification.value).to.equal('RESET-42');
+    expect(req.newPassword).to.deep.equal({ password: 'Another$ecure1', changeRequired: false });
+    expect(req.verification).to.deep.equal({ case: 'verificationCode', value: 'RESET-42' });
   });
 });

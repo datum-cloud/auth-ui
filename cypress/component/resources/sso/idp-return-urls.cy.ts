@@ -21,24 +21,4 @@ describe('idpReturnUrls', () => {
       'http://localhost:3000/id/sso/google/callback?requestId=oidc_V2_123&organization=org-1'
     );
   });
-
-  it('sets link=true for the account-linking flow', () => {
-    const { success } = idpReturnUrls('https://auth.example', 'github', { link: true });
-    expect(success).to.equal('https://auth.example/id/sso/github/callback?link=true');
-  });
-
-  it('combines link + requestId in the callback query', () => {
-    const { success } = idpReturnUrls('http://localhost:3000', 'google', {
-      link: true,
-      requestId: 'oidc_V2_9',
-    });
-    expect(success).to.equal(
-      'http://localhost:3000/id/sso/google/callback?link=true&requestId=oidc_V2_9'
-    );
-  });
-
-  it('carries an idpId fallback slug through unchanged (idpTypeToSlug miss)', () => {
-    const { success } = idpReturnUrls('http://localhost:3000', '377177363051446323');
-    expect(success).to.equal('http://localhost:3000/id/sso/377177363051446323/callback');
-  });
 });

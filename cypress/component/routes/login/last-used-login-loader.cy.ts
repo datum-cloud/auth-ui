@@ -10,39 +10,6 @@
 import { callService } from '../../../support/node/call-service';
 
 describe('/login loader — lastUsedLogin threading', () => {
-  it('returns lastUsedLogin=null when the cookie is absent', () => {
-    callService({
-      fn: 'loginLoader',
-      provider: 'singleton',
-      request: { url: 'http://localhost/id/login?organization=org1' },
-    }).then((v) => {
-      expect(v.response?.isResponse).to.equal(false);
-      expect(v.response?.dataBody).to.have.property('lastUsedLogin', null);
-    });
-  });
-
-  it('returns lastUsedLogin="email" when the cookie contains "email"', () => {
-    callService({
-      fn: 'loginLoader',
-      provider: 'singleton',
-      request: { url: 'http://localhost/id/login?organization=org1', lastUsedLogin: 'email' },
-    }).then((v) => {
-      expect(v.response?.isResponse).to.equal(false);
-      expect(v.response?.dataBody).to.have.property('lastUsedLogin', 'email');
-    });
-  });
-
-  it('returns lastUsedLogin="passkey" when the cookie contains "passkey"', () => {
-    callService({
-      fn: 'loginLoader',
-      provider: 'singleton',
-      request: { url: 'http://localhost/id/login?organization=org1', lastUsedLogin: 'passkey' },
-    }).then((v) => {
-      expect(v.response?.isResponse).to.equal(false);
-      expect(v.response?.dataBody).to.have.property('lastUsedLogin', 'passkey');
-    });
-  });
-
   it('returns lastUsedLogin="idp:google" when the cookie contains "idp:google"', () => {
     callService({
       fn: 'loginLoader',

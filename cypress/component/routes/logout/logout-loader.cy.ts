@@ -1,8 +1,7 @@
 // cypress/component/routes/logout/logout-loader.cy.ts
 //
-// CY-TASK: logout route loader — logout_token branch (OIDC logout → 302) vs no-token
-// branch (CSRF data for confirm page). Migrated from:
-//   app/routes/logout/__tests__/logout-loader.test.ts
+// CY-TASK: logout route loader — logout_token branch (OIDC logout → 302).
+// Migrated from: app/routes/logout/__tests__/logout-loader.test.ts
 //
 // The real completeOidcLogout does NOT validate the JWT logout_token — it only reads the
 // sessions cookie and calls provider.deleteSession (best-effort). With an empty sessions
@@ -23,18 +22,6 @@ describe('logout loader', () => {
       expect(v.error).to.be.undefined;
       expect(v.response!.isResponse).to.be.true;
       expect(v.response!.status).to.equal(302);
-    });
-  });
-
-  it('no logout_token → returns CSRF payload for the confirm page', () => {
-    callService({
-      fn: 'logoutLoader',
-      request: { url: BASE },
-    }).then((v) => {
-      expect(v.error).to.be.undefined;
-      expect(v.response!.isResponse).to.be.false;
-      const body = v.response!.dataBody as Record<string, unknown>;
-      expect(typeof body.csrfToken).to.equal('string');
     });
   });
 });

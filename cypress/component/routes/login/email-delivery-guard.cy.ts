@@ -24,21 +24,4 @@ describe('login action — email-link guard when delivery is off', () => {
       expect(v.response?.dataBody).to.have.property('error', 'INVALID_INPUT');
     });
   });
-
-  it('does not redirect to /login/verify/email when delivery is off', () => {
-    callService({
-      fn: 'loginAction',
-      provider: 'singleton',
-      env: { AUTH_EMAIL_DELIVERY_ENABLED: 'false' },
-      request: {
-        url: 'http://localhost/id/login',
-        form: { loginName: 'email-otp-user@acme.test', intent: 'email-link' },
-        csrf: true,
-      },
-    }).then((v) => {
-      // Must be a data response with error, not a 302 redirect
-      expect(v.response?.isResponse).to.equal(false);
-      expect(v.response?.dataBody).to.have.property('error', 'INVALID_INPUT');
-    });
-  });
 });

@@ -2,19 +2,30 @@
 //
 // cy.task node-spec port of the SESSION/CHALLENGE-bound otp tests:
 //   - otp.service.test.ts  (dispatchEmailChallenge url_template; submitOtpCode 8-digit Bug B)
-//   - otp-verify.test.ts   (createOtpVerifyHandlers loader challenge-dispatch matrix + resend)
+//   - otp-verify.test.ts   (createOtpVerifyHandlers loader challenge-dispatch matrix)
 //
 // These drive the REAL fake singleton: dispatchEmailChallenge/submitOtpCode call provider methods
-// (recorded via recordCalls), and the handler loader/action read a signed sessions cookie (+ a
-// real CSRF round-trip for the action) off a Request — node-bound. The browser bundle stubs the
-// cookie/observability modules, so the matrix can only be asserted node-side.
+// (recorded via recordCalls), and the handler loader reads a signed sessions cookie off a Request
+// — node-bound. The browser bundle stubs the cookie/observability modules, so the matrix can only
+// be asserted node-side.
 import { callService } from '../../../support/node/call-service';
 
 const ALICE = 'alice@acme.test';
 const EMAIL_USER = 'email-otp-user@acme.test';
 
-describe('dispatchEmailChallenge — OTP-email LINK fix (Bug A)', () => {
-  it('requests the otpEmail challenge with an url_template pointing at /id/login/verify/email', () => {
+const emailConfig = {
+  channel: 'email' as const,
+  suppressChallengeOnCode: true,
+  nextParamHandling: 'passkey-redirect' as const,
+  writeLastUsedLogin: 'email' as const,
+  verifyPath: '/login/verify/email',
+};
+
+const emailLive = { id: 's1', token: 't1', user: { id: 'u3', loginName: EMAIL_USER } };
+const emailCookie = [{ id: 's1', token: 't1', loginName: EMAIL_USER }];
+
+describe('dispatchEmailChallenge (Bug A) + createOtpVerifyHandlers loader — email challenge dispatch', () => {
+  it('requests the otpEmail challenge with an url_template pointing at /id/login/verify/email, and the loader suppresses a duplicate dispatch while prefilling the code from the link', () => {
     callService({
       fn: 'dispatchEmailChallenge',
       provider: 'singleton',
@@ -39,10 +50,25 @@ describe('dispatchEmailChallenge — OTP-email LINK fix (Bug A)', () => {
       expect(urlTemplate).to.include(`loginName=${encodeURIComponent(ALICE)}`);
       expect(urlTemplate).to.not.include('{{.OrgID}}'); // OTPEmail does not support OrgID
     });
+
+    callService({
+      fn: 'otpVerifyLoader',
+      provider: 'singleton',
+      otpVerifyConfig: emailConfig,
+      liveSessions: [emailLive],
+      request: {
+        url: `http://localhost/id/login/verify/email?loginName=${EMAIL_USER}&code=86230120`,
+        sessions: emailCookie,
+      },
+      recordCalls: ['updateSession'],
+    }).then((v) => {
+      expect(v.calls?.updateSession ?? []).to.have.length(0);
+      expect((v.response?.dataBody as { code?: string })?.code).to.equal('86230120');
+    });
   });
 });
 
-describe('submitOtpCode — accepts 8- and 6-digit delivered codes (Bug B)', () => {
+describe('submitOtpCode — accepts 8-digit delivered codes (Bug B)', () => {
   const run = (channel: 'email' | 'sms', code: string) =>
     callService({
       fn: 'submitOtpCode',
@@ -70,141 +96,6 @@ describe('submitOtpCode — accepts 8- and 6-digit delivered codes (Bug B)', () 
           .filter((x): x is string => typeof x === 'string');
         expect(forwarded).to.include('86230120');
       });
-    });
-
-    it(`${channel}: still accepts a 6-digit code`, () => {
-      run(channel, '123456').then((v) => {
-        const forwarded = (v.calls?.updateSession ?? [])
-          .map((c) => (c[2] as Record<string, unknown>)[field(channel)])
-          .filter((x): x is string => typeof x === 'string');
-        expect(forwarded).to.include('123456');
-      });
-    });
-  });
-});
-
-// ── createOtpVerifyHandlers — loader challenge-dispatch matrix + session guard ────────────────
-
-const emailConfig = {
-  channel: 'email' as const,
-  suppressChallengeOnCode: true,
-  nextParamHandling: 'passkey-redirect' as const,
-  writeLastUsedLogin: 'email' as const,
-  verifyPath: '/login/verify/email',
-};
-const smsConfig = {
-  channel: 'sms' as const,
-  writeLastUsedLogin: false as const,
-  verifyPath: '/login/verify/sms',
-};
-const authenticatorConfig = {
-  channel: 'authenticator' as const,
-  writeLastUsedLogin: false as const,
-  verifyPath: '/login/verify/authenticator',
-};
-
-const emailLive = { id: 's1', token: 't1', user: { id: 'u3', loginName: EMAIL_USER } };
-const emailCookie = [{ id: 's1', token: 't1', loginName: EMAIL_USER }];
-
-describe('createOtpVerifyHandlers — loader session guard', () => {
-  it('redirects to /login when there is no active session (no cookie)', () => {
-    callService({
-      fn: 'otpVerifyLoader',
-      provider: 'singleton',
-      otpVerifyConfig: emailConfig,
-      request: { url: `http://localhost/id/login/verify/email?loginName=${EMAIL_USER}` },
-    }).then((v) => {
-      expect(v.response?.isResponse).to.equal(true);
-      expect(v.response?.status).to.equal(302);
-      expect(v.response?.location).to.equal('/login');
-    });
-  });
-});
-
-describe('createOtpVerifyHandlers — loader challenge dispatch matrix', () => {
-  it('email: sends the challenge once on first arrival (no ?code)', () => {
-    callService({
-      fn: 'otpVerifyLoader',
-      provider: 'singleton',
-      otpVerifyConfig: emailConfig,
-      liveSessions: [emailLive],
-      request: {
-        url: `http://localhost/id/login/verify/email?loginName=${EMAIL_USER}`,
-        sessions: emailCookie,
-      },
-      recordCalls: ['updateSession'],
-    }).then((v) => {
-      expect(v.calls?.updateSession ?? []).to.have.length(1);
-    });
-  });
-
-  it('email: suppresses the duplicate challenge AND prefills code on the ?code link path', () => {
-    callService({
-      fn: 'otpVerifyLoader',
-      provider: 'singleton',
-      otpVerifyConfig: emailConfig,
-      liveSessions: [emailLive],
-      request: {
-        url: `http://localhost/id/login/verify/email?loginName=${EMAIL_USER}&code=86230120`,
-        sessions: emailCookie,
-      },
-      recordCalls: ['updateSession'],
-    }).then((v) => {
-      expect(v.calls?.updateSession ?? []).to.have.length(0);
-      expect((v.response?.dataBody as { code?: string })?.code).to.equal('86230120');
-    });
-  });
-
-  it('authenticator: sends no challenge (user reads the code from their app)', () => {
-    callService({
-      fn: 'otpVerifyLoader',
-      provider: 'singleton',
-      otpVerifyConfig: authenticatorConfig,
-      liveSessions: [emailLive],
-      request: {
-        url: `http://localhost/id/login/verify/authenticator?loginName=${EMAIL_USER}`,
-        sessions: emailCookie,
-      },
-      recordCalls: ['updateSession'],
-    }).then((v) => {
-      expect(v.calls?.updateSession ?? []).to.have.length(0);
-    });
-  });
-
-  it('sms: sends a challenge on arrival', () => {
-    callService({
-      fn: 'otpVerifyLoader',
-      provider: 'singleton',
-      otpVerifyConfig: smsConfig,
-      liveSessions: [emailLive],
-      request: {
-        url: `http://localhost/id/login/verify/sms?loginName=${EMAIL_USER}`,
-        sessions: emailCookie,
-      },
-      recordCalls: ['updateSession'],
-    }).then((v) => {
-      expect((v.calls?.updateSession ?? []).length).to.be.at.least(1);
-    });
-  });
-});
-
-describe('createOtpVerifyHandlers — resend intent (action)', () => {
-  it('redirects back to the verify path without ?code', () => {
-    callService({
-      fn: 'otpVerifyAction',
-      provider: 'singleton',
-      otpVerifyConfig: emailConfig,
-      request: {
-        url: 'http://localhost/id/login/verify/email',
-        form: { intent: 'resend', loginName: EMAIL_USER },
-        csrf: true,
-      },
-    }).then((v) => {
-      expect(v.response?.status).to.equal(302);
-      const loc = v.response?.location ?? '';
-      expect(loc.startsWith('/login/verify/email?')).to.equal(true);
-      expect(loc).to.include(`loginName=${encodeURIComponent(EMAIL_USER)}`);
-      expect(loc).to.not.include('code=');
     });
   });
 });

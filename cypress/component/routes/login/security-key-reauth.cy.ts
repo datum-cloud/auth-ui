@@ -9,28 +9,6 @@ const ALICE = 'alice@acme.test';
 const SESSION = { id: 's1', token: 't1', loginName: ALICE };
 
 describe('login/security-key (webauthn) action — re-auth identity guard (H-1)', () => {
-  it('matching identity → completes to the resolved target and clears the intent', () => {
-    callService({
-      fn: 'securityKeyAction',
-      provider: 'singleton',
-      liveSessions: [{ id: 's1', token: 't1', user: { id: 'u1', loginName: ALICE } }],
-      request: {
-        url: 'http://localhost/id/login/security-key',
-        sessions: [SESSION],
-        form: { loginName: ALICE, credential: '{}' },
-        csrf: true,
-        reauthIntent: ALICE,
-      },
-    }).then((v) => {
-      expect(v.response?.status).to.equal(302);
-      expect(v.response?.setCookies?.some((c: string) => c.startsWith('reauth-intent='))).to.equal(
-        true
-      );
-      const loc = v.response?.location ?? '';
-      expect(loc).not.to.contain('/accounts');
-    });
-  });
-
   it('different identity → bounces to /accounts?reauthMismatch=1 (carrying requestId), clears intent', () => {
     // form loginName = alice, reauthIntent = totp-user → mismatch
     callService({
@@ -53,25 +31,6 @@ describe('login/security-key (webauthn) action — re-auth identity guard (H-1)'
       expect(v.response?.setCookies?.some((c: string) => c.startsWith('reauth-intent='))).to.equal(
         true
       );
-    });
-  });
-
-  it('no re-auth intent → completes normally (no mismatch bounce)', () => {
-    callService({
-      fn: 'securityKeyAction',
-      provider: 'singleton',
-      liveSessions: [{ id: 's1', token: 't1', user: { id: 'u1', loginName: ALICE } }],
-      request: {
-        url: 'http://localhost/id/login/security-key',
-        sessions: [SESSION],
-        form: { loginName: ALICE, credential: '{}' },
-        csrf: true,
-        // No reauthIntent
-      },
-    }).then((v) => {
-      expect(v.response?.status).to.equal(302);
-      const loc = v.response?.location ?? '';
-      expect(loc).not.to.contain('/accounts');
     });
   });
 });

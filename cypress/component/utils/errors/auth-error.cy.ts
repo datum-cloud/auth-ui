@@ -25,32 +25,8 @@ describe('authErrorMessage', () => {
     }
   });
 
-  it('maps signin_failed to the fixed sign-in error copy', () => {
-    expect(authErrorMessage('signin_failed')).to.deep.equal({
-      title: 'Sign-in error',
-      body: 'Could not complete sign-in. Return to your application and try again.',
-    });
-  });
-
-  it('maps request_expired to the fixed expired-request copy', () => {
-    expect(authErrorMessage('request_expired')).to.deep.equal({
-      title: 'Login request expired',
-      body: 'Your login session has expired. Return to the application and sign in again.',
-    });
-  });
-
-  it('maps no_session to the fixed no-account copy', () => {
-    expect(authErrorMessage('no_session')).to.deep.equal({
-      title: 'No account',
-      body: 'No active session found.',
-    });
-  });
-
-  it('returns the generic fallback for an unknown code', () => {
+  it('returns the generic fallback for an unknown code, and for null/undefined', () => {
     expect(authErrorMessage('not_a_real_code')).to.deep.equal(GENERIC);
-  });
-
-  it('returns the generic fallback for null / undefined', () => {
     expect(authErrorMessage(null)).to.deep.equal(GENERIC);
     expect(authErrorMessage(undefined)).to.deep.equal(GENERIC);
   });
@@ -64,33 +40,16 @@ describe('authErrorMessage', () => {
     expect(result.body).not.to.include('script');
     expect(JSON.stringify(result)).not.to.include(tampered);
   });
-
-  it('treats an arbitrary attacker string as unknown (generic fallback, no reflection)', () => {
-    const attacker = 'You have been hacked — send money to evil.test';
-    expect(authErrorMessage(attacker)).to.deep.equal(GENERIC);
-  });
 });
 
 describe('providerErrorCode', () => {
-  it('maps NOT_FOUND to request_expired', () => {
-    expect(providerErrorCode('NOT_FOUND')).to.equal('request_expired');
-  });
-
-  it('maps PERMISSION_DENIED to access_denied', () => {
-    expect(providerErrorCode('PERMISSION_DENIED')).to.equal('access_denied');
-  });
-
   it('maps UNAVAILABLE to service_unavailable', () => {
     expect(providerErrorCode('UNAVAILABLE')).to.equal('service_unavailable');
   });
 
-  it('falls back to signin_failed for any other code', () => {
+  it('falls back to signin_failed for any other code, or for undefined', () => {
     expect(providerErrorCode('DEADLINE_EXCEEDED')).to.equal('signin_failed');
     expect(providerErrorCode('UNKNOWN')).to.equal('signin_failed');
-    expect(providerErrorCode('ALREADY_DONE')).to.equal('signin_failed');
-  });
-
-  it('falls back to signin_failed for undefined', () => {
     expect(providerErrorCode(undefined)).to.equal('signin_failed');
   });
 

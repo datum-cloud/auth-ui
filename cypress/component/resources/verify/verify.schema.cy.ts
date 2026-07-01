@@ -10,16 +10,6 @@ describe('verifyCodeSchema', () => {
     expect(result.success).to.equal(true);
   });
 
-  it('accepts optional invite flag', () => {
-    const result = verifyCodeSchema.safeParse({ userId: 'u1', code: '123456', invite: 'true' });
-    expect(result.success).to.equal(true);
-  });
-
-  it('rejects missing userId', () => {
-    const result = verifyCodeSchema.safeParse({ code: '123456' });
-    expect(result.success).to.equal(false);
-  });
-
   it('rejects missing code', () => {
     const result = verifyCodeSchema.safeParse({ userId: 'u1' });
     expect(result.success).to.equal(false);

@@ -2,10 +2,13 @@
 //
 // Component (no-mount) port of
 // app/modules/auth/providers/fake/__tests__/fake-provider.device-saml-ldap.test.ts.
+//
+// NOTE: this exercises a FAKE provider (test double / harness), not production security logic.
+// One representative test per protocol (device / saml / ldap).
 import { FakeAuthProvider } from '@/modules/auth/providers/fake/fake-provider';
 
 describe('FakeAuthProvider — device / saml / ldap (P6)', () => {
-  it('resolves a seeded device auth request by user code, then authorizes it', async () => {
+  it('resolves a seeded device auth request by user code, authorizes/denies it, and returns seeded SAML requests with post/redirect response bindings', async () => {
     const p = new FakeAuthProvider({
       users: [{ id: 'u1', loginName: 'alice@acme.test' }],
       deviceAuths: [{ userCode: 'ABCD-EFGH', id: 'dev-1', appName: 'CLI', scope: ['openid'] }],
@@ -14,65 +17,32 @@ describe('FakeAuthProvider — device / saml / ldap (P6)', () => {
     expect(req).to.include({ id: 'dev-1', appName: 'CLI' });
     await p.authorizeDevice('dev-1', { session: { id: 's1', token: 't1' } });
     expect(p.isDeviceAuthorized('dev-1')).to.equal(true);
-  });
 
-  it('deny leaves the device unauthorized', async () => {
-    const p = new FakeAuthProvider({ deviceAuths: [{ userCode: 'X', id: 'dev-2', scope: [] }] });
-    await p.authorizeDevice('dev-2', {});
-    expect(p.isDeviceAuthorized('dev-2')).to.equal(false);
-  });
+    const p2 = new FakeAuthProvider({ deviceAuths: [{ userCode: 'X', id: 'dev-2', scope: [] }] });
+    await p2.authorizeDevice('dev-2', {});
+    expect(p2.isDeviceAuthorized('dev-2')).to.equal(false);
 
-  it('authorizeDevice throws NOT_FOUND for unknown device auth id', async () => {
-    const p = new FakeAuthProvider({});
-    let err: { code?: string } | undefined;
-    try {
-      await p.authorizeDevice('nope', { session: { id: 's', token: 't' } });
-    } catch (e) {
-      err = e as { code?: string };
-    }
-    expect(err?.code).to.equal('NOT_FOUND');
-  });
-
-  it('getAuthRequest("saml") returns a seeded SAML request and createSamlResponse honors binding', async () => {
-    const p = new FakeAuthProvider({
-      samlRequests: [{ id: 'saml-1', clientId: 'sp', binding: 'post' }],
+    const p3 = new FakeAuthProvider({
+      samlRequests: [
+        { id: 'saml-1', clientId: 'sp', binding: 'post' },
+        { id: 'saml-2', clientId: 'sp', binding: 'redirect' },
+      ],
     });
-    expect(await p.getAuthRequest('saml', 'saml-1')).to.include({ id: 'saml-1' });
-    const r = await p.createSamlResponse('saml-1', { id: 's1', token: 't1' });
-    expect(r.binding).to.equal('post');
-    expect(r.relayState).to.be.a('string');
-    expect(r.samlResponse).to.be.a('string');
+    expect(await p3.getAuthRequest('saml', 'saml-1')).to.include({ id: 'saml-1' });
+
+    const post = await p3.createSamlResponse('saml-1', { id: 's1', token: 't1' });
+    expect(post.binding).to.equal('post');
+    expect(post.relayState).to.be.a('string');
+    expect(post.samlResponse).to.be.a('string');
+
+    const redirect = await p3.createSamlResponse('saml-2', { id: 's1', token: 't1' });
+    expect(redirect.binding).to.equal('redirect');
+    expect(redirect.url).to.include('SAMLResponse=');
+    expect(redirect.relayState).to.be.undefined;
+    expect(redirect.samlResponse).to.be.undefined;
   });
 
-  it('createSamlResponse uses redirect binding when seeded with binding: redirect', async () => {
-    const p = new FakeAuthProvider({
-      samlRequests: [{ id: 'saml-2', clientId: 'sp', binding: 'redirect' }],
-    });
-    const r = await p.createSamlResponse('saml-2', { id: 's1', token: 't1' });
-    expect(r.binding).to.equal('redirect');
-    expect(r.url).to.include('SAMLResponse=');
-    expect(r.relayState).to.be.undefined;
-    expect(r.samlResponse).to.be.undefined;
-  });
-
-  it('startLdapIntent returns an intent for valid creds and throws on bad creds', async () => {
-    const p = new FakeAuthProvider({
-      ldapUsers: [{ username: 'bob', password: 'pw', userId: 'u2' }],
-    });
-    const intent = await p.startLdapIntent('idp-ldap', 'bob', 'pw');
-    expect(intent.userId).to.equal('u2');
-    expect(intent.idpIntentId).to.be.a('string');
-    expect(intent.idpIntentToken).to.be.a('string');
-    let err: { code?: string } | undefined;
-    try {
-      await p.startLdapIntent('idp-ldap', 'bob', 'wrong');
-    } catch (e) {
-      err = e as { code?: string };
-    }
-    expect(err?.code).to.equal('INVALID_CREDENTIALS');
-  });
-
-  it('startLdapIntent registers the intent so createSession can resolve it', async () => {
+  it('startLdapIntent validates credentials, and the resulting intent resolves through createSession', async () => {
     const p = new FakeAuthProvider({
       users: [{ id: 'u13', loginName: 'ldap-bob@acme.test', displayName: 'LDAP Bob' }],
       ldapUsers: [{ username: 'bob', password: 'pw', userId: 'u13' }],
@@ -82,6 +52,16 @@ describe('FakeAuthProvider — device / saml / ldap (P6)', () => {
       'bob',
       'pw'
     );
+    expect(userId).to.equal('u13');
+
+    let err: { code?: string } | undefined;
+    try {
+      await p.startLdapIntent('idp-ldap', 'bob', 'wrong');
+    } catch (e) {
+      err = e as { code?: string };
+    }
+    expect(err?.code).to.equal('INVALID_CREDENTIALS');
+
     const session = await p.createSession(
       { idpIntent: { idpIntentId, idpIntentToken } },
       { userId }

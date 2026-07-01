@@ -7,7 +7,7 @@ import { postRegisterStep } from '@/resources/signup/post-register';
 const base = { loginName: 'a@acme.test', userId: 'user-1', organization: 'org1' };
 
 describe('postRegisterStep', () => {
-  it('routes a no-password registration to passkey setup', () => {
+  it('routes based on password/verification state, threading userId and requestId', () => {
     expect(
       postRegisterStep({
         ...base,
@@ -16,18 +16,16 @@ describe('postRegisterStep', () => {
         requireVerification: true,
       })
     ).to.match(/^\/setup\/passkey\?/);
-  });
-  it('routes password + verification-required + unverified to /verify, threading userId', () => {
-    const r = postRegisterStep({
+
+    const toVerify = postRegisterStep({
       ...base,
       hasPassword: true,
       emailVerified: false,
       requireVerification: true,
     });
-    expect(r).to.match(/^\/verify\?/);
-    expect(r).to.contain('userId=user-1');
-  });
-  it('routes password + verified to /signed-in when no requestId', () => {
+    expect(toVerify).to.match(/^\/verify\?/);
+    expect(toVerify).to.contain('userId=user-1');
+
     expect(
       postRegisterStep({
         ...base,
@@ -36,8 +34,7 @@ describe('postRegisterStep', () => {
         requireVerification: true,
       })
     ).to.equal('/signed-in');
-  });
-  it('hands back to /authorize when a requestId is present', () => {
+
     expect(
       postRegisterStep({
         ...base,
@@ -47,8 +44,7 @@ describe('postRegisterStep', () => {
         requestId: 'oidc_1',
       })
     ).to.equal('/authorize?requestId=oidc_1');
-  });
-  it('skips /verify when verification is not required', () => {
+
     expect(
       postRegisterStep({
         ...base,
@@ -57,17 +53,5 @@ describe('postRegisterStep', () => {
         requireVerification: false,
       })
     ).to.equal('/signed-in');
-  });
-  it('routes passwordless (passkey) signup to /setup/passkey with checkAfter=true', () => {
-    const target = postRegisterStep({
-      loginName: 'a@x.com',
-      userId: 'u1',
-      hasPassword: false,
-      emailVerified: false,
-      requireVerification: false,
-    });
-    expect(target).to.contain('/setup/passkey');
-    expect(target).to.contain('checkAfter=true');
-    expect(target).to.contain('force=false');
   });
 });

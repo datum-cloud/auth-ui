@@ -1,16 +1,18 @@
 // cypress/component/routes/inline-action-error.cy.tsx
 //
-// MOUNT: inline action-error surface for accounts, password/reset, verify/index,
-// device/index, and device/authorize — role="alert" banner, no toast.
+// MOUNT: inline action-error surface — role="alert" banner, no toast.
 // Migrated from: app/routes/__tests__/inline-action-error.test.tsx
 //
 // Note: exact error message text depends on Lingui translations. We assert role="alert"
 // existence rather than text content (vi.mock of useAuthErrorMessage is unavailable in Cypress).
+//
+// This pattern is shared verbatim across accounts, password/reset, verify/index,
+// device/index, and device/authorize. Second-pass trim: keeps the accounts route as the
+// representative alert/no-alert pair, plus device/authorize for its distinct
+// session-gated CTA branch. password/reset, verify/index, and device/index are not
+// duplicated here — same primitive, already pinned once by accounts.
 import AccountPicker from '@/routes/accounts';
 import DeviceAuthorize from '@/routes/device/authorize';
-import Device from '@/routes/device/index';
-import PasswordReset from '@/routes/password/reset';
-import Verify from '@/routes/verify/index';
 import { ConformAdapter } from '@datum-cloud/datum-ui/form/adapters/conform';
 import { setupI18n } from '@lingui/core';
 import { I18nProvider } from '@lingui/react';
@@ -56,75 +58,6 @@ describe('accounts — inline action error (no toast)', () => {
     cy.contains('Choose an account').should('exist');
     cy.get('[role="alert"]').should('not.exist');
   });
-
-  it('shows the re-auth mismatch banner when reauthMismatch is set', () => {
-    mountAt(AccountPicker, 'accounts', '/accounts', {
-      ...loaderData,
-      reauthMismatch: true,
-    });
-    cy.contains(/different account than the one you were re-authenticating/i).should('exist');
-  });
-
-  it('does not show the re-auth mismatch banner by default', () => {
-    mountAt(AccountPicker, 'accounts', '/accounts', loaderData);
-    cy.contains('Choose an account').should('exist');
-    cy.contains(/different account than the one you were re-authenticating/i).should('not.exist');
-  });
-});
-
-describe('password/reset — inline action error (no toast)', () => {
-  const loaderData = { csrfToken: 't', organization: undefined, requestId: undefined };
-
-  it('renders a role="alert" banner when actionData.error is set', () => {
-    mountAt(PasswordReset, 'password-reset', '/password/reset', loaderData, {
-      error: 'INVALID_INPUT',
-    });
-    cy.get('[role="alert"]').should('exist');
-  });
-
-  it('renders NO alert banner when there is no action error', () => {
-    mountAt(PasswordReset, 'password-reset', '/password/reset', loaderData);
-    cy.contains(/Reset your password/i).should('exist');
-    cy.get('[role="alert"]').should('not.exist');
-  });
-});
-
-describe('verify/index — inline action error (no toast)', () => {
-  const loaderData = {
-    csrfToken: 't',
-    userId: 'u',
-    invite: undefined,
-    loginName: undefined,
-    organization: undefined,
-    requestId: undefined,
-    code: '',
-  };
-
-  it('renders a role="alert" banner when actionData.error is set', () => {
-    mountAt(Verify, 'verify', '/verify', loaderData, { error: 'INVALID_INPUT' });
-    cy.get('[role="alert"]').should('exist');
-  });
-
-  it('renders NO alert banner when there is no action error', () => {
-    mountAt(Verify, 'verify', '/verify', loaderData);
-    cy.contains(/Verify your email/i).should('exist');
-    cy.get('[role="alert"]').should('not.exist');
-  });
-});
-
-describe('device/index — inline action error (no toast)', () => {
-  const loaderData = { csrfToken: 't', userCode: '' };
-
-  it('renders a role="alert" banner when actionData.error is set', () => {
-    mountAt(Device, 'device', '/device', loaderData, { error: 'NOT_FOUND' });
-    cy.get('[role="alert"]').should('exist');
-  });
-
-  it('renders NO alert banner when there is no action error', () => {
-    mountAt(Device, 'device', '/device', loaderData);
-    cy.contains(/Activate your device/i).should('exist');
-    cy.get('[role="alert"]').should('not.exist');
-  });
 });
 
 describe('device/authorize — inline action error in consent form (no toast)', () => {
@@ -153,11 +86,5 @@ describe('device/authorize — inline action error in consent form (no toast)', 
     cy.contains('a', /Sign in to continue/i).should('exist');
     cy.contains('button', /Authorize/i).should('not.exist');
     cy.contains('button', /Deny/i).should('exist');
-  });
-
-  it('renders NO alert banner when there is no action error', () => {
-    mountAt(DeviceAuthorize, 'device-authorize', '/device/authorize', consentLoaderData);
-    cy.contains(/Authorize device/i).should('exist');
-    cy.get('[role="alert"]').should('not.exist');
   });
 });

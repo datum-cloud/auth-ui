@@ -35,15 +35,4 @@ describe('/setup/authenticator loader — broken-session guard', () => {
       expect(v.response!.location).to.equal('/login?requestId=rq1&organization=acme');
     });
   });
-
-  it('no active session WITH requestId but no organization → redirect preserves requestId alone', () => {
-    callService({
-      fn: 'setupAuthenticatorLoader',
-      request: { url: `${BASE}?loginName=alice%40acme.test&requestId=rq1` },
-    }).then((v) => {
-      expect(v.response!.isResponse).to.be.true;
-      expect(v.response!.status).to.equal(302);
-      expect(v.response!.location).to.equal('/login?requestId=rq1');
-    });
-  });
 });

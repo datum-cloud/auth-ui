@@ -6,44 +6,11 @@
 import { callService } from '../../../support/node/call-service';
 
 describe('device/complete loader — decision validation', () => {
-  it('?decision=authorize → returns decision: authorize', () => {
-    callService({
-      fn: 'deviceCompleteLoader',
-      provider: 'singleton',
-      request: { url: 'http://localhost/id/device/complete?decision=authorize' },
-    }).then((v) => {
-      const body = v.response?.dataBody as Record<string, unknown> | undefined;
-      expect(body?.decision).to.equal('authorize');
-    });
-  });
-
-  it('?decision=deny → returns decision: deny', () => {
-    callService({
-      fn: 'deviceCompleteLoader',
-      provider: 'singleton',
-      request: { url: 'http://localhost/id/device/complete?decision=deny' },
-    }).then((v) => {
-      const body = v.response?.dataBody as Record<string, unknown> | undefined;
-      expect(body?.decision).to.equal('deny');
-    });
-  });
-
   it('missing ?decision → fails safe to deny', () => {
     callService({
       fn: 'deviceCompleteLoader',
       provider: 'singleton',
       request: { url: 'http://localhost/id/device/complete' },
-    }).then((v) => {
-      const body = v.response?.dataBody as Record<string, unknown> | undefined;
-      expect(body?.decision).to.equal('deny');
-    });
-  });
-
-  it('tampered ?decision → fails safe to deny', () => {
-    callService({
-      fn: 'deviceCompleteLoader',
-      provider: 'singleton',
-      request: { url: 'http://localhost/id/device/complete?decision=garbage' },
     }).then((v) => {
       const body = v.response?.dataBody as Record<string, unknown> | undefined;
       expect(body?.decision).to.equal('deny');

@@ -6,15 +6,9 @@ import { assetUrl } from '@/utils/asset-url';
 describe('assetUrl', () => {
   const base = import.meta.env.BASE_URL;
 
-  it('prefixes a leading-slash path with the Vite base', () => {
+  it('prefixes a path (with or without a leading slash) with the Vite base, without doubling the slash', () => {
     expect(assetUrl('/images/idps/google.png')).to.equal(`${base}images/idps/google.png`);
-  });
-
-  it('prefixes a path with no leading slash', () => {
     expect(assetUrl('favicons/light/favicon.ico')).to.equal(`${base}favicons/light/favicon.ico`);
-  });
-
-  it('does not double the slash after the base', () => {
     expect(assetUrl('/x.png').startsWith(`${base}/`)).to.equal(false);
   });
 });

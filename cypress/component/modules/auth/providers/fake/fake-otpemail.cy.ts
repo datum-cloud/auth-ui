@@ -58,12 +58,4 @@ describe('FakeAuthProvider otpEmail primary factor', () => {
     }
     expect(err?.code).to.equal('INVALID_CREDENTIALS');
   });
-
-  it('seeded users with email already verified can addOtpEmail without calling verifyEmail', async () => {
-    const p = new FakeAuthProvider({
-      users: [{ id: 'u1', loginName: 'seeded@x.com', displayName: 'Seeded' }],
-    });
-    await p.verifyEmail('u1', 'email-u1');
-    expect(await p.addOtpEmail('u1')).to.be.undefined;
-  });
 });

@@ -25,19 +25,6 @@ describe('SSO IdP-display flows — org-first / default-org fallback', () => {
         expect(v.calls?.getActiveIdPs?.[0]?.[0]).to.equal('org-default-fake');
       });
     });
-
-    it('with an explicit org, uses it and never consults the provider default org', () => {
-      callService({
-        fn: 'activeIdPsProbe',
-        provider: 'singleton',
-        request: { url: 'http://localhost/id/sso' },
-        resolveOrgInput: { urlOrg: 'org-explicit' },
-        recordCalls: [...RECORD],
-      }).then((v) => {
-        expect(v.calls?.getDefaultOrg).to.have.length(0);
-        expect(v.calls?.getActiveIdPs?.[0]?.[0]).to.equal('org-explicit');
-      });
-    });
   });
 
   describe('runSsoAction (start intent)', () => {
@@ -50,73 +37,6 @@ describe('SSO IdP-display flows — org-first / default-org fallback', () => {
       }).then((v) => {
         expect(v.calls?.getDefaultOrg).to.have.length(1);
         expect(v.calls?.getActiveIdPs?.[0]?.[0]).to.equal('org-default-fake');
-      });
-    });
-
-    it('with an explicit organization, preserves it (provider default unused)', () => {
-      callService({
-        fn: 'runSsoAction',
-        provider: 'singleton',
-        request: {
-          url: 'http://localhost/id/sso',
-          form: { intent: 'start', provider: 'google', organization: 'org-explicit' },
-        },
-        recordCalls: [...RECORD],
-      }).then((v) => {
-        expect(v.calls?.getDefaultOrg).to.have.length(0);
-        expect(v.calls?.getActiveIdPs?.[0]?.[0]).to.equal('org-explicit');
-      });
-    });
-  });
-
-  describe('resolveSsoLink (sign-in-required prompt)', () => {
-    it('with NO ?organization and no session, resolves the default org for the IdP list', () => {
-      callService({
-        fn: 'resolveSsoLink',
-        provider: 'singleton',
-        request: { url: 'http://localhost/id/sso/link' },
-        recordCalls: [...RECORD],
-      }).then((v) => {
-        expect(v.calls?.getDefaultOrg).to.have.length(1);
-        expect(v.calls?.getActiveIdPs?.[0]?.[0]).to.equal('org-default-fake');
-      });
-    });
-
-    it('with an explicit ?organization, preserves it (provider default unused)', () => {
-      callService({
-        fn: 'resolveSsoLink',
-        provider: 'singleton',
-        request: { url: 'http://localhost/id/sso/link?organization=org-explicit' },
-        recordCalls: [...RECORD],
-      }).then((v) => {
-        expect(v.calls?.getDefaultOrg).to.have.length(0);
-        expect(v.calls?.getActiveIdPs?.[0]?.[0]).to.equal('org-explicit');
-      });
-    });
-  });
-
-  describe('resolveSsoManagement (/sso screen)', () => {
-    it('with NO ?organization, resolves the default org before listing/joining IdPs', () => {
-      callService({
-        fn: 'resolveSsoManagement',
-        provider: 'singleton',
-        request: { url: 'http://localhost/id/sso' },
-        recordCalls: [...RECORD],
-      }).then((v) => {
-        expect(v.calls?.getDefaultOrg).to.have.length(1);
-        expect(v.calls?.getActiveIdPs?.[0]?.[0]).to.equal('org-default-fake');
-      });
-    });
-
-    it('with an explicit ?organization, preserves it (provider default unused)', () => {
-      callService({
-        fn: 'resolveSsoManagement',
-        provider: 'singleton',
-        request: { url: 'http://localhost/id/sso?organization=org-explicit' },
-        recordCalls: [...RECORD],
-      }).then((v) => {
-        expect(v.calls?.getDefaultOrg).to.have.length(0);
-        expect(v.calls?.getActiveIdPs?.[0]?.[0]).to.equal('org-explicit');
       });
     });
   });

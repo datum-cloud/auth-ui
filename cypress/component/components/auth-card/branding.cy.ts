@@ -1,7 +1,7 @@
 import { brandingToStyle } from '@/components/auth-card/branding';
 
 describe('brandingToStyle', () => {
-  it('maps primaryColor → --primary and backgroundColor → --background', () => {
+  it('maps primaryColor/backgroundColor to CSS vars, and returns an empty object (datum defaults) when branding or the field is absent', () => {
     expect(brandingToStyle({ primaryColor: '#5469d4' })).to.deep.equal({ '--primary': '#5469d4' });
     expect(brandingToStyle({ backgroundColor: '#ffffff' })).to.deep.equal({
       '--background': '#ffffff',
@@ -10,9 +10,7 @@ describe('brandingToStyle', () => {
       '--primary': '#111',
       '--background': '#222',
     });
-  });
 
-  it('returns an empty object (datum defaults) when branding or the field is absent', () => {
     expect(brandingToStyle(undefined)).to.deep.equal({});
     expect(brandingToStyle(null)).to.deep.equal({});
     expect(brandingToStyle({})).to.deep.equal({});

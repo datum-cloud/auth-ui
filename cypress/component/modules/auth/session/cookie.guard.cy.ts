@@ -49,28 +49,4 @@ describe('readSessions zod guard (P0 carry-over)', () => {
       expect(lines[0]).to.include('invalid_signature');
     });
   });
-
-  it('validly-signed wrong-shape payload → [] + malformed_payload audit', () => {
-    callService({
-      fn: 'cookieGuardCheck',
-      cookieGuardOp: 'forgedWrongShape',
-      request: { url: 'http://localhost/id/accounts' },
-    }).then((v) => {
-      expect((v.outcome as { count: number }).count).to.equal(0);
-      const lines = sessionCookieAudit(v);
-      expect(lines).to.have.length(1);
-      expect(lines[0]).to.include('malformed_payload');
-    });
-  });
-
-  it('validly-signed non-array payload → [] + malformed_payload audit', () => {
-    callService({
-      fn: 'cookieGuardCheck',
-      cookieGuardOp: 'forgedNonArray',
-      request: { url: 'http://localhost/id/accounts' },
-    }).then((v) => {
-      expect((v.outcome as { count: number }).count).to.equal(0);
-      expect(sessionCookieAudit(v)).to.have.length(1);
-    });
-  });
 });

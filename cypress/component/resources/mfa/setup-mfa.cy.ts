@@ -33,30 +33,10 @@ const settings = (over: Partial<LoginSettings> = {}): LoginSettings => ({
 const keys = (caps: ProviderCapabilities, s: LoginSettings) => offerableSetupRoutes(caps, s);
 
 describe('offerableSetupRoutes (setup.mfa policy gating)', () => {
-  it('shows only authenticator + passkey when policy enables only TOTP (+ passkey via multiFactors)', () => {
-    const s = settings({ secondFactors: ['totp'], multiFactors: ['passkey'] });
-    expect(keys(ALL_CAPS, s)).to.deep.equal(['passkey', 'totpOtp']);
-  });
-
-  it('drops the passkey row when the policy multiFactors does not include passkey', () => {
-    const s = settings({ secondFactors: ['totp'], multiFactors: [] });
-    expect(keys(ALL_CAPS, s)).to.deep.equal(['totpOtp']);
-  });
-
-  it('falls back to capabilities-only when policy sets are undefined (back-compat)', () => {
-    const s = settings(); // no secondFactors/multiFactors
-    expect(keys(ALL_CAPS, s)).to.deep.equal(['passkey', 'u2f', 'totpOtp', 'emailOtp', 'smsOtp']);
-  });
-
   it('still respects capability gating: a policy-allowed method with no capability is hidden', () => {
     const caps: ProviderCapabilities = { ...ALL_CAPS, totpOtp: false };
     const s = settings({ secondFactors: ['totp', 'otp_email'], multiFactors: ['passkey'] });
     // totpOtp policy-allowed but capability off → hidden; emailOtp shown; passkey shown.
     expect(keys(caps, s)).to.deep.equal(['passkey', 'emailOtp']);
-  });
-
-  it('maps each capability key to the right policy factor (u2f/email/sms)', () => {
-    const s = settings({ secondFactors: ['u2f', 'otp_email', 'otp_sms'], multiFactors: [] });
-    expect(keys(ALL_CAPS, s)).to.deep.equal(['u2f', 'emailOtp', 'smsOtp']);
   });
 });

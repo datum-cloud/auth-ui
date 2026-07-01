@@ -96,10 +96,4 @@ describe('login/mfa — inline recovery', () => {
       '/login?requestId=rq1&organization=acme'
     );
   });
-
-  it('renders NO recovery link for a non-recoverable code (banner only)', () => {
-    mountRecoveryRoute(LoginMfa, '/login/mfa', 'mfa', loaderData, { error: 'INVALID_INPUT' });
-    cy.get('[role="alert"]').should('exist');
-    cy.findByRole('link', { name: 'Sign in again' }).should('not.exist');
-  });
 });

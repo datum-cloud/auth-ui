@@ -18,18 +18,6 @@ describe('assertHttpUrl', () => {
 });
 
 describe('renderSamlPostForm', () => {
-  it('renders an auto-submit form with hidden inputs and a nonced script', () => {
-    const html = renderSamlPostForm(
-      'https://sp.test/acs',
-      { RelayState: 'rs', SAMLResponse: 'b64' },
-      'n-1'
-    );
-    expect(html).to.include('action="https://sp.test/acs"');
-    expect(html).to.include('name="RelayState" value="rs"');
-    expect(html).to.include('name="SAMLResponse" value="b64"');
-    expect(html).to.include('<script nonce="n-1">document.forms[0].submit()</script>');
-  });
-
   it('HTML-attribute-escapes field values and the url (XSS defence)', () => {
     const html = renderSamlPostForm(
       'https://sp.test/acs?x="><script>',

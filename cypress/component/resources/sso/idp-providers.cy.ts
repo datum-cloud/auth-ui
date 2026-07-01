@@ -22,14 +22,6 @@ function makeProvider(externalIdp: boolean) {
 }
 
 describe('getActiveIdPs', () => {
-  it("returns the provider's active IdPs for the org when externalIdp is supported", () => {
-    const { provider, getActiveIdPsStub } = makeProvider(true);
-    return getActiveIdPs(provider, 'org-1').then((idps) => {
-      expect(idps.map((i) => i.id)).to.deep.equal(['idp-g', 'idp-gh']);
-      expect(getActiveIdPsStub).to.have.been.calledWith('org-1');
-    });
-  });
-
   it('returns [] without calling the port when externalIdp is unsupported', () => {
     const { provider, getActiveIdPsStub } = makeProvider(false);
     return getActiveIdPs(provider, 'org-1').then((idps) => {

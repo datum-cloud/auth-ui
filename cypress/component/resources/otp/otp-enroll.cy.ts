@@ -19,22 +19,4 @@ describe('setupSkipSchema — graceful tampered force/checkAfter params (otp-enr
       false
     );
   });
-
-  it('treats absent params as a valid empty result (both undefined)', () => {
-    const r = setupSkipSchema.safeParse({});
-    expect(r.success).to.equal(true);
-    if (r.success) {
-      expect(r.data.force).to.equal(undefined);
-      expect(r.data.checkAfter).to.equal(undefined);
-    }
-  });
-
-  it('accepts the only two valid force/checkAfter values', () => {
-    expect(setupSkipSchema.safeParse({ force: 'true', checkAfter: 'false' }).success).to.equal(
-      true
-    );
-    expect(setupSkipSchema.safeParse({ force: 'false', checkAfter: 'true' }).success).to.equal(
-      true
-    );
-  });
 });

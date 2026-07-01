@@ -1,7 +1,7 @@
 import { BackLink } from '@/components/back-link/back-link';
 
 describe('BackLink', () => {
-  it('links /login/password back to /login, preserving the query', () => {
+  it('links /login/password back to /login preserving the query, and renders nothing on a step with no predecessor', () => {
     cy.mount(<BackLink />, {
       initialEntries: ['/login/password?loginName=a%40b.c&requestId=oidc_x'],
       path: '*',
@@ -11,9 +11,7 @@ describe('BackLink', () => {
       .and('match', /^\/login\?/)
       .and('include', 'loginName=a%40b.c')
       .and('include', 'requestId=oidc_x');
-  });
 
-  it('renders nothing on a step with no predecessor', () => {
     cy.mount(<BackLink />, { initialEntries: ['/login'], path: '*' });
     cy.get('a').should('not.exist');
   });

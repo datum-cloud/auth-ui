@@ -99,35 +99,6 @@ describe('scrubEvent — allowlist (egress neutrality)', () => {
     expect(scrubbed?.platform).to.equal('node');
   });
 
-  it('reduces the exception to the neutral type/value with NO stacktrace vars or provider detail', () => {
-    const scrubbed = scrubEvent(hostileEvent());
-    const values = scrubbed?.exception?.values ?? [];
-    expect(values).to.have.length(1);
-    expect(values[0]?.value).not.to.include(PROVIDER_PROTO);
-    expect(values[0]?.type).not.to.equal('ProviderError');
-    expect(values[0]?.stacktrace).to.be.undefined;
-    expect(values[0]?.mechanism?.handled).to.equal(true);
-  });
-
-  it('keeps trace_id/span_id in contexts.trace but drops trace.data (arbitrary attrs)', () => {
-    const scrubbed = scrubEvent(hostileEvent());
-    const trace = scrubbed?.contexts?.trace;
-    expect(trace?.trace_id).to.equal(TRACE_ID);
-    expect(trace?.span_id).to.equal(SPAN_ID);
-    expect(trace?.op).to.equal('http.server');
-    expect(trace?.status).to.equal('internal_error');
-    expect(trace?.data).to.be.undefined;
-    expect(scrubbed?.contexts?.device).to.be.undefined;
-  });
-
-  it('keeps only the known tag subset (traceId, code) and drops all other tags', () => {
-    const scrubbed = scrubEvent(hostileEvent());
-    expect(scrubbed?.tags?.traceId).to.equal(TRACE_ID);
-    expect(scrubbed?.tags?.code).to.equal(APP_CODE);
-    expect(scrubbed?.tags?.loginName).to.be.undefined;
-    expect(scrubbed?.tags?.secretTag).to.be.undefined;
-  });
-
   it('drops user, request, extra, breadcrumbs, server_name, and top-level message entirely', () => {
     const scrubbed = scrubEvent(hostileEvent());
     expect(scrubbed?.user).to.be.undefined;

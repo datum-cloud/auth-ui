@@ -4,17 +4,11 @@
 // Zod identifier + method schemas → browser-side Chai only.
 import { signupIdentifierSchema, signupMethodSchema } from '@/resources/signup/signup.schema';
 
-describe('signupIdentifierSchema', () => {
-  it('accepts a valid email', () => {
+describe('signup identifier & method schemas', () => {
+  it('validates a proper email identifier and a known method intent, rejecting invalid variants', () => {
     expect(signupIdentifierSchema.safeParse({ email: 'a@b.com' }).success).to.equal(true);
-  });
-  it('rejects a non-email', () => {
     expect(signupIdentifierSchema.safeParse({ email: 'nope' }).success).to.equal(false);
-  });
-});
 
-describe('signupMethodSchema', () => {
-  it('accepts a valid method intent', () => {
     expect(
       signupMethodSchema.safeParse({
         intent: 'email-link',
@@ -23,8 +17,6 @@ describe('signupMethodSchema', () => {
         lastName: 'B',
       }).success
     ).to.equal(true);
-  });
-  it('rejects an unknown intent', () => {
     expect(
       signupMethodSchema.safeParse({
         intent: 'sms',

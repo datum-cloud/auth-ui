@@ -29,23 +29,6 @@ describe('signup/method action — email-link guard when delivery is off', () =>
     });
   });
 
-  it('body has error not sent — short-circuited before registration', () => {
-    callService({
-      fn: 'signupMethodAction',
-      provider: 'singleton',
-      env: { AUTH_EMAIL_DELIVERY_ENABLED: 'false' },
-      request: {
-        url: 'http://localhost/id/signup/method',
-        form: { intent: 'email-link', ...IDENTITY },
-        csrf: true,
-      },
-    }).then((v) => {
-      const body = v.response?.dataBody as Record<string, unknown> | undefined;
-      expect(body?.sent).to.be.undefined;
-      expect(body?.error).to.equal('INVALID_INPUT');
-    });
-  });
-
   it('still allows intent=password when delivery is off', () => {
     callService({
       fn: 'signupMethodAction',

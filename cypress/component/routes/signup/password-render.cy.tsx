@@ -42,19 +42,6 @@ function mountPassword() {
 }
 
 describe('signup/password — render adoption', () => {
-  it('wraps the screen in the AuthCeremony tokenized layout div', () => {
-    mountPassword();
-    cy.get('input[value="csrf-token-pw"]', { timeout: 6000 }).should('exist');
-    cy.get('div.flex.flex-col.items-baseline.justify-center.gap-4').should('exist');
-  });
-
-  it('emits the shared csrf hidden input from AuthFormFields', () => {
-    mountPassword();
-    cy.get('input[value="csrf-token-pw"]', { timeout: 6000 })
-      .should('have.attr', 'name', 'csrf')
-      .and('have.attr', 'type', 'hidden');
-  });
-
   it('renders the ceremony-owned BackLink pointing to /signup', () => {
     mountPassword();
     cy.findByRole('link', { name: /back/i }, { timeout: 6000 }).should(

@@ -10,6 +10,10 @@
 //
 // CUT: "switch→302 success path" — requires compound session seeding (live provider session +
 // matching cookie entry + resolveNextPath). Demoted to E2E coverage.
+//
+// Second-pass trim: keeps the loader happy path, the non-allowlisted requestId security
+// gate, and the CSRF-enforcement security gate. requestId-threading permutations and the
+// no-matching-session action response are cut (same shape as the CSRF-enforcement case).
 import { callService } from '../../support/node/call-service';
 import type { Scenario, Verdict } from '../../support/node/call-service';
 
@@ -23,23 +27,6 @@ describe('accounts loader', () => {
       const body = v.response!.dataBody as Record<string, unknown>;
       expect(typeof body.csrfToken).to.equal('string');
       expect(Array.isArray(body.accounts)).to.be.true;
-    });
-  });
-
-  it('threads an allowlisted ceremony requestId from the URL', () => {
-    callService({
-      fn: 'accountsLoader',
-      request: { url: `${BASE}?requestId=oidc_V3-current&organization=org-a` },
-    }).then((v) => {
-      const body = v.response!.dataBody as Record<string, unknown>;
-      expect(body.requestId).to.equal('oidc_V3-current');
-    });
-  });
-
-  it('returns requestId: null when absent', () => {
-    callService({ fn: 'accountsLoader', request: { url: BASE } }).then((v) => {
-      const body = v.response!.dataBody as Record<string, unknown>;
-      expect(body.requestId).to.equal(null);
     });
   });
 
@@ -69,18 +56,6 @@ describe('accounts action', () => {
     } as Scenario).then((verdict) => {
       expect(verdict.ok).to.be.false;
       expect(verdict.error).to.be.a('string');
-    });
-  });
-
-  it('dispatches with valid CSRF — no-matching-session returns an error response (not a throw)', () => {
-    // Valid CSRF + no sessions cookie entry for sessionId → resolveAccountAction error outcome
-    // → accountActionOutcomeToResponse wraps it → response (not a throw).
-    callService({
-      fn: 'accountsAction',
-      request: { url: BASE, csrf: true, form: { intent: 'switch', sessionId: 'no-such-id' } },
-    }).then((v) => {
-      expect(v.error).to.be.undefined;
-      expect(v.response).to.exist;
     });
   });
 });

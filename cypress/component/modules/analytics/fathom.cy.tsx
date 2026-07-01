@@ -7,12 +7,7 @@
 // trackEvent call into window.__fathomCalls. Only the EXTERNAL SDK is doubled — the SUT
 // (resolveFathomSiteId / FathomAnalytics / trackAuthEvent / TrackOnMount) runs for real. cy.mount
 // flushes effects (act), so calls are observable in the .then() after mount.
-import {
-  resolveFathomSiteId,
-  FathomAnalytics,
-  TrackOnMount,
-  trackAuthEvent,
-} from '@/modules/analytics/fathom';
+import { resolveFathomSiteId, FathomAnalytics, TrackOnMount } from '@/modules/analytics/fathom';
 
 interface FathomCalls {
   load: unknown[][];
@@ -32,30 +27,21 @@ beforeEach(() => {
 });
 
 describe('resolveFathomSiteId', () => {
-  it('returns the id in production when set', () => {
+  it('returns the id only in production when set, and undefined outside production or when unset', () => {
     expect(resolveFathomSiteId('production', 'SITE123')).to.equal('SITE123');
-  });
-
-  it('returns undefined in production when the id is unset', () => {
     expect(resolveFathomSiteId('production', undefined)).to.be.undefined;
-  });
-
-  it('returns undefined outside production even when the id is set', () => {
     expect(resolveFathomSiteId('development', 'SITE123')).to.be.undefined;
-    expect(resolveFathomSiteId('test', 'SITE123')).to.be.undefined;
   });
 });
 
-describe('FathomAnalytics', () => {
-  it('does not load or track when siteId is absent', () => {
+describe('FathomAnalytics + TrackOnMount', () => {
+  it('does not load/track when siteId is absent; loads once and fires a pageview when set; TrackOnMount fires its event once', () => {
     cy.mount(<FathomAnalytics />);
     cy.then(() => {
       expect(fathomCalls().load).to.have.length(0);
       expect(fathomCalls().trackPageview).to.have.length(0);
     });
-  });
 
-  it('loads once with auto:false and fires a pageview on first render when siteId is set', () => {
     cy.mount(<FathomAnalytics siteId="SITE123" />);
     // useEffect runs as a passive effect after paint (async) — retry until recorded.
     cy.wrap(null).should(() => {
@@ -65,21 +51,8 @@ describe('FathomAnalytics', () => {
     cy.then(() => {
       expect(fathomCalls().load[0]).to.deep.equal(['SITE123', { auto: false }]);
     });
-  });
-});
 
-describe('trackAuthEvent', () => {
-  it('forwards the event name to fathom-client trackEvent', () => {
-    trackAuthEvent('email_verified');
-    expect(fathomCalls().trackEvent).to.have.length(1);
-    expect(fathomCalls().trackEvent[0]).to.deep.equal(['email_verified']);
-  });
-});
-
-describe('TrackOnMount', () => {
-  it('fires the conversion event exactly once on mount', () => {
     cy.mount(<TrackOnMount event="signup_submitted" />);
-    // useEffect runs as a passive effect after paint (async) — retry until recorded.
     cy.wrap(null).should(() => {
       expect(fathomCalls().trackEvent).to.have.length(1);
     });

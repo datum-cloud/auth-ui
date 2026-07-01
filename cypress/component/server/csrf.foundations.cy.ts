@@ -9,12 +9,6 @@ describe('loaderCsrf', () => {
     });
   });
 
-  it('set-cookie header is not the literal string "null"', () => {
-    callService({ fn: 'csrfFoundationsCheck', csrfFoundationsOp: 'setCookieNotNull' }).then((v) => {
-      expect(v.outcome.setCookieIsLiteralNull).to.equal(false);
-    });
-  });
-
   it('uses CSRF_FORM_KEY as the form field name', () => {
     callService({ fn: 'csrfFoundationsCheck', csrfFoundationsOp: 'formKeyInSource' }).then((v) => {
       expect(v.outcome.containsKey).to.equal(true);

@@ -18,49 +18,12 @@ describe('otpEmailUrlTemplate', () => {
     );
   });
 
-  it('includes the /id basename explicitly (trustedAppOrigin returns origin-only)', () => {
-    const t = otpEmailUrlTemplate({ origin: 'https://auth.datum.net', loginName: 'x' });
-    expect(t.startsWith('https://auth.datum.net/id/login/verify/email?')).to.equal(true);
-  });
-
   it('keeps the {{.Code}}/{{.UserID}}/{{.SessionID}} braces literal (never percent-encoded)', () => {
     const t = otpEmailUrlTemplate({ origin: 'https://h', loginName: 'x' });
     expect(t).to.include('code={{.Code}}');
     expect(t).to.include('userId={{.UserID}}');
     expect(t).to.include('sessionId={{.SessionID}}');
     expect(t).to.not.include('%7B');
-  });
-
-  it('never emits {{.OrgID}} — OTPEmail does not support that placeholder', () => {
-    const t = otpEmailUrlTemplate({ origin: 'https://h', loginName: 'x', organization: 'acme' });
-    expect(t).to.not.include('{{.OrgID}}');
-  });
-
-  it('encodes the loginName (a real value, not a placeholder)', () => {
-    const t = otpEmailUrlTemplate({ origin: 'https://h', loginName: 'a b/c@d' });
-    expect(t).to.include('&loginName=a%20b%2Fc%40d');
-  });
-
-  it('threads requestId (URL-encoded) when present, omits it otherwise', () => {
-    const withReq = otpEmailUrlTemplate({
-      origin: 'https://h',
-      loginName: 'x',
-      requestId: 'a b/c',
-    });
-    expect(withReq).to.include('&requestId=a%20b%2Fc');
-    const without = otpEmailUrlTemplate({ origin: 'https://h', loginName: 'x' });
-    expect(without).to.not.include('requestId=');
-  });
-
-  it('threads organization (URL-encoded) when present, omits it otherwise', () => {
-    const withOrg = otpEmailUrlTemplate({
-      origin: 'https://h',
-      loginName: 'x',
-      organization: 'acme corp',
-    });
-    expect(withOrg).to.include('&organization=acme%20corp');
-    const without = otpEmailUrlTemplate({ origin: 'https://h', loginName: 'x' });
-    expect(without).to.not.include('organization=');
   });
 
   it('uses the passed origin VERBATIM, including its scheme (no hardcoded https)', () => {

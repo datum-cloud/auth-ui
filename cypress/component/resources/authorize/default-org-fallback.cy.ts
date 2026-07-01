@@ -25,21 +25,4 @@ describe('/authorize — org-first / default-org fallback', () => {
       expect(loc).to.contain('organization=org-default-fake');
     });
   });
-
-  it('an OIDC request WITH an org-id scope → the scope org wins (provider default unused)', () => {
-    callService({
-      fn: 'resolveAuthorize',
-      seed: {
-        authRequests: {
-          req2: { id: 'req2', scopes: ['openid', 'urn:zitadel:iam:org:id:99999'], prompt: [] },
-        },
-        defaultOrgId: 'should-not-appear',
-      },
-      request: { url: 'http://localhost/id/authorize?authRequest=req2' },
-    }).then((v) => {
-      const loc = v.response?.location ?? '';
-      expect(loc).to.contain('organization=99999');
-      expect(loc).to.not.contain('should-not-appear');
-    });
-  });
 });

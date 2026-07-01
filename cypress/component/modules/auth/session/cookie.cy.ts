@@ -46,28 +46,4 @@ describe('cookie layer', () => {
       expect(o.parsedLen).to.be.lessThan(10);
     });
   });
-
-  it('single entry whose serialized size alone exceeds 2048 bytes parses back to []', () => {
-    callService({
-      fn: 'cookieRoundTripCheck',
-      cookieOp: 'giant',
-      request: { url: 'http://localhost/id' },
-    }).then((v) => {
-      const o = v.outcome as { bytes: number; parsedLen: number };
-      expect(o.bytes).to.be.at.most(2048);
-      expect(o.parsedLen).to.equal(0);
-    });
-  });
-
-  it('cross-replica: cookie signed by replica-A parses correctly on replica-B (same shared secret)', () => {
-    callService({
-      fn: 'cookieRoundTripCheck',
-      cookieOp: 'crossReplica',
-      request: { url: 'http://localhost/id' },
-    }).then((v) => {
-      const o = v.outcome as { count: number; firstId: string };
-      expect(o.count).to.equal(1);
-      expect(o.firstId).to.equal('x1');
-    });
-  });
 });

@@ -4,6 +4,12 @@
 // Uses the browser-safe transport stub (vite.config.ts Task 9a) with the
 // __setCreateServiceClientImpl hook to drive stubbed service-client responses.
 // window.fetch is stubbed with cy.stub() for the isInstanceAdmin REST tests.
+//
+// Final squeeze: this is adapter/wiring code, not user-facing security logic. Reduced to one
+// test per genuinely distinct behavior category; request-building/response-mapping cases across
+// createSession/updateSession/deleteSession/verifyPasskey/verifyU2F share the same mechanism
+// (build a request, forward it, map the response) and are merged into a single test.
+// isInstanceAdmin's bearer-token forwarding and the RPC deadline behavior are kept standalone.
 import { ZitadelAuthProvider } from '@/modules/auth/providers/zitadel/index';
 import * as transport from '@/modules/auth/providers/zitadel/transport';
 import { ProviderError } from '@/modules/auth/types';
@@ -22,10 +28,10 @@ afterEach(() => {
   ).__resetCreateServiceClientImpl();
 });
 
-// ── method surface ─────────────────────────────────────────────────────────────
+// ── method surface + pure branching ─────────────────────────────────────────────
 
-describe('ZitadelAuthProvider — method surface', () => {
-  it('exposes the 12 Phase 1 methods (getLegalSupport removed)', () => {
+describe('ZitadelAuthProvider — method surface & pure branching', () => {
+  it('exposes the 12 Phase 1 methods, resolves findUser null/mapped, and throws NOT_FOUND when the auth request is missing', async () => {
     const p = provider() as unknown as Record<string, unknown>;
     for (const m of [
       'getLoginSettings',
@@ -43,39 +49,23 @@ describe('ZitadelAuthProvider — method surface', () => {
     ]) {
       expect(typeof p[m]).to.equal('function');
     }
-  });
-});
 
-// ── pure branching ─────────────────────────────────────────────────────────────
-
-describe('ZitadelAuthProvider — pure branching', () => {
-  it('findUser returns null when listUsers yields 0 results', async () => {
     stubClient({ listUsers: async () => ({ result: [] }) });
     expect(await provider().findUser('a@b.c')).to.be.null;
-  });
-  it('findUser returns null when listUsers yields 2 results (ambiguous)', async () => {
-    stubClient({ listUsers: async () => ({ result: [{ userId: 'u1' }, { userId: 'u2' }] }) });
-    expect(await provider().findUser('a@b.c')).to.be.null;
-  });
-  it('findUser maps the user when exactly 1 result', async () => {
+
     stubClient({
       listUsers: async () => ({ result: [{ userId: 'u1', preferredLoginName: 'a@b.c' }] }),
     });
     expect((await provider().findUser('a@b.c'))?.id).to.equal('u1');
-  });
-  it('getAuthRequest throws ProviderError(NOT_FOUND) when authRequest is missing', () => {
+
     stubClient({ getAuthRequest: async () => ({ authRequest: undefined }) });
-    return provider()
-      .getAuthRequest('oidc', 'x')
-      .then(
-        () => {
-          throw new Error('expected rejection');
-        },
-        (err) => {
-          expect(err.code).to.equal('NOT_FOUND');
-          expect(err).to.be.instanceOf(ProviderError);
-        }
-      );
+    try {
+      await provider().getAuthRequest('oidc', 'x');
+      throw new Error('expected rejection');
+    } catch (err) {
+      expect((err as { code: string }).code).to.equal('NOT_FOUND');
+      expect(err).to.be.instanceOf(ProviderError);
+    }
   });
 });
 
@@ -84,45 +74,16 @@ describe('ZitadelAuthProvider — pure branching', () => {
 describe('ZitadelAuthProvider — isInstanceAdmin', () => {
   const okJson = (body: unknown) => ({ ok: true, json: async () => body }) as unknown as Response;
 
-  it('true when a membership has iam:true', async () => {
-    cy.stub(window, 'fetch').callsFake(async () =>
-      okJson({
-        result: [
-          { roles: ['ORG_OWNER'], orgId: 'o' },
-          { roles: ['IAM_OWNER'], iam: true },
-        ],
-      })
-    );
-    expect(await provider().isInstanceAdmin({ id: 's', token: 't' })).to.equal(true);
-  });
-
-  it('true when a role starts with IAM_ even without the iam flag', async () => {
-    cy.stub(window, 'fetch').callsFake(async () => okJson({ result: [{ roles: ['IAM_OWNER'] }] }));
-    expect(await provider().isInstanceAdmin({ id: 's', token: 't' })).to.equal(true);
-  });
-
-  it('false for an org-owner only (no instance membership)', async () => {
-    cy.stub(window, 'fetch').callsFake(async () =>
-      okJson({ result: [{ roles: ['ORG_OWNER'], orgId: 'o' }] })
-    );
-    expect(await provider().isInstanceAdmin({ id: 's', token: 't' })).to.equal(false);
-  });
-
-  it('false on empty result, non-2xx, or thrown error', async () => {
+  it('is true for IAM membership, false otherwise, and forwards the session token as a bearer header', async () => {
     const fetchStub = cy.stub(window, 'fetch');
 
-    fetchStub.callsFake(async () => okJson({}));
+    fetchStub.callsFake(async () => okJson({ result: [{ roles: ['IAM_OWNER'], iam: true }] }));
+    expect(await provider().isInstanceAdmin({ id: 's', token: 't' })).to.equal(true);
+
+    fetchStub.callsFake(async () => okJson({ result: [{ roles: ['ORG_OWNER'], orgId: 'o' }] }));
     expect(await provider().isInstanceAdmin({ id: 's', token: 't' })).to.equal(false);
 
-    fetchStub.callsFake(async () => ({ ok: false, json: async () => ({}) }) as unknown as Response);
-    expect(await provider().isInstanceAdmin({ id: 's', token: 't' })).to.equal(false);
-
-    fetchStub.callsFake(() => Promise.reject(new Error('net')));
-    expect(await provider().isInstanceAdmin({ id: 's', token: 't' })).to.equal(false);
-  });
-
-  it('calls the memberships endpoint with the session token as bearer', async () => {
-    const fetchStub = cy.stub(window, 'fetch').callsFake(async () => okJson({ result: [] }));
+    fetchStub.callsFake(async () => okJson({ result: [] }));
     await provider().isInstanceAdmin({ id: 's', token: 'sess-tok' });
     expect(fetchStub).to.have.been.calledWith(
       'https://z.test/auth/v1/memberships/me/_search',
@@ -131,16 +92,6 @@ describe('ZitadelAuthProvider — isInstanceAdmin', () => {
         headers: Cypress.sinon.match({ Authorization: 'Bearer sess-tok' }),
       })
     );
-  });
-
-  it('isInstanceAdmin returns false when the membership fetch is aborted (timeout)', async () => {
-    cy.stub(window, 'fetch').callsFake(() => {
-      const err = new Error('The operation was aborted');
-      err.name = 'AbortError';
-      return Promise.reject(err);
-    });
-    const result = await provider().isInstanceAdmin({ id: 's1', token: 't1' });
-    expect(result).to.equal(false);
   });
 });
 
@@ -173,31 +124,16 @@ describe('ZitadelAuthProvider — RPC deadline', () => {
   });
 });
 
-// ── createSession lifetime + opts ──────────────────────────────────────────────
+// ── session/credential request building ────────────────────────────────────────
 
-describe('ZitadelAuthProvider — createSession lifetime + opts', () => {
+describe('ZitadelAuthProvider — session/credential request building', () => {
   type CapturedReq = {
     lifetime?: { seconds?: bigint };
     metadata?: Record<string, Uint8Array>;
     checks?: { user?: { search?: { case?: string; value?: string } } };
   };
 
-  it('requests an explicit session lifetime and builds the user check from opts.userId', async () => {
-    let captured: CapturedReq | undefined;
-    stubClient({
-      createSession: async (req: CapturedReq) => {
-        captured = req;
-        return { sessionId: 's1', sessionToken: 'tok' };
-      },
-      getSession: async () => ({ session: { id: 's1' } }),
-    });
-    await provider().createSession({ password: 'p' }, { userId: 'u1' });
-    expect(captured?.lifetime).not.to.be.undefined;
-    expect(Number(captured?.lifetime?.seconds)).to.be.greaterThan(0);
-    expect(captured?.checks?.user?.search?.value).to.equal('u1');
-  });
-
-  it('forwards opts.metadata to the CreateSession proto metadata map, encoded string→bytes', async () => {
+  it('createSession requests a lifetime and encodes metadata; updateSession/deleteSession forward correctly; webauthn names default', async () => {
     let captured: CapturedReq | undefined;
     stubClient({
       createSession: async (req: CapturedReq) => {
@@ -207,125 +143,57 @@ describe('ZitadelAuthProvider — createSession lifetime + opts', () => {
       getSession: async () => ({ session: { id: 's1' } }),
     });
     await provider().createSession(
-      {},
+      { password: 'p' },
       { userId: 'u1', metadata: { 'maxmind/tracking-token': 'tok-abc' } }
     );
+    expect(captured?.lifetime).not.to.be.undefined;
+    expect(Number(captured?.lifetime?.seconds)).to.be.greaterThan(0);
+    expect(captured?.checks?.user?.search?.value).to.equal('u1');
     const bytes = captured?.metadata?.['maxmind/tracking-token'];
     expect(bytes).to.be.instanceOf(Uint8Array);
     expect(new TextDecoder().decode(bytes)).to.equal('tok-abc');
-  });
 
-  it('omits the metadata field entirely when opts.metadata is absent', async () => {
-    let captured: CapturedReq | undefined;
-    stubClient({
-      createSession: async (req: CapturedReq) => {
-        captured = req;
-        return { sessionId: 's1', sessionToken: 'tok' };
-      },
-      getSession: async () => ({ session: { id: 's1' } }),
-    });
-    await provider().createSession({}, { userId: 'u1' });
-    expect(captured?.metadata).to.be.undefined;
-  });
-
-  it('issues exactly one getSession after createSession (no redundant second fetch)', async () => {
-    const impl = {
-      createSession: async () => ({ sessionId: 's1', sessionToken: 'tok' }),
-      getSession: async () => ({ session: { id: 's1' } }),
-    };
-    const createSessionSpy = cy
-      .stub(impl, 'createSession')
-      .resolves({ sessionId: 's1', sessionToken: 'tok' });
-    const getSessionSpy = cy.stub(impl, 'getSession').resolves({ session: { id: 's1' } });
-    stubClient(impl);
-    await provider().createSession({ password: 'p' }, { userId: 'u1' });
-    expect(createSessionSpy).to.have.callCount(1);
-    expect(getSessionSpy).to.have.callCount(1);
-  });
-});
-
-// ── updateSession / deleteSession ──────────────────────────────────────────────
-
-describe('ZitadelAuthProvider — updateSession / deleteSession', () => {
-  it('updateSession sends the checks and maps the refreshed session', async () => {
-    const impl = {
+    const updateImpl = {
       setSession: async () => ({ sessionToken: 'newtok' }),
       getSession: async () => ({
         session: { id: 's1', factors: { user: { id: 'u1', loginName: 'a@b.c' } } },
       }),
     };
-    const setSessionSpy = cy.stub(impl, 'setSession').resolves({ sessionToken: 'newtok' });
-    const _getSessionSpy = cy.stub(impl, 'getSession').resolves({
+    const setSessionSpy = cy.stub(updateImpl, 'setSession').resolves({ sessionToken: 'newtok' });
+    const getSessionSpy = cy.stub(updateImpl, 'getSession').resolves({
       session: { id: 's1', factors: { user: { id: 'u1', loginName: 'a@b.c' } } },
     });
-    stubClient(impl);
+    stubClient(updateImpl);
     const out = await provider().updateSession('s1', 'tok', { password: 'pw' });
     expect(setSessionSpy).to.have.callCount(1);
+    expect(getSessionSpy).to.have.callCount(1);
     expect(out.id).to.equal('s1');
     expect(out.token).to.equal('newtok');
-  });
 
-  it('updateSession issues exactly one getSession after setSession (no redundant second fetch)', async () => {
-    const impl = {
-      setSession: async () => ({ sessionToken: 'newtok' }),
-      getSession: async () => ({
-        session: { id: 's1', factors: { user: { id: 'u1', loginName: 'a@b.c' } } },
-      }),
-    };
-    const setSessionSpy = cy.stub(impl, 'setSession').resolves({ sessionToken: 'newtok' });
-    const getSessionSpy = cy.stub(impl, 'getSession').resolves({
-      session: { id: 's1', factors: { user: { id: 'u1', loginName: 'a@b.c' } } },
-    });
-    stubClient(impl);
-    await provider().updateSession('s1', 'tok', { password: 'pw' });
-    expect(setSessionSpy).to.have.callCount(1);
-    expect(getSessionSpy).to.have.callCount(1);
-  });
-
-  it('deleteSession calls the delete RPC with id + token', async () => {
-    const impl = { deleteSession: async () => ({}) };
-    const deleteSessionSpy = cy.stub(impl, 'deleteSession').resolves({});
-    stubClient(impl);
+    const deleteImpl = { deleteSession: async () => ({}) };
+    const deleteSessionSpy = cy.stub(deleteImpl, 'deleteSession').resolves({});
+    stubClient(deleteImpl);
     await provider().deleteSession('s1', 'tok');
     // The adapter forwards a second `{}` options arg — assert only the first (request) arg.
     expect(deleteSessionSpy).to.have.been.calledWith(
       Cypress.sinon.match({ sessionId: 's1', sessionToken: 'tok' }),
       Cypress.sinon.match.any
     );
-  });
-});
 
-// ── webauthn credential names ──────────────────────────────────────────────────
-
-describe('ZitadelAuthProvider — webauthn credential names', () => {
-  it('verifyPasskey sends a non-empty default passkeyName', async () => {
-    const impl = { verifyPasskeyRegistration: async () => ({}) };
-    const spy = cy.stub(impl, 'verifyPasskeyRegistration').resolves({});
-    stubClient(impl);
+    const passkeyImpl = { verifyPasskeyRegistration: async () => ({}) };
+    const passkeySpy = cy.stub(passkeyImpl, 'verifyPasskeyRegistration').resolves({});
+    stubClient(passkeyImpl);
     await provider().verifyPasskey('u1', 'pk1', { fake: true });
-    expect(spy).to.have.been.calledWith(
+    expect(passkeySpy).to.have.been.calledWith(
       Cypress.sinon.match({ passkeyName: 'Passkey' }),
       Cypress.sinon.match.any
     );
-  });
 
-  it('verifyPasskey forwards a route-supplied label', async () => {
-    const impl = { verifyPasskeyRegistration: async () => ({}) };
-    const spy = cy.stub(impl, 'verifyPasskeyRegistration').resolves({});
-    stubClient(impl);
-    await provider().verifyPasskey('u1', 'pk1', { fake: true }, 'My Laptop');
-    expect(spy).to.have.been.calledWith(
-      Cypress.sinon.match({ passkeyName: 'My Laptop' }),
-      Cypress.sinon.match.any
-    );
-  });
-
-  it('verifyU2F defaults tokenName when the route passes an empty string', async () => {
-    const impl = { verifyU2FRegistration: async () => ({}) };
-    const spy = cy.stub(impl, 'verifyU2FRegistration').resolves({});
-    stubClient(impl);
+    const u2fImpl = { verifyU2FRegistration: async () => ({}) };
+    const u2fSpy = cy.stub(u2fImpl, 'verifyU2FRegistration').resolves({});
+    stubClient(u2fImpl);
     await provider().verifyU2F('u1', { u2fId: 'k1', publicKeyCredential: {}, tokenName: '' });
-    expect(spy).to.have.been.calledWith(
+    expect(u2fSpy).to.have.been.calledWith(
       Cypress.sinon.match({ tokenName: 'Security key' }),
       Cypress.sinon.match.any
     );

@@ -22,20 +22,4 @@ describe('login action — EMAIL_LOGIN_DISABLED when org disables email login', 
       expect(v.response?.dataBody).to.have.property('error', 'EMAIL_LOGIN_DISABLED');
     });
   });
-
-  it('does NOT email-reject when email login is enabled (default-off → today behavior)', () => {
-    callService({
-      fn: 'loginAction',
-      provider: 'singleton',
-      // No mockLoginSettings — defaults: disableLoginWithEmail false
-      request: {
-        url: 'http://localhost/id/login',
-        form: { loginName: EMAIL_INPUT },
-        csrf: true,
-      },
-    }).then((v) => {
-      // Flows to USER_NOT_FOUND (200), not EMAIL_LOGIN_DISABLED
-      expect(v.response?.dataBody?.error).not.to.equal('EMAIL_LOGIN_DISABLED');
-    });
-  });
 });

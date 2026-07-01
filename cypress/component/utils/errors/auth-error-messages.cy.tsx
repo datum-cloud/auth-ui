@@ -18,25 +18,23 @@ const GENERIC = 'Something went wrong. Please try again.';
 describe('useAuthErrorMessage — device-code lookup codes (lowercase)', () => {
   // REGRESSION: device.service.ts emits lowercase codes ('not_found' / 'invalid_code');
   // without these cases they fell through to the generic fallback masking the real reason.
-  it("maps 'not_found' to the device-specific not-found message (NOT the generic fallback)", () => {
+  // Also asserts the uppercase 'NOT_FOUND' generic-resource message stays distinct from
+  // the lowercase device-specific ones.
+  it("maps 'not_found'/'invalid_code' to device-specific messages (NOT the generic fallback), distinct from uppercase 'NOT_FOUND'", () => {
     cy.mount(<MessageHarness code="not_found" />);
     cy.get('[data-testid="msg"]').should(
       'have.text',
       'That device code was not found. Check the code on your device and try again.'
     );
     cy.get('[data-testid="msg"]').should('not.have.text', GENERIC);
-  });
 
-  it("maps 'invalid_code' to the device-specific invalid message (NOT the generic fallback)", () => {
     cy.mount(<MessageHarness code="invalid_code" />);
     cy.get('[data-testid="msg"]').should(
       'have.text',
       "That device code isn't valid. Check the code on your device and try again."
     );
     cy.get('[data-testid="msg"]').should('not.have.text', GENERIC);
-  });
 
-  it("keeps the uppercase 'NOT_FOUND' generic-resource message distinct from the device one", () => {
     cy.mount(<MessageHarness code="NOT_FOUND" />);
     cy.get('[data-testid="msg"]').should(
       'have.text',
@@ -51,13 +49,11 @@ describe('useAuthErrorMessage — baseline behavior', () => {
     cy.get('[data-testid="msg"]').should('have.text', '__undefined__');
   });
 
-  it('falls back to the generic message for an unknown code', () => {
-    cy.mount(<MessageHarness code="SOME_UNKNOWN_CODE" />);
-    cy.get('[data-testid="msg"]').should('have.text', GENERIC);
-  });
-
-  it('resolves a known uppercase code to its specific message', () => {
+  it('resolves a known code to its specific message, and falls back to the generic message for an unknown code', () => {
     cy.mount(<MessageHarness code="INVALID_CREDENTIALS" />);
     cy.get('[data-testid="msg"]').should('have.text', 'Incorrect credentials. Please try again.');
+
+    cy.mount(<MessageHarness code="SOME_UNKNOWN_CODE" />);
+    cy.get('[data-testid="msg"]').should('have.text', GENERIC);
   });
 });

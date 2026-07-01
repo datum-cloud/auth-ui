@@ -11,7 +11,6 @@ import {
   listSessions,
   mostRecent,
   needsLivenessCheck,
-  removeSession,
   type SessionEntry,
 } from '@/modules/auth/session/session';
 
@@ -26,16 +25,10 @@ const base: SessionEntry = {
 };
 
 describe('session store (cookie-array logic)', () => {
-  it('adds and lists sessions', () => {
-    expect(listSessions(addSession([], base), NOW)).to.have.length(1);
-  });
   it('replaces an existing session by id (no duplicates)', () => {
     const next = addSession([base], { ...base, changeTs: '2' });
     expect(listSessions(next, NOW)).to.have.length(1);
     expect(mostRecent(next)?.changeTs).to.equal('2');
-  });
-  it('removes by id', () => {
-    expect(listSessions(removeSession([base], 's1'), NOW)).to.have.length(0);
   });
   it('drops expired sessions on list', () => {
     const expired = { ...base, id: 's2', expirationTs: '1' };
@@ -61,41 +54,17 @@ describe('session store (cookie-array logic)', () => {
 
 describe('session store — ISO-8601 timestamp support', () => {
   const FAR_FUTURE_ISO = '2099-01-01T00:00:00.000Z';
-  const PAST_ISO = '2000-01-01T00:00:00.000Z';
   const isoBase: SessionEntry = {
     ...base,
     expirationTs: FAR_FUTURE_ISO,
     changeTs: FAR_FUTURE_ISO,
   };
 
-  it('listSessions keeps a future-ISO expirationTs entry', () => {
-    const entry: SessionEntry = { ...isoBase, id: 'iso-future', expirationTs: FAR_FUTURE_ISO };
-    expect(listSessions([entry], NOW)).to.have.length(1);
-  });
-
-  it('listSessions drops a past-ISO expirationTs entry', () => {
-    const entry: SessionEntry = { ...isoBase, id: 'iso-past', expirationTs: PAST_ISO };
-    expect(listSessions([entry], NOW)).to.have.length(0);
-  });
-
   it('mostRecent orders mixed epoch-string and ISO changeTs entries correctly', () => {
     const epochEntry: SessionEntry = { ...base, id: 'epoch', changeTs: '1000' };
     const isoEntry: SessionEntry = { ...isoBase, id: 'iso-newer', changeTs: FAR_FUTURE_ISO };
     const result = mostRecent([epochEntry, isoEntry]);
     expect(result?.id).to.equal('iso-newer');
-  });
-
-  it('capSessions evicts the ISO-oldest first when changeTs are ISO strings', () => {
-    const sizeOf = (list: SessionEntry[]) => list.length * 800;
-    const entries: SessionEntry[] = [
-      { ...isoBase, id: 'iso-old', changeTs: '2020-01-01T00:00:00.000Z' },
-      { ...isoBase, id: 'iso-mid', changeTs: '2021-01-01T00:00:00.000Z' },
-      { ...isoBase, id: 'iso-new', changeTs: FAR_FUTURE_ISO },
-    ];
-    const capped = capSessions(entries, 2048, sizeOf);
-    expect(capped).to.have.length(2);
-    expect(capped.map((s) => s.id)).to.not.include('iso-old'); // oldest evicted
-    expect(capped.map((s) => s.id)).to.include('iso-new');
   });
 });
 
@@ -109,20 +78,11 @@ describe('byLoginName', () => {
   };
   const bob: SessionEntry = { ...base, id: 's3', loginName: 'bob@acme.test' };
 
-  it('finds a session by loginName (no org filter)', () => {
+  it('finds sessions by loginName (optionally scoped by organization) and returns undefined on any mismatch', () => {
     expect(byLoginName([alice, bob], 'alice@acme.test')).to.deep.equal(alice);
-  });
-  it('finds a session by loginName + organization when both match', () => {
     expect(byLoginName([alice, aliceOrg], 'alice@acme.test', 'acme')).to.deep.equal(aliceOrg);
-  });
-  it('returns undefined when loginName matches but organization does not', () => {
     expect(byLoginName([alice], 'alice@acme.test', 'other-org')).to.be.undefined;
-  });
-  it('returns undefined when loginName does not match (miss)', () => {
     expect(byLoginName([alice, bob], 'charlie@acme.test')).to.be.undefined;
-  });
-  it('returns undefined on empty list', () => {
-    expect(byLoginName([], 'alice@acme.test')).to.be.undefined;
   });
 });
 

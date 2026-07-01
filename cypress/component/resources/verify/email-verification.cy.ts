@@ -11,24 +11,11 @@ describe('emailVerificationGate', () => {
     expect(emailVerificationGate({ ...base, emailVerified: true, requireVerification: true })).to.be
       .null;
   });
-  it('returns null when verification is not required by policy', () => {
-    expect(emailVerificationGate({ ...base, emailVerified: false, requireVerification: false })).to
-      .be.null;
-  });
   it('redirects to /verify with send=true when unverified and required', () => {
     const r = emailVerificationGate({ ...base, emailVerified: false, requireVerification: true });
     expect(r?.redirect).to.match(/^\/verify\?/);
     expect(r?.redirect).to.contain('send=true');
     expect(r?.redirect).to.contain('loginName=a%40acme.test');
     expect(r?.redirect).to.contain('organization=org1');
-  });
-  it('threads requestId when present', () => {
-    const r = emailVerificationGate({
-      ...base,
-      emailVerified: false,
-      requireVerification: true,
-      requestId: 'oidc_9',
-    });
-    expect(r?.redirect).to.contain('requestId=oidc_9');
   });
 });

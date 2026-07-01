@@ -25,39 +25,26 @@ describe('resolveSignupView', () => {
       registrationDisabled: false,
     });
   });
-  it('adds password when allowPassword is on', () => {
-    expect(resolveSignupView({ ...base, allowPassword: true }, idps, true).showPassword).to.equal(
-      true
-    );
-  });
-  it('hides IdP buttons when no IdPs are active', () => {
-    expect(resolveSignupView(base, [], true).showIdpButtons).to.equal(false);
-  });
-  it('hides passkey when passkeysType is not allowed', () => {
+
+  it('reflects allowPassword, missing IdPs, disabled passkeys, disabled registration, and disabled email delivery together', () => {
     expect(
-      resolveSignupView({ ...base, passkeysType: 'not_allowed' } as LoginSettings, idps, true)
-        .showPasskey
-    ).to.equal(false);
-  });
-  it('disables email entry + link when disableLoginWithEmail', () => {
-    const v = resolveSignupView(
-      { ...base, disableLoginWithEmail: true } as LoginSettings,
-      idps,
-      true
-    );
-    expect(v.allowEmailEntry).to.equal(false);
-    expect(v.showEmailLink).to.equal(false);
-  });
-  it('flags registrationDisabled when allowRegister is false', () => {
-    expect(
-      resolveSignupView({ ...base, allowRegister: false } as LoginSettings, idps, true)
-        .registrationDisabled
-    ).to.equal(true);
-  });
-  it('hides email link when email delivery is disabled', () => {
-    expect(resolveSignupView(base, idps, false).showEmailLink).to.equal(false);
-  });
-  it('shows email link when email allowed AND delivery enabled', () => {
-    expect(resolveSignupView(base, idps, true).showEmailLink).to.equal(true);
+      resolveSignupView(
+        {
+          ...base,
+          allowPassword: true,
+          passkeysType: 'not_allowed',
+          allowRegister: false,
+        } as LoginSettings,
+        [],
+        false
+      )
+    ).to.deep.equal({
+      showIdpButtons: false,
+      allowEmailEntry: true,
+      showEmailLink: false,
+      showPasskey: false,
+      showPassword: true,
+      registrationDisabled: true,
+    });
   });
 });

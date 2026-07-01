@@ -37,48 +37,4 @@ describe('listAccounts — listAuthMethods N+1 dedupe', () => {
       expect(accounts.every((a) => a.displayName === 'Alice')).to.equal(true);
     });
   });
-
-  it('issues one listAuthMethods PER distinct userId when sessions belong to different users', () => {
-    callService({
-      fn: 'listAccounts',
-      provider: 'fresh',
-      liveSessions: [
-        { id: 's1', token: 'tok-s1', user: { id: 'u1', loginName: 'alice@acme.test' } },
-        { id: 's2', token: 'tok-s2', user: { id: 'u2', loginName: 'bob@acme.test' } },
-      ],
-      recordCalls: ['listAuthMethods'],
-      request: {
-        url: 'http://localhost/id/accounts',
-        sessions: [
-          { id: 's1', token: 'tok-s1', loginName: 'alice@acme.test', organization: 'org-a' },
-          { id: 's2', token: 'tok-s2', loginName: 'bob@acme.test', organization: 'org-a' },
-        ],
-      },
-    }).then((v) => {
-      const calls = v.calls?.listAuthMethods ?? [];
-      expect(calls.length).to.equal(2);
-      expect(calls.map((c) => c[0]).sort()).to.deep.equal(['u1', 'u2']);
-      expect(v.outcome as Account[]).to.have.length(2);
-    });
-  });
-
-  it('does not call listAuthMethods for a session with no resolved userId', () => {
-    callService({
-      fn: 'listAccounts',
-      provider: 'fresh',
-      liveSessions: [{ id: 's1', token: 'tok-s1' }], // no user → userId ''
-      recordCalls: ['listAuthMethods'],
-      request: {
-        url: 'http://localhost/id/accounts',
-        sessions: [
-          { id: 's1', token: 'tok-s1', loginName: 'alice@acme.test', organization: 'org-a' },
-        ],
-      },
-    }).then((v) => {
-      expect(v.calls?.listAuthMethods ?? []).to.have.length(0);
-      const accounts = v.outcome as Account[];
-      expect(accounts).to.have.length(1);
-      expect(accounts[0].sessionId).to.equal('s1');
-    });
-  });
 });

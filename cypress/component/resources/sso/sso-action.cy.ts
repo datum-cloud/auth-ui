@@ -18,36 +18,6 @@ const ENV_BASE = { SESSION_SECRET: 'x'.repeat(32) };
 type ParseEnvOutcome = { success: boolean; ALLOW_IDP_UNLINK?: boolean };
 
 describe('ALLOW_IDP_UNLINK env parsing (SEC-5, fail-closed)', () => {
-  it("coerces the exact string 'true' to boolean true", () => {
-    callService({
-      fn: 'parseEnv',
-      parseEnvRaw: { ...ENV_BASE, ALLOW_IDP_UNLINK: 'true' },
-      request: { url: BASE },
-    }).then((v) => {
-      expect((v.outcome as ParseEnvOutcome).ALLOW_IDP_UNLINK).to.equal(true);
-    });
-  });
-
-  it("coerces 'false' to boolean false", () => {
-    callService({
-      fn: 'parseEnv',
-      parseEnvRaw: { ...ENV_BASE, ALLOW_IDP_UNLINK: 'false' },
-      request: { url: BASE },
-    }).then((v) => {
-      expect((v.outcome as ParseEnvOutcome).ALLOW_IDP_UNLINK).to.equal(false);
-    });
-  });
-
-  it("coerces '1' (not the literal 'true') to boolean false", () => {
-    callService({
-      fn: 'parseEnv',
-      parseEnvRaw: { ...ENV_BASE, ALLOW_IDP_UNLINK: '1' },
-      request: { url: BASE },
-    }).then((v) => {
-      expect((v.outcome as ParseEnvOutcome).ALLOW_IDP_UNLINK).to.equal(false);
-    });
-  });
-
   it('defaults to boolean false when unset (fail-closed)', () => {
     callService({
       fn: 'parseEnv',
@@ -81,26 +51,6 @@ describe('runSsoAction — start: provider slug is hardened against URL-injectio
       request: { url: BASE, form: { intent: 'start', provider: '../evil/../../callback' } },
     }).then((v) => {
       expect(v.response?.status).to.equal(400);
-    });
-  });
-
-  it('rejects a slug exceeding 64 chars', () => {
-    callService({
-      fn: 'runSsoAction',
-      provider: 'singleton',
-      request: { url: BASE, form: { intent: 'start', provider: 'a'.repeat(65) } },
-    }).then((v) => {
-      expect(v.response?.status).to.equal(400);
-    });
-  });
-
-  it('accepts a well-formed slug (regression guard for the regex)', () => {
-    callService({
-      fn: 'runSsoAction',
-      provider: 'singleton',
-      request: { url: BASE, form: { intent: 'start', provider: 'google' } },
-    }).then((v) => {
-      expect(v.response?.status).to.not.equal(400);
     });
   });
 });

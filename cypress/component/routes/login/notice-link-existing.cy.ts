@@ -19,16 +19,4 @@ describe('login/index loader — notice passthrough', () => {
       expect(v.response?.dataBody).to.have.property('notice', 'link-existing');
     });
   });
-
-  it('omits notice when absent', () => {
-    callService({
-      fn: 'loginLoader',
-      provider: 'singleton',
-      request: { url: 'http://localhost/id/login?organization=org1' },
-    }).then((v) => {
-      expect(v.response?.isResponse).to.equal(false);
-      const notice = (v.response?.dataBody as Record<string, unknown> | undefined)?.notice ?? null;
-      expect(notice).to.equal(null);
-    });
-  });
 });

@@ -15,14 +15,12 @@ afterEach(() => {
 });
 
 describe('MaxMindTracker', () => {
-  it('renders nothing and appends no script when accountId is empty', () => {
+  it('renders nothing and appends no script when accountId is empty; appends the device.js script exactly once when accountId is set', () => {
     cy.mount(<MaxMindTracker accountId="" />);
     cy.document().then((doc) => {
       expect(doc.querySelectorAll('script[data-maxmind="device"]')).to.have.length(0);
     });
-  });
 
-  it('appends the device.js script exactly once when accountId is set', () => {
     cy.mount(<MaxMindTracker accountId="123456" />);
     cy.get('script[data-maxmind="device"]')
       .should('have.length', 1)
@@ -33,11 +31,8 @@ describe('MaxMindTracker', () => {
 describe('readMaxMindTrackingToken', () => {
   beforeEach(() => window.sessionStorage.clear());
 
-  it('returns undefined when no token has been mirrored', () => {
+  it('returns undefined when no token has been mirrored, and returns the token previously written to sessionStorage', () => {
     expect(readMaxMindTrackingToken()).to.be.undefined;
-  });
-
-  it('returns the token previously written to sessionStorage', () => {
     window.sessionStorage.setItem(MAXMIND_TOKEN_STORAGE_KEY, 'tok-xyz');
     expect(readMaxMindTrackingToken()).to.equal('tok-xyz');
   });

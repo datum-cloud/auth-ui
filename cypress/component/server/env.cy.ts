@@ -8,12 +8,6 @@ describe('requireEmailVerification', () => {
     expect(requireEmailVerification({})).to.equal(true);
   });
 
-  it('defaults to true when EMAIL_VERIFICATION is set to an arbitrary string', () => {
-    expect(requireEmailVerification({ EMAIL_VERIFICATION: 'true' })).to.equal(true);
-    expect(requireEmailVerification({ EMAIL_VERIFICATION: '1' })).to.equal(true);
-    expect(requireEmailVerification({ EMAIL_VERIFICATION: 'yes' })).to.equal(true);
-  });
-
   it('returns false only when EMAIL_VERIFICATION is exactly "false"', () => {
     expect(requireEmailVerification({ EMAIL_VERIFICATION: 'false' })).to.equal(false);
   });

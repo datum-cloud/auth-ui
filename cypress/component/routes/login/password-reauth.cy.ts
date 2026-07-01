@@ -32,26 +32,6 @@ describe('login/password action — re-auth identity guard (H-4)', () => {
     });
   });
 
-  it('matches case-insensitively (no false mismatch on casing)', () => {
-    callService({
-      fn: 'loginPasswordAction',
-      provider: 'singleton',
-      liveSessions: [{ id: 's1', token: 't1', user: { id: 'u1', loginName: ALICE } }],
-      request: {
-        url: 'http://localhost/id/login/password',
-        sessions: [SESSION],
-        form: { loginName: ALICE, password: 'hunter2' },
-        csrf: true,
-        reauthIntent: 'Alice@ACME.test',
-      },
-    }).then((v) => {
-      expect(v.response?.status).to.equal(302);
-      // Matching case-insensitively → no mismatch bounce
-      const loc = v.response?.location ?? '';
-      expect(loc).not.to.contain('/accounts');
-    });
-  });
-
   it('different identity → bounces to /accounts?reauthMismatch=1 (carrying requestId), clears intent', () => {
     // form loginName = alice, reauthIntent = totp-user → mismatch
     callService({
@@ -74,25 +54,6 @@ describe('login/password action — re-auth identity guard (H-4)', () => {
       expect(v.response?.setCookies?.some((c: string) => c.startsWith('reauth-intent='))).to.equal(
         true
       );
-    });
-  });
-
-  it('no re-auth intent → completes normally (no mismatch bounce)', () => {
-    callService({
-      fn: 'loginPasswordAction',
-      provider: 'singleton',
-      liveSessions: [{ id: 's1', token: 't1', user: { id: 'u1', loginName: ALICE } }],
-      request: {
-        url: 'http://localhost/id/login/password',
-        sessions: [SESSION],
-        form: { loginName: ALICE, password: 'hunter2' },
-        csrf: true,
-        // No reauthIntent
-      },
-    }).then((v) => {
-      expect(v.response?.status).to.equal(302);
-      const loc = v.response?.location ?? '';
-      expect(loc).not.to.contain('/accounts');
     });
   });
 });

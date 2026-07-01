@@ -8,23 +8,22 @@
 import { callService } from '../../../support/node/call-service';
 
 describe('providerRegistry — one binding point', () => {
-  it('has exactly the fake and zitadel modes', () => {
+  it('has exactly the fake and zitadel modes, and the fake entry is a process-stable singleton', () => {
     callService({
       fn: 'selectProvider',
       selectOp: 'registryKeys',
       request: { url: 'http://localhost/id' },
-    }).then((v) => {
-      expect((v.outcome as { keys: string[] }).keys).to.deep.equal(['fake', 'zitadel']);
-    });
-  });
-
-  it('the fake entry returns a process-stable singleton', () => {
-    callService({
-      fn: 'selectProvider',
-      selectOp: 'fakeSingleton',
-      request: { url: 'http://localhost/id' },
-    }).then((v) => {
-      expect((v.outcome as { same: boolean }).same).to.equal(true);
-    });
+    })
+      .then((v) => {
+        expect((v.outcome as { keys: string[] }).keys).to.deep.equal(['fake', 'zitadel']);
+        return callService({
+          fn: 'selectProvider',
+          selectOp: 'fakeSingleton',
+          request: { url: 'http://localhost/id' },
+        });
+      })
+      .then((v) => {
+        expect((v.outcome as { same: boolean }).same).to.equal(true);
+      });
   });
 });

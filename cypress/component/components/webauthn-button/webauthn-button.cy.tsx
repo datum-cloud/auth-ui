@@ -17,16 +17,14 @@ function mountBtn(mode: 'assertion' | 'attestation') {
 }
 
 describe('WebAuthnButton failure copy', () => {
-  it('attestation failure does not reuse the verification wording', () => {
+  it('attestation failure shows enrollment wording (not verification wording); assertion failure shows verification wording', () => {
     mountBtn('attestation');
     // Wait for the hydration gate (disabled → enabled) then click.
     cy.findByRole('button').should('not.be.disabled').click();
     // Enrollment wording ("set up") must appear; assertion wording must not.
     cy.findByText(/set up/i).should('exist');
     cy.findByText(/verification failed/i).should('not.exist');
-  });
 
-  it('assertion failure shows the verification wording', () => {
     mountBtn('assertion');
     cy.findByRole('button').should('not.be.disabled').click();
     cy.findByText(/verification failed/i).should('exist');

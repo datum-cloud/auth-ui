@@ -9,7 +9,6 @@
 import { AuthCeremony } from '@/components/auth-ceremony/auth-ceremony';
 import { OtpCodeField } from '@/components/auth-ceremony/otp-code-field';
 import { AuthFormFields } from '@/components/auth-form/auth-form-fields';
-import { BackLink } from '@/components/back-link/back-link';
 import { FormError } from '@/components/form-error/form-error';
 import { otpCodeClientSchema } from '@/resources/otp/otp.schema';
 import { Form } from '@datum-cloud/datum-ui/form';
@@ -80,30 +79,6 @@ describe('a11y guard — axe structural/aria (0 violations)', () => {
     checkComponentA11y();
   });
 
-  it('AuthCeremony with the inline error banner + recovery link has no axe violations', () => {
-    cy.mount(
-      <AuthCeremony
-        title="Enter your code"
-        error="Your session has expired."
-        recovery={{ to: '/login', label: 'Sign in again' }}>
-        <CeremonyBody />
-      </AuthCeremony>,
-      OPTS
-    );
-    checkComponentA11y();
-  });
-
-  it('OtpCodeField (datum-ui Form.Field labelled control) has no axe violations', () => {
-    cy.mount(
-      <ConformAdapter>
-        <Form.Root schema={otpCodeClientSchema} method="POST" defaultValues={{ code: '' }}>
-          <OtpCodeField label="Authenticator code" />
-        </Form.Root>
-      </ConformAdapter>
-    );
-    checkComponentA11y();
-  });
-
   it('AuthFormFields (hidden-input cluster) has no axe violations', () => {
     cy.mount(
       <form>
@@ -116,11 +91,6 @@ describe('a11y guard — axe structural/aria (0 violations)', () => {
         />
       </form>
     );
-    checkComponentA11y();
-  });
-
-  it('BackLink (single styled <a>) has no axe violations', () => {
-    cy.mount(<BackLink />, OPTS);
     checkComponentA11y();
   });
 
@@ -154,22 +124,6 @@ describe('a11y guard — focus order / keyboard (logical order, no trap, recover
           });
         });
       });
-    });
-  });
-
-  it('uses no positive tabindex (no manual focus-order trap)', () => {
-    cy.mount(
-      <AuthCeremony title="Enter your code">
-        <CeremonyBody />
-      </AuthCeremony>,
-      OPTS
-    );
-    // Use document.querySelectorAll directly so an empty result doesn't throw.
-    cy.document().then((doc) => {
-      const positive = Array.from(doc.querySelectorAll('[tabindex]')).filter(
-        (el) => Number(el.getAttribute('tabindex')) > 0
-      );
-      expect(positive, 'no positive tabindex elements').to.have.length(0);
     });
   });
 

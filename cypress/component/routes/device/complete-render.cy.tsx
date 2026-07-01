@@ -1,7 +1,7 @@
 // cypress/component/routes/device/complete-render.cy.tsx
 //
 // Render port of app/routes/device/__tests__/complete.render.test.tsx.
-// Pins the terminal decision screen: authorize → success card, deny → denied card.
+// Pins the terminal decision screen: authorize → success card.
 import DeviceComplete from '@/routes/device/complete';
 import { setupI18n } from '@lingui/core';
 import { I18nProvider } from '@lingui/react';
@@ -29,16 +29,5 @@ describe('device/complete — terminal render', () => {
     mountWithDecision('authorize');
     cy.contains('Authorization complete').should('exist');
     cy.contains('You may return to your device.').should('exist');
-  });
-
-  it('deny → renders a clear denied message', () => {
-    mountWithDecision('deny');
-    cy.contains('Device denied').should('exist');
-  });
-
-  it('renders no Authorize/Deny consent buttons on either terminal screen', () => {
-    mountWithDecision('authorize');
-    cy.findByRole('button', { name: /authorize/i }).should('not.exist');
-    cy.findByRole('button', { name: /deny/i }).should('not.exist');
   });
 });

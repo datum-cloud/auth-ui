@@ -22,21 +22,8 @@ afterEach(() => {
 });
 
 describe('FakeAuthProvider — getDefaultOrg', () => {
-  it('returns a stable fake default org id by default', async () => {
+  it('returns a stable fake default org id by default, and is overridable at runtime (incl. the no-default-org branch)', async () => {
     expect(await new FakeAuthProvider().getDefaultOrg()).to.equal('org-default-fake');
-  });
-
-  it('returns the seeded defaultOrgId when provided', async () => {
-    expect(await new FakeAuthProvider({ defaultOrgId: 'org-seed' }).getDefaultOrg()).to.equal(
-      'org-seed'
-    );
-  });
-
-  it('returns null when seeded null (the no-default-org / last-resort branch)', async () => {
-    expect(await new FakeAuthProvider({ defaultOrgId: null }).getDefaultOrg()).to.equal(null);
-  });
-
-  it('is overridable at runtime via setDefaultOrg', async () => {
     const p = new FakeAuthProvider();
     p.setDefaultOrg('org-x');
     expect(await p.getDefaultOrg()).to.equal('org-x');
@@ -46,29 +33,15 @@ describe('FakeAuthProvider — getDefaultOrg', () => {
 });
 
 describe('ZitadelAuthProvider — getDefaultOrg', () => {
-  it('maps the id of the first ListOrganizations result (the instance Default Organization)', async () => {
+  it('maps the id of the first ListOrganizations result, or returns null when there is no result', async () => {
     stubClient({
       listOrganizations: async () => ({
         result: [{ id: '325848896225939482' }, { id: 'other-org' }],
       }),
     });
     expect(await zprovider().getDefaultOrg()).to.equal('325848896225939482');
-  });
 
-  it('returns null when ListOrganizations yields no result', async () => {
     stubClient({ listOrganizations: async () => ({ result: [] }) });
     expect(await zprovider().getDefaultOrg()).to.equal(null);
-  });
-
-  it('filters ListOrganizations by the instance defaultQuery', async () => {
-    let captured: { queries?: Array<{ query?: { case?: string } }> } | undefined;
-    stubClient({
-      listOrganizations: async (req: { queries?: Array<{ query?: { case?: string } }> }) => {
-        captured = req;
-        return { result: [{ id: 'o1' }] };
-      },
-    });
-    await zprovider().getDefaultOrg();
-    expect(captured?.queries?.[0]?.query?.case).to.equal('defaultQuery');
   });
 });

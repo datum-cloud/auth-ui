@@ -9,18 +9,6 @@ function params(search: string): URLSearchParams {
 }
 
 describe('/login → /authorize protocol bridge', () => {
-  it('bridges ?authRequest= (the caller forwards to /authorize, preserving the query)', () => {
-    expect(shouldBridgeToAuthorize(params('?authRequest=V2_abc&organization=org1'))).to.equal(true);
-  });
-
-  it('bridges ?samlRequest= (the caller forwards to /authorize)', () => {
-    expect(shouldBridgeToAuthorize(params('?samlRequest=sr-1'))).to.equal(true);
-  });
-
-  it('does NOT bridge a plain /login (renders the identifier screen)', () => {
-    expect(shouldBridgeToAuthorize(params(''))).to.equal(false);
-  });
-
   it('does NOT re-trigger on the post-identifier ?requestId= return (no loop)', () => {
     expect(shouldBridgeToAuthorize(params('?requestId=oidc_V2_abc'))).to.equal(false);
   });

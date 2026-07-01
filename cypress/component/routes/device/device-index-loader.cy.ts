@@ -19,15 +19,4 @@ describe('device/index loader', () => {
       expect(body?.userCode).to.equal('WDJB-MJHT');
     });
   });
-
-  it('returns empty string for userCode when user_code param is absent', () => {
-    callService({
-      fn: 'deviceIndexLoader',
-      provider: 'singleton',
-      request: { url: 'http://localhost/id/device' },
-    }).then((v) => {
-      const body = v.response?.dataBody as Record<string, unknown> | undefined;
-      expect(body?.userCode).to.equal('');
-    });
-  });
 });

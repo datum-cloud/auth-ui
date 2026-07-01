@@ -9,23 +9,22 @@
 import { callService } from '../../../support/node/call-service';
 
 describe('getAuthProvider', () => {
-  it('returns the FakeAuthProvider when AUTH_PROVIDER=fake', () => {
+  it('returns the FakeAuthProvider when AUTH_PROVIDER=fake, and a Zitadel-backed provider otherwise', () => {
     callService({
       fn: 'selectProvider',
       selectOp: 'fakeIsInstance',
       request: { url: 'http://localhost/id' },
-    }).then((v) => {
-      expect((v.outcome as { isFake: boolean }).isFake).to.equal(true);
-    });
-  });
-
-  it('constructs a Zitadel-backed provider otherwise without throwing', () => {
-    callService({
-      fn: 'selectProvider',
-      selectOp: 'zitadelNoThrow',
-      request: { url: 'http://localhost/id' },
-    }).then((v) => {
-      expect((v.outcome as { threw: boolean }).threw).to.equal(false);
-    });
+    })
+      .then((v) => {
+        expect((v.outcome as { isFake: boolean }).isFake).to.equal(true);
+        return callService({
+          fn: 'selectProvider',
+          selectOp: 'zitadelNoThrow',
+          request: { url: 'http://localhost/id' },
+        });
+      })
+      .then((v) => {
+        expect((v.outcome as { threw: boolean }).threw).to.equal(false);
+      });
   });
 });

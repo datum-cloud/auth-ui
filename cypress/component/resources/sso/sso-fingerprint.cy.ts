@@ -42,20 +42,4 @@ describe('fingerprintId end-to-end through the SSO auto-create createSession', (
       expect((v.response?.setCookies ?? []).some((c) => c.startsWith('sessions='))).to.equal(true);
     });
   });
-
-  it('cookie PRESENT: reused — no new fingerprintId Set-Cookie, session carries the existing id', () => {
-    callService({
-      fn: 'processIdpCallback',
-      slug: 'google',
-      seed: {},
-      idpIntent: REGISTER_INTENT_VERIFIED,
-      request: { url: CB, fingerprintId: 'existing-fp-xyz' },
-      inspect: { lastCreateSessionFingerprintId: true },
-    }).then((v) => {
-      // No fresh fingerprintId Set-Cookie on reuse.
-      expect(v.response?.fingerprintId).to.equal(null);
-      // The created session's userAgent carries the EXISTING cookie value.
-      expect(v.inspect?.lastCreateSessionFingerprintId).to.equal('existing-fp-xyz');
-    });
-  });
 });

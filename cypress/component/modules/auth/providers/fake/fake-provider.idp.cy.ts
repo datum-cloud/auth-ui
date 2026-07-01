@@ -1,6 +1,9 @@
 // cypress/component/modules/auth/providers/fake/fake-provider.idp.cy.ts
 //
 // Component (no-mount) port of app/modules/auth/providers/fake/__tests__/fake-provider.idp.test.ts.
+//
+// NOTE: this exercises a FAKE provider (test double / harness), not production security logic.
+// One representative test per distinct capability.
 import { FakeAuthProvider } from '@/modules/auth/providers/fake/fake-provider';
 
 function provider() {
@@ -13,38 +16,28 @@ function provider() {
         userId: 'u1',
         draft: null,
       },
-      'intent-new': {
-        information: { idpId: 'idp-g', idpUserId: 'g-2', idpUserName: 'bob' },
-        userId: null,
-        draft: { email: 'bob@acme.test', firstName: 'Bob', lastName: 'B' },
-      },
     },
   });
 }
 
 describe('FakeAuthProvider — IdP', () => {
-  it('lists active IdPs', async () => {
-    expect(await provider().getActiveIdPs()).to.have.length(1);
-  });
-  it('starts an intent returning an authUrl', async () => {
-    const r = await provider().startIdpIntent('idp-g', { success: 's', failure: 'f' });
-    expect(r.authUrl).to.include('idp-g');
-  });
-  it('retrieves a linked intent (userId present)', async () => {
-    const r = (await provider().retrieveIdpIntent('intent-linked', 'tok')) as {
+  it('lists active IdPs, starts an intent, retrieves a linked intent, creates a session from it, and adds/lists/removes idp links', async () => {
+    const p = provider();
+    expect(await p.getActiveIdPs()).to.have.length(1);
+
+    const started = await p.startIdpIntent('idp-g', { success: 's', failure: 'f' });
+    expect(started.authUrl).to.include('idp-g');
+
+    const retrieved = (await p.retrieveIdpIntent('intent-linked', 'tok')) as {
       userId: string | null;
     };
-    expect(r.userId).to.equal('u1');
-  });
-  it('creates a session from an idpIntent check', async () => {
-    const p = provider();
+    expect(retrieved.userId).to.equal('u1');
+
     const s = await p.createSession({
       idpIntent: { idpIntentId: 'intent-linked', idpIntentToken: 'tok' },
     });
     expect(s.factors.idpIntent?.verifiedAt).to.not.be.null;
-  });
-  it('adds and lists idp links, then removes', async () => {
-    const p = provider();
+
     await p.addIdpLink('u1', { idpId: 'idp-g', idpUserId: 'g-1', idpUserName: 'alice' });
     expect(await p.listIdpLinks('u1')).to.have.length(1);
     await p.removeIdpLink('u1', 'idp-g', 'g-1');

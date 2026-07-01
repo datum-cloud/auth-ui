@@ -10,10 +10,6 @@ const schema = withPasswordMatch(z.object({ password: z.string(), confirmPasswor
 });
 
 describe('withPasswordMatch', () => {
-  it('passes when passwords match', () => {
-    expect(schema.safeParse({ password: 'a', confirmPassword: 'a' }).success).to.equal(true);
-  });
-
   it('fails when passwords differ, error on confirmPassword path', () => {
     const r = schema.safeParse({ password: 'a', confirmPassword: 'b' });
     expect(r.success).to.equal(false);

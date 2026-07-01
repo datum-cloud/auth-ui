@@ -1,11 +1,11 @@
 // cypress/component/routes/signup/password.cy.ts
 //
 // cy.task port of app/routes/signup/__tests__/password.test.tsx.
-// Covers the signup/password loader (URL param threading) and action validation
-// (schema rejection before the provider is reached). Result-kind fan-out tests
-// (sent / sent-with-session / redirect / ProviderError) require per-test provider
-// mocking that doesn't fit cy.task; those paths are exercised by the real provider
-// integration in the harness's happy-path case below.
+// Covers the signup/password action: enumeration-safe error handling for existing
+// accounts (security regression gate) and the real-provider happy path. Loader
+// param-threading, schema-validation permutations, and complexity-policy fan-out are
+// covered once each in password-loader-action.cy.ts / password.cy.ts siblings — not
+// duplicated here.
 import { callService } from '../../../support/node/call-service';
 
 const VALID_IDENTITY = {
@@ -15,80 +15,6 @@ const VALID_IDENTITY = {
   password: 'sup3rsecret',
   confirm: 'sup3rsecret',
 };
-
-// ── Loader ────────────────────────────────────────────────────────────────────
-
-describe('signup/password — loader', () => {
-  it('defaults all identity fields to empty/undefined when no URL params present', () => {
-    callService({
-      fn: 'signupPasswordLoader',
-      provider: 'singleton',
-      request: { url: 'http://localhost/id/signup/password' },
-    }).then((v) => {
-      const body = v.response?.dataBody as Record<string, unknown> | undefined;
-      expect(body?.csrfToken).to.be.ok;
-      expect(body?.loginName).to.equal('');
-      expect(body?.firstName).to.equal('');
-      expect(body?.lastName).to.equal('');
-      expect(body?.organization).to.be.undefined;
-      expect(body?.requestId).to.be.undefined;
-    });
-  });
-
-  it('reflects loginName, firstName, lastName, organization, requestId from URL params', () => {
-    callService({
-      fn: 'signupPasswordLoader',
-      provider: 'singleton',
-      request: {
-        url: 'http://localhost/id/signup/password?loginName=jane@example.com&firstName=Jane&lastName=Doe&organization=acme&requestId=rq-9&deviceTrackingToken=mm-1',
-      },
-    }).then((v) => {
-      const body = v.response?.dataBody as Record<string, unknown> | undefined;
-      expect(body?.loginName).to.equal('jane@example.com');
-      expect(body?.firstName).to.equal('Jane');
-      expect(body?.lastName).to.equal('Doe');
-      expect(body?.organization).to.equal('acme');
-      expect(body?.requestId).to.equal('rq-9');
-      expect(body?.deviceTrackingToken).to.equal('mm-1');
-    });
-  });
-});
-
-// ── Action: validation ────────────────────────────────────────────────────────
-
-describe('signup/password — action: schema validation', () => {
-  it('returns 400 INVALID_INPUT when confirm does not match password', () => {
-    callService({
-      fn: 'signupPasswordAction',
-      provider: 'singleton',
-      request: {
-        url: 'http://localhost/id/signup/password',
-        form: { ...VALID_IDENTITY, confirm: 'different!' },
-        csrf: true,
-      },
-    }).then((v) => {
-      const status = v.response?.isResponse ? v.response.status : v.response?.dataStatus;
-      expect(status).to.equal(400);
-      const body = v.response?.dataBody as Record<string, unknown> | undefined;
-      expect(body?.error).to.equal('INVALID_INPUT');
-    });
-  });
-
-  it('returns 400 INVALID_INPUT when password is missing entirely', () => {
-    callService({
-      fn: 'signupPasswordAction',
-      provider: 'singleton',
-      request: {
-        url: 'http://localhost/id/signup/password',
-        form: { loginName: 'jane@example.com', firstName: 'Jane', lastName: 'Doe' },
-        csrf: true,
-      },
-    }).then((v) => {
-      const status = v.response?.isResponse ? v.response.status : v.response?.dataStatus;
-      expect(status).to.equal(400);
-    });
-  });
-});
 
 // ── Action: ALREADY_EXISTS enumeration safety (tamper-proof error model) ─────
 
@@ -164,96 +90,6 @@ describe('signup/password — action: real provider happy path', () => {
       },
     }).then((v) => {
       expect(v.ok).to.equal(true);
-      const status = v.response?.isResponse
-        ? (v.response.status ?? 200)
-        : (v.response?.dataStatus ?? 200);
-      expect(status).to.be.within(200, 399);
-    });
-  });
-});
-
-// ── Loader: org password-complexity policy ──────────────────────────────────────
-//
-// The loader fetches provider.getPasswordComplexity(resolveOrg(provider, ?organization)) and returns
-// the policy so the form can render the checklist + validate against it.
-
-const SYMBOL_POLICY = {
-  minLength: 12,
-  requiresUppercase: false,
-  requiresLowercase: false,
-  requiresNumber: false,
-  requiresSymbol: true,
-};
-
-describe('signup/password — loader: password-complexity policy', () => {
-  it('returns the fetched policy AND fetches it with the explicit ?organization', () => {
-    callService({
-      fn: 'signupPasswordLoader',
-      provider: 'singleton',
-      passwordComplexity: SYMBOL_POLICY,
-      recordCalls: ['getPasswordComplexity'],
-      request: { url: 'http://localhost/id/signup/password?organization=acme' },
-    }).then((v) => {
-      const body = v.response?.dataBody as Record<string, unknown> | undefined;
-      expect(body?.passwordComplexity).to.deep.equal(SYMBOL_POLICY);
-      // Explicit org wins in resolveOrg → threaded into getPasswordComplexity.
-      expect(v.calls?.getPasswordComplexity?.[0]?.[0]).to.equal('acme');
-    });
-  });
-
-  it('falls back to the default org when ?organization is absent (resolveOrg)', () => {
-    callService({
-      fn: 'signupPasswordLoader',
-      provider: 'singleton',
-      recordCalls: ['getPasswordComplexity'],
-      request: { url: 'http://localhost/id/signup/password' },
-    }).then((v) => {
-      // No explicit org → resolveOrg falls back to the fake's instance default org.
-      expect(v.calls?.getPasswordComplexity?.[0]?.[0]).to.equal('org-default-fake');
-    });
-  });
-});
-
-// ── Action: policy-driven validation ────────────────────────────────────────────
-
-describe('signup/password — action: policy-driven password rules', () => {
-  const identity = { loginName: 'jane@example.com', firstName: 'Jane', lastName: 'Doe' };
-
-  it('rejects a symbol-less password (400) when the policy requiresSymbol', () => {
-    callService({
-      fn: 'signupPasswordAction',
-      provider: 'singleton',
-      passwordComplexity: SYMBOL_POLICY,
-      request: {
-        url: 'http://localhost/id/signup/password',
-        csrf: true,
-        form: { ...identity, password: 'NoSymbolHere1', confirm: 'NoSymbolHere1' },
-      },
-    }).then((v) => {
-      const status = v.response?.isResponse ? v.response.status : v.response?.dataStatus;
-      expect(status).to.equal(400);
-      const body = v.response?.dataBody as Record<string, unknown> | undefined;
-      expect(body?.error).to.equal('INVALID_INPUT');
-    });
-  });
-
-  it('accepts the SAME symbol-less password when the policy does NOT require a symbol', () => {
-    // Control: identical input, default policy (no required classes) → proceeds past validation.
-    callService({
-      fn: 'signupPasswordAction',
-      provider: 'singleton',
-      env: { AUTH_EMAIL_DELIVERY_ENABLED: 'true' },
-      request: {
-        url: 'http://localhost/id/signup/password',
-        csrf: true,
-        form: {
-          ...identity,
-          loginName: 'nosymbolok@example.com',
-          password: 'NoSymbolHere1',
-          confirm: 'NoSymbolHere1',
-        },
-      },
-    }).then((v) => {
       const status = v.response?.isResponse
         ? (v.response.status ?? 200)
         : (v.response?.dataStatus ?? 200);

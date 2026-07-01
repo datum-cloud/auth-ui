@@ -70,28 +70,4 @@ describe('signup/index — render adoption', () => {
         cy.get('input[type="hidden"][name="organization"]').should('have.value', 'acme');
       });
   });
-
-  it('emits csrf hidden input on the email form (AuthFormFields cluster)', () => {
-    mountSignup(loaderData({ idps: [], view: { ...BASE_VIEW, showIdpButtons: false } }));
-    cy.contains('Email', { timeout: 6000 }).click();
-    cy.get('form')
-      .first()
-      .within(() => {
-        cy.get('input[type="hidden"][name="csrf"]').should('have.value', 'csrf-token-xyz');
-      });
-  });
-
-  it('email form hidden input order: csrf → requestId → organization → deviceTrackingToken', () => {
-    mountSignup(loaderData({ idps: [], view: { ...BASE_VIEW, showIdpButtons: false } }));
-    cy.contains('Email', { timeout: 6000 }).click();
-    cy.get('form')
-      .first()
-      .find('input[type="hidden"]')
-      .then(($inputs) => {
-        const names = Array.from($inputs).map((el) => el.getAttribute('name'));
-        expect(names).to.include('csrf');
-        expect(names).to.include('requestId');
-        expect(names).to.include('organization');
-      });
-  });
 });

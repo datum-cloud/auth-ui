@@ -13,19 +13,13 @@ import {
 } from '@/resources/webauthn/webauthn';
 
 describe('webauthn base64url codec', () => {
-  it('round-trips bytes through base64url', () => {
+  it('round-trips bytes, decodes known strings, and returns a real ArrayBuffer', () => {
     const bytes = new Uint8Array([0, 1, 2, 250, 255]);
     const b64 = bufferToBase64Url(bytes.buffer);
     expect(b64).to.not.match(/[+/=]/); // URL-safe, unpadded
     expect(new Uint8Array(base64UrlToBuffer(b64))).to.deep.equal(bytes);
     expect(bufferToBase64Url(base64UrlToBuffer(''))).to.equal('');
-  });
-
-  it('decodes a known base64url string', () => {
     expect(new Uint8Array(base64UrlToBuffer('AQID'))).to.deep.equal(new Uint8Array([1, 2, 3]));
-  });
-
-  it('returns an ArrayBuffer (not a node Buffer)', () => {
     expect(base64UrlToBuffer('AQID')).to.be.instanceOf(ArrayBuffer);
   });
 });

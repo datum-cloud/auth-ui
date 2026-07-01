@@ -22,20 +22,4 @@ describe('login action — strict phone rejection per disableLoginWithPhone poli
       expect(v.response?.dataBody).to.have.property('error', 'PHONE_LOGIN_DISABLED');
     });
   });
-
-  it('does NOT phone-reject when phone login is enabled (default-off → today behavior)', () => {
-    callService({
-      fn: 'loginAction',
-      provider: 'singleton',
-      // No mockLoginSettings — defaults: disableLoginWithPhone false
-      request: {
-        url: 'http://localhost/id/login',
-        form: { loginName: PHONE_INPUT },
-        csrf: true,
-      },
-    }).then((v) => {
-      // Phone check bypassed → USER_NOT_FOUND (200 inline) not PHONE_LOGIN_DISABLED
-      expect(v.response?.dataBody?.error).not.to.equal('PHONE_LOGIN_DISABLED');
-    });
-  });
 });

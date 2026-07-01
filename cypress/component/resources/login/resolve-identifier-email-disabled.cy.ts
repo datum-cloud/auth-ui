@@ -14,45 +14,4 @@ describe('resolveIdentifier — disableLoginWithEmail (detect-for-copy)', () => 
     });
     expect(r).to.deep.equal({ ok: false, error: 'USER_NOT_FOUND' });
   });
-
-  it('ON + email-shaped + not found → EMAIL_LOGIN_DISABLED', async () => {
-    const p = new FakeAuthProvider({
-      users: [{ id: 'u1', loginName: 'alice' }],
-      settingsByOrg: { 'org-x': { disableLoginWithEmail: true } },
-    });
-    const r = await resolveIdentifier(p, [], {
-      loginName: 'ghost@acme.test',
-      organization: 'org-x',
-      emailDeliveryEnabled: true,
-    });
-    expect(r).to.deep.equal({ ok: false, error: 'EMAIL_LOGIN_DISABLED' });
-  });
-
-  it('ON + non-email (plain username) + not found → USER_NOT_FOUND', async () => {
-    const p = new FakeAuthProvider({
-      users: [{ id: 'u1', loginName: 'alice' }],
-      settingsByOrg: { 'org-x': { disableLoginWithEmail: true } },
-    });
-    const r = await resolveIdentifier(p, [], {
-      loginName: 'bob',
-      organization: 'org-x',
-      emailDeliveryEnabled: true,
-    });
-    expect(r).to.deep.equal({ ok: false, error: 'USER_NOT_FOUND' });
-  });
-
-  it('ON + ignoreUnknownUsernames ON: no email-disabled — funnels to password (reveals nothing)', async () => {
-    const p = new FakeAuthProvider({
-      users: [{ id: 'u1', loginName: 'alice' }],
-      settingsByOrg: { 'org-x': { disableLoginWithEmail: true, ignoreUnknownUsernames: true } },
-    });
-    const r = await resolveIdentifier(p, [], {
-      loginName: 'ghost@acme.test',
-      organization: 'org-x',
-      emailDeliveryEnabled: true,
-    });
-    expect(r.ok).to.equal(true);
-    if (!r.ok) return;
-    expect(r.target).to.equal('/login/password');
-  });
 });

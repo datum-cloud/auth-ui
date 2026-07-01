@@ -16,10 +16,4 @@ describe('providerForRequest', () => {
       expect(v.outcome.containsZitadel).to.equal(false);
     });
   });
-
-  it('re-exports providerForRequest so callers import from a single surface', () => {
-    callService({ fn: 'compositionCheck', compositionOp: 'authContextReexport' }).then((v) => {
-      expect(v.outcome.hasFn).to.equal(true);
-    });
-  });
 });

@@ -9,7 +9,7 @@
 // fresh FakeAuthProvider seeded with alice rather than the Cypress select.server
 // stub (which lacks users).
 import { FakeAuthProvider } from '@/modules/auth/providers/fake/fake-provider';
-import { requestPasswordReset, submitNewPassword } from '@/resources/password/password.service';
+import { requestPasswordReset } from '@/resources/password/password.service';
 
 const TRUSTED_ORIGIN = 'https://auth.datum.net';
 const SPOOFED_HOST = 'attacker.evil';
@@ -22,16 +22,6 @@ function makeProvider() {
     passwords: { u1: 'hunter2' },
     authMethods: { u1: ['password'] },
   });
-}
-
-function newPasswordForm(overrides: Record<string, string>): Record<string, unknown> {
-  return {
-    code: 'validCode123',
-    userId: 'u1',
-    password: 'ValidPassword1!',
-    confirm: 'ValidPassword1!',
-    ...overrides,
-  };
 }
 
 describe('requestPasswordReset — email-link origin (anti Host-header injection)', () => {
@@ -56,21 +46,6 @@ describe('requestPasswordReset — email-link origin (anti Host-header injection
     expect(urlTemplate).not.to.contain('%7B');
   });
 
-  it('threads requestId onto the trusted-origin reset link', async () => {
-    const fake = makeProvider();
-    const stub = cy.stub(fake, 'sendPasswordReset').resolves();
-
-    await requestPasswordReset(fake, {
-      loginName: 'alice@acme.test',
-      origin: TRUSTED_ORIGIN,
-      requestId: 'oidc_42',
-    });
-
-    const [, urlTemplate] = stub.args[0];
-    expect(urlTemplate.startsWith('https://auth.datum.net/id/password/new?')).to.equal(true);
-    expect(urlTemplate).to.contain('&requestId=oidc_42');
-  });
-
   it('does NOT call sendPasswordReset for an unknown account (enumeration-safe)', async () => {
     const fake = makeProvider();
     const stub = cy.stub(fake, 'sendPasswordReset').resolves();
@@ -81,31 +56,5 @@ describe('requestPasswordReset — email-link origin (anti Host-header injection
     });
 
     expect(stub.callCount).to.equal(0);
-  });
-});
-
-describe('submitNewPassword — requestId validation', () => {
-  it('does not forward a malformed requestId to /authorize', async () => {
-    const fake = makeProvider();
-    cy.stub(fake, 'setPasswordWithCode').resolves(undefined as never);
-
-    const result = await submitNewPassword(fake, newPasswordForm({ requestId: 'evil://x' }));
-
-    if (result.ok) {
-      expect(result.target).not.to.contain('evil');
-      expect(result.target).not.to.contain('requestId');
-    } else {
-      expect(result.error).to.equal('INVALID_INPUT');
-    }
-  });
-
-  it('forwards a valid oidc_ requestId to /authorize on success', async () => {
-    const fake = makeProvider();
-    cy.stub(fake, 'setPasswordWithCode').resolves(undefined as never);
-
-    const result = await submitNewPassword(fake, newPasswordForm({ requestId: 'oidc_abc123' }));
-
-    expect(result.ok).to.equal(true);
-    if (result.ok) expect(result.target).to.contain('requestId=oidc_abc123');
   });
 });

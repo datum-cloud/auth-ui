@@ -25,20 +25,6 @@ function makeProvider() {
 }
 
 describe('device_ requestId threading through the login ceremony', () => {
-  it('identifier flow accepts a device_ requestId and threads it (not rejected)', async () => {
-    const fake = makeProvider();
-    const result = await resolveIdentifier(fake, [], {
-      loginName: 'alice@acme.test',
-      requestId: REQUEST_ID,
-      emailDeliveryEnabled: true,
-    });
-
-    expect(result.ok).to.equal(true);
-    if (!result.ok) return;
-    // The threaded device_ requestId rides on the redirect params toward the next factor.
-    expect(result.params.get('requestId')).to.equal(REQUEST_ID);
-  });
-
   it('password flow accepts a device_ requestId and threads it (not rejected)', async () => {
     const fake = makeProvider();
 

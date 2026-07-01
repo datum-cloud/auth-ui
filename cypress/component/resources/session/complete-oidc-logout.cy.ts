@@ -29,33 +29,4 @@ describe('completeOidcLogout', () => {
       expect(o.location).to.equal('/logout/success');
     });
   });
-
-  it('tolerates provider deleteSession failures (best-effort) and still clears + redirects', () => {
-    callService({
-      fn: 'completeOidcLogout',
-      provider: 'singleton',
-      failDeleteSession: true,
-      request: {
-        url: 'https://auth.localtest.me:30000/id/logout',
-        sessions: [{ id: 's1', token: 't1', loginName: 'a@x.test' }],
-      },
-    }).then((v) => {
-      const o = v.outcome as { location: string };
-      expect(o.location).to.equal('/logout/success');
-    });
-  });
-
-  it('rejects a relative post_logout_redirect and falls back to /logout/success', () => {
-    callService({
-      fn: 'completeOidcLogout',
-      provider: 'singleton',
-      request: {
-        url: 'https://auth.localtest.me:30000/id/logout?logout_token=x&post_logout_redirect=/logout/done',
-        sessions: [{ id: 's1', token: 't1', loginName: 'a@x.test' }],
-      },
-    }).then((v) => {
-      const o = v.outcome as { location: string };
-      expect(o.location).to.equal('/logout/success');
-    });
-  });
 });

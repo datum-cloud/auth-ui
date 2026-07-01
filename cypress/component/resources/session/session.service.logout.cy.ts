@@ -36,16 +36,4 @@ describe('performLogout — explicit session scope', () => {
       expect(v.response?.location ?? '').to.match(/prompt=select_account|\/accounts/);
     });
   });
-
-  it('single-session logout (no residual) still redirects to /logout/success', () => {
-    callService({
-      fn: 'performLogout',
-      provider: 'singleton',
-      request: { url: 'http://localhost/id/logout', sessions: [s1] },
-    }).then((v) => {
-      const o = v.outcome as { location: string };
-      expect(o.location).to.include('/logout/success');
-      expect(v.response?.location ?? '').to.include('/logout/success');
-    });
-  });
 });

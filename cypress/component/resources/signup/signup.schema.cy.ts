@@ -5,55 +5,39 @@
 import { registerSchema, signupPasswordSchema } from '@/resources/signup/signup.schema';
 
 describe('registerSchema', () => {
-  it('accepts a valid registration', () => {
-    const result = registerSchema.safeParse({
-      email: 'alice@acme.test',
-      firstName: 'Alice',
-      lastName: 'Acme',
-    });
-    expect(result.success).to.equal(true);
-  });
-
-  it('rejects an invalid email', () => {
-    const result = registerSchema.safeParse({
-      email: 'not-an-email',
-      firstName: 'Alice',
-      lastName: 'Acme',
-    });
-    expect(result.success).to.equal(false);
-  });
-
-  it('accepts optional fields when provided', () => {
-    const result = registerSchema.safeParse({
-      email: 'alice@acme.test',
-      firstName: 'Alice',
-      lastName: 'Acme',
-      organization: 'org1',
-      requestId: 'oidc_1',
-      deviceTrackingToken: 'tok123',
-    });
-    expect(result.success).to.equal(true);
+  it('accepts a valid registration and rejects an invalid email', () => {
+    expect(
+      registerSchema.safeParse({
+        email: 'alice@acme.test',
+        firstName: 'Alice',
+        lastName: 'Acme',
+      }).success
+    ).to.equal(true);
+    expect(
+      registerSchema.safeParse({
+        email: 'not-an-email',
+        firstName: 'Alice',
+        lastName: 'Acme',
+      }).success
+    ).to.equal(false);
   });
 });
 
 describe('signupPasswordSchema', () => {
-  it('rejects when password and confirm do not match', () => {
-    const result = signupPasswordSchema.safeParse({
+  it('rejects mismatched passwords with a clear message and accepts matching ones', () => {
+    const mismatch = signupPasswordSchema.safeParse({
       password: 'correct-horse',
       confirm: 'wrong-horse',
     });
-    expect(result.success).to.equal(false);
-    if (!result.success) {
-      const confirmError = result.error.issues.find((i) => i.path.includes('confirm'));
+    expect(mismatch.success).to.equal(false);
+    if (!mismatch.success) {
+      const confirmError = mismatch.error.issues.find((i) => i.path.includes('confirm'));
       expect(confirmError?.message).to.equal('Passwords must match');
     }
-  });
 
-  it('accepts when password and confirm match', () => {
-    const result = signupPasswordSchema.safeParse({
-      password: 'correct-horse',
-      confirm: 'correct-horse',
-    });
-    expect(result.success).to.equal(true);
+    expect(
+      signupPasswordSchema.safeParse({ password: 'correct-horse', confirm: 'correct-horse' })
+        .success
+    ).to.equal(true);
   });
 });

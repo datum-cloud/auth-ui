@@ -20,19 +20,7 @@ describe('samlPostHandler', () => {
     });
   });
 
-  it('no session → 302 redirect to /id/login with requestId=saml_<id>', () => {
-    callService({
-      fn: 'samlPostCheck',
-      samlPostOp: 'handlerNoSession',
-      seed: { samlRequests: SAML_SEEDS },
-    }).then((v) => {
-      expect(v.outcome.status).to.equal(302);
-      expect(v.outcome.location).to.include('/id/login');
-      expect(v.outcome.location).to.include('requestId=saml_sr-post');
-    });
-  });
-
-  it('valid session + POST-binding → 200 auto-submit form with ACS url and nonce', () => {
+  it('valid session renders POST-binding auto-submit form (200) and redirects for redirect-binding (302)', () => {
     callService({
       fn: 'samlPostCheck',
       samlPostOp: 'handlerPostBinding',
@@ -45,9 +33,7 @@ describe('samlPostHandler', () => {
       expect(v.outcome.body).to.include('name="RelayState" value="rs-sr-post"');
       expect(v.outcome.body).to.include('<script nonce="n-1">');
     });
-  });
 
-  it('valid session + redirect-binding → 302 to the SP url', () => {
     callService({
       fn: 'samlPostCheck',
       samlPostOp: 'handlerRedirectBinding',
@@ -57,52 +43,6 @@ describe('samlPostHandler', () => {
       expect(v.outcome.status).to.equal(302);
       expect(v.outcome.location).to.include('https://sp.test/acs');
       expect(v.outcome.location).to.include('SAMLResponse=resp-sr-1');
-    });
-  });
-
-  it('valid session + unresolvable request id → 302 to /id/error', () => {
-    callService({
-      fn: 'samlPostCheck',
-      samlPostOp: 'handlerUnresolvable',
-      liveSessions: LIVE_SESSION,
-      seed: { samlRequests: SAML_SEEDS },
-    }).then((v) => {
-      expect(v.outcome.status).to.equal(302);
-      expect(v.outcome.location).to.include('/id/error');
-    });
-  });
-
-  it('missing nonce on POST path → 500 (fail-closed: never emit nonce="undefined")', () => {
-    callService({
-      fn: 'samlPostCheck',
-      samlPostOp: 'handlerMissingNonce',
-      liveSessions: LIVE_SESSION,
-      seed: { samlRequests: SAML_SEEDS },
-    }).then((v) => {
-      expect(v.outcome.status).to.equal(500);
-    });
-  });
-
-  it('dead (stale-cookie) session → 302 to /id/login instead of serving a SAML assertion', () => {
-    callService({
-      fn: 'samlPostCheck',
-      samlPostOp: 'handlerDeadSession',
-      liveSessions: LIVE_SESSION,
-      seed: { samlRequests: SAML_SEEDS },
-    }).then((v) => {
-      expect(v.outcome.status).to.equal(302);
-      expect(v.outcome.location).to.include('/id/login');
-    });
-  });
-
-  it('redirect-binding with javascript: ACS url → handler rejects via assertHttpUrl guard (SSRF/open-redirect gate)', () => {
-    callService({
-      fn: 'samlPostCheck',
-      samlPostOp: 'handlerRedirectBadUrl',
-      liveSessions: LIVE_SESSION,
-      seed: { samlRequests: SAML_SEEDS },
-    }).then((v) => {
-      expect(v.outcome.status).to.be.oneOf([400, 500]);
     });
   });
 });

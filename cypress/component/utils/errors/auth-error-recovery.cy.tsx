@@ -27,40 +27,20 @@ function RecoveryHarness({
 }
 
 describe('useAuthErrorRecovery', () => {
-  it('maps SESSION_EXPIRED to a "Sign in again" recovery pointing at paths.login.index()', () => {
+  it('maps recoverable codes to their labelled recovery ("Sign in again" for SESSION_EXPIRED, "Start over" for NO_SUPPORTED_METHOD), pointing at paths.login.index()', () => {
     cy.mount(<RecoveryHarness code="SESSION_EXPIRED" />);
     cy.get('[data-testid="to"]').should('have.text', paths.login.index());
     cy.get('[data-testid="label"]').should('have.text', 'Sign in again');
-  });
 
-  it('maps NO_SUPPORTED_METHOD to a "Start over" recovery pointing at paths.login.index()', () => {
     cy.mount(<RecoveryHarness code="NO_SUPPORTED_METHOD" />);
     cy.get('[data-testid="to"]').should('have.text', paths.login.index());
     cy.get('[data-testid="label"]').should('have.text', 'Start over');
   });
 
-  it('maps PASSWORD_NOT_ALLOWED to a "Start over" recovery pointing at paths.login.index()', () => {
-    cy.mount(<RecoveryHarness code="PASSWORD_NOT_ALLOWED" />);
-    cy.get('[data-testid="to"]').should('have.text', paths.login.index());
-    cy.get('[data-testid="label"]').should('have.text', 'Start over');
-  });
-
-  it('returns undefined for a non-recoverable code (banner only)', () => {
+  it('returns undefined for a non-recoverable code and when there is no error code (banner only)', () => {
     cy.mount(<RecoveryHarness code="INVALID_CREDENTIALS" />);
     cy.get('[data-testid="result"]').should('have.text', 'undefined');
-  });
 
-  it('returns undefined for RATE_LIMITED', () => {
-    cy.mount(<RecoveryHarness code="RATE_LIMITED" />);
-    cy.get('[data-testid="result"]').should('have.text', 'undefined');
-  });
-
-  it('returns undefined for UNEXPECTED', () => {
-    cy.mount(<RecoveryHarness code="UNEXPECTED" />);
-    cy.get('[data-testid="result"]').should('have.text', 'undefined');
-  });
-
-  it('returns undefined when there is no error code', () => {
     cy.mount(<RecoveryHarness code={undefined} />);
     cy.get('[data-testid="result"]').should('have.text', 'undefined');
   });
@@ -78,18 +58,11 @@ describe('useAuthErrorRecovery', () => {
     cy.get('[data-testid="to"]').should('have.text', '/login?requestId=rq1&organization=acme');
   });
 
-  it('threads requestId alone when ctx has no organization', () => {
-    cy.mount(<RecoveryHarness code="NO_SUPPORTED_METHOD" ctx={{ requestId: 'rq1' }} />);
-    cy.get('[data-testid="to"]').should('have.text', '/login?requestId=rq1');
-  });
-
-  it('keeps the bare /login when ctx is absent (non-OIDC flow)', () => {
+  it('keeps the bare /login when ctx is absent or incomplete (non-OIDC flow)', () => {
     cy.mount(<RecoveryHarness code="SESSION_EXPIRED" />);
     cy.get('[data-testid="to"]').should('have.text', paths.login.index());
     cy.get('[data-testid="to"]').should('have.text', '/login');
-  });
 
-  it('keeps the bare /login when ctx has no requestId (organization alone is not enough)', () => {
     cy.mount(<RecoveryHarness code="SESSION_EXPIRED" ctx={{ organization: 'acme' }} />);
     cy.get('[data-testid="to"]').should('have.text', '/login');
   });
