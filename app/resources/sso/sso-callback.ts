@@ -17,6 +17,7 @@ import { clearReauthIntent, readReauthIntent } from '@/modules/auth/session/reau
 import { ProviderError } from '@/modules/auth/types';
 import type { IdpIntentResult } from '@/modules/auth/types';
 import { authorizeHandbackTarget, ssoErrorRedirect } from '@/resources/shared/next-step-params';
+import { resolveOrg } from '@/resources/shared/resolve-org';
 import { registerAndLinkIdp } from '@/resources/signup';
 import { deriveIdpProfileName } from '@/resources/sso/derive-idp-name';
 import { decideIdpCallback } from '@/resources/sso/idp-callback';
@@ -102,6 +103,14 @@ export async function processIdpCallback(
   let intent: IdpIntentResult;
   let entries: Awaited<ReturnType<typeof readSessions>>;
   let decision: ReturnType<typeof decideIdpCallback>;
+  // Resolve the effective org for this callback ceremony — org-first (URL ?organization=),
+  // then ZITADEL_DEFAULT_ORG_ID env pin, then the provider's instance Default Organization.
+  // Hoisted before the try block so both the decision try and the auto-create switch case
+  // can reference it. This resolved org feeds the allowRegister gate (getLoginSettings) and
+  // the auto-create register call so a bare (no ?organization=) flow always has a concrete
+  // org, preventing Zitadel's FAILED_PRECONDITION on addHumanUser with no org.
+  // NOTE: findUser calls below deliberately stay on raw `organization` (instance-wide lookup).
+  const callbackOrg = await resolveOrg(provider, organization);
 
   try {
     intent = await doRetrieveIdpIntent(id, token);
@@ -124,7 +133,10 @@ export async function processIdpCallback(
           // (Zitadel getSession throws NOT_FOUND for an expired session.) Treat as no user.
           .catch(() => null)
       : Promise.resolve(null);
-    const settingsP = provider.getLoginSettings(organization);
+    // BUG 2 fix: read allowRegister from the org we'll register into (callbackOrg), not
+    // instance-level (raw organization). On a bare flow organization is undefined, so the
+    // instance settings could allow/deny differently from the target org's policy.
+    const settingsP = provider.getLoginSettings(callbackOrg);
 
     const [sessionUserId, settings] = await Promise.all([sessionUserIdP, settingsP]);
 
@@ -374,11 +386,14 @@ export async function processIdpCallback(
           displayName: decision.draft.displayName,
           idpUserName: decision.link.idpUserName,
         });
+        // BUG 1 fix: pass callbackOrg (resolved default org) instead of raw organization
+        // so addHumanUser always receives a concrete org. Raw organization is undefined on a
+        // bare (no ?organization=) flow, which causes Zitadel's FAILED_PRECONDITION.
         const result = await registerAndLinkIdp(provider, entries, {
           email: decision.draft.email ?? '',
           firstName,
           lastName,
-          organization,
+          organization: callbackOrg,
           requestId,
           idpId: decision.link.idpId,
           idpUserId: decision.link.idpUserId,

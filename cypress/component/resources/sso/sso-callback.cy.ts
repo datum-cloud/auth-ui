@@ -259,6 +259,57 @@ describe('processIdpCallback — same-email collision hard error (default: ALLOW
   });
 });
 
+describe('processIdpCallback — default-org resolution for IdP auto-create (bare flow)', () => {
+  // BUG: on a bare flow (no ?organization= in the callback URL), raw `organization` is undefined.
+  // registerAndLinkIdp receives organization:undefined → provider.register({orgId:undefined}) →
+  // Zitadel returns FAILED_PRECONDITION (addHumanUser rejects with no org).
+  // FIX: resolveOrg(provider, organization) → 'org-default-fake' → register receives that org.
+  // The fake does NOT throw on undefined orgId (it ignores it), so we assert the ARG, not
+  // the outcome, to get a genuine RED before the fix.
+  it('calls register with the resolved default org (not undefined) on a bare flow (no ?organization=)', () => {
+    callService({
+      fn: 'processIdpCallback',
+      slug: 'google',
+      // fresh provider: no seed users → decision routes to auto-create
+      seed: {},
+      idpIntent: REGISTER_INTENT_VERIFIED,
+      // No organization= in the callback URL → raw organization is undefined
+      request: { url: CB('google', 'id=intent-1&token=tok-1') },
+      // Capture the args passed to provider.register
+      recordCalls: ['register'],
+    }).then((v) => {
+      // Must route to success (not an error page)
+      expect(v.response?.status).to.equal(302);
+      expect(isSignedInOrAuthorize(v.response?.location ?? '')).to.equal(true);
+      // The register call must receive the resolved default org, NOT undefined
+      const registerCalls = (v.calls?.['register'] ?? []) as Array<[Record<string, unknown>]>;
+      expect(registerCalls.length, 'register was called').to.be.greaterThan(0);
+      const registerInput = registerCalls[0][0];
+      expect(registerInput.orgId, 'orgId must be the resolved default org, not undefined').to.equal(
+        'org-default-fake'
+      );
+    });
+  });
+
+  it('calls getLoginSettings with the resolved default org (not undefined) on a bare flow', () => {
+    callService({
+      fn: 'processIdpCallback',
+      slug: 'google',
+      seed: {},
+      idpIntent: REGISTER_INTENT_VERIFIED,
+      request: { url: CB('google', 'id=intent-1&token=tok-1') },
+      recordCalls: ['getLoginSettings'],
+    }).then((v) => {
+      const settingsCalls = (v.calls?.['getLoginSettings'] ?? []) as Array<[string | undefined]>;
+      expect(settingsCalls.length, 'getLoginSettings was called').to.be.greaterThan(0);
+      const orgArg = settingsCalls[0][0];
+      expect(orgArg, 'getLoginSettings must receive resolved default org, not undefined').to.equal(
+        'org-default-fake'
+      );
+    });
+  });
+});
+
 describe('processIdpCallback — fresh-identity link ceremony (Req 2)', () => {
   // A FRESH external identity (intent.userId == null) attached to the ACTIVE session user via
   // ?link=true — the Req-2 wiring (sso-callback.ts:144-153) that the existing already-MAPPED link
