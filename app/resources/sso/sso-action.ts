@@ -11,6 +11,7 @@ import { ProviderError } from '@/modules/auth/types';
 import { ssoErrorRedirect } from '@/resources/shared/next-step-params';
 import { getActiveIdPs } from '@/resources/sso/idp-providers';
 import { idpReturnUrls } from '@/resources/sso/idp-return-urls';
+import { canUnlinkIdp } from '@/resources/sso/sso-management';
 import type { SsoOutcome } from '@/resources/sso/sso-outcome';
 import { trustedAppOrigin } from '@/server/infra/app-origin.server';
 import { env } from '@/server/infra/env.server';
@@ -78,6 +79,22 @@ export async function runSsoAction(
     const userId = session?.user?.id;
     if (!userId) {
       return { kind: 'response', response: new Response(null) }; // never trust a form userId
+    }
+
+    // Lockout guard (defense-in-depth): never remove the user's last primary sign-in method,
+    // even if a client submitted a disabled/forged button. Re-resolve server-side.
+    const links = await provider.listIdpLinks(userId);
+    const authMethods = await provider.listAuthMethods(userId);
+    const target = links.find(
+      (l) => l.idpId === payload.idpId && l.idpUserId === payload.linkedUserId
+    );
+    if (!target || !canUnlinkIdp(target, links, authMethods)) {
+      logAuthEvent('idp.unlink', 'failure', {
+        userId,
+        idpId: payload.idpId,
+        reason: 'lockout_guard',
+      });
+      return { kind: 'redirect', location: '/sso' };
     }
 
     // Guard removeIdpLink — on ProviderError return a 502 + failure event.

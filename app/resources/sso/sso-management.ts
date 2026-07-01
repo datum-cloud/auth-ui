@@ -152,13 +152,20 @@ export async function resolveSsoManagement(
   // Join links ↔ active IdPs; per-identity rows when multi-identity linking is on.
   const linked = joinLinkedIdps(links, active, allowMulti);
 
+  // Login-method-aware unlink guard: stamp each row so the UI can disable the sole-method one.
+  const authMethods = await provider.listAuthMethods(userId);
+  const linkedStamped = linked.map((l) => ({
+    ...l,
+    unlinkable: canUnlinkIdp(l, links, authMethods),
+  }));
+
   return {
     kind: 'data',
     data: {
       csrfToken: csrf.token,
       userId,
       loginName: session?.user?.loginName ?? null,
-      linked,
+      linked: linkedStamped,
       // Multi on → offer every provider (add another); off → only providers with no link yet.
       linkable: linkableProviders(active, linked, allowMulti),
       allowUnlink: env.ALLOW_IDP_UNLINK,
