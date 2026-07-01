@@ -100,11 +100,7 @@ function UnlinkConfirmDialog({
           description={<Trans>This removes it as a sign-in method for your account.</Trans>}
         />
         <Dialog.Footer>
-          <Button
-            type="secondary"
-            theme="outline"
-            htmlType="button"
-            onClick={() => setOpen(false)}>
+          <Button type="secondary" theme="outline" htmlType="button" onClick={() => setOpen(false)}>
             <Trans>Cancel</Trans>
           </Button>
           {/* RRForm auto-adds ?index → POST reaches the sso index action. */}
