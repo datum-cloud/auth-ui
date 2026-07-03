@@ -53,10 +53,9 @@ describe('registerAndLinkIdp — default-org resolution on bare flow (no organiz
       const registerCalls = (verdict.calls?.['register'] ?? []) as Array<[Record<string, unknown>]>;
       expect(registerCalls.length, 'register was called').to.be.greaterThan(0);
       const registerInput = registerCalls[0][0];
-      expect(
-        registerInput.orgId,
-        'orgId must be the resolved default org, not undefined'
-      ).to.equal('org-default-fake');
+      expect(registerInput.orgId, 'orgId must be the resolved default org, not undefined').to.equal(
+        'org-default-fake'
+      );
     });
   });
 });
@@ -81,10 +80,9 @@ describe('registerPasskeyFirst — default-org resolution on bare flow (no organ
       const registerCalls = (verdict.calls?.['register'] ?? []) as Array<[Record<string, unknown>]>;
       expect(registerCalls.length, 'register was called').to.be.greaterThan(0);
       const registerInput = registerCalls[0][0];
-      expect(
-        registerInput.orgId,
-        'orgId must be the resolved default org, not undefined'
-      ).to.equal('org-default-fake');
+      expect(registerInput.orgId, 'orgId must be the resolved default org, not undefined').to.equal(
+        'org-default-fake'
+      );
     });
   });
 });
@@ -110,10 +108,9 @@ describe('registerWithPassword — default-org resolution on bare flow (no organ
       const registerCalls = (verdict.calls?.['register'] ?? []) as Array<[Record<string, unknown>]>;
       expect(registerCalls.length, 'register was called').to.be.greaterThan(0);
       const registerInput = registerCalls[0][0];
-      expect(
-        registerInput.orgId,
-        'orgId must be the resolved default org, not undefined'
-      ).to.equal('org-default-fake');
+      expect(registerInput.orgId, 'orgId must be the resolved default org, not undefined').to.equal(
+        'org-default-fake'
+      );
     });
   });
 });
@@ -137,10 +134,9 @@ describe('registerEmailLinkSignup — default-org resolution on bare flow (no or
       const registerCalls = (verdict.calls?.['register'] ?? []) as Array<[Record<string, unknown>]>;
       expect(registerCalls.length, 'register was called').to.be.greaterThan(0);
       const registerInput = registerCalls[0][0];
-      expect(
-        registerInput.orgId,
-        'orgId must be the resolved default org, not undefined'
-      ).to.equal('org-default-fake');
+      expect(registerInput.orgId, 'orgId must be the resolved default org, not undefined').to.equal(
+        'org-default-fake'
+      );
     });
   });
 });

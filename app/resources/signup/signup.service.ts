@@ -332,7 +332,10 @@ export async function registerPasskeyFirst(
           })
         : provider.register({ email, firstName, lastName, orgId: registrationOrg }),
     noVerifySuccessAudit: () =>
-      logAuthEvent('signup.requested', 'success', { actor: hashActor(email), organization: registrationOrg }),
+      logAuthEvent('signup.requested', 'success', {
+        actor: hashActor(email),
+        organization: registrationOrg,
+      }),
   });
 }
 
