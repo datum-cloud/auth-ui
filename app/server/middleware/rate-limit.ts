@@ -64,15 +64,22 @@ export class RateLimiter {
 const verifyEmailSendLimiter = new RateLimiter({ limit: 10, windowMs: 10 * 60_000 });
 
 // Mounted on `/id/verify` in server.ts (or by callers who wire it).
-// Self-guards on GET + normalized path; POST submits (code verification) are NOT limited
-// here (they are already covered by the CSRF check and are not a flood vector).
+// Guards two surfaces:
+//   GET  /id/verify?send=true  -- the auto email-code dispatch from the loader.
+//   POST /id/verify (intent=resend) -- the manual Resend button action.
+// Both are email-send vectors; the service-layer ownership gate is the primary
+// defence, but rate-limiting here adds a defence-in-depth layer that bounds
+// worst-case email throughput from a single IP even before the ownership check.
 export const verifyEmailSendRateLimit: MiddlewareHandler = createRateLimit({
   limiter: verifyEmailSendLimiter,
-  // Only count GET /id/verify?send=true (the email-code dispatch path).
-  match: (c, pathname) =>
-    c.req.method === 'GET' &&
-    pathname === '/id/verify' &&
-    new URL(c.req.url).searchParams.get('send') === 'true',
+  match: (c, pathname) => {
+    if (pathname !== '/id/verify') return false;
+    if (c.req.method === 'GET') return new URL(c.req.url).searchParams.get('send') === 'true';
+    // POST resend: intent=resend is in the body (body-stream hazard) -- key on method alone.
+    // The ownership gate in resendEmailCode provides the per-account defence;
+    // this limiter caps the per-IP email-send rate as a backstop.
+    return c.req.method === 'POST';
+  },
   key: (_c, ip) => ip,
 });
 

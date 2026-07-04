@@ -75,7 +75,7 @@ export async function submitLdapCredentials(
     return { kind: 'data', payload: { error: 'ACCOUNT_NOT_LINKED' as const }, status: 403 };
   }
 
-  const { setCookie, target } = await signInWithIdpIntent(provider, request, {
+  const { setCookie, target, reauthClearCookie } = await signInWithIdpIntent(provider, request, {
     idpIntentId,
     idpIntentToken,
     userId,
@@ -86,5 +86,7 @@ export async function submitLdapCredentials(
 
   logAuthEvent('ldap_signin', 'success', { idpId, userId, requestId });
 
-  return { kind: 'redirect', location: target, setCookie };
+  // Thread reauthClearCookie through the outcome (outcomeToResponse appends it). Dropping it
+  // left a stale reauth-intent marker that false-mismatches the NEXT login's identity check.
+  return { kind: 'redirect', location: target, setCookie, reauthClearCookie };
 }

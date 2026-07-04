@@ -22,7 +22,7 @@ export function removeSession(list: SessionEntry[], id: string): SessionEntry[] 
  * which silently broke expiry filtering and recency sorting — parse both.
  * Unparseable values map to NaN → treated as expired / oldest.
  */
-function tsMs(value: string): number {
+export function tsMs(value: string): number {
   const n = Number(value);
   return Number.isNaN(n) ? Date.parse(value) : n;
 }

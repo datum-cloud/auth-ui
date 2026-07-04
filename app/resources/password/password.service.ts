@@ -18,7 +18,7 @@ import {
   resetRequestSchema,
 } from '@/resources/password/password.schema';
 import { verifyUrlTemplate } from '@/resources/verify/verify-url-template';
-import { logAuthEvent } from '@/server/observability';
+import { logAuthEvent, hashActor } from '@/server/observability';
 import { constantTimeNoop } from '@/server/timing';
 
 // ── reset (request a reset email) ─────────────────────────────────────────────
@@ -71,7 +71,7 @@ export async function requestPasswordReset(
   }
 
   // Same event regardless of branch — never branch audit on account existence.
-  logAuthEvent('password.reset.requested', 'success', { loginName });
+  logAuthEvent('password.reset.requested', 'success', { actor: hashActor(loginName) });
 }
 
 // ── new (set a password from a reset code) ────────────────────────────────────
@@ -79,8 +79,7 @@ export async function requestPasswordReset(
 export type NewPasswordError = 'INVALID_INPUT' | 'INVALID_CREDENTIALS' | 'PASSWORD_COMPLEXITY';
 
 export type SubmitNewPasswordResult =
-  | { ok: true; target: string }
-  | { ok: false; error: NewPasswordError };
+  { ok: true; target: string } | { ok: false; error: NewPasswordError };
 
 /**
  * Parse + dispatch a "set new password" submission.
@@ -134,8 +133,7 @@ export type ChangePasswordError =
   | 'PERMISSION_DENIED';
 
 export type ChangePasswordResult =
-  | { ok: true; target: string }
-  | { ok: false; error: ChangePasswordError };
+  { ok: true; target: string } | { ok: false; error: ChangePasswordError };
 
 /** A resolved ceremony session — only the fields the change flow needs. */
 export interface ActiveSession {

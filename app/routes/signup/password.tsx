@@ -7,7 +7,6 @@ import { useAuthActionError } from '@/hooks/use-auth-action-error';
 import { TrackOnMount } from '@/modules/analytics/fathom';
 import { readSessions, serializeSessions } from '@/modules/auth/session/cookie';
 import { MaxMindTracker, readMaxMindTrackingToken } from '@/modules/fraud/maxmind-tracker';
-import { genericCheckYourEmail } from '@/resources/schemas/check-your-email.schema';
 import { resolveOrg } from '@/resources/shared/resolve-org';
 import { registerWithPassword } from '@/resources/signup';
 import { signupPasswordSchemaFor } from '@/resources/signup/signup.schema';
@@ -16,7 +15,7 @@ import { loaderCsrf, assertCsrf } from '@/server/csrf';
 import { requireEmailVerification } from '@/server/env';
 import { trustedAppOrigin } from '@/server/infra/app-origin.server';
 import { env } from '@/server/infra/env.server';
-import { userAgentFromRequest } from '@/server/user-agent';
+import { getOrCreateFingerprintId, userAgentFromRequest } from '@/server/user-agent';
 import { actionError } from '@/utils/errors/auth-error';
 import { Form } from '@datum-cloud/datum-ui/form';
 import { Trans, useLingui } from '@lingui/react/macro';
@@ -82,7 +81,13 @@ export async function action({ request }: ActionFunctionArgs) {
     const deviceTrackingToken = fields.deviceTrackingToken
       ? String(fields.deviceTrackingToken)
       : undefined;
-    const result = await registerWithPassword(provider, await readSessions(request), {
+    // Hoist session read for reuse in the enumeration-safe 'sent' branch.
+    // Ensure a fingerprintId cookie exists: brand-new users arrive without one, so
+    // mint it here and pass the id to userAgentFromRequest (not deviceTrackingToken,
+    // which is a MaxMind fraud signal, not a browser fingerprint).
+    const sessions = await readSessions(request);
+    const [fingerprintId, fpCookie] = getOrCreateFingerprintId(request);
+    const result = await registerWithPassword(provider, sessions, {
       email: String(fields.loginName ?? ''),
       firstName: String(fields.firstName ?? ''),
       lastName: String(fields.lastName ?? ''),
@@ -90,21 +95,26 @@ export async function action({ request }: ActionFunctionArgs) {
       organization: fields.organization ? String(fields.organization) : undefined,
       requestId: fields.requestId ? String(fields.requestId) : undefined,
       deviceTrackingToken,
-      userAgent: userAgentFromRequest(request, deviceTrackingToken),
+      userAgent: userAgentFromRequest(request, fingerprintId),
       requireVerification: requireEmailVerification(),
       origin: trustedAppOrigin(request),
     });
 
-    if (result.kind === 'sent') return genericCheckYourEmail(result.email);
-    if (result.kind === 'sent-with-session') {
-      return data(
-        { sent: true as const, email: result.email },
-        { status: 200, headers: { 'set-cookie': await serializeSessions(result.sessions) } }
-      );
+    if (result.kind === 'sent') {
+      // Enumeration defence (#16): emit a Set-Cookie on the duplicate-email path so the
+      // presence of Set-Cookie cannot distinguish a fresh address from an existing one.
+      const headers = new Headers({ 'set-cookie': await serializeSessions(sessions) });
+      if (fpCookie) headers.append('set-cookie', fpCookie);
+      return data({ sent: true as const, email: result.email }, { status: 200, headers });
     }
-    return redirect(result.target, {
-      headers: { 'set-cookie': await serializeSessions(result.sessions) },
-    });
+    if (result.kind === 'sent-with-session') {
+      const headers = new Headers({ 'set-cookie': await serializeSessions(result.sessions) });
+      if (fpCookie) headers.append('set-cookie', fpCookie);
+      return data({ sent: true as const, email: result.email }, { status: 200, headers });
+    }
+    const headers = new Headers({ 'set-cookie': await serializeSessions(result.sessions) });
+    if (fpCookie) headers.append('set-cookie', fpCookie);
+    return redirect(result.target, { headers });
   } catch (err) {
     return actionError(err);
   }

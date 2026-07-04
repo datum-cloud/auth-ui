@@ -6,6 +6,7 @@ import {
   listSessions,
   byId,
   byLoginName,
+  tsMs,
   type SessionEntry,
 } from './session';
 import type { Session } from '@/modules/auth/types';
@@ -89,12 +90,14 @@ export async function readSessions(request: Request): Promise<SessionEntry[]> {
 export async function serializeSessions(list: SessionEntry[]): Promise<string> {
   // Async pre-pass: measure the REAL signed payload for each newest-k candidate list,
   // then let the pure capSessions pick the survivors via a lookup-based sizeOf.
-  const byNewest = [...list].sort((a, b) => Number(b.changeTs) - Number(a.changeTs));
+  // changeTs is a string (numeric-epoch OR ISO-8601). Number(ISO) is NaN, which made this sort
+  // a no-op — the "newest-k" pre-pass then measured an arbitrary subset, so the eviction size
+  // table was computed over the wrong sessions and the emitted cookie could exceed the byte
+  // budget or over-evict. tsMs parses both formats (shared with mostRecent/listSessions).
+  const byNewest = [...list].sort((a, b) => tsMs(b.changeTs) - tsMs(a.changeTs));
   const sizeByLength = new Map<number, number>();
   for (let k = list.length; k >= 0; k--) {
-    const candidate = [...byNewest.slice(0, k)].sort(
-      (a, b) => Number(a.changeTs) - Number(b.changeTs)
-    );
+    const candidate = [...byNewest.slice(0, k)].sort((a, b) => tsMs(a.changeTs) - tsMs(b.changeTs));
     const bytes = new TextEncoder().encode(await sessionsCookie.serialize(candidate)).byteLength;
     sizeByLength.set(k, bytes);
     if (bytes <= MAX_COOKIE_BYTES) break; // smaller suffixes can only be smaller; no need to measure them

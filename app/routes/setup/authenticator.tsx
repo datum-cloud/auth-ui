@@ -4,6 +4,7 @@ import { SubmitButton } from '@/components/auth-form/auth-form';
 import { AuthFormFields } from '@/components/auth-form/auth-form-fields';
 import { useAuthActionRecovery } from '@/hooks/use-auth-action-recovery';
 import { readSessions, byLoginName } from '@/modules/auth/session/cookie';
+import { ProviderError } from '@/modules/auth/types';
 import { setupSkipSchema } from '@/resources/mfa/mfa.schema';
 import { enrollTotp } from '@/resources/otp';
 import { otpCodeClientSchema } from '@/resources/otp/otp.schema';
@@ -31,7 +32,9 @@ export const meta: MetaFunction = () => [{ title: 'Set up authenticator app' }];
 export async function loader({ request }: LoaderFunctionArgs) {
   const url = new URL(request.url);
   const { loginName, requestId, organization } = readCeremonyParams(url);
-  const { force, checkAfter } = setupSkipSchema.parse(Object.fromEntries(url.searchParams));
+  // Never throw a 500 on tampered query params — an invalid force/checkAfter degrades to undefined.
+  const skip = setupSkipSchema.safeParse(Object.fromEntries(url.searchParams));
+  const { force, checkAfter } = skip.success ? skip.data : {};
 
   // Guard: require an active session for this loginName (mirror login.verify.authenticator.tsx).
   const sessions = await readSessions(request);
@@ -44,7 +47,17 @@ export async function loader({ request }: LoaderFunctionArgs) {
   if (!user) return redirect(redirectToLogin(requestId, organization));
 
   // Register TOTP: returns deterministic { uri, secret } in fake; real adapter generates a new key.
-  const { uri, secret } = await provider.registerTotp(user.id);
+  // A user who ALREADY has verified TOTP makes registerTotp throw (ALREADY_EXISTS /
+  // FAILED_PRECONDITION); an unhandled throw dead-ends them on a generic error page. Bounce them
+  // back into login so their existing authenticator satisfies the MFA challenge instead.
+  let uri: string;
+  let secret: string;
+  try {
+    ({ uri, secret } = await provider.registerTotp(user.id));
+  } catch (err) {
+    if (err instanceof ProviderError) return redirect(redirectToLogin(requestId, organization));
+    throw err;
+  }
 
   const { csrfToken, headers } = await loaderCsrf(request);
 

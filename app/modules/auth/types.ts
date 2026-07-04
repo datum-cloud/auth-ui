@@ -68,9 +68,7 @@ export interface U2FCreationOptions {
  *                     `SessionChallenges.otpEmailCode` so callers can complete the factor in-band.
  */
 export type OtpEmailChallenge =
-  | { kind: 'send' }
-  | { kind: 'send-template'; urlTemplate: string }
-  | { kind: 'return-code' };
+  { kind: 'send' } | { kind: 'send-template'; urlTemplate: string } | { kind: 'return-code' };
 
 // OIDC (Phase 1) — SAML fields added in Phase 5.
 export interface AuthRequest {
@@ -134,7 +132,15 @@ export interface LoginSettings {
   allowRegister: boolean;
   allowExternalIdp: boolean;
   passkeysType: 'not_allowed' | 'allowed';
+  /** Login policy: MFA is mandatory for all sessions (local and IdP). Proto `forceMfa`. */
   forceMfa: boolean;
+  /**
+   * Login policy: MFA is mandatory only for local (username/password) logins; sessions
+   * authenticated via an external IdP are exempt. Proto `forceMfaLocalOnly`. Optional,
+   * default-off. Kept distinct from `forceMfa` so IdP sessions the policy exempts are not
+   * wrongly forced into MFA setup.
+   */
+  forceMfaLocalOnly?: boolean;
   /** Login policy: hide the "Forgot password?" entry point. Proto `hidePasswordReset`. Optional (undefined ⇒ show). */
   hidePasswordReset?: boolean;
   /**

@@ -69,12 +69,30 @@ export function MaxMindTracker({ accountId }: MaxMindTrackerProps) {
   return null;
 }
 
-/** Reads the mirrored device-tracking token at form-submit time. */
+/**
+ * Reads the device-tracking token at form-submit time.
+ *
+ * Checks sessionStorage first (the fast path — the tracker polls the cookie and mirrors it
+ * there on success). If the mirror is absent (e.g. the MaxMind cookie landed after the poll
+ * budget expired), falls back to reading the cookie directly and mirrors it so future reads
+ * are fast. This prevents the token from being permanently lost on slow connections.
+ */
 export function readMaxMindTrackingToken(): string | undefined {
   if (typeof window === 'undefined') return undefined;
   try {
-    return window.sessionStorage.getItem(MAXMIND_TOKEN_STORAGE_KEY) || undefined;
+    const mirrored = window.sessionStorage.getItem(MAXMIND_TOKEN_STORAGE_KEY);
+    if (mirrored) return mirrored;
   } catch {
-    return undefined;
+    // sessionStorage unavailable — fall through to cookie read
   }
+  // Fallback: cookie may have arrived after the poll budget expired.
+  const fromCookie = readMaxMindCookie();
+  if (!fromCookie) return undefined;
+  // Mirror it so subsequent reads (e.g. the signup interval) find it immediately.
+  try {
+    window.sessionStorage.setItem(MAXMIND_TOKEN_STORAGE_KEY, fromCookie);
+  } catch {
+    // sessionStorage unavailable; the cookie read still returns the token this call.
+  }
+  return fromCookie;
 }

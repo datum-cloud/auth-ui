@@ -18,7 +18,7 @@ import { loaderCsrf, assertCsrf } from '@/server/csrf';
 import { requireEmailVerification } from '@/server/env';
 import { trustedAppOrigin } from '@/server/infra/app-origin.server';
 import { env } from '@/server/infra/env.server';
-import { userAgentFromRequest } from '@/server/user-agent';
+import { getOrCreateFingerprintId, userAgentFromRequest } from '@/server/user-agent';
 import { actionError } from '@/utils/errors/auth-error';
 import { Button } from '@datum-cloud/datum-ui/button';
 import { Trans } from '@lingui/react/macro';
@@ -85,6 +85,19 @@ export async function action({ request }: ActionFunctionArgs) {
   const { intent, loginName, firstName, lastName, organization, requestId, deviceTrackingToken } =
     parsed.data;
 
+  // Enforce the org registration policy SERVER-SIDE. The loader hides disabled methods from the
+  // view, but that is display-only — a direct POST (or a stale form) would otherwise bypass it and
+  // register on an org that disallows registration (or the specific method). Re-read the policy for
+  // the same org scope the loader used and reject disallowed methods before provisioning anything.
+  const policy = await provider.getLoginSettings(await resolveOrg(provider, organization));
+  const methodDisallowed =
+    policy.allowRegister === false ||
+    (intent === 'password' && !policy.allowPassword) ||
+    (intent === 'passkey' && policy.passkeysType === 'not_allowed');
+  if (methodDisallowed) {
+    return data({ error: 'INVALID_INPUT' as const }, { status: 400 });
+  }
+
   if (intent === 'email-link') {
     if (!env.AUTH_EMAIL_DELIVERY_ENABLED)
       return data({ error: 'INVALID_INPUT' as const }, { status: 400 });
@@ -106,14 +119,20 @@ export async function action({ request }: ActionFunctionArgs) {
 
   if (intent === 'passkey') {
     try {
-      const result = await registerPasskeyFirst(provider, await readSessions(request), {
+      // Hoist session read so both the service call and the 'sent' fallback use the
+      // same snapshot. Also ensure a fingerprintId cookie exists for this browser:
+      // brand-new users arrive here without one, and the minted id must feed the
+      // userAgent so the first session already carries a stable fingerprint.
+      const sessions = await readSessions(request);
+      const [fingerprintId, fpCookie] = getOrCreateFingerprintId(request);
+      const result = await registerPasskeyFirst(provider, sessions, {
         email: loginName,
         firstName,
         lastName,
         organization,
         requestId,
         deviceTrackingToken,
-        userAgent: userAgentFromRequest(request, deviceTrackingToken),
+        userAgent: userAgentFromRequest(request, fingerprintId),
         // Verify email first (anti-spam): a passkey proves device possession, not email
         // ownership, so enrollment is gated behind email verification. With EMAIL_VERIFICATION
         // on (the default), a brand-new email gets the 'sent-with-session' result below
@@ -124,17 +143,23 @@ export async function action({ request }: ActionFunctionArgs) {
         origin: trustedAppOrigin(request),
       });
 
-      if (result.kind === 'sent') return genericCheckYourEmail(result.email);
+      if (result.kind === 'sent') {
+        // Enumeration defence (#16): emit a Set-Cookie on the duplicate-email path too so
+        // the presence of Set-Cookie cannot distinguish a fresh address from an existing one.
+        // We re-serialize the caller's unchanged session list (no new sessions were created).
+        const headers = new Headers({ 'set-cookie': await serializeSessions(sessions) });
+        if (fpCookie) headers.append('set-cookie', fpCookie);
+        return data({ sent: true as const, email: result.email }, { status: 200, headers });
+      }
       if (result.kind === 'sent-with-session') {
-        return data(
-          { sent: true as const, email: result.email },
-          { status: 200, headers: { 'set-cookie': await serializeSessions(result.sessions) } }
-        );
+        const headers = new Headers({ 'set-cookie': await serializeSessions(result.sessions) });
+        if (fpCookie) headers.append('set-cookie', fpCookie);
+        return data({ sent: true as const, email: result.email }, { status: 200, headers });
       }
       // kind === 'redirect'
-      return redirect(result.target, {
-        headers: { 'set-cookie': await serializeSessions(result.sessions) },
-      });
+      const headers = new Headers({ 'set-cookie': await serializeSessions(result.sessions) });
+      if (fpCookie) headers.append('set-cookie', fpCookie);
+      return redirect(result.target, { headers });
     } catch (err) {
       return actionError(err);
     }

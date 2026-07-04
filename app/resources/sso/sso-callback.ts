@@ -19,6 +19,7 @@ import type { IdpIntentResult } from '@/modules/auth/types';
 import { authorizeHandbackTarget, ssoErrorRedirect } from '@/resources/shared/next-step-params';
 import { resolveOrg } from '@/resources/shared/resolve-org';
 import { registerAndLinkIdp } from '@/resources/signup';
+import { MAXMIND_TRACKING_TOKEN_METADATA_KEY } from '@/resources/signup/signup.service';
 import { deriveIdpProfileName } from '@/resources/sso/derive-idp-name';
 import { decideIdpCallback } from '@/resources/sso/idp-callback';
 import { signInWithIdpIntent, requestScopedProviderReads } from '@/resources/sso/idp-session';
@@ -249,6 +250,19 @@ export async function processIdpCallback(
           deviceTrackingToken,
         }));
       } catch (err) {
+        if (err instanceof ProviderError) {
+          deps.onAuthEvent?.('idp.signin', 'failure');
+          logAuthEvent('idp.signin', 'failure', {
+            userId: decision.userId,
+            idpId: intent.information.idpId,
+            requestId,
+            reason: err.code,
+          });
+          return {
+            kind: 'redirect',
+            location: ssoErrorRedirect(slug, providerErrorCode(err.code)),
+          };
+        }
         const reason = err instanceof Error ? err.message : 'unknown';
         logAuthEvent('idp.signin', 'failure', {
           userId: decision.userId,
@@ -293,6 +307,9 @@ export async function processIdpCallback(
           }
         }
 
+        const metadata = deviceTrackingToken
+          ? { [MAXMIND_TRACKING_TOKEN_METADATA_KEY]: deviceTrackingToken }
+          : undefined;
         const session = await provider.createSession(
           { idpIntent: { idpIntentId: id, idpIntentToken: token } },
           {
@@ -300,6 +317,7 @@ export async function processIdpCallback(
             orgId: organization,
             userId: decision.userId,
             userAgent: userAgentFromRequest(request, fingerprintId),
+            metadata,
           }
         );
         // Elide the post-create getUser(decision.userId) lookup — the cookie's

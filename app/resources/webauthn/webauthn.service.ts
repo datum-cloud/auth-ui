@@ -197,7 +197,7 @@ export async function verifyWebAuthnAssertion(
       webAuthN: { credentialAssertionData: credentialData },
     });
   } catch (err) {
-    logAuthEvent(cfg.auditEvent, 'failure', { loginName });
+    logAuthEvent(cfg.auditEvent, 'failure', { actor: hashActor(loginName) });
     if (err instanceof ProviderError && err.code === 'INVALID_CREDENTIALS') {
       return { ok: false, error: 'INVALID_CREDENTIALS' };
     }

@@ -25,9 +25,18 @@ function xffOf(c: Context): string {
   return c.req.header('x-forwarded-for') ?? '';
 }
 
-/** Normalize a request pathname: lowercase + strip trailing slashes (mount-blind self-guard). */
+/**
+ * Normalize a request pathname: lowercase + strip trailing slashes (mount-blind self-guard),
+ * then strip a trailing `.data` suffix. React Router v7 single-fetch submits loader/action
+ * requests to `<path>.data` (e.g. POST /id/login/password.data), so every exact-path self-guard
+ * below would miss the JS-hydrated variant and the limiter would be bypassed for all JS-enabled
+ * clients — only no-JS form posts (which hit the bare path) were being counted.
+ */
 function normalizedPathname(c: Context): string {
-  return new URL(c.req.url).pathname.toLowerCase().replace(/\/+$/, '');
+  return new URL(c.req.url).pathname
+    .toLowerCase()
+    .replace(/\/+$/, '')
+    .replace(/\.data$/, '');
 }
 
 const RATE_LIMITED_BODY = {

@@ -15,7 +15,7 @@ import { ProviderError } from '@/modules/auth/types';
 import { completeEmailLinkSignup } from '@/resources/signup';
 import { paths } from '@/routes/paths';
 import { providerForRequest } from '@/server/auth-context.server';
-import { userAgentFromRequest } from '@/server/user-agent';
+import { getOrCreateFingerprintId, userAgentFromRequest } from '@/server/user-agent';
 import { LinkButton } from '@datum-cloud/datum-ui/button';
 import { Trans } from '@lingui/react/macro';
 import {
@@ -36,6 +36,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const organization = url.searchParams.get('organization') ?? undefined;
   const next = url.searchParams.get('next') ?? undefined;
   const deviceTrackingToken = url.searchParams.get('deviceTrackingToken') ?? undefined;
+  // The email link carries the oidc_/saml_ requestId; without threading it the ceremony can
+  // never resume at /authorize after email-link signup completes.
+  const requestId = url.searchParams.get('requestId') ?? undefined;
 
   // Guard: both code and userId are required — without them the link is structurally invalid.
   if (!code || !userId) {
@@ -44,26 +47,34 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
   const provider = providerForRequest(request);
 
-  // Resolve the user to get their loginName (needed for the session and the redirect target).
-  const user = await provider.getUser(userId);
-  if (!user) {
-    return data({ error: 'EXPIRED' as const }, { status: 400 });
-  }
-
   try {
+    // Resolve the user to get their loginName. getUser must be INSIDE the try: a stale/invalid
+    // userId makes Zitadel throw NOT_FOUND, which OUTSIDE the try would surface as a 500 instead
+    // of the friendly 'EXPIRED' state a second click on an old link should show.
+    const user = await provider.getUser(userId);
+    if (!user) {
+      return data({ error: 'EXPIRED' as const }, { status: 400 });
+    }
     const sessions = await readSessions(request);
+    // Ensure a fingerprintId cookie exists for this browser. Email-link signup lands here
+    // without a prior session, so brand-new users may not yet have a fingerprint cookie.
+    // The minted id feeds userAgentFromRequest (not deviceTrackingToken, which is a MaxMind
+    // fraud signal kept only in the service metadata path).
+    const [fingerprintId, fpCookie] = getOrCreateFingerprintId(request);
     const result = await completeEmailLinkSignup(provider, sessions, {
       userId,
       code,
       loginName: user.loginName,
       organization,
+      requestId,
       next: next === 'passkey' ? 'passkey' : undefined,
       deviceTrackingToken,
-      userAgent: userAgentFromRequest(request, deviceTrackingToken),
+      userAgent: userAgentFromRequest(request, fingerprintId),
     });
     const headers = new Headers();
     headers.append('set-cookie', await serializeSessions(result.sessions));
     headers.append('set-cookie', await serializeLastUsedLogin('email'));
+    if (fpCookie) headers.append('set-cookie', fpCookie);
     return redirect(result.target, { headers });
   } catch (err) {
     // Bad/expired/replayed code, or otpEmail FAILED_PRECONDITION — surface the friendly

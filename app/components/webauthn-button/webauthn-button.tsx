@@ -90,7 +90,13 @@ export function WebAuthnButton({
       let credential: Record<string, unknown>;
 
       const isCypress = typeof window !== 'undefined' && 'Cypress' in window;
-      if (isCypress || !isWebAuthnSupported()) {
+      if (!isCypress && !isWebAuthnSupported()) {
+        // Real browser without WebAuthn — surface the unsupported message immediately
+        // instead of submitting the fake Cypress credential to the production backend.
+        setError('webauthn-unsupported');
+        return;
+      }
+      if (isCypress) {
         // Cypress fake-credential path: no publicKey needed.
         // The pre-baked credential works for both assertion and attestation because
         // the fake provider accepts any payload for both verifyPasskey and verifyU2F.

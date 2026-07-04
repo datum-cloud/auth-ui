@@ -92,7 +92,17 @@ export async function startIdpIntent(
     organization,
     deviceTrackingToken,
   });
-  const result = await provider.startIdpIntent(idpId, { success, failure });
+  // Guard the provider call: a ProviderError (Zitadel unavailable / IdP intent rejected) is the
+  // designed IDP_UNAVAILABLE result (502 at route), NOT a crash to the error boundary. Unknown
+  // errors still propagate.
+  let result: Awaited<ReturnType<typeof provider.startIdpIntent>>;
+  try {
+    result = await provider.startIdpIntent(idpId, { success, failure });
+  } catch (err) {
+    if (!(err instanceof ProviderError)) throw err;
+    logAuthEvent('idp_start', 'failure', { idpId, reason: 'provider_error' });
+    return { ok: false, error: 'IDP_UNAVAILABLE' };
+  }
   if (!result.authUrl) {
     logAuthEvent('idp_start', 'failure', { idpId, reason: 'no_auth_url' });
     return { ok: false, error: 'IDP_UNAVAILABLE' };
@@ -154,8 +164,22 @@ export interface ResolveIdentifierRedirect {
   sessions: SessionEntry[];
 }
 
+/**
+ * Domain-discovery single-IdP outcome: the resolved org disallows password and exposes exactly one
+ * external IdP, so the identifier step should start that IdP intent directly (skipping the
+ * password screen). The route converts this into `startIdpIntent(...)` + `redirect(authUrl)` —
+ * it CANNOT be a plain redirect to `/sso`, which is a session-gated management page that cannot
+ * start an intent and would bounce a fresh user back to `/login`.
+ */
+export interface ResolveIdentifierStartIdp {
+  ok: true;
+  startIdp: { idpId: string; organization: string; loginName: string; requestId?: string };
+  sessions: SessionEntry[];
+}
+
 export type ResolveIdentifierResult =
   | ResolveIdentifierRedirect
+  | ResolveIdentifierStartIdp
   | { ok: false; error: ResolveIdentifierError };
 
 /** Lowercased domain of an email-style identifier, or null when it is not an email. */
@@ -210,13 +234,13 @@ export async function resolveIdentifier(
         const idps = await provider.getActiveIdPs(await resolveOrg(provider, org));
         if (!orgSettings.allowPassword && orgSettings.allowExternalIdp && idps.length === 1) {
           logAuthEvent('identifier', 'success', { actor: hashActor(loginName) });
-          const idpParams = new URLSearchParams({
-            loginName,
-            idpId: idps[0].id,
-            organization: org,
-          });
-          if (requestId) idpParams.set('requestId', requestId);
-          return { ok: true, target: '/sso', params: idpParams, sessions: list };
+          // Signal the route to start the IdP intent directly (see ResolveIdentifierStartIdp).
+          // A plain redirect to /sso cannot start an intent and dead-ends session-less users.
+          return {
+            ok: true,
+            startIdp: { idpId: idps[0].id, organization: org, loginName, requestId },
+            sessions: list,
+          };
         }
       }
     }
@@ -228,7 +252,10 @@ export async function resolveIdentifier(
     // byte-identical to before (USER_NOT_FOUND). With it on, proceed to the password
     // step bound to the typed loginName but with NO user attached — the credential check
     // then fails generically, identical to a wrong password for a real account.
-    const settings = await provider.getLoginSettings(org);
+    // Org-first: resolve the org (explicit wins; else default org) before reading the policy that
+    // gates ignoreUnknownUsernames / disableLoginWithEmail. Reading raw `org` (often undefined
+    // here) returned INSTANCE settings, so these gates could diverge from the default org's policy.
+    const settings = await provider.getLoginSettings(await resolveOrg(provider, org));
     if (settings.ignoreUnknownUsernames !== true) {
       // disableLoginWithEmail (settings-gated, DEFAULT-OFF): an email is never a valid loginname
       // under this policy, so the lookup already failed. Refine the generic not-found into a
@@ -261,12 +288,18 @@ export async function resolveIdentifier(
     { requestId, orgId: org, userId: user.id, userAgent }
   );
   const methods = await provider.listAuthMethods(user.id);
-  // Reuse the caller's already-fetched settings when they still
-  // describe the resolved org (org unchanged by discovery); otherwise re-fetch.
+  // The effective org for post-identifier decisions is the org the FOUND USER belongs
+  // to — not the caller's (possibly default-org) ceremony org. When no explicit org was
+  // pinned and domain-discovery didn't run (org === undefined), the user may live in a
+  // different org than the default. Use user.orgId as the authoritative org so the
+  // settings (allowPassword, passkeysType, …) match the user's actual policies.
+  // The caller's threadedSettings are only reused when both the caller pinned an explicit
+  // org AND the user's org matches it (org !== undefined && org === organization).
+  const userOrg = org ?? user.orgId;
   const settings =
-    threadedSettings && org === organization
+    threadedSettings && org !== undefined && org === organization
       ? threadedSettings
-      : await provider.getLoginSettings(org);
+      : await provider.getLoginSettings(userOrg);
   const decision = decideAfterIdentifier({
     methods,
     settings,
@@ -414,9 +447,8 @@ export async function verifyLoginPassword(
   // /authorize finalization carve-out (see doc above).
   const isSignedIn = targetUrl === '/signed-in' || targetUrl.startsWith('/signed-in?');
   // A `device_` requestId must NOT take the /authorize carve-out. It has to reach
-  // `/signed-in?requestId=device_…`, where resolveSignedIn auto-completes the device grant
-  // (mirroring the OLD app's /signedin → completeDeviceAuthorization), so `datumctl login`
-  // finishes WITHOUT a second manual Authorize click. Only oidc_/saml_ go through /authorize.
+  // `/signed-in?requestId=device_…`, where resolveSignedIn hands it back to the /device/authorize
+  // consent screen (an explicit CSRF-protected Approve). Only oidc_/saml_ go through /authorize.
   const isDeviceFlow = requestId?.startsWith('device_') ?? false;
   if (isSignedIn && requestId && !isDeviceFlow) {
     const authorizeParams = new URLSearchParams({ requestId, sessionId: session.id });

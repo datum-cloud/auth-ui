@@ -19,59 +19,18 @@ export async function loader({ request }: LoaderFunctionArgs) {
     defaultAppUrl: env.DEFAULT_APP_URL,
   });
 
+  // Ceremony hand-back (OIDC/SAML → /authorize, device_ → the /device/authorize consent screen)
+  // or a configured post-login destination. A device grant is NEVER auto-completed here — it
+  // routes to the CSRF-protected /device/authorize consent screen (see resolveSignedIn).
   if (outcome.kind === 'redirect') return redirect(outcome.location);
-
-  // The post-login device-grant auto-authorization FAILED — render a tailored
-  // recovery card (no sign-out form / no CSRF needed for this terminal state).
-  if (outcome.kind === 'device-error') {
-    return data({ deviceError: true } as const);
-  }
 
   // Terminal "You are signed in" page — mint a CSRF token for the sign-out form.
   const { csrfToken, headers } = await loaderCsrf(request);
-  return data(
-    { loginName: outcome.loginName, csrfToken, deviceComplete: outcome.deviceComplete ?? false },
-    { headers }
-  );
+  return data({ loginName: outcome.loginName, csrfToken }, { headers });
 }
 
 export default function SignedIn() {
-  const loaderData = useLoaderData<typeof loader>();
-
-  // Device auto-authorization failed — tailored inline recovery (no sign-out form).
-  if ('deviceError' in loaderData) {
-    return (
-      <AuthCard
-        title={<Trans>Authorization failed</Trans>}
-        description={
-          <Trans>We could not complete the device authorization. Please try again.</Trans>
-        }
-      />
-    );
-  }
-
-  const { loginName, csrfToken, deviceComplete } = loaderData;
-
-  // Device grant was auto-completed after login — restore the OLD behavior of landing
-  // on a "you can close this window" terminal page (no second Authorize click, no sign-out form).
-  if (deviceComplete) {
-    return (
-      <AuthCard
-        title={<Trans>Authorization complete</Trans>}
-        description={
-          loginName ? (
-            <Trans>
-              You are signed in as <strong>{loginName}</strong>
-            </Trans>
-          ) : null
-        }>
-        <TrackOnMount event="login_completed" />
-        <p className="text-center">
-          <Trans>You can now close this window and return to the device where you started.</Trans>
-        </p>
-      </AuthCard>
-    );
-  }
+  const { loginName, csrfToken } = useLoaderData<typeof loader>();
 
   return (
     <AuthCard

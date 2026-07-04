@@ -12,28 +12,41 @@
 import type { AuthProvider } from '@/modules/auth/auth-provider';
 import { env } from '@/server/infra/env.server';
 
-// Module-level memo of the provider's instance Default Organization. It is STABLE for the life of
-// the process, so one lookup serves every request. A `null` result (provider returned no default)
-// is deliberately NOT cached — the next call retries, so a transient miss never pins us to the
-// instance/default context permanently. Tradeoff: in the rare deployment with no default org AND no
-// ZITADEL_DEFAULT_ORG_ID pin, every resolveOrg re-hits getDefaultOrg — set the env pin there.
-let cachedDefaultOrg: string | null = null;
+// Per-serviceUrl memo of each Zitadel instance's Default Organization.
+//
+// Keyed by serviceUrl so multi-forward-host deployments (ZITADEL_TRUSTED_FORWARD_HOSTS) each
+// get their own slot — a plain singleton would let the first-to-answer instance's org bleed
+// into every subsequent request for any other instance (cross-tenant org bleed).
+//
+// Only NON-null results are cached; null is left uncached so the next call retries, preventing
+// a transient miss from permanently pinning a request to the INSTANCE/default context.
+//
+// A `null` serviceUrl key (fake provider / unknown URL) keeps the old singleton behavior, which
+// is fine because those deployments never span multiple distinct Zitadel instances.
+const defaultOrgByUrl = new Map<string, string>();
+
+/** Extract the serviceUrl from a provider instance when it exposes one, else null. */
+function providerServiceUrl(provider: AuthProvider): string | null {
+  return (provider as AuthProvider & { serviceUrl?: string }).serviceUrl ?? null;
+}
 
 /**
- * Memoized read of the provider's instance Default Organization. Only a NON-null id is cached; a
- * null result is returned but left uncached so the next call retries. The provider is injected
- * (not module-global) to keep this unit-testable.
+ * Memoized read of the provider's instance Default Organization, keyed by serviceUrl.
+ * Only a NON-null id is cached; a null result is returned but left uncached so the next
+ * call retries. The provider is injected (not module-global) to keep this unit-testable.
  */
 export async function getCachedDefaultOrg(provider: AuthProvider): Promise<string | null> {
-  if (cachedDefaultOrg !== null) return cachedDefaultOrg;
+  const key = providerServiceUrl(provider) ?? '';
+  const hit = defaultOrgByUrl.get(key);
+  if (hit !== undefined) return hit;
   const resolved = await provider.getDefaultOrg();
-  if (resolved !== null) cachedDefaultOrg = resolved;
+  if (resolved !== null) defaultOrgByUrl.set(key, resolved);
   return resolved;
 }
 
 /** Test-only: clear the module cache so precedence/caching specs start from a clean slate. */
 export function resetDefaultOrgCache(): void {
-  cachedDefaultOrg = null;
+  defaultOrgByUrl.clear();
 }
 
 /**

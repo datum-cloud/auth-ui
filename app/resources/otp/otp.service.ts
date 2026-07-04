@@ -22,7 +22,7 @@ import { otpCodeSchema, otpDeliveryCodeSchema } from '@/resources/mfa/mfa.schema
 import { otpEmailUrlTemplate } from '@/resources/otp/otp-email-url-template';
 import { nextStepWithParams, threadParams } from '@/resources/shared/next-step-params';
 import { resolveOrg } from '@/resources/shared/resolve-org';
-import { logAuthEvent } from '@/server/observability';
+import { logAuthEvent, hashActor } from '@/server/observability';
 import { z } from 'zod';
 
 // ── shared session shapes ─────────────────────────────────────────────────────
@@ -212,7 +212,9 @@ export async function submitOtpCode(
     logAuthEvent(
       cfg.failureEvent,
       'failure',
-      cfg.channel ? { loginName, channel: cfg.channel } : { loginName }
+      cfg.channel
+        ? { actor: hashActor(loginName), channel: cfg.channel }
+        : { actor: hashActor(loginName) }
     );
     if (err instanceof ProviderError && err.code === 'INVALID_CREDENTIALS') {
       return { ok: false, error: 'INVALID_CREDENTIALS' };

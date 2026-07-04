@@ -7,7 +7,7 @@
 import type { AuthProvider } from '@/modules/auth/auth-provider';
 import { slugToProvider } from '@/modules/auth/idp-slug';
 import { readSessions, mostRecent } from '@/modules/auth/session/cookie';
-import type { IdProvider } from '@/modules/auth/types';
+import { ProviderError, type IdProvider } from '@/modules/auth/types';
 import { getActiveIdPs } from '@/resources/sso/idp-providers';
 import { idpReturnUrls } from '@/resources/sso/idp-return-urls';
 import { trustedAppOrigin } from '@/server/infra/app-origin.server';
@@ -60,8 +60,7 @@ export interface SsoLinkSignInRequired {
 }
 
 export type SsoLinkResult =
-  | { kind: 'redirect'; location: string }
-  | { kind: 'data'; data: SsoLinkSignInRequired };
+  { kind: 'redirect'; location: string } | { kind: 'data'; data: SsoLinkSignInRequired };
 
 /**
  * /sso/link loader logic. Session-gated: no session → render the sign-in-required prompt;
@@ -78,7 +77,16 @@ export async function resolveSsoLink(
 
   const entries = await readSessions(request);
   const recent = mostRecent(entries);
-  const session = recent ? await provider.getSession(recent.id, recent.token) : null;
+  // Guard getSession: an expired/invalid session cookie makes Zitadel throw NOT_FOUND, which
+  // would otherwise surface as a raw 500. Treat any ProviderError as "no session" so the flow
+  // falls through to the sign-in-required prompt below; rethrow unknown errors to the boundary.
+  let session: Awaited<ReturnType<typeof provider.getSession>> | null = null;
+  try {
+    session = recent ? await provider.getSession(recent.id, recent.token) : null;
+  } catch (err) {
+    if (!(err instanceof ProviderError)) throw err;
+    // ProviderError (expired/invalid session) → session stays null → sign-in-required prompt.
+  }
 
   // (c) No session → render sign-in-required prompt
   if (!session?.user?.id) {
@@ -115,7 +123,21 @@ export async function resolveSsoLink(
 
   const origin = trustedAppOrigin(request);
   const { success, failure } = idpReturnUrls(origin, wantedSlug, { link: true, organization });
-  const { authUrl } = await provider.startIdpIntent(target.id, { success, failure });
+  // Guard startIdpIntent: a ProviderError (Zitadel unavailable / IdP intent rejected) must not
+  // crash the loader to the error boundary. Log the failure and fall back to /sso, mirroring the
+  // existing empty-authUrl handling below. Unknown errors still propagate to the boundary.
+  let authUrl: string | undefined;
+  try {
+    ({ authUrl } = await provider.startIdpIntent(target.id, { success, failure }));
+  } catch (err) {
+    if (!(err instanceof ProviderError)) throw err;
+    logAuthEvent('idp.link.start', 'failure', {
+      idpId: target.id,
+      userId: session.user.id,
+      slug: wantedSlug,
+    });
+    return { kind: 'redirect', location: '/sso' };
+  }
 
   logAuthEvent('idp.link.start', authUrl ? 'success' : 'failure', {
     idpId: target.id,

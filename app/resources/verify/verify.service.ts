@@ -106,22 +106,35 @@ export type ResendNotice = 'CODE_SENT' | 'ALREADY_VERIFIED';
 export type ResendEmailError = 'INVALID_INPUT';
 
 export type ResendEmailResult =
-  | { ok: true; notice: ResendNotice }
-  | { ok: false; error: ResendEmailError };
+  { ok: true; notice: ResendNotice } | { ok: false; error: ResendEmailError };
 
 export interface ResendEmailCodeInput {
   userId: string;
   origin: string;
   requestId?: string;
   invite: boolean;
+  /**
+   * The active ceremony session resolved from the cookie, or undefined. The resend is
+   * GATED on this session owning `userId`; without it, INVALID_INPUT is returned (fail closed).
+   */
+  session?: ActiveSession;
 }
 
 /**
  * Resend the verification email code. Returns a typed result the route surfaces:
- *  - { ok: true, notice: 'CODE_SENT' } on success
+ *  - { ok: true, notice: 'CODE_SENT' } on success, or on any ProviderError after ownership
+ *    is confirmed (enumeration-safe: transient failures must not distinguish from a real send)
  *  - { ok: true, notice: 'ALREADY_VERIFIED' } when the provider reports ALREADY_DONE
- *  - { ok: false, error: 'INVALID_INPUT' } when userId is empty/missing
- * Other provider errors re-throw.
+ *  - { ok: false, error: 'INVALID_INPUT' } when userId is empty/missing, or when the
+ *    session cannot be verified as owning userId (flood/ownership gate, fail closed)
+ *
+ * All ProviderErrors from the resend call are absorbed into typed results so the route
+ * never 500s on a transient provider failure. Non-ProviderError exceptions (programming
+ * errors, network panics) still propagate.
+ *
+ * OWNERSHIP GATE: mirrors dispatchEmailCode — calls provider.getSession to verify the
+ * session owns `userId` server-side before dispatching. Mismatch, no session, or a
+ * getSession failure => INVALID_INPUT (fail closed; no email is sent to arbitrary users).
  *
  * INPUT GATE: the original action ran verifyCodeSchema.safeParse over the whole form
  * BEFORE branching on intent, so the resend path was also gated on userId.min(1)
@@ -131,9 +144,23 @@ export interface ResendEmailCodeInput {
  */
 export async function resendEmailCode(
   provider: AuthProvider,
-  { userId, origin, requestId, invite }: ResendEmailCodeInput
+  { userId, origin, requestId, invite, session }: ResendEmailCodeInput
 ): Promise<ResendEmailResult> {
   if (!userId) return { ok: false, error: 'INVALID_INPUT' };
+
+  // Resolve the session cookie and verify ownership server-side via the provider.
+  // No session or a getSession failure => fail closed (INVALID_INPUT, no email sent).
+  let ownsUser = false;
+  try {
+    if (session) {
+      const activeSession = await provider.getSession(session.id, session.token);
+      ownsUser = !!activeSession && activeSession.user?.id === userId;
+    }
+  } catch {
+    // getSession failure => treat as no session (fail closed, do not send)
+  }
+
+  if (!ownsUser) return { ok: false, error: 'INVALID_INPUT' };
 
   const urlTemplate = verifyUrlTemplate({ origin, requestId, invite });
   try {
@@ -142,6 +169,13 @@ export async function resendEmailCode(
   } catch (error) {
     if (error instanceof ProviderError && error.code === 'ALREADY_DONE') {
       return { ok: true, notice: 'ALREADY_VERIFIED' };
+    }
+    // All other ProviderErrors (UNAVAILABLE, NOT_FOUND, etc.) absorb to CODE_SENT.
+    // Returning CODE_SENT for any backend failure is intentional: the caller already
+    // passed the ownership gate, so no information leaks — and the route never 500s
+    // on a transient provider outage.
+    if (error instanceof ProviderError) {
+      return { ok: true, notice: 'CODE_SENT' };
     }
     throw error;
   }
@@ -152,8 +186,7 @@ export async function resendEmailCode(
 export type SubmitEmailError = 'INVALID_INPUT' | 'INVALID_CREDENTIALS';
 
 export type SubmitEmailResult =
-  | { ok: true; target: string }
-  | { ok: false; error: SubmitEmailError };
+  { ok: true; target: string } | { ok: false; error: SubmitEmailError };
 
 /**
  * Parse + dispatch an email/invite code verification.
@@ -189,7 +222,9 @@ export async function submitEmailCode(
     logAuthEvent(isInvite ? 'invite.verified' : 'email.verified', 'success', { userId });
 
     if (hasActiveSession && requestId) {
-      return { ok: true, target: `/authorize?requestId=${requestId}` };
+      // Encode requestId — raw interpolation let a crafted value inject extra /authorize params
+      // (e.g. requestId="x&redirect_uri=..."). The other redirects below already use URLSearchParams.
+      return { ok: true, target: `/authorize?requestId=${encodeURIComponent(requestId)}` };
     }
     if (hasActiveSession) {
       return { ok: true, target: '/signed-in' };

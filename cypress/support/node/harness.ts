@@ -853,11 +853,19 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
       case 'resendEmailCode': {
         if (!s.verifyEmailInput) throw new Error('resendEmailCode requires verifyEmailInput');
         const vei = s.verifyEmailInput;
+        // Thread the active session (first seeded liveSessions entry) so resendEmailCode's
+        // session-ownership gate can call getSession(id, token) node-side against the real fake —
+        // mirrors dispatchEmailCode above. Without it the gate fail-closes to INVALID_INPUT.
+        const activeSessionEntry = s.liveSessions?.[0];
+        const session = activeSessionEntry
+          ? { id: activeSessionEntry.id, token: activeSessionEntry.token }
+          : undefined;
         outcome = await resendEmailCode(provider, {
           userId: vei.userId,
           origin: vei.origin,
           requestId: vei.requestId,
           invite: vei.invite,
+          session,
         });
         break;
       }

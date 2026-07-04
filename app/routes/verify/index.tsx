@@ -98,11 +98,15 @@ export async function action({ request }: ActionFunctionArgs) {
 
   // Resend intent
   if (form.get('intent') === 'resend') {
+    // Resolve the active session from the SIGNED cookie and pass it to resendEmailCode
+    // so the service can verify session ownership before dispatching (mirrors the loader).
+    const recentResend = mostRecent(await readSessions(request));
     const result = await resendEmailCode(provider, {
       userId: parsed.data.userId,
       origin,
       requestId,
       invite,
+      session: recentResend ? { id: recentResend.id, token: recentResend.token } : undefined,
     });
     if (!result.ok) {
       return data({ error: result.error }, { status: 400 });

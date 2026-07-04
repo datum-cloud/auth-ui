@@ -21,6 +21,7 @@ import {
 import type { JsonObject } from '@bufbuild/protobuf';
 import { timestampDate } from '@bufbuild/protobuf/wkt';
 import type { Timestamp } from '@bufbuild/protobuf/wkt';
+import { CredentialsCheckErrorSchema } from '@zitadel/proto/zitadel/message_pb';
 import { UserVerificationRequirement } from '@zitadel/proto/zitadel/session/v2/challenge_pb';
 
 // gRPC status code → ProviderError code
@@ -82,7 +83,11 @@ export function normalizeError(error: unknown): ProviderError {
 
 function extractFailedAttempts(e: ConnectErrorLike): number | undefined {
   try {
-    const details = e.findDetails?.() ?? [];
+    // ConnectError.findDetails REQUIRES a message schema (or registry): it dereferences
+    // `arg.kind` immediately, so calling it with no argument throws — the catch would then
+    // swallow it and failedAttempts would never surface. Zitadel returns the count in a
+    // zitadel.v1.CredentialsCheckError detail, so pass its schema explicitly.
+    const details = e.findDetails?.(CredentialsCheckErrorSchema) ?? [];
     for (const d of details) {
       if (d && typeof d === 'object' && 'failedAttempts' in d) {
         const v = (d as { failedAttempts: unknown }).failedAttempts;
@@ -177,7 +182,6 @@ export function toSession(
       totp?: { verifiedAt?: unknown };
       otpSms?: { verifiedAt?: unknown };
       otpEmail?: { verifiedAt?: unknown };
-      u2f?: { verifiedAt?: unknown; userVerified?: unknown };
     };
     expirationDate?: unknown;
     changeDate?: unknown;
@@ -201,6 +205,16 @@ export function toSession(
   };
   const v = (x?: { verifiedAt?: unknown }): Date | null =>
     x?.verifiedAt ? tsToDate(x.verifiedAt) : null;
+  // Real Zitadel reports BOTH passwordless passkeys and U2F security keys through the single
+  // `webAuthN` proto factor — the session Factors message has no `u2f` field. `userVerified` is
+  // the discriminator: passkeys verify the user (true); U2F 2nd-factor keys do not (the app
+  // requests 'discouraged' user verification for U2F). Split that one proto factor into the two
+  // neutral factors so passwordlessPasskeyFresh (passkey) and secondFactorFresh (u2f) each see
+  // their own signal — without the split a completed U2F check satisfies neither rule and the
+  // security-key login loops forever.
+  const webAuthN = proto.factors?.webAuthN;
+  const webAuthNVerifiedAt = v(webAuthN);
+  const webAuthNUserVerified = Boolean(webAuthN?.userVerified);
   return {
     id: proto.id ?? '',
     token,
@@ -213,20 +227,22 @@ export function toSession(
       : undefined,
     factors: {
       password: { verifiedAt: v(proto.factors?.password) },
-      // passkey factor carries userVerified, which drives the passwordless-passkey MFA-satisfied rule
+      // passkey factor carries userVerified, which drives the passwordless-passkey MFA-satisfied
+      // rule. Only a user-verified webAuthN check is a passkey; a non-verified one is a U2F key.
       passkey: {
-        verifiedAt: v(proto.factors?.webAuthN),
-        userVerified: Boolean(proto.factors?.webAuthN?.userVerified),
+        verifiedAt: webAuthNUserVerified ? webAuthNVerifiedAt : null,
+        userVerified: webAuthNUserVerified,
       },
       idpIntent: { verifiedAt: v(proto.factors?.intent) },
-      // Real Zitadel populates these after an OTP/TOTP/U2F check; without
+      // Real Zitadel populates these after an OTP/TOTP check; without
       // mapping them, mfa-routing.secondFactorFresh never sees a completed second factor.
       totp: { verifiedAt: v(proto.factors?.totp) },
       otpSms: { verifiedAt: v(proto.factors?.otpSms) },
       otpEmail: { verifiedAt: v(proto.factors?.otpEmail) },
+      // A U2F security key surfaces as a non-user-verified webAuthN check (see split above).
       u2f: {
-        verifiedAt: v(proto.factors?.u2f),
-        userVerified: Boolean(proto.factors?.u2f?.userVerified),
+        verifiedAt: webAuthN && !webAuthNUserVerified ? webAuthNVerifiedAt : null,
+        userVerified: false,
       },
     },
     expiresAt: proto.expirationDate ? tsToIso(proto.expirationDate) : '',
@@ -340,7 +356,9 @@ export function toLoginSettings(proto: Record<string, unknown>): LoginSettings {
     allowRegister: Boolean(proto.allowRegister),
     allowExternalIdp: Boolean(proto.allowExternalIdp),
     passkeysType: proto.passkeysType === 1 ? 'allowed' : 'not_allowed',
-    forceMfa: Boolean(proto.forceMfa) || Boolean(proto.forceMfaLocalOnly),
+    forceMfa: Boolean(proto.forceMfa),
+    // Kept distinct from forceMfa: local-only must NOT force MFA on IdP-authenticated sessions.
+    forceMfaLocalOnly: Boolean(proto.forceMfaLocalOnly),
     hidePasswordReset: Boolean(proto.hidePasswordReset),
     ignoreUnknownUsernames: Boolean(proto.ignoreUnknownUsernames),
     disableLoginWithEmail: Boolean(proto.disableLoginWithEmail),

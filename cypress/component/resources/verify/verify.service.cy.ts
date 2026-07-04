@@ -133,12 +133,16 @@ describe('dispatchEmailCode — session-ownership gate on ?send=true', () => {
 // resendEmailCode — action intent=resend
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe('resendEmailCode — action intent=resend', () => {
-  it('returns CODE_SENT on a successful resend', () => {
+describe('resendEmailCode — action intent=resend (ownership gate)', () => {
+  it('returns CODE_SENT on a successful resend when the session owns the userId', () => {
     run({
       fn: 'resendEmailCode',
       request: { url: `${BASE_URL}/verify` },
       provider: 'singleton',
+      // The resend is gated on the session owning userId — seed a session for self-1.
+      liveSessions: [
+        { id: 's1', token: 't1', user: { id: 'self-1', loginName: 'test@example.com' } },
+      ],
       verifyEmailInput: {
         userId: 'self-1',
         origin: TRUSTED_ORIGIN,
@@ -157,6 +161,54 @@ describe('resendEmailCode — action intent=resend', () => {
       expect(urlTemplate).to.include(`${TRUSTED_ORIGIN}/id/verify?`);
       expect(urlTemplate).to.include('code={{.Code}}');
       expect(urlTemplate).to.not.include('%7B');
+    });
+  });
+
+  it('fail-closes to INVALID_INPUT when the session user does not own the userId (no send)', () => {
+    run({
+      fn: 'resendEmailCode',
+      request: { url: `${BASE_URL}/verify` },
+      provider: 'singleton',
+      // Session belongs to the attacker; the resend targets a different (victim) userId.
+      liveSessions: [
+        { id: 's1', token: 't1', user: { id: 'attacker-1', loginName: 'atk@example.com' } },
+      ],
+      verifyEmailInput: {
+        userId: 'victim-999',
+        origin: TRUSTED_ORIGIN,
+        invite: false,
+      },
+      recordCalls: ['resendEmailCode'],
+    }).then((verdict) => {
+      expect(verdict.ok, verdict.error ?? '').to.be.true;
+      const r = verdict.outcome as Record<string, unknown>;
+      expect(r.ok).to.be.false;
+      expect(r.error).to.eq('INVALID_INPUT');
+      // Gate blocks the flood — provider.resendEmailCode must NOT be called for a foreign userId.
+      const calls = verdict.calls as Record<string, unknown[][]>;
+      expect(calls['resendEmailCode']).to.have.length(0);
+    });
+  });
+
+  it('fail-closes to INVALID_INPUT when there is no active session', () => {
+    run({
+      fn: 'resendEmailCode',
+      request: { url: `${BASE_URL}/verify` },
+      provider: 'singleton',
+      // NO liveSessions → harness passes session=undefined → gate fail-closes.
+      verifyEmailInput: {
+        userId: 'self-1',
+        origin: TRUSTED_ORIGIN,
+        invite: false,
+      },
+      recordCalls: ['resendEmailCode'],
+    }).then((verdict) => {
+      expect(verdict.ok, verdict.error ?? '').to.be.true;
+      const r = verdict.outcome as Record<string, unknown>;
+      expect(r.ok).to.be.false;
+      expect(r.error).to.eq('INVALID_INPUT');
+      const calls = verdict.calls as Record<string, unknown[][]>;
+      expect(calls['resendEmailCode']).to.have.length(0);
     });
   });
 });

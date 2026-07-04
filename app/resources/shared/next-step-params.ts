@@ -23,10 +23,10 @@ export function threadParams(loginName: string, requestId?: string, organization
  */
 export function authorizeHandbackTarget(requestId: string | undefined, sessionId: string): string {
   // Device grants are NOT OIDC/SAML auth requests: they finish via /signed-in, where
-  // resolveSignedIn → resolveDeviceCompletion auto-authorizes the grant with the just-created
-  // (most-recent) session. Routing a device_ requestId to /authorize mis-resolves it (→ default
-  // cloud-portal redirect). This mirrors the password path, which always lands on /signed-in and
-  // lets it dispatch by requestId prefix.
+  // resolveSignedIn hands the device_ requestId back to the /device/authorize consent screen
+  // (an explicit CSRF-protected Approve — never an auto-grant). Routing a device_ requestId to
+  // /authorize mis-resolves it (→ default cloud-portal redirect). This mirrors the password path,
+  // which always lands on /signed-in and lets it dispatch by requestId prefix.
   if (requestId?.startsWith('device_')) {
     return `/signed-in?requestId=${encodeURIComponent(requestId)}`;
   }

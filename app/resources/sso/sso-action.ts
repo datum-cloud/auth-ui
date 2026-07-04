@@ -76,7 +76,16 @@ export async function runSsoAction(
 
     const entries = await readSessions(request);
     const recent = mostRecent(entries);
-    const session = recent ? await provider.getSession(recent.id, recent.token) : null;
+    // Guard getSession: an expired/invalid session cookie makes Zitadel throw NOT_FOUND. Treat any
+    // ProviderError as "no session" so we hit the handled no_session path below instead of a raw
+    // 500; rethrow unknown errors to the boundary.
+    let session: Awaited<ReturnType<typeof provider.getSession>> | null = null;
+    try {
+      session = recent ? await provider.getSession(recent.id, recent.token) : null;
+    } catch (err) {
+      if (!(err instanceof ProviderError)) throw err;
+      // ProviderError (expired/invalid session) → session stays null → handled no_session path.
+    }
     const userId = session?.user?.id;
     if (!userId) {
       // Session expired/absent (CSRF already asserted upstream) — keep the probe observable.

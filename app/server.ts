@@ -94,51 +94,26 @@ export default await createHonoServer<RequestContextEnv>({
         );
       }
     }
-    // Mount covers all sub-paths of /id/login/* so Hono's stricter path-equality matching cannot
-    // be bypassed by trailing-slash or case variants that RR7 still routes to the action.
-    // The middleware self-guards on method (POST only) and normalized path (/id/login/password),
-    // so no other sub-routes or GETs are affected. Body-stream hazard: the middleware never reads
-    // the body — key is taken from URL params (see middleware comment).
-    app.use('/id/login/*', loginPasswordRateLimit);
-    // Signup rate-limit: covers /id/signup and /id/signup/password (POST only).
-    // The middleware self-guards on method + normalized path so neither GETs nor
-    // unrelated sub-routes are affected. Body-stream hazard: key is ip-only for /signup
-    // (email is in the body) and ip+loginName for /signup/password (loginName is a URL param).
-    app.use('/id/signup/*', signupRateLimit);
-    // Password-reset rate-limit: covers /id/password/reset (POST only).
-    // The middleware self-guards on method + normalized path. Key is ip-only
-    // (loginName is in the POST body — body-stream hazard; cannot read it here).
-    // The ip-keyed response is identical for known/unknown accounts.
-    app.use('/id/password/*', passwordResetRateLimit);
-    // MFA verify rate-limit: covers /id/login/verify/* (POST only, all three screens).
-    // loginPasswordRateLimit already covers this mount path but self-guards on
-    // /id/login/password exactly — so the verify sub-routes need their own guard.
-    // Key is ip-only (loginName is in the POST body — body-stream hazard).
-    app.use('/id/login/verify/*', mfaVerifyRateLimit);
-    // LDAP credential-entry rate-limit: covers /id/sso/ldap (POST only).
-    // Matches the same window/limit as loginPasswordRateLimit (5 attempts / 5 min).
-    // Key is ip-only — body-stream hazard prevents reading username from the body here.
-    app.use('/id/sso/ldap', ldapRateLimit);
-    // P5 carry-over (2026-06-12): WebAuthn verification ceremony rate-limit.
-    // Covers POST /id/login/passkey, /id/login/security-key, /id/login/mfa (10/5min, ip-only).
-    // Self-guards on its three exact paths — does NOT overlap with loginPasswordRateLimit
-    // (/id/login/password) or mfaVerifyRateLimit (/id/login/verify/*).
-    // Body-stream hazard: assertion payloads are in the POST body — key is ip-only.
-    app.use('/id/login/*', webauthnVerifyRateLimit);
-    // P5 carry-over (2026-06-12): MFA enrollment rate-limit.
-    // Covers all POST /id/setup/* surfaces: passkey, security-key, authenticator,
-    // email, sms, and mfa (skip/confirm) (15/5min, ip-only).
-    // Enrollment is session-gated already; the limiter guards scripted abuse from
-    // compromised sessions. Body-stream hazard: key is ip-only.
-    app.use('/id/setup/*', mfaEnrollRateLimit);
-    // P5 carry-over (2026-06-12): Accounts (session switch/remove) rate-limit.
-    // Covers POST /id/accounts (15/5min, ip-only).
-    // Body-stream hazard: intent + sessionId are in the POST body — key is ip-only.
-    app.use('/id/accounts', accountsRateLimit);
-    // Email-code dispatch rate-limit for GET /id/verify?send=true.
-    // Defence-in-depth alongside the session-ownership gate in the verify.tsx loader.
-    // Self-guards on GET + ?send=true; POST submits are unaffected. Key is ip-only.
-    app.use('/id/verify', verifyEmailSendRateLimit);
+    // Rate-limit middlewares are mounted on '*' (catch-all) rather than specific path prefixes.
+    //
+    // WHY: Hono's static-segment path matching is case-sensitive, but React Router matches routes
+    // case-insensitively. A request to e.g. /id/Login/password (capital L) bypasses a
+    // '/id/login/*' Hono mount entirely and reaches the RR action unthrottled. Mounting on '*'
+    // ensures the middleware always executes and its own `match` self-guard handles filtering.
+    //
+    // Each middleware is safe on every request because `match` receives a pathname already
+    // normalized to lowercase by `normalizedPathname` in net.ts (toLowerCase + trailing-slash
+    // strip + .data strip). Requests that do not match call `next()` immediately with no
+    // meaningful overhead beyond a pathname parse.
+    app.use('*', loginPasswordRateLimit);
+    app.use('*', signupRateLimit);
+    app.use('*', passwordResetRateLimit);
+    app.use('*', mfaVerifyRateLimit);
+    app.use('*', ldapRateLimit);
+    app.use('*', webauthnVerifyRateLimit);
+    app.use('*', mfaEnrollRateLimit);
+    app.use('*', accountsRateLimit);
+    app.use('*', verifyEmailSendRateLimit);
     app.get('/healthz', (c) => c.json({ status: 'ok' }));
     app.get('/readyz', (c) => c.json({ status: 'ready' }));
     app.get('/security', (c) =>

@@ -252,9 +252,8 @@ export async function resolveDeviceDecision(
     );
   } catch (error) {
     if (error instanceof ProviderError) {
-      // Idempotent success: the grant may already be finalized — the post-login
-      // auto-complete (resolveDeviceCompletion) authorized it on the way in, or this is
-      // a double-submit. Zitadel returns ALREADY_DONE; that IS success from the user's
+      // Idempotent success: the grant may already be finalized — this is a double-submit
+      // of the consent form. Zitadel returns ALREADY_DONE; that IS success from the user's
       // perspective, so land on the terminal completion screen instead of a 502.
       if (error.code === 'ALREADY_DONE') {
         logAuthEvent('device_authorize', 'success', {

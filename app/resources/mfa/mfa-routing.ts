@@ -29,8 +29,7 @@ export interface MfaRoutingInput {
 }
 
 export type MfaRoutingResult =
-  | { kind: 'done' }
-  | { kind: 'route'; path: string; params: Record<string, string> };
+  { kind: 'done' } | { kind: 'route'; path: string; params: Record<string, string> };
 
 // Note: AuthMethod uses snake_case ('otp_email') while Factors keys use camelCase ('otpEmail') —
 // separate concerns; do not conflate. The allow-list below intentionally excludes
@@ -113,7 +112,12 @@ export function nextMfaStep(input: MfaRoutingInput): MfaRoutingResult {
   }
 
   // 5. No 2nd factor enrolled + forced ⇒ forced setup.
-  if (settings.forceMfa) {
+  // forceMfa forces MFA for everyone; forceMfaLocalOnly forces it only for local
+  // (username/password) logins and exempts sessions authenticated via an external IdP
+  // (idpIntent factor present). Collapsing the two would wrongly force MFA on exempt IdP sessions.
+  const idpAuthenticated = Boolean(factors.idpIntent?.verifiedAt);
+  const mfaForced = settings.forceMfa || (Boolean(settings.forceMfaLocalOnly) && !idpAuthenticated);
+  if (mfaForced) {
     return {
       kind: 'route',
       path: '/setup/mfa',

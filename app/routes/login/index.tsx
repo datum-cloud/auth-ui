@@ -7,6 +7,7 @@ import { FormError } from '@/components/form-error/form-error';
 import { useAuthActionError } from '@/hooks/use-auth-action-error';
 import { useLoginContext } from '@/hooks/use-login-context';
 import SplitLayout from '@/layouts/split.layout';
+import { idpTypeToSlug } from '@/modules/auth/idp-slug';
 // ADAPTATION (plan-drift fix): readSessions + serializeSessions live in @/modules/auth/session/cookie.
 // The locked plan block incorrectly listed them as coming from @/modules/auth/session/session
 // (that module only has pure helpers, no cookie I/O).
@@ -22,6 +23,7 @@ import {
   makeLoginIdentifierClientSchema,
 } from '@/resources/login/login.schema';
 import { resolveOrg } from '@/resources/shared/resolve-org';
+import { getActiveIdPs } from '@/resources/sso/idp-providers';
 import { paths } from '@/routes/paths';
 import { providerForRequest } from '@/server/auth-context.server';
 import { loaderCsrf, assertCsrf } from '@/server/csrf';
@@ -104,6 +106,17 @@ export async function action({ request }: ActionFunctionArgs) {
     // RE-AUTH: when this login is re-authenticating a specific account, pass its loginName as a
     // best-effort login_hint so the IdP pre-selects it. The callback's identity check is the guard.
     const reauthHint = await readReauthIntent(request);
+    // LDAP is not a redirect-based IdP: startIdpIntent returns no authUrl for it (→ IDP_UNAVAILABLE
+    // 502). Resolve the IdP type server-side (same displayOrg scope the loader used to render the
+    // buttons) and route LDAP submits to the /sso/ldap credential form, mirroring sso-action.ts.
+    const displayIdps = await getActiveIdPs(provider, await resolveOrg(provider, organization));
+    const targetIdp = displayIdps.find((i) => i.id === idpId);
+    if (targetIdp && idpTypeToSlug(targetIdp.type) === 'ldap') {
+      const qs = new URLSearchParams({ idpId });
+      if (requestId) qs.set('requestId', requestId);
+      if (organization) qs.set('organization', organization);
+      return redirect(`/sso/ldap?${qs.toString()}`);
+    }
     const result = await startIdpIntent(provider, {
       idpId,
       origin: trustedAppOrigin(request),
@@ -147,10 +160,23 @@ export async function action({ request }: ActionFunctionArgs) {
       }
       return data({ error: result.error });
     }
-    const verifyParams = new URLSearchParams(result.params);
     const headers = new Headers();
     headers.append('set-cookie', await serializeSessions(result.sessions));
     if (fpCookie) headers.append('set-cookie', fpCookie);
+    // Domain-discovery single-IdP org (org disallows password): start the IdP intent directly
+    // rather than the email-link OTP flow, which the org policy doesn't support.
+    if ('startIdp' in result) {
+      const idpResult = await startIdpIntent(provider, {
+        idpId: result.startIdp.idpId,
+        origin: trustedAppOrigin(request),
+        requestId: result.startIdp.requestId,
+        organization: result.startIdp.organization,
+        reauthHint: result.startIdp.loginName,
+      });
+      if (!idpResult.ok) return data({ error: idpResult.error }, { status: 502 });
+      return redirect(idpResult.authUrl, { headers });
+    }
+    const verifyParams = new URLSearchParams(result.params);
     return redirect(`${paths.login.verify.email()}?${verifyParams.toString()}`, { headers });
   }
 
@@ -196,6 +222,19 @@ export async function action({ request }: ActionFunctionArgs) {
   const headers = new Headers();
   headers.append('set-cookie', await serializeSessions(result.sessions));
   if (fpCookie) headers.append('set-cookie', fpCookie);
+  // Domain-discovery single-IdP org: start the IdP intent directly. A plain redirect to /sso
+  // (the old behavior) dead-ends session-less users in a /login ↔ /sso bounce loop.
+  if ('startIdp' in result) {
+    const idpResult = await startIdpIntent(provider, {
+      idpId: result.startIdp.idpId,
+      origin: trustedAppOrigin(request),
+      requestId: result.startIdp.requestId,
+      organization: result.startIdp.organization,
+      reauthHint: result.startIdp.loginName,
+    });
+    if (!idpResult.ok) return data({ error: idpResult.error }, { status: 502 });
+    return redirect(idpResult.authUrl, { headers });
+  }
   return redirect(`${result.target}?${result.params}`, { headers });
 }
 

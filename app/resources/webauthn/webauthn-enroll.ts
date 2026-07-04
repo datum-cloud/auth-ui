@@ -73,9 +73,7 @@ export interface WebAuthnEnrollLoaderData {
 }
 
 export type WebAuthnEnrollActionData =
-  | { error: 'INVALID_INPUT' }
-  | { error: 'SESSION_EXPIRED' }
-  | { error: 'INVALID_CREDENTIALS' };
+  { error: 'INVALID_INPUT' } | { error: 'SESSION_EXPIRED' } | { error: 'INVALID_CREDENTIALS' };
 
 export interface WebAuthnEnrollConfig {
   /** The hidden form field name the route posts for the credential id ('passkeyId' | 'u2fId'). */
@@ -150,7 +148,9 @@ export function createWebAuthnEnrollHandlers(cfg: WebAuthnEnrollConfig) {
     const loginName = url.searchParams.get('loginName') ?? '';
     const requestId = url.searchParams.get('requestId') ?? undefined;
     const organization = url.searchParams.get('organization') ?? undefined;
-    const { force, checkAfter } = setupSkipSchema.parse(Object.fromEntries(url.searchParams));
+    // Never throw a 500 on tampered query params — an invalid force/checkAfter degrades to undefined.
+    const skip = setupSkipSchema.safeParse(Object.fromEntries(url.searchParams));
+    const { force, checkAfter } = skip.success ? skip.data : {};
 
     const provider = providerForRequest(request);
     const sessions = await readSessions(request);

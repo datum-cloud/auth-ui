@@ -86,7 +86,9 @@ const CAPABILITY_ROUTES: Array<{
 export async function loader({ request }: LoaderFunctionArgs) {
   const url = new URL(request.url);
   const { loginName, requestId, organization } = readCeremonyParams(url);
-  const { force, checkAfter } = setupSkipSchema.parse(Object.fromEntries(url.searchParams));
+  // Never throw a 500 on tampered query params — an invalid force/checkAfter degrades to undefined.
+  const skip = setupSkipSchema.safeParse(Object.fromEntries(url.searchParams));
+  const { force, checkAfter } = skip.success ? skip.data : {};
 
   // Service resolves the session guard, user lookup, and the capability + login-policy gating,
   // returning either a redirect or the offerable enrollment KEYS. The route only

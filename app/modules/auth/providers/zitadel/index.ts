@@ -59,9 +59,12 @@ export class ZitadelAuthProvider implements AuthProvider {
     oidc: true,
     registration: true,
   };
+  /** Exposed so resolve-org can key the default-org memo per Zitadel instance URL. */
+  readonly serviceUrl: string;
   private readonly ctx: ZitadelCtx;
   constructor(opts: ZitadelOpts) {
     this.ctx = createZitadelCtx(opts);
+    this.serviceUrl = opts.serviceUrl;
   }
 
   // settings

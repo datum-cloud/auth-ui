@@ -30,7 +30,6 @@ import { serializeReauthIntent } from '@/modules/auth/session/reauth-intent';
 import type { Session, AuthMethod, LoginSettings, ProviderErrorCode } from '@/modules/auth/types';
 import { ProviderError } from '@/modules/auth/types';
 import { isAllowedRequestId } from '@/resources/authorize';
-import { deviceDecision } from '@/resources/device';
 import { postLoginDestinationWithSource } from '@/resources/login/post-login-destination';
 import { nextStepWithParams } from '@/resources/shared/next-step-params';
 import { resolveOrg } from '@/resources/shared/resolve-org';
@@ -47,15 +46,7 @@ import { z } from 'zod';
  * configured post-login destination) or the terminal "You are signed in" data() payload.
  */
 export type SignedInOutcome =
-  | { kind: 'redirect'; location: string }
-  // `deviceComplete` marks the post-login device-grant auto-authorization terminal page:
-  // the consent was completed automatically (no second manual Authorize click — restores the
-  // OLD `completeDeviceAuthorization` behavior), so the route renders the "you can close this
-  // window and return to your device" message instead of the standard sign-out form.
-  | { kind: 'page'; loginName: string | null; deviceComplete?: boolean }
-  // The device grant failed to auto-authorize after login (provider rejected the
-  // authorizeDevice call). Inline-only error surface — the route renders a tailored card.
-  | { kind: 'device-error' };
+  { kind: 'redirect'; location: string } | { kind: 'page'; loginName: string | null };
 
 /**
  * Config the /signed-in loader needs from the route (env values are owned by the route's
@@ -93,24 +84,26 @@ export async function resolveSignedIn(
   // OIDC/SAML ceremonies hand back to /authorize to finish the protocol callback
   // (createCallback → client ?code=). Hand back the active sessionId too so /authorize completes
   // via the session path (runCallback) instead of re-running decideAuthorize — without it a
-  // prompt=select_account request loops straight back to /accounts. The device grant is DIFFERENT:
-  // it auto-completes here (resolveDeviceCompletion), not via a second consent screen.
+  // prompt=select_account request loops straight back to /accounts. A device grant is DIFFERENT:
+  // it hands back to the /device/authorize consent screen (see the device_ branch below).
   if (requestId && (requestId.startsWith('oidc_') || requestId.startsWith('saml_'))) {
     const params = new URLSearchParams({ requestId });
     if (recent) params.set('sessionId', recent.id);
     return { kind: 'redirect', location: `/authorize?${params.toString()}` };
   }
 
-  if (!recent) return { kind: 'redirect', location: '/login' };
-
-  // Post-login device-grant AUTO-COMPLETE. The OLD signedin page completed the grant
-  // automatically (completeDeviceAuthorization) — no second manual Authorize click. The rebuild
-  // regressed to bouncing device_ back to /authorize → /device/authorize (a redundant consent
-  // screen). Restore the auto-complete: with an active session present, authorize the grant
-  // directly and land on the terminal "return to your device" page.
+  // Post-login device-grant: a state-changing RFC 8628 consent grant must NOT be
+  // auto-completed from this GET loader — the ?requestId= is forgeable and carries no consent
+  // proof, so auto-completing here let an emailed /signed-in?requestId=device_<code> link
+  // silently authorize an attacker's device against the victim's session. Hand back to the real
+  // /device/authorize consent screen (mirrors authorize.service.ts' device_ branch), which
+  // requires an explicit CSRF-protected Approve click showing the requesting app + scope.
   if (requestId && requestId.startsWith('device_')) {
-    return resolveDeviceCompletion(provider, requestId, recent);
+    const params = new URLSearchParams({ user_code: requestId.slice('device_'.length) });
+    return { kind: 'redirect', location: `/device/authorize?${params}` };
   }
+
+  if (!recent) return { kind: 'redirect', location: '/login' };
 
   type Settings = Awaited<ReturnType<typeof provider.getLoginSettings>>;
   const [settings, isAdmin] = await Promise.all([
@@ -144,54 +137,6 @@ export async function resolveSignedIn(
 
   // Nothing configured → terminal "You are signed in" page.
   return { kind: 'page', loginName: recent.loginName ?? null };
-}
-
-/**
- * Complete a device authorization grant automatically after login.
- *
- * Mirrors the OLD `completeDeviceAuthorization` flow: the user code is the stable handle threaded
- * through the login ceremony as `device_<userCode>` (the adapter returns a fresh opaque
- * deviceAuth.id per getDeviceAuth call). Re-resolve the device auth by user code, authorize it
- * against the just-established session, and land on the terminal "return to your device" page —
- * so the user never sees a second manual Authorize click.
- *
- * Failures (NOT_FOUND/expired code, provider outage) resolve to a typed `device-error` outcome
- * the route renders as an inline recovery card. Best-effort throughout: an unexpected non-provider
- * error is also caught and surfaced inline rather than bubbling to the root ErrorBoundary.
- */
-async function resolveDeviceCompletion(
-  provider: AuthProvider,
-  requestId: string,
-  recent: SessionEntry
-): Promise<SignedInOutcome> {
-  const userCode = requestId.slice('device_'.length);
-
-  try {
-    const deviceAuth = await provider.getDeviceAuth(userCode);
-    await provider.authorizeDevice(
-      deviceAuth.id,
-      deviceDecision({ decision: 'authorize', session: { id: recent.id, token: recent.token } })
-    );
-  } catch (err) {
-    // Idempotent: the grant may already be finalized — the explicit consent-page POST
-    // (resolveDeviceDecision) won the race, or this is a re-entry. ALREADY_DONE means the
-    // device IS authorized, so fall through to the success/completion path, not an error.
-    if (!(err instanceof ProviderError && err.code === 'ALREADY_DONE')) {
-      logAuthEvent('device_authorize', 'failure', {
-        requestId,
-        actor: hashActor(recent.loginName),
-        reason: err instanceof ProviderError ? err.code : 'UNKNOWN',
-      });
-      return { kind: 'device-error' };
-    }
-  }
-
-  logAuthEvent('device_authorize', 'success', {
-    requestId,
-    actor: hashActor(recent.loginName),
-  });
-
-  return { kind: 'page', loginName: recent.loginName ?? null, deviceComplete: true };
 }
 
 // ─── /accounts — session listing + enrichment ────────────────────────────────
@@ -448,10 +393,7 @@ export const removeSchema = z.object({
 });
 
 export type AccountActionError =
-  | 'INVALID_INPUT'
-  | 'NOT_FOUND'
-  | 'SESSION_EXPIRED'
-  | 'PROVIDER_ERROR';
+  'INVALID_INPUT' | 'NOT_FOUND' | 'SESSION_EXPIRED' | 'PROVIDER_ERROR';
 
 /**
  * Typed outcome of the /accounts action. The route turns it into a Response via
