@@ -25,7 +25,9 @@ export function resolveSignupView(
   idps: IdProvider[],
   emailDeliveryEnabled: boolean
 ): SignupView {
-  const allowEmailEntry = settings.disableLoginWithEmail !== true;
+  // Email-based signup (entry + link) needs email delivery to complete verification.
+  // When delivery is off, hide the whole email path so signup is IdP-only.
+  const allowEmailEntry = settings.disableLoginWithEmail !== true && emailDeliveryEnabled;
   return {
     showIdpButtons: settings.allowExternalIdp && idps.length > 0,
     allowEmailEntry,

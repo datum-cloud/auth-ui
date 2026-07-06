@@ -70,4 +70,19 @@ describe('signup/index — render adoption', () => {
         cy.get('input[type="hidden"][name="organization"]').should('have.value', 'acme');
       });
   });
+
+  it('shows IdP button and hides Email entry button when emailDeliveryEnabled=false (IdP-only signup)', () => {
+    // view.allowEmailEntry=false when delivery is off — the Email button must not appear.
+    mountSignup(
+      loaderData({
+        view: {
+          ...BASE_VIEW,
+          allowEmailEntry: false,
+          showEmailLink: false,
+        },
+      })
+    );
+    cy.contains('Google', { timeout: 6000 }).should('exist');
+    cy.contains('Email').should('not.exist');
+  });
 });

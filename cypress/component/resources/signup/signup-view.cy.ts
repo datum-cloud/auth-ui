@@ -40,11 +40,48 @@ describe('resolveSignupView', () => {
       )
     ).to.deep.equal({
       showIdpButtons: false,
-      allowEmailEntry: true,
+      allowEmailEntry: false,
       showEmailLink: false,
       showPasskey: false,
       showPassword: true,
       registrationDisabled: true,
+    });
+  });
+
+  it('hides email entry and link when emailDeliveryEnabled=false, regardless of Zitadel policy', () => {
+    // RED→GREEN: before the fix allowEmailEntry was true when delivery was off.
+    // With delivery off the whole email path must hide so signup is IdP-only.
+    expect(resolveSignupView(base, idps, false)).to.deep.equal({
+      showIdpButtons: true,
+      allowEmailEntry: false,
+      showEmailLink: false,
+      showPasskey: true,
+      showPassword: false,
+      registrationDisabled: false,
+    });
+  });
+
+  it('keeps allowEmailEntry when Zitadel policy allows email AND delivery is on', () => {
+    expect(resolveSignupView(base, idps, true)).to.deep.equal({
+      showIdpButtons: true,
+      allowEmailEntry: true,
+      showEmailLink: true,
+      showPasskey: true,
+      showPassword: false,
+      registrationDisabled: false,
+    });
+  });
+
+  it('hides email entry when Zitadel disableLoginWithEmail=true even if delivery is on', () => {
+    expect(
+      resolveSignupView({ ...base, disableLoginWithEmail: true } as LoginSettings, idps, true)
+    ).to.deep.equal({
+      showIdpButtons: true,
+      allowEmailEntry: false,
+      showEmailLink: false,
+      showPasskey: true,
+      showPassword: false,
+      registrationDisabled: false,
     });
   });
 });
