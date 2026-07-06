@@ -4,6 +4,11 @@ build
 .git
 docs
 cypress
+# vite.config.ts imports this stub factory at config-load time (even for the prod
+# build, though it's only *used* when CYPRESS is set). Re-include just this one file
+# so `bun run build` in the Docker image can resolve the import; the rest of cypress/
+# stays excluded.
+!cypress/support/vite-cypress-stubs.ts
 coverage
 .env
 .claude
