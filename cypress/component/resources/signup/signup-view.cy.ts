@@ -88,7 +88,11 @@ describe('resolveSignupView', () => {
   // --- signupUnavailable edge-case coverage ---
 
   it('signupUnavailable=true when allowRegister=false (policy disabled)', () => {
-    const result = resolveSignupView({ ...base, allowRegister: false } as LoginSettings, idps, true);
+    const result = resolveSignupView(
+      { ...base, allowRegister: false } as LoginSettings,
+      idps,
+      true
+    );
     expect(result.signupUnavailable).to.equal(true);
   });
 
