@@ -102,8 +102,7 @@ export async function resolveMfaPicker(
 export type ChooseMfaMethodError = 'SESSION_EXPIRED' | 'INVALID_INPUT';
 
 export type ChooseMfaMethodResult =
-  | { ok: true; target: string }
-  | { ok: false; error: ChooseMfaMethodError };
+  { ok: true; target: string } | { ok: false; error: ChooseMfaMethodError };
 
 /**
  * Parse + route a 2nd-factor-method choice for an already-read sessions list.
@@ -257,6 +256,16 @@ export type MfaSetupResult = MfaSetupRedirect | MfaSetupData;
  * the raw policy arrays. (Keys, not route objects: the route labels are non-serializable
  * JSX.)
  *
+ * AUTO-SKIP when no MFA methods are offerable: if the combined capability+policy gate
+ * yields an empty set, there is nothing for the user to enroll in. Rendering an empty
+ * chooser (and hiding the Skip button under `force`) would leave the user stuck. Instead,
+ * auto-skip by stamping the skip timestamp (setMfaInitSkipped — same as the manual skip
+ * path) and redirecting to the next step. Stamping is required: without it, nextStep
+ * would see mfaInitSkippedAt=null and re-route back to /setup/mfa, creating a redirect
+ * loop. This mirrors recordMfaSetupSkip exactly, including the FORCE+empty case — when
+ * no factor is available, forced MFA is impossible to satisfy, so auto-skipping is the
+ * only correct (non-stuck) outcome.
+ *
  * The CSRF token + Set-Cookie header are the route's concern (only emitted on the setup
  * branch), so they are NOT part of this result.
  */
@@ -276,6 +285,37 @@ export async function resolveMfaSetup(
   const settings = await provider.getLoginSettings(await resolveOrg(provider, organization));
   const offerableKeys = offerableSetupRoutes(capabilities, settings);
 
+  // AUTO-SKIP: no offerable MFA methods → stamp the skip and redirect to next step.
+  // Mirrors recordMfaSetupSkip's stamping + next-step logic so the user lands on exactly
+  // the same screen as a manual skip. Stamping suppresses the /setup/mfa nudge on the
+  // next nextStep call (otherwise mfaInitSkippedAt=null would re-route back here).
+  if (offerableKeys.length === 0) {
+    logAuthEvent('mfa_skip', 'success', { userId: user.id, reason: 'no_offerable_methods' });
+    await provider.setMfaInitSkipped(user.id);
+
+    // Re-fetch so mfaInitSkippedAt is fresh (mirrors recordMfaSetupSkip's re-fetch).
+    const refreshedUser = await provider.findUser(loginName, organization);
+
+    const session = await provider.getSession(entry.id, entry.token);
+    if (!session) return { kind: 'redirect', target: '/login' };
+
+    const [methods, refreshedSettings] = await Promise.all([
+      provider.listAuthMethods(user.id),
+      provider.getLoginSettings(await resolveOrg(provider, organization)),
+    ]);
+
+    const target = nextStepFromSession({
+      session,
+      methods,
+      settings: refreshedSettings,
+      loginName: session.user?.loginName ?? loginName,
+      mfaInitSkippedAt: refreshedUser?.mfaInitSkippedAt,
+      organization,
+    });
+
+    return { kind: 'redirect', target };
+  }
+
   return { kind: 'setup', offerableKeys };
 }
 
@@ -290,8 +330,7 @@ const skipFormSchema = z.object({
 export type RecordMfaSetupSkipError = 'INVALID_INPUT' | 'SESSION_EXPIRED';
 
 export type RecordMfaSetupSkipResult =
-  | { ok: true; target: string }
-  | { ok: false; error: RecordMfaSetupSkipError };
+  { ok: true; target: string } | { ok: false; error: RecordMfaSetupSkipError };
 
 /**
  * Parse + perform an MFA-setup skip for an already-read sessions list.

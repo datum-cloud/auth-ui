@@ -34,6 +34,13 @@ export interface ScenarioSeed {
   /** Instance Default Organization getDefaultOrg returns (org-first fallback). Default
    *  'org-default-fake' in the fake; pass `null` for the "no default org" last-resort branch. */
   defaultOrgId?: string | null;
+
+  /**
+   * Partial capability override applied over the FakeAuthProvider class defaults.
+   * Use to simulate an instance that offers no MFA enrollment methods — e.g. all MFA
+   * capabilities false triggers the resolveMfaSetup auto-skip path.
+   */
+  capabilities?: Partial<Record<string, boolean>>;
   deviceAuths?: Array<{ userCode: string; id: string; appName?: string; scope: string[] }>;
   samlRequests?: Array<{ id: string; clientId: string; binding: 'redirect' | 'post' }>;
 }

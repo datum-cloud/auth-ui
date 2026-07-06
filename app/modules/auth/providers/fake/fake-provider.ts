@@ -88,6 +88,13 @@ interface Seed {
    * character classes — the legacy behaviour the forms assumed before the policy was wired in.
    */
   passwordComplexity?: PasswordComplexity;
+
+  /**
+   * Override the provider's static capability flags. Partial — only provided keys are overridden;
+   * unspecified keys keep their class defaults. Use in tests to simulate an instance that offers
+   * no MFA enrollment methods (e.g. all MFA caps false → resolveMfaSetup auto-skip path).
+   */
+  capabilities?: Partial<ProviderCapabilities>;
 }
 
 export class FakeAuthProvider implements AuthProvider {
@@ -159,6 +166,10 @@ export class FakeAuthProvider implements AuthProvider {
     this.deviceAuthSeeds = seed.deviceAuths ?? []; // P6
     this.samlRequestSeeds = seed.samlRequests ?? []; // P6
     this.ldapUserSeeds = seed.ldapUsers ?? []; // P6
+    // Apply any capability overrides from the seed (partial merge over class defaults).
+    if (seed.capabilities) {
+      Object.assign(this.capabilities, seed.capabilities);
+    }
     this.passwordComplexity = seed.passwordComplexity ?? {
       minLength: 8,
       requiresUppercase: false,
