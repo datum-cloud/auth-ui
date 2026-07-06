@@ -29,7 +29,7 @@ const BASE_VIEW = {
   showEmailLink: false,
   showPasskey: false,
   showPassword: true,
-  registrationDisabled: false,
+  signupUnavailable: false,
 };
 
 const IDPS = [{ id: 'idp-g', name: 'Google', type: 'GOOGLE' }];
@@ -84,5 +84,25 @@ describe('signup/index — render adoption', () => {
     );
     cy.contains('Google', { timeout: 6000 }).should('exist');
     cy.contains('Email').should('not.exist');
+  });
+
+  it('shows unavailable message and no blank content when delivery off + no IdPs (signupUnavailable=true)', () => {
+    // RED→GREEN: before the fix this rendered a blank content area (no IdP buttons,
+    // no Email button, no message). signupUnavailable=true must surface the message.
+    mountSignup(
+      loaderData({
+        view: {
+          ...BASE_VIEW,
+          showIdpButtons: false,
+          allowEmailEntry: false,
+          showEmailLink: false,
+          signupUnavailable: true,
+        },
+        idps: [],
+      })
+    );
+    cy.contains('Registration is currently unavailable', { timeout: 6000 }).should('exist');
+    cy.contains('Email').should('not.exist');
+    cy.contains('Google').should('not.exist');
   });
 });

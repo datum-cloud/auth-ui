@@ -22,7 +22,7 @@ describe('resolveSignupView', () => {
       showEmailLink: true,
       showPasskey: true,
       showPassword: false,
-      registrationDisabled: false,
+      signupUnavailable: false,
     });
   });
 
@@ -44,7 +44,7 @@ describe('resolveSignupView', () => {
       showEmailLink: false,
       showPasskey: false,
       showPassword: true,
-      registrationDisabled: true,
+      signupUnavailable: true,
     });
   });
 
@@ -57,7 +57,7 @@ describe('resolveSignupView', () => {
       showEmailLink: false,
       showPasskey: true,
       showPassword: false,
-      registrationDisabled: false,
+      signupUnavailable: false,
     });
   });
 
@@ -68,7 +68,7 @@ describe('resolveSignupView', () => {
       showEmailLink: true,
       showPasskey: true,
       showPassword: false,
-      registrationDisabled: false,
+      signupUnavailable: false,
     });
   });
 
@@ -81,7 +81,31 @@ describe('resolveSignupView', () => {
       showEmailLink: false,
       showPasskey: true,
       showPassword: false,
-      registrationDisabled: false,
+      signupUnavailable: false,
     });
+  });
+
+  // --- signupUnavailable edge-case coverage ---
+
+  it('signupUnavailable=true when allowRegister=false (policy disabled)', () => {
+    const result = resolveSignupView({ ...base, allowRegister: false } as LoginSettings, idps, true);
+    expect(result.signupUnavailable).to.equal(true);
+  });
+
+  it('signupUnavailable=true when allowRegister=true but no IdPs and email delivery off (blank index)', () => {
+    // This is the new empty-state case: registration is allowed by policy but
+    // there is no usable entry method on the index screen.
+    const result = resolveSignupView(base, [], false);
+    expect(result.signupUnavailable).to.equal(true);
+  });
+
+  it('signupUnavailable=false when allowRegister=true and an IdP is present (even if email delivery off)', () => {
+    const result = resolveSignupView(base, idps, false);
+    expect(result.signupUnavailable).to.equal(false);
+  });
+
+  it('signupUnavailable=false when allowRegister=true and email entry is available (even if no IdPs)', () => {
+    const result = resolveSignupView(base, [], true);
+    expect(result.signupUnavailable).to.equal(false);
   });
 });

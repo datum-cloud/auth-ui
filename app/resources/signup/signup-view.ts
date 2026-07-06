@@ -6,7 +6,8 @@ export interface SignupView {
   showEmailLink: boolean;
   showPasskey: boolean;
   showPassword: boolean;
-  registrationDisabled: boolean;
+  /** True when the index screen would be blank: policy disabled OR no usable entry method. */
+  signupUnavailable: boolean;
 }
 
 /**
@@ -28,12 +29,17 @@ export function resolveSignupView(
   // Email-based signup (entry + link) needs email delivery to complete verification.
   // When delivery is off, hide the whole email path so signup is IdP-only.
   const allowEmailEntry = settings.disableLoginWithEmail !== true && emailDeliveryEnabled;
+  const showIdpButtons = settings.allowExternalIdp && idps.length > 0;
+  // Registration is effectively unavailable if policy disables it OR no entry method
+  // is usable on the index screen (no IdP buttons AND no email entry — password/passkey
+  // live behind email entry on /signup/method, so they can't rescue an empty index).
+  const signupUnavailable = !settings.allowRegister || (!showIdpButtons && !allowEmailEntry);
   return {
-    showIdpButtons: settings.allowExternalIdp && idps.length > 0,
+    showIdpButtons,
     allowEmailEntry,
     showEmailLink: allowEmailEntry && emailDeliveryEnabled,
     showPasskey: settings.passkeysType === 'allowed',
     showPassword: settings.allowPassword,
-    registrationDisabled: !settings.allowRegister,
+    signupUnavailable,
   };
 }

@@ -203,7 +203,7 @@ export default function Signup() {
           </p>
         </div>
 
-        {view.registrationDisabled ? (
+        {view.signupUnavailable ? (
           <p className="text-foreground text-center text-sm">
             <Trans>Registration is currently unavailable. Please contact your administrator.</Trans>
           </p>
