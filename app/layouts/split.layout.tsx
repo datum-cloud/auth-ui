@@ -71,7 +71,7 @@ export default function SplitLayout({
         </div>
 
         <div className="flex w-full flex-1 items-center justify-center">
-          <div className="relative flex w-full max-w-[400px] flex-col gap-6">
+          <div className="relative flex w-full max-w-[440px] flex-col gap-6">
             <div className="absolute -top-36 -left-24 z-0 max-w-[115px]">
               {/* Intrinsic 232×290 raster line-art. width/height pin the aspect ratio so
                   the absolutely-positioned panel reserves space and never shifts layout (CLS).
@@ -94,19 +94,16 @@ export default function SplitLayout({
 
             <div className="text-muted-foreground stretch dark:text-card-quaternary leading-6">
               <Trans>
-                Using Datum requires setting up a billing account, but to help you explore without
-                cost, we add{' '}
-                {/* The lime credit chip (aurora-moss #e6f59f) is a fixed brand accent that
-                    stays light in BOTH themes, so it pins dark text (midnight-fjord) explicitly —
-                    text-foreground would flip to light on dark and become unreadable on lime. */}
-                <span className="dark:text-secondary bg-[#e6f59f] px-0.5 font-semibold text-[#0c1d31] dark:bg-[#4D6356]">
-                  $50 USD
-                </span>{' '}
-                in credit on signup.
+                While Datum is currently free of charge to use, we require a valid payment method
+                during the signup process.
               </Trans>
               <span className="block h-4" />
               <Trans>
-                Prefer a demo instead? Just{' '}
+                This helps us keep our platform stable by heading off fraud and abusive behavior.
+              </Trans>
+              <span className="block h-4" />
+              <Trans>
+                If you prefer a demo, just{' '}
                 <Link
                   to="https://link.datum.net/founders"
                   target="_blank"

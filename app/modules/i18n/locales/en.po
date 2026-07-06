@@ -327,6 +327,10 @@ msgstr "Forgot password?"
 msgid "Get started"
 msgstr "Get started"
 
+#: app/layouts/split.layout.tsx:105
+msgid "If you prefer a demo, just <0>reach out</0>."
+msgstr "If you prefer a demo, just <0>reach out</0>."
+
 #: app/utils/errors/auth-error-messages.tsx:19
 msgid "Incorrect credentials. Please try again."
 msgstr "Incorrect credentials. Please try again."
@@ -440,10 +444,6 @@ msgstr "Phone sign-in isn't available — use your email or username."
 #: app/utils/errors/auth-error-messages.tsx:27
 msgid "Please check your input and try again."
 msgstr "Please check your input and try again."
-
-#: app/layouts/split.layout.tsx:108
-msgid "Prefer a demo instead? Just <0>reach out</0>."
-msgstr "Prefer a demo instead? Just <0>reach out</0>."
 
 #: app/routes/setup/security-key.tsx:48
 msgid "Register a hardware security key (e.g. YubiKey) as a second factor for your account."
@@ -602,7 +602,7 @@ msgstr "Something went wrong. Please try again."
 msgid "Start over"
 msgstr "Start over"
 
-#: app/layouts/split.layout.tsx:120
+#: app/layouts/split.layout.tsx:117
 msgid "Thanks,"
 msgstr "Thanks,"
 
@@ -650,6 +650,10 @@ msgstr "This device was not granted access. You may close this window."
 #: app/routes/sso/provider/error.tsx:40
 msgid "This directory account can't be linked here yet. Sign in with your password instead."
 msgstr "This directory account can't be linked here yet. Sign in with your password instead."
+
+#: app/layouts/split.layout.tsx:101
+msgid "This helps us keep our platform stable by heading off fraud and abusive behavior."
+msgstr "This helps us keep our platform stable by heading off fraud and abusive behavior."
 
 #: app/routes/sso/index.tsx:182
 msgid "This is your only sign-in method"
@@ -705,10 +709,6 @@ msgstr "Use your security key to verify your identity."
 #: app/routes/sso/ldap.tsx:73
 msgid "Username"
 msgstr "Username"
-
-#: app/layouts/split.layout.tsx:96
-msgid "Using Datum requires setting up a billing account, but to help you explore without cost, we add <0>$50 USD</0> in credit on signup."
-msgstr "Using Datum requires setting up a billing account, but to help you explore without cost, we add <0>$50 USD</0> in credit on signup."
 
 #: app/routes/verify/index.tsx:159
 msgid "Verification code"
@@ -774,6 +774,10 @@ msgstr "We've sent a verification link to <0>{0}</0>"
 #: app/routes/login/index.tsx:302
 msgid "Welcome"
 msgstr "Welcome"
+
+#: app/layouts/split.layout.tsx:96
+msgid "While Datum is currently free of charge to use, we require a valid payment method during the signup process."
+msgstr "While Datum is currently free of charge to use, we require a valid payment method during the signup process."
 
 #: app/routes/signed-in.tsx:37
 msgid "You are signed in"
