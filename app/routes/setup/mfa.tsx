@@ -95,7 +95,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   // reads the cookie, mints the CSRF token, and wires the result to a redirect or rendered chooser.
   const provider = providerForRequest(request);
   const sessions = await readSessions(request);
-  const result = await resolveMfaSetup(provider, sessions, { loginName, organization });
+  const result = await resolveMfaSetup(provider, sessions, { loginName, requestId, organization });
   if (result.kind === 'redirect') return redirect(result.target);
 
   const { csrfToken, headers } = await loaderCsrf(request);

@@ -227,6 +227,7 @@ export function offerableSetupRoutes(
 
 export interface MfaSetupInput {
   loginName: string;
+  requestId?: string;
   organization?: string;
 }
 
@@ -272,7 +273,7 @@ export type MfaSetupResult = MfaSetupRedirect | MfaSetupData;
 export async function resolveMfaSetup(
   provider: AuthProvider,
   sessions: SessionEntry[],
-  { loginName, organization }: MfaSetupInput
+  { loginName, requestId, organization }: MfaSetupInput
 ): Promise<MfaSetupResult> {
   const entry = byLoginName(sessions, loginName, organization);
   if (!entry) return { kind: 'redirect', target: '/login' };
@@ -310,6 +311,7 @@ export async function resolveMfaSetup(
       settings: refreshedSettings,
       loginName: session.user?.loginName ?? loginName,
       mfaInitSkippedAt: refreshedUser?.mfaInitSkippedAt,
+      requestId,
       organization,
     });
 

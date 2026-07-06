@@ -132,6 +132,61 @@ describe('resolveMfaSetup — auto-skip when no MFA methods are offerable', () =
   });
 });
 
+// ── resolveMfaSetup: auto-skip threads requestId into redirect target ───────────────────────────
+//
+// Regression guard: when resolveMfaSetup auto-skips (no offerable MFA methods), the resulting
+// redirect target MUST carry the requestId so the OIDC/SAML ceremony can resume. Without it,
+// nextStepFromSession builds a target without the requestId query param → the handback to the
+// IdP is broken → staging returns /id/error?code=signin_failed after Google IdP login.
+//
+// REQUEST_ID_PATTERN in next-step only threads ids matching oidc_*/saml_*/device_* prefixes,
+// so we use 'oidc_test123' to exercise the actual threading path.
+
+describe('resolveMfaSetup — auto-skip threads requestId into the redirect target', () => {
+  const NO_MFA_CAPS = {
+    passkey: false,
+    u2f: false,
+    totpOtp: false,
+    emailOtp: false,
+    smsOtp: false,
+    externalIdp: false,
+    ldap: false,
+    saml: false,
+    oidc: false,
+    registration: false,
+  };
+
+  const scenarioWithRequestId = {
+    fn: 'resolveMfaSetup' as const,
+    provider: 'fresh' as const,
+    seed: {
+      users: [{ id: 'u-nomfa2', loginName: 'nomfa2@test.example' }],
+      authMethods: { 'u-nomfa2': ['password'] as string[] },
+      capabilities: NO_MFA_CAPS,
+    },
+    liveSessions: [
+      {
+        id: 'sess-nomfa2',
+        token: 'tok-nomfa2',
+        user: { id: 'u-nomfa2', loginName: 'nomfa2@test.example' },
+      },
+    ],
+    request: {
+      url: 'http://localhost/id/setup/mfa',
+      sessions: [{ id: 'sess-nomfa2', token: 'tok-nomfa2', loginName: 'nomfa2@test.example' }],
+    },
+    mfaInput: { loginName: 'nomfa2@test.example', requestId: 'oidc_test123' },
+  };
+
+  it('redirect target includes requestId=oidc_test123 so the OIDC ceremony can resume', () => {
+    callService(scenarioWithRequestId).then((v) => {
+      const o = v.outcome as { kind: string; target?: string };
+      expect(o.kind, 'auto-skip: kind must be redirect').to.equal('redirect');
+      expect(o.target ?? '', 'target must carry requestId').to.include('requestId=oidc_test123');
+    });
+  });
+});
+
 // ── resolveMfaSetup: normal path (non-empty offerable set) still returns offerableKeys ──────────
 //
 // Regression guard: ensure the fix does not break the normal chooser path where MFA methods ARE
