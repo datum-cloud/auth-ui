@@ -60,7 +60,7 @@ msgstr "Add your phone number as a second factor. We will send a one-time code v
 msgid "Additional verification is required to continue."
 msgstr "Additional verification is required to continue."
 
-#: app/routes/signup/index.tsx:290
+#: app/routes/signup/index.tsx:291
 msgid "Already have an account?"
 msgstr "Already have an account?"
 
@@ -187,7 +187,7 @@ msgstr "Connected accounts"
 
 #: app/routes/device/index.tsx:73
 #: app/routes/login/index.tsx:386
-#: app/routes/signup/index.tsx:275
+#: app/routes/signup/index.tsx:276
 msgid "Continue"
 msgstr "Continue"
 
@@ -207,7 +207,7 @@ msgstr "Couldn't complete sign-in. Return to your application and try again."
 msgid "Couldn't sign in"
 msgstr "Couldn't sign in"
 
-#: app/routes/signup/index.tsx:202
+#: app/routes/signup/index.tsx:203
 msgid "Create a new account"
 msgstr "Create a new account"
 
@@ -235,8 +235,8 @@ msgstr "Device denied"
 
 #: app/routes/login/index.tsx:262
 #: app/routes/login/index.tsx:359
-#: app/routes/signup/index.tsx:236
-#: app/routes/signup/index.tsx:261
+#: app/routes/signup/index.tsx:237
+#: app/routes/signup/index.tsx:262
 msgid "Email"
 msgstr "Email"
 
@@ -323,7 +323,7 @@ msgstr "Finish creating your account"
 msgid "Forgot password?"
 msgstr "Forgot password?"
 
-#: app/routes/signup/index.tsx:199
+#: app/routes/signup/index.tsx:200
 msgid "Get started"
 msgstr "Get started"
 
@@ -457,7 +457,7 @@ msgstr "Register a passkey using your device's biometric sensor or PIN to sign i
 msgid "Register passkey"
 msgstr "Register passkey"
 
-#: app/routes/signup/index.tsx:208
+#: app/routes/signup/index.tsx:209
 msgid "Registration is currently unavailable. Please contact your administrator."
 msgstr "Registration is currently unavailable. Please contact your administrator."
 
@@ -535,7 +535,7 @@ msgid "Set up SMS one-time code"
 msgstr "Set up SMS one-time code"
 
 #: app/routes/login/password.tsx:183
-#: app/routes/signup/index.tsx:292
+#: app/routes/signup/index.tsx:293
 #: app/routes/sso/ldap.tsx:82
 msgid "Sign in"
 msgstr "Sign in"

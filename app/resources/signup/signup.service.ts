@@ -385,12 +385,6 @@ export async function registerWithPassword(
   // createSession in runEnumerationSafeRegister also receives the resolved org via `organization`.
   const registrationOrg = await resolveOrg(provider, organization);
 
-  // Steer the verification mail's link back to OUR /verify route (raw provider
-  // placeholders, filled by Zitadel). requestId rides along so the post-verify step
-  // can resume an OIDC/SAML ceremony. The origin comes from trusted config
-  // (PUBLIC_ORIGIN), NOT the request Host header, to block Host-header injection.
-  const tmpl = verifyUrlTemplate({ origin, requestId });
-
   return runEnumerationSafeRegister(provider, list, {
     email,
     organization: registrationOrg,
@@ -399,16 +393,36 @@ export async function registerWithPassword(
     userAgent: input.userAgent,
     requireVerification: input.requireVerification,
     hasPassword: true,
-    // With-password always passes a password + verifyUrlTemplate (both branches).
+    // When verification is skipped (EMAIL_VERIFICATION=false on staging): pass emailVerified:true
+    // so Zitadel marks the email verified in-place and sends nothing. Omit verifyUrlTemplate
+    // entirely — passing it alongside emailVerified is redundant and risks triggering the sendCode
+    // path in a future Zitadel version.
+    //
+    // When verification is required (the default/prod path): pass verifyUrlTemplate so Zitadel
+    // sends the verification email to the user's address. emailVerified is omitted — the user
+    // must click the link before their session is fully verified.
     register: () =>
-      provider.register({
-        email,
-        firstName,
-        lastName,
-        password,
-        orgId: registrationOrg,
-        verifyUrlTemplate: tmpl,
-      }),
+      input.requireVerification
+        ? provider.register({
+            email,
+            firstName,
+            lastName,
+            password,
+            orgId: registrationOrg,
+            // Steer the verification mail's link back to OUR /verify route. requestId rides
+            // along so the post-verify step can resume an OIDC/SAML ceremony. Origin comes
+            // from trusted config (PUBLIC_ORIGIN), NOT the Host header, to block injection.
+            verifyUrlTemplate: verifyUrlTemplate({ origin, requestId }),
+          })
+        : provider.register({
+            email,
+            firstName,
+            lastName,
+            password,
+            orgId: registrationOrg,
+            // emailVerified:true → Zitadel marks verified immediately, sends no email.
+            emailVerified: true,
+          }),
     // Distinct audit from the passkey path: 'signup.created' carrying userId, hashing loginName.
     noVerifySuccessAudit: (user) =>
       logAuthEvent('signup.created', 'success', {

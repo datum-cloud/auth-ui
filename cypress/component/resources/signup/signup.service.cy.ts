@@ -186,6 +186,113 @@ describe('registerEmailLinkSignup', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Task 1: registerWithPassword — verification skip (EMAIL_VERIFICATION=false)
+//
+// When requireVerification=false, provider.register() must be called with
+// emailVerified:true and NO verifyUrlTemplate (Zitadel marks the email
+// verified in-place, sends nothing). When requireVerification=true, the
+// existing sent-with-session path is preserved (verifyUrlTemplate present).
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('registerWithPassword — verification skip (requireVerification=false)', () => {
+  it('calls register with emailVerified:true and NO verifyUrlTemplate when requireVerification=false', () => {
+    // RED: before the fix, register was always called with verifyUrlTemplate and no emailVerified.
+    // GREEN: when requireVerification=false, emailVerified:true + no verifyUrlTemplate.
+    run({
+      fn: 'registerWithPassword',
+      request: { url: `${BASE_URL}/signup/password` },
+      provider: 'singleton',
+      signupInput: {
+        email: 'noverify@test.com',
+        firstName: 'No',
+        lastName: 'Verify',
+        password: 'hunter2hunter2',
+        requireVerification: false,
+        origin: ORIGIN,
+        organization: 'org-z',
+      },
+      recordCalls: ['register'],
+    }).then((verdict) => {
+      expect(verdict.ok, verdict.error ?? '').to.be.true;
+      const registerCalls = (verdict.calls?.['register'] ?? []) as Array<[Record<string, unknown>]>;
+      expect(registerCalls.length, 'register was called once').to.equal(1);
+      const arg = registerCalls[0][0];
+      // Must be pre-verified — Zitadel marks email verified, sends nothing.
+      expect(arg.emailVerified, 'emailVerified must be true').to.equal(true);
+      // Must NOT include verifyUrlTemplate — that would trigger Zitadel's sendCode path.
+      expect(arg.verifyUrlTemplate, 'verifyUrlTemplate must be absent').to.be.undefined;
+    });
+  });
+
+  it('result is a redirect (not sent-with-session) when requireVerification=false', () => {
+    run({
+      fn: 'registerWithPassword',
+      request: { url: `${BASE_URL}/signup/password` },
+      provider: 'singleton',
+      signupInput: {
+        email: 'noverify2@test.com',
+        firstName: 'No',
+        lastName: 'Verify',
+        password: 'hunter2hunter2',
+        requireVerification: false,
+        origin: ORIGIN,
+      },
+    }).then((verdict) => {
+      expect(verdict.ok, verdict.error ?? '').to.be.true;
+      const r = verdict.outcome as Record<string, unknown>;
+      // No-verification path must redirect, never stall on "check your email".
+      expect(r.kind).to.equal('redirect');
+    });
+  });
+
+  it('calls register with verifyUrlTemplate and NO emailVerified when requireVerification=true (existing path unchanged)', () => {
+    run({
+      fn: 'registerWithPassword',
+      request: { url: `${BASE_URL}/signup/password` },
+      provider: 'singleton',
+      signupInput: {
+        email: 'withverify@test.com',
+        firstName: 'With',
+        lastName: 'Verify',
+        password: 'hunter2hunter2',
+        requireVerification: true,
+        origin: ORIGIN,
+        organization: 'org-z',
+      },
+      recordCalls: ['register'],
+    }).then((verdict) => {
+      expect(verdict.ok, verdict.error ?? '').to.be.true;
+      const registerCalls = (verdict.calls?.['register'] ?? []) as Array<[Record<string, unknown>]>;
+      expect(registerCalls.length, 'register was called once').to.equal(1);
+      const arg = registerCalls[0][0];
+      // Verification ON: verifyUrlTemplate present, emailVerified absent/falsy.
+      expect(arg.verifyUrlTemplate, 'verifyUrlTemplate must be present').to.be.a('string').and.not.be.empty;
+      expect(arg.emailVerified, 'emailVerified must be absent').to.be.undefined;
+    });
+  });
+
+  it('result is sent-with-session when requireVerification=true (existing path unchanged)', () => {
+    run({
+      fn: 'registerWithPassword',
+      request: { url: `${BASE_URL}/signup/password` },
+      provider: 'singleton',
+      signupInput: {
+        email: 'withverify2@test.com',
+        firstName: 'With',
+        lastName: 'Verify',
+        password: 'hunter2hunter2',
+        requireVerification: true,
+        origin: ORIGIN,
+      },
+    }).then((verdict) => {
+      expect(verdict.ok, verdict.error ?? '').to.be.true;
+      const r = verdict.outcome as Record<string, unknown>;
+      expect(r.kind).to.equal('sent-with-session');
+    });
+  });
+});
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Audit-event divergence guard
 //
 // registerPasskeyFirst and registerWithPassword share most of their flow BUT emit

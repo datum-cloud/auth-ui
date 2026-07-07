@@ -14,6 +14,7 @@ import {
   decideSignupIdpIntent,
 } from '@/resources/signup/signup-decision';
 import { resolveSignupView } from '@/resources/signup/signup-view';
+import { requireEmailVerification } from '@/server/env';
 import { signupIdentifierSchema } from '@/resources/signup/signup.schema';
 import { paths } from '@/routes/paths';
 import { providerForRequest } from '@/server/auth-context.server';
@@ -74,7 +75,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     email: url.searchParams.get('email') ?? '',
   };
 
-  const view = resolveSignupView(settings, idps, env.AUTH_EMAIL_DELIVERY_ENABLED);
+  const view = resolveSignupView(settings, idps, env.AUTH_EMAIL_DELIVERY_ENABLED, requireEmailVerification());
 
   return data(
     {

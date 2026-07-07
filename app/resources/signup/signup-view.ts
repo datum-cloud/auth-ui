@@ -13,6 +13,10 @@ export interface SignupView {
 /**
  * Pure settings→render-booleans for the signup identifier + method screens. Mirrors
  * resolveLoginView so the routes map these straight to JSX presence.
+ *
+ * @param requireEmailVerification - whether EMAIL_VERIFICATION env is on (true = default/prod).
+ *   When false (staging/no-delivery deployment), password signup can skip verification and
+ *   complete without sending any email, so email entry is safe to show even without delivery.
  */
 export function resolveSignupView(
   settings: Pick<
@@ -24,21 +28,42 @@ export function resolveSignupView(
     | 'disableLoginWithEmail'
   >,
   idps: IdProvider[],
-  emailDeliveryEnabled: boolean
+  emailDeliveryEnabled: boolean,
+  requireEmailVerification: boolean
 ): SignupView {
-  // Email-based signup (entry + link) needs email delivery to complete verification.
-  // When delivery is off, hide the whole email path so signup is IdP-only.
-  const allowEmailEntry = settings.disableLoginWithEmail !== true && emailDeliveryEnabled;
+  // Email entry is shown when:
+  //   a) policy allows it (disableLoginWithEmail !== true), AND
+  //   b) either delivery is on (normal path), OR
+  //      password signup is available AND verification is skipped (no-delivery staging):
+  //      password with emailVerified:true completes without any email, so showing entry is safe.
+  // Without both conditions for (b), showing email entry without delivery would strand the user
+  // on a "check your email" screen they can never complete.
+  const allowEmailEntry =
+    settings.disableLoginWithEmail !== true &&
+    (emailDeliveryEnabled || (settings.allowPassword && !requireEmailVerification));
+
   const showIdpButtons = settings.allowExternalIdp && idps.length > 0;
+
   // Registration is effectively unavailable if policy disables it OR no entry method
   // is usable on the index screen (no IdP buttons AND no email entry — password/passkey
   // live behind email entry on /signup/method, so they can't rescue an empty index).
   const signupUnavailable = !settings.allowRegister || (!showIdpButtons && !allowEmailEntry);
+
+  // Email-link (passwordless) signup always requires delivery to send the magic link.
+  // showEmailLink stays false without delivery even when allowEmailEntry is true.
+  const showEmailLink = allowEmailEntry && emailDeliveryEnabled;
+
+  // Passkey signup (registerPasskeyFirst) sends a verification email — it requires delivery.
+  // Hide passkey when delivery is off so the no-delivery method screen offers only password,
+  // avoiding a new stranding path where the user picks passkey and hits "check your email"
+  // with no delivery to resolve it.
+  const showPasskey = settings.passkeysType === 'allowed' && emailDeliveryEnabled;
+
   return {
     showIdpButtons,
     allowEmailEntry,
-    showEmailLink: allowEmailEntry && emailDeliveryEnabled,
-    showPasskey: settings.passkeysType === 'allowed',
+    showEmailLink,
+    showPasskey,
     showPassword: settings.allowPassword,
     signupUnavailable,
   };
