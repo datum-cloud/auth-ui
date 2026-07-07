@@ -196,9 +196,7 @@ export interface PasskeyFirstRegisterInput {
 }
 
 export type PasskeyFirstRegisterResult =
-  | SignupSentWithSessionResult
-  | SignupSentResult
-  | SignupRedirectResult;
+  SignupSentWithSessionResult | SignupSentResult | SignupRedirectResult;
 
 type RegisteredUser = Awaited<ReturnType<AuthProvider['register']>>;
 
@@ -359,9 +357,7 @@ export interface RegisterWithPasswordInput {
 }
 
 export type RegisterWithPasswordResult =
-  | SignupSentWithSessionResult
-  | SignupSentResult
-  | SignupRedirectResult;
+  SignupSentWithSessionResult | SignupSentResult | SignupRedirectResult;
 
 /**
  * /signup/password register: register with a password, then apply enumeration-safe

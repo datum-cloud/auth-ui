@@ -14,11 +14,11 @@ import {
   decideSignupIdpIntent,
 } from '@/resources/signup/signup-decision';
 import { resolveSignupView } from '@/resources/signup/signup-view';
-import { requireEmailVerification } from '@/server/env';
 import { signupIdentifierSchema } from '@/resources/signup/signup.schema';
 import { paths } from '@/routes/paths';
 import { providerForRequest } from '@/server/auth-context.server';
 import { loaderCsrf, assertCsrf } from '@/server/csrf';
+import { requireEmailVerification } from '@/server/env';
 import { trustedAppOrigin } from '@/server/infra/app-origin.server';
 import { env } from '@/server/infra/env.server';
 import { actionError } from '@/utils/errors/auth-error';
@@ -75,7 +75,12 @@ export async function loader({ request }: LoaderFunctionArgs) {
     email: url.searchParams.get('email') ?? '',
   };
 
-  const view = resolveSignupView(settings, idps, env.AUTH_EMAIL_DELIVERY_ENABLED, requireEmailVerification());
+  const view = resolveSignupView(
+    settings,
+    idps,
+    env.AUTH_EMAIL_DELIVERY_ENABLED,
+    requireEmailVerification()
+  );
 
   return data(
     {

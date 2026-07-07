@@ -266,7 +266,8 @@ describe('registerWithPassword — verification skip (requireVerification=false)
       expect(registerCalls.length, 'register was called once').to.equal(1);
       const arg = registerCalls[0][0];
       // Verification ON: verifyUrlTemplate present, emailVerified absent/falsy.
-      expect(arg.verifyUrlTemplate, 'verifyUrlTemplate must be present').to.be.a('string').and.not.be.empty;
+      expect(arg.verifyUrlTemplate, 'verifyUrlTemplate must be present').to.be.a('string').and.not
+        .be.empty;
       expect(arg.emailVerified, 'emailVerified must be absent').to.be.undefined;
     });
   });

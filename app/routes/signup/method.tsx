@@ -55,7 +55,12 @@ export async function loader({ request }: LoaderFunctionArgs) {
     provider.getLoginSettings(settingsOrg),
     provider.capabilities.externalIdp ? provider.getActiveIdPs(settingsOrg) : Promise.resolve([]),
   ]);
-  const view = resolveSignupView(settings, idps, env.AUTH_EMAIL_DELIVERY_ENABLED, requireEmailVerification());
+  const view = resolveSignupView(
+    settings,
+    idps,
+    env.AUTH_EMAIL_DELIVERY_ENABLED,
+    requireEmailVerification()
+  );
 
   const { csrfToken, headers } = await loaderCsrf(request);
 
