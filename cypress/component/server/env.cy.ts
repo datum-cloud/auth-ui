@@ -4,11 +4,15 @@
 import { requireEmailVerification } from '@/server/env';
 
 describe('requireEmailVerification', () => {
-  it('defaults to true when EMAIL_VERIFICATION is unset', () => {
-    expect(requireEmailVerification({})).to.equal(true);
+  it('defaults to false when EMAIL_VERIFICATION is unset (opt-in)', () => {
+    expect(requireEmailVerification({})).to.equal(false);
   });
 
-  it('returns false only when EMAIL_VERIFICATION is exactly "false"', () => {
+  it('returns false when EMAIL_VERIFICATION is explicitly "false"', () => {
     expect(requireEmailVerification({ EMAIL_VERIFICATION: 'false' })).to.equal(false);
+  });
+
+  it('returns true only when EMAIL_VERIFICATION is exactly "true"', () => {
+    expect(requireEmailVerification({ EMAIL_VERIFICATION: 'true' })).to.equal(true);
   });
 });
