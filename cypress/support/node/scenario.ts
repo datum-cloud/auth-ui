@@ -260,7 +260,10 @@ export type SessionResultScript =
   | { mode: 'throw'; code: ProviderErrorCode }
   // Fails the FIRST getSession call for that id, then falls through to the real fake behavior —
   // drives the healIfSessionDead read-after-write retry tests ("fail once, then succeed").
-  | { mode: 'throw-once'; code: ProviderErrorCode };
+  | { mode: 'throw-once'; code: ProviderErrorCode }
+  // Fails the next `times` getSession calls, then falls through — drives the bounded-backoff-loop
+  // test where a replica lags more than one read cycle ("fail N times, then succeed").
+  | { mode: 'throw-times'; code: ProviderErrorCode; times: number };
 export type CallbackResultScript = { mode: 'throw'; code: ProviderErrorCode };
 
 export interface Scenario {

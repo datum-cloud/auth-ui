@@ -69,9 +69,9 @@ describe('/authorize — stale-cookie self-heal (validate before reuse)', () => 
 // Read-after-write retry (Zitadel eventual consistency): a session THIS request just created
 // (the post-register /authorize handback is the concrete case) can transiently 404 on getSession
 // if the read lands on a replica that hasn't caught up with the write yet. healIfSessionDead
-// retries exactly once — but ONLY when the cookie entry's creationTs is fresh — before treating
-// a dead code as ground truth. See authorize.service.ts's RETRY_FRESHNESS_WINDOW_MS block for
-// the full scoping rationale.
+// re-probes with a bounded increasing backoff (stopping the instant it comes back alive) — but
+// ONLY when the cookie entry's creationTs is fresh — before treating a dead code as ground truth.
+// See authorize.service.ts's RETRY_FRESHNESS_WINDOW_MS block for the full scoping rationale.
 describe('/authorize — read-after-write retry on a freshly-created session (NOT_FOUND)', () => {
   const NOW_MS = Date.parse('2026-06-24T12:00:00.000Z');
 
@@ -105,6 +105,40 @@ describe('/authorize — read-after-write retry on a freshly-created session (NO
       expect(loc).to.not.include('/login');
       // No self-heal fired — the retry recovered the session, so it must NOT look like the
       // stale-cookie case above.
+      expect(v.audit.some((e) => e.event === 'session_stale')).to.equal(false);
+    });
+  });
+
+  it('FRESH session lagging MORE than one read cycle: NOT_FOUND twice then alive → the bounded backoff loop keeps polling and finalizes (no self-heal)', () => {
+    callService({
+      fn: 'resolveAuthorize',
+      provider: 'singleton',
+      // Throws NOT_FOUND for the first TWO getSession calls (the initial probe + the first retry),
+      // then falls through to this live session on the third — a replica that lags past a single
+      // retry. Proves healIfSessionDead's loop keeps going instead of giving up after one attempt.
+      liveSessions: [{ id: 'fresh-race-2', token: 'tok-fresh-race-2' }],
+      sessionResults: {
+        'fresh-race-2': { mode: 'throw-times', code: 'NOT_FOUND', times: 2 },
+      },
+      nowMs: NOW_MS,
+      request: {
+        url: `http://localhost/id/authorize?requestId=oidc_${RAW_ID}&sessionId=fresh-race-2`,
+        sessions: [
+          {
+            id: 'fresh-race-2',
+            token: 'tok-fresh-race-2',
+            loginName: 'alice@acme.test',
+            // 2s old — inside the retry window.
+            creationTs: new Date(NOW_MS - 2000).toISOString(),
+          },
+        ],
+      },
+    }).then((v) => {
+      expect(v.response?.status).to.equal(302);
+      const loc = v.response?.location ?? '';
+      expect(loc).to.include('client.acme.test/callback');
+      expect(loc).to.include(`code=fake_${RAW_ID}_fresh-race-2`);
+      expect(loc).to.not.include('/login');
       expect(v.audit.some((e) => e.event === 'session_stale')).to.equal(false);
     });
   });

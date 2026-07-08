@@ -37,10 +37,15 @@ import { ProviderError } from '@/modules/auth/types';
 // entry is deleted) so every subsequent call falls through to the real in-memory session lookup
 // — i.e. "fail once, then behave normally," which is exactly what a transient replica-lag 404
 // followed by a successful retry looks like.
+//
+// 'throw-times' generalises that to N consecutive throws before falling through — it drives the
+// BOUNDED-backoff-loop test (a replica that lags more than one read cycle), proving the retry
+// keeps polling past the first attempt rather than giving up after one.
 type FakeOutcomeScript =
   | { mode: 'null' }
   | { mode: 'throw'; code: ProviderErrorCode }
-  | { mode: 'throw-once'; code: ProviderErrorCode };
+  | { mode: 'throw-once'; code: ProviderErrorCode }
+  | { mode: 'throw-times'; code: ProviderErrorCode; times: number };
 
 export const FIXED_NOW = '2026-01-01T00:00:00.000Z'; // deterministic for tests (no Date.now())
 // Factor verifiedAt is `Date | null`. A frozen Date keeps the fake deterministic.
@@ -382,6 +387,17 @@ export class FakeAuthProvider implements AuthProvider {
         // it) falls through to the real lookup below instead of throwing again.
         this.sessionResults.delete(id);
         throw new ProviderError(scripted.code, `scripted getSession ${scripted.code} (once)`);
+      }
+      if (scripted.mode === 'throw-times') {
+        // Throw for the next `times` calls, decrementing each time; on the last one consume the
+        // script so the following call falls through to the real lookup. Immutable update: re-set
+        // a decremented copy rather than mutating the stored script object.
+        if (scripted.times <= 1) this.sessionResults.delete(id);
+        else this.sessionResults.set(id, { ...scripted, times: scripted.times - 1 });
+        throw new ProviderError(
+          scripted.code,
+          `scripted getSession ${scripted.code} (${scripted.times} left)`
+        );
       }
       throw new ProviderError(scripted.code, `scripted getSession ${scripted.code}`);
     }

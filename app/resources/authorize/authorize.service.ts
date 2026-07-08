@@ -65,10 +65,15 @@ const DEAD_SESSION_CODES: ReadonlySet<ProviderError['code']> = new Set([
 //     itself a retry. This preserves the existing anti-forgery guarantee: a stale post-logout
 //     cookie (or a genuinely forged sessionId) still self-heals to /login on the FIRST dead
 //     response, with zero added latency or leniency.
-//   • It retries AT MOST ONCE. If the retry still comes back dead (or errors again), the
-//     function falls through to the exact same self-heal path as if there had been no retry.
+//   • It retries a BOUNDED number of times (RETRY_BACKOFFS_MS, ~2.8s total max), stopping early
+//     the moment a probe comes back alive or non-dead. If every attempt still comes back dead (or
+//     errors), the function falls through to the exact same self-heal path as if there had been no
+//     retry — the retry only ever *adds* patience for a fresh session, never leniency.
 const RETRY_FRESHNESS_WINDOW_MS = 5000; // 5s — covers redirect latency + replica lag, nothing more
-const RETRY_BACKOFF_MS = 350; // short pause before the single retry attempt
+// Increasing backoffs between fresh-session liveness re-probes (~2.8s total max). A single short
+// retry loses the race when a replica lags >1 read cycle; a bounded poll rides out the write→read
+// replication for a session we KNOW we just created. Only ever applied to a fresh entry.
+const RETRY_BACKOFFS_MS = [300, 500, 800, 1200] as const;
 
 /** True when `entry` was created within RETRY_FRESHNESS_WINDOW_MS of `nowMs`. A malformed or
  *  missing creationTs (tsMs → NaN) is treated as NOT fresh — the safe default is the original,
@@ -232,7 +237,8 @@ function errorRedirect(url: URL, code: AuthErrorCode): Response {
  *     and never mistaken for a genuine error. (The post-logout stale-cookie case.)
  *
  *     EXCEPT: a DEAD_SESSION_CODES code on a FRESH entry (isFreshEntry — see the retry block
- *     above) gets ONE retry, after a short backoff, before this self-heal fires — see the
+ *     above) is re-probed with a BOUNDED increasing backoff (RETRY_BACKOFFS_MS, ~2.8s total max),
+ *     stopping the instant it comes back alive, before this self-heal fires — see the
  *     RETRY_FRESHNESS_WINDOW_MS comment for the full scoping rationale (Zitadel read-after-write
  *     lag on a session THIS request just created). An old/stale/forged entry skips the retry
  *     entirely and self-heals immediately, exactly as before.
@@ -260,13 +266,18 @@ async function healIfSessionDead(
 ): Promise<AuthorizeOutcome | { session: Session }> {
   let probe = await probeSession(provider, entry);
 
-  // RETRY-ON-FRESH: see the RETRY_FRESHNESS_WINDOW_MS block above for the full scoping
-  // rationale. Bounded to exactly one retry, and ONLY for a dead-code result on a genuinely
-  // fresh cookie entry — every other case (already alive, confirmed-null, transient error, or a
-  // dead code on an old/stale/forged entry) falls straight through to the original behavior.
-  if (probe.kind === 'dead-code' && isFreshEntry(entry, nowMs)) {
-    await sleep(RETRY_BACKOFF_MS);
-    probe = await probeSession(provider, entry);
+  // RETRY-ON-FRESH: see the RETRY_FRESHNESS_WINDOW_MS block above for the full scoping rationale.
+  // Zitadel's read-after-write lag on a session THIS request just created can exceed a single
+  // retry, so poll with increasing backoff (RETRY_BACKOFFS_MS, ~2.8s total max) — but ONLY while
+  // the entry is genuinely fresh (isFreshEntry, signed creationTs) AND the probe is still a dead
+  // code. Every other case (already alive, confirmed-null, transient error, or a dead code on an
+  // old/stale/forged entry) falls straight through to the original behavior with no wait.
+  if (isFreshEntry(entry, nowMs)) {
+    for (const backoff of RETRY_BACKOFFS_MS) {
+      if (probe.kind !== 'dead-code') break;
+      await sleep(backoff);
+      probe = await probeSession(provider, entry);
+    }
   }
 
   switch (probe.kind) {
