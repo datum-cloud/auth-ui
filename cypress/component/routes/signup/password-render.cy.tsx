@@ -50,4 +50,12 @@ describe('signup/password — render adoption', () => {
       '/signup'
     );
   });
+
+  it('shows the identity being registered with a "Not you?" link back to /signup', () => {
+    mountPassword();
+    cy.contains(LOADER_DATA.loginName, { timeout: 6000 }).should('exist');
+    cy.findByRole('link', { name: /not you/i })
+      .should('have.attr', 'href')
+      .and('match', /^\/signup(\?|$)/);
+  });
 });

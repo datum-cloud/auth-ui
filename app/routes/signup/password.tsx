@@ -10,6 +10,7 @@ import { MaxMindTracker, readMaxMindTrackingToken } from '@/modules/fraud/maxmin
 import { resolveOrg } from '@/resources/shared/resolve-org';
 import { registerWithPassword } from '@/resources/signup';
 import { signupPasswordSchemaFor } from '@/resources/signup/signup.schema';
+import { paths } from '@/routes/paths';
 import { providerForRequest } from '@/server/auth-context.server';
 import { loaderCsrf, assertCsrf } from '@/server/csrf';
 import { requireEmailVerification } from '@/server/env';
@@ -30,7 +31,7 @@ import {
   type LoaderFunctionArgs,
   type MetaFunction,
 } from 'react-router';
-import { Form as RRForm } from 'react-router';
+import { Form as RRForm, Link } from 'react-router';
 
 export const meta: MetaFunction = () => [{ title: 'Set a password' }];
 
@@ -164,6 +165,12 @@ export default function SignupPassword() {
   // replaces the per-route toast).
   const errorMessage = useAuthActionError(actionData);
 
+  // "Not you?" returns to the signup start (not /login — this is a signup ceremony) so a
+  // different email can be entered. Mirrors IdentityBadge's requestId/organization threading,
+  // loginName intentionally dropped. AuthCeremony's shared IdentityBadge is login-only copy
+  // ("Signing in as" → /login), so the identity + link are rendered inline here instead.
+  const notYouHref = paths.signup.index({ requestId, organization });
+
   if (actionData && 'sent' in actionData) {
     return (
       <AuthCard
@@ -183,7 +190,14 @@ export default function SignupPassword() {
       <MaxMindTracker accountId={maxmindAccountId} />
       <AuthCeremony
         title={<Trans>Set a password</Trans>}
-        description={<Trans>You'll need to set a password to complete your signup.</Trans>}
+        description={
+          <>
+            <Trans>Signing up as</Trans> <strong>{loginName}</strong>.{' '}
+            <Link to={notYouHref} className="underline">
+              <Trans>Not you?</Trans>
+            </Link>
+          </>
+        }
         error={errorMessage}>
         <Form.Root
           schema={schema}

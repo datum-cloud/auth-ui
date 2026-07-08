@@ -144,7 +144,7 @@ msgstr "Change your password"
 
 #: app/routes/password/reset.tsx:98
 #: app/routes/signup/method.tsx:255
-#: app/routes/signup/password.tsx:170
+#: app/routes/signup/password.tsx:177
 msgid "Check your email"
 msgstr "Check your email"
 
@@ -177,7 +177,7 @@ msgid "Confirm new password"
 msgstr "Confirm new password"
 
 #: app/routes/password/change.tsx:113
-#: app/routes/signup/password.tsx:213
+#: app/routes/signup/password.tsx:227
 msgid "Confirm password"
 msgstr "Confirm password"
 
@@ -212,7 +212,7 @@ msgid "Create a new account"
 msgstr "Create a new account"
 
 #: app/routes/login/index.tsx:417
-#: app/routes/signup/password.tsx:217
+#: app/routes/signup/password.tsx:231
 msgid "Create account"
 msgstr "Create account"
 
@@ -381,6 +381,7 @@ msgid "Not registered?"
 msgstr "Not registered?"
 
 #: app/components/identity-badge/identity-badge.tsx:28
+#: app/routes/signup/password.tsx:197
 msgid "Not you?"
 msgstr "Not you?"
 
@@ -403,7 +404,7 @@ msgid "Passkey"
 msgstr "Passkey"
 
 #: app/routes/login/method.tsx:132
-#: app/routes/signup/password.tsx:209
+#: app/routes/signup/password.tsx:223
 #: app/routes/sso/ldap.tsx:77
 msgid "Password"
 msgstr "Password"
@@ -501,7 +502,7 @@ msgid "Session active"
 msgstr "Session active"
 
 #: app/routes/signup/method.tsx:334
-#: app/routes/signup/password.tsx:185
+#: app/routes/signup/password.tsx:192
 msgid "Set a password"
 msgstr "Set a password"
 
@@ -572,6 +573,10 @@ msgstr "Sign-in is currently unavailable for this account. Please contact your a
 #: app/components/identity-badge/identity-badge.tsx:26
 msgid "Signing in as"
 msgstr "Signing in as"
+
+#: app/routes/signup/password.tsx:195
+msgid "Signing up as"
+msgstr "Signing up as"
 
 #: app/routes/setup/mfa.tsx:209
 msgid "Skip for now"
@@ -767,7 +772,7 @@ msgstr "We've sent a password reset link to <0>{0}</0>"
 #. placeholder {0}: (actionData as { email: string }).email
 #. placeholder {0}: actionData.email
 #: app/routes/signup/method.tsx:257
-#: app/routes/signup/password.tsx:172
+#: app/routes/signup/password.tsx:179
 msgid "We've sent a verification link to <0>{0}</0>"
 msgstr "We've sent a verification link to <0>{0}</0>"
 
@@ -815,10 +820,6 @@ msgstr "You signed in as a different account than the one you were re-authentica
 #: app/routes/device/authorize.tsx:134
 msgid "You'll be asked to sign in before authorizing."
 msgstr "You'll be asked to sign in before authorizing."
-
-#: app/routes/signup/password.tsx:186
-msgid "You'll need to set a password to complete your signup."
-msgstr "You'll need to set a password to complete your signup."
 
 #: app/routes/signup/method.tsx:279
 msgid "You're almost done! <0>{loginName}</0>"
