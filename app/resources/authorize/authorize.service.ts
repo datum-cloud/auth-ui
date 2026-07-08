@@ -109,18 +109,19 @@ async function probeSession(provider: AuthProvider, entry: SessionEntry): Promis
 // though getSession reported it alive — a stale OIDC grant after RP-initiated logout (cloud-portal
 // revokes the grant but auth-ui's `sessions` cookie outlives it). Re-authenticate instead of
 // dead-ending on signin_failed: a fresh login mints a new session that completes the callback
-// (confirmed in staging — this fails ONLY for old/stale sessions; a fresh login always works, so
-// self-healing here cannot create a redirect loop).
-//   • FAILED_PRECONDITION — the exact code observed in staging logs for this failure.
-//   • ALREADY_DONE — mappers.ts normalizeError maps the SAME underlying gRPC FailedPrecondition
-//     (code 9) to ALREADY_DONE instead of FAILED_PRECONDITION whenever Zitadel's error message
-//     matches /verified|already/i (e.g. "auth request already handled"). createCallback goes
-//     through that same generic mapper, so a stale grant can surface as either code depending on
-//     Zitadel's wording — both must self-heal the same way.
-const DEAD_CALLBACK_CODES: ReadonlySet<ProviderError['code']> = new Set([
-  'FAILED_PRECONDITION',
-  'ALREADY_DONE',
-]);
+// (confirmed in staging — this fails ONLY for old/stale sessions; a fresh login always works).
+//
+// SCOPED TO FAILED_PRECONDITION ONLY — the exact code observed in staging logs for the stale-grant
+// failure. We deliberately do NOT self-heal on ALREADY_DONE: mappers.ts maps a code-9
+// FailedPrecondition whose message matches /verified|already/i ("auth request already handled") to
+// ALREADY_DONE, which is the DOUBLE-CALLBACK case — the SAME requestId re-submitted after it was
+// already finalized (browser back+reload, duplicate tab, request race). There the session is still
+// perfectly valid; pruning it and redirecting to /login (which re-threads the already-consumed
+// requestId straight back to /authorize) would destroy a good session and risk a self-heal loop
+// that keeps destroying each freshly-minted session. ALREADY_DONE therefore falls through to the
+// conservative signin_failed path below with the session left intact — the pre-fix behavior for
+// this case, which was strictly safe.
+const DEAD_CALLBACK_CODES: ReadonlySet<ProviderError['code']> = new Set(['FAILED_PRECONDITION']);
 
 // Freshness window for honoring a query-handed-back sessionId against a prompt=login request.
 // The post-auth finalize redirect is near-immediate (the ceremony hands the just-authenticated

@@ -4,11 +4,17 @@
 // (cloud-portal), auth-ui's `sessions` cookie can hold a session whose Zitadel SESSION is still
 // alive but whose OIDC GRANT is gone. getSession succeeds (so healIfSessionDead's dead-session
 // check never fires) and the flow proceeds to createCallback, which Zitadel rejects with
-// FAILED_PRECONDITION (confirmed in staging logs) — or ALREADY_DONE, the sibling code the same
-// gRPC FailedPrecondition maps to depending on Zitadel's error message (see mappers.ts). Before
-// the fix, ANY createCallback failure dead-ended on `signin_failed`; now DEAD_CALLBACK_CODES
-// self-heals (prune + /login) exactly like the already-covered dead-session case in logout.cy.ts,
-// while a genuinely transient/unknown code (e.g. UNAVAILABLE) still surfaces the error page.
+// FAILED_PRECONDITION (confirmed in staging logs). Before the fix, ANY createCallback failure
+// dead-ended on `signin_failed`; now FAILED_PRECONDITION self-heals (prune + /login) exactly like
+// the already-covered dead-session case in logout.cy.ts.
+//
+// IMPORTANT — ALREADY_DONE is NOT self-healed. mappers.ts maps a code-9 FailedPrecondition whose
+// message matches /verified|already/i ("auth request already handled") to ALREADY_DONE, which is
+// the DOUBLE-CALLBACK case: the SAME requestId re-submitted after it was already finalized (browser
+// back+reload, duplicate tab), where the session is still valid. Self-healing there would prune a
+// good session and re-thread the already-consumed requestId, risking a redirect loop — so
+// ALREADY_DONE, like any transient/unknown code (e.g. UNAVAILABLE), surfaces the conservative
+// signin_failed error page with the session left intact.
 //
 // Node-bound: resolveAuthorize reads a real signed `sessions` cookie off a Request (Fetch spec
 // forbids a Cookie header in the browser), so this runs through the cy.task node-spec harness.
@@ -56,7 +62,7 @@ describe('resolveOidc — stale OIDC grant after logout (createCallback failure 
     });
   });
 
-  it('ALREADY_DONE (the sibling code for the same underlying gRPC FailedPrecondition) also self-heals to /login', () => {
+  it('ALREADY_DONE (double-callback: the same auth request re-submitted after it was already finalized) does NOT self-heal — surfaces signin_failed with the still-valid session left intact', () => {
     callService({
       fn: 'resolveAuthorize',
       provider: 'fresh',
@@ -70,8 +76,18 @@ describe('resolveOidc — stale OIDC grant after logout (createCallback failure 
     }).then((v) => {
       expect(v.response?.status).to.equal(302);
       const loc = v.response?.location ?? '';
-      expect(loc).to.include('/login');
-      expect(loc).to.not.include('/error');
+      // Conservative error page, NOT a self-heal to /login: a double-callback must not destroy the
+      // still-valid session or re-thread the already-consumed requestId (which risks a heal loop).
+      expect(loc).to.include('/error');
+      expect(loc).to.include('code=signin_failed');
+      expect(loc).to.not.include('/login');
+      // No self-heal event and no cookie prune — the valid session is preserved (no Set-Cookie rewrite).
+      expect(v.audit.some((e: AuditEvent) => e.event === 'session_stale')).to.equal(false);
+      // The failed createCallback is still logged for diagnosability, just no longer terminal-to-heal.
+      const failure = v.audit.find(
+        (e: AuditEvent) => e.event === 'oidc_callback' && e.outcome === 'failure'
+      );
+      expect(failure?.code).to.equal('ALREADY_DONE');
     });
   });
 
