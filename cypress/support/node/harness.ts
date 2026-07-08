@@ -92,6 +92,7 @@ import { dispatchEmailCode, resendEmailCode, submitEmailCode } from '@/resources
 import {
   requestPasskeyAttestation,
   requestU2FAttestation,
+  requestWebAuthnChallenge,
   verifyPasskeyEnrollment,
   verifyU2FEnrollment,
 } from '@/resources/webauthn/webauthn.service';
@@ -705,6 +706,19 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
         outcome = await requestU2FAttestation(
           provider,
           buildSessionEntries(sr.sessions),
+          s.attestationInput
+        );
+        break;
+      }
+      case 'requestWebAuthnChallenge': {
+        if (!s.attestationInput)
+          throw new Error('requestWebAuthnChallenge requires attestationInput');
+        // cfg is unused on the no-session guard-fail path exercised by the threading test; a valid
+        // passkey config keeps the type honest.
+        outcome = await requestWebAuthnChallenge(
+          provider,
+          buildSessionEntries(sr.sessions),
+          { userVerificationRequirement: 'required', challengeAuditEvent: 'mfa_passkey_challenge' },
           s.attestationInput
         );
         break;

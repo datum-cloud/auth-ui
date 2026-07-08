@@ -53,10 +53,12 @@ export function resolveSignupView(
   // showEmailLink stays false without delivery even when allowEmailEntry is true.
   const showEmailLink = allowEmailEntry && emailDeliveryEnabled;
 
-  // Passkey signup (registerPasskeyFirst) sends a verification email — it requires delivery.
-  // Hide passkey when delivery is off so the no-delivery method screen offers only password,
-  // avoiding a new stranding path where the user picks passkey and hits "check your email"
-  // with no delivery to resolve it.
+  // Passkey signup (registerPasskeyFirst) sends a verification email ONLY when verification is
+  // required; with verification off it registers without one. We still hide passkey whenever
+  // delivery is off — even in the verification-off case where it could technically proceed — to
+  // keep the no-delivery method screen to the single well-exercised password path and avoid any
+  // "check your email" stranding. (allowEmailEntry above deliberately makes the opposite call for
+  // password entry, which completes with no email at all.)
   const showPasskey = settings.passkeysType === 'allowed' && emailDeliveryEnabled;
 
   return {

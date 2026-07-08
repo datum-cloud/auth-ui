@@ -145,6 +145,7 @@ export type ServiceFn =
   | 'submitOtpCode'
   | 'requestPasskeyAttestation'
   | 'requestU2FAttestation'
+  | 'requestWebAuthnChallenge'
   | 'verifyPasskeyEnrollment'
   | 'verifyU2FEnrollment'
   // createOtpVerifyHandlers loader/action — read a signed sessions cookie (+ CSRF for the action)

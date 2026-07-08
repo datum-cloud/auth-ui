@@ -30,7 +30,7 @@ describe('ALLOW_IDP_UNLINK env parsing (SEC-5, fail-closed)', () => {
 });
 
 describe('runSsoAction — provider error handling', () => {
-  it('start: provider error returns a handled response and logs failure (no 500)', () => {
+  it('start: provider error returns a handled redirect and logs failure (no 500)', () => {
     callService({
       fn: 'runSsoAction',
       provider: 'singleton',
@@ -38,6 +38,22 @@ describe('runSsoAction — provider error handling', () => {
       request: { url: BASE, form: { intent: 'start', provider: 'google' } },
     }).then((v) => {
       expect([302, 502]).to.include(v.response?.status);
+      expect(v.audit.some((e) => e.outcome === 'failure')).to.equal(true);
+    });
+  });
+
+  it('start: provider error threads organization into the error redirect (so the "Back to sign in" link keeps org scope)', () => {
+    callService({
+      fn: 'runSsoAction',
+      provider: 'singleton',
+      startIdpIntentError: 'UNAVAILABLE',
+      request: {
+        url: BASE,
+        form: { intent: 'start', provider: 'google', organization: 'org-1' },
+      },
+    }).then((v) => {
+      expect(v.response?.status).to.equal(302);
+      expect(v.response?.location ?? '').to.include('organization=org-1');
       expect(v.audit.some((e) => e.outcome === 'failure')).to.equal(true);
     });
   });

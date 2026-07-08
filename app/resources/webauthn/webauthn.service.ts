@@ -100,7 +100,8 @@ export type WebAuthnChallengeResult = WebAuthnChallengeRedirect | WebAuthnChalle
 /**
  * Request a WebAuthn assertion challenge for an already-read sessions list.
  *
- * Guard: require an active session for this loginName → otherwise redirect('/login').
+ * Guard: require an active session for this loginName → otherwise bounce to
+ * loginBounceTarget(requestId, organization) (i.e. /login, carrying ceremony context when present).
  * Then updateSession with a webAuthN challenge parameterised by userVerificationRequirement.
  * A challenge failure is NOT fatal — log the configured failure audit and return a null
  * options object so the screen still renders (the browser surfaces an error on click).
@@ -299,7 +300,8 @@ export type PasskeyAttestationResult = AttestationLoaderRedirect | PasskeyAttest
 /**
  * Fetch a passkey attestation challenge for an already-read sessions list.
  *
- * Guard: active session + resolvable user required → redirect('/login') otherwise.
+ * Guard: active session + resolvable user required → otherwise bounce to
+ * loginBounceTarget(requestId, organization) (i.e. /login, carrying ceremony context when present).
  * Steps 1–2: get a registration link, then fetch attestation options. On failure
  * (provider unreachable, token expired, etc.) degrade gracefully: log a TYPED audit
  * code with a PSEUDONYMIZED actor, surface challengeFailed=true,
@@ -359,7 +361,8 @@ export type U2FAttestationResult = AttestationLoaderRedirect | U2FAttestationDat
 /**
  * Fetch a U2F (security-key) attestation challenge for an already-read sessions list.
  *
- * Guard: active session + resolvable user required → redirect('/login') otherwise.
+ * Guard: active session + resolvable user required → otherwise bounce to
+ * loginBounceTarget(requestId, organization) (i.e. /login, carrying ceremony context when present).
  * Fetch U2F attestation options; degrade gracefully on failure (log a failure audit,
  * leave publicKey null — the button surfaces the inline error on click).
  *

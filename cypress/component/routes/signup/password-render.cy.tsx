@@ -31,7 +31,10 @@ const LOADER_DATA = {
   maxmindAccountId: '',
 };
 
-function mountPassword(onSubmitFormData?: (form: FormData) => void) {
+function mountPassword(
+  onSubmitFormData?: (form: FormData) => void,
+  data: typeof LOADER_DATA = LOADER_DATA
+) {
   const router = createMemoryRouter(
     [
       {
@@ -48,12 +51,12 @@ function mountPassword(onSubmitFormData?: (form: FormData) => void) {
           onSubmitFormData?.(await request.formData());
           return null;
         },
-        loader: () => LOADER_DATA,
+        loader: () => data,
       },
     ],
     {
       initialEntries: ['/signup/password'],
-      hydrationData: { loaderData: { 'signup-password': LOADER_DATA } },
+      hydrationData: { loaderData: { 'signup-password': data } },
     }
   );
   return mount(withProviders(<RouterProvider router={router} />));
@@ -69,12 +72,18 @@ describe('signup/password — render adoption', () => {
     );
   });
 
-  it('shows the identity being registered with a "Not you?" link back to /signup', () => {
-    mountPassword();
-    cy.contains(LOADER_DATA.loginName, { timeout: 6000 }).should('exist');
+  it('"Not you?" link threads the ceremony requestId + organization back to /signup (not a bare /signup)', () => {
+    // Seed real ceremony params so the assertion actually exercises threading — with the bare
+    // fixture (requestId/organization undefined) the href degrades to "/signup" no matter whether
+    // threading works, is hardcoded, or is wired to the wrong fields, so it proves nothing.
+    const withCeremony = { ...LOADER_DATA, requestId: 'oidc_V2_123', organization: 'org-1' };
+    mountPassword(undefined, withCeremony);
+    cy.contains(withCeremony.loginName, { timeout: 6000 }).should('exist');
     cy.findByRole('link', { name: /not you/i })
       .should('have.attr', 'href')
-      .and('match', /^\/signup(\?|$)/);
+      .and('include', '/signup?')
+      .and('include', 'requestId=oidc_V2_123')
+      .and('include', 'organization=org-1');
   });
 });
 

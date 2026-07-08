@@ -146,6 +146,39 @@ describe('requestPasskeyAttestation / requestU2FAttestation — challenge audit 
   });
 });
 
+describe('requestWebAuthnChallenge — guard-fail bounce target threading', () => {
+  it('bounces to /login threading requestId + organization when there is no matching session (mirrors the attestation siblings)', () => {
+    callService({
+      fn: 'requestWebAuthnChallenge',
+      provider: 'singleton',
+      request: { url: 'http://localhost/id/login/passkey' }, // no sessions
+      attestationInput: {
+        loginName: 'ghost@nowhere.test',
+        domain: 'localhost',
+        requestId: 'oidc_V2_789',
+        organization: 'org-1',
+      },
+    }).then((v) => {
+      const o = v.outcome as { kind: string; target?: string };
+      expect(o.kind).to.equal('redirect');
+      expect(o.target).to.equal('/login?requestId=oidc_V2_789&organization=org-1');
+    });
+  });
+
+  it('bounces to a bare /login when no ceremony context is present', () => {
+    callService({
+      fn: 'requestWebAuthnChallenge',
+      provider: 'singleton',
+      request: { url: 'http://localhost/id/login/passkey' }, // no sessions
+      attestationInput: { loginName: 'ghost@nowhere.test', domain: 'localhost' },
+    }).then((v) => {
+      const o = v.outcome as { kind: string; target?: string };
+      expect(o.kind).to.equal('redirect');
+      expect(o.target).to.equal('/login');
+    });
+  });
+});
+
 describe('verifyPasskeyEnrollment', () => {
   it('threads checkAfter routing params, rejects malformed/invalid credentials, and expires with no session', () => {
     callService({

@@ -144,12 +144,13 @@ export async function action({ request }: ActionFunctionArgs) {
         requestId,
         deviceTrackingToken,
         userAgent: userAgentFromRequest(request, fingerprintId),
-        // Verify email first (anti-spam): a passkey proves device possession, not email
-        // ownership, so enrollment is gated behind email verification. With EMAIL_VERIFICATION
-        // on (the default), a brand-new email gets the 'sent-with-session' result below
-        // (→ "Check your email"); an existing email returns the enumeration-safe 'sent',
-        // indistinguishable from a new one. Only EMAIL_VERIFICATION=false routes straight to
-        // /setup/passkey via the 'redirect' branch.
+        // A passkey proves device possession, not email ownership. When verification is REQUIRED,
+        // a brand-new email gets the 'sent-with-session' result below (→ "Check your email") and an
+        // existing email returns the enumeration-safe 'sent', indistinguishable from a new one.
+        // EMAIL_VERIFICATION is OFF by default (opt-in) — when off, this routes straight to
+        // /setup/passkey via the 'redirect' branch, minting a FACTORLESS placeholder session that
+        // only becomes an authenticated login once the WebAuthn ceremony completes (mirrors the old
+        // auth-ui /passkey/set wizard: pre-ceremony session carries no verified factor).
         requireVerification: requireEmailVerification(),
         origin: trustedAppOrigin(request),
       });
