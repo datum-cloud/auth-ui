@@ -40,6 +40,23 @@ describe('accounts loader', () => {
       expect(body.requestId).to.equal(null);
     });
   });
+
+  it('reads ?organization= (regression: the loader never read it before)', () => {
+    callService({
+      fn: 'accountsLoader',
+      request: { url: `${BASE}?organization=org-1` },
+    }).then((v) => {
+      const body = v.response!.dataBody as Record<string, unknown>;
+      expect(body.organization).to.equal('org-1');
+    });
+  });
+
+  it('returns organization=undefined when absent (never fabricated)', () => {
+    callService({ fn: 'accountsLoader', request: { url: BASE } }).then((v) => {
+      const body = v.response!.dataBody as Record<string, unknown>;
+      expect(body.organization).to.equal(undefined);
+    });
+  });
 });
 
 describe('accounts action', () => {

@@ -53,6 +53,12 @@ export default function SsoError() {
   const { provider } = useParams();
   const [sp] = useSearchParams();
   const reason = sp.get('reason') ?? '';
+  // idpReturnUrls now carries requestId/organization on the failure URL (sso-callback and
+  // sso-action thread them into the redirect too), so a mid-OIDC/SAML IdP failure lands here
+  // WITH the ceremony context — thread it into "Back to sign in" so retrying resumes the same
+  // ceremony instead of dropping into a bare, unscoped /login.
+  const requestId = sp.get('requestId') ?? undefined;
+  const organization = sp.get('organization') ?? undefined;
   const message = REASONS[reason] ?? (
     <Trans>
       Something went wrong with <strong>{provider}</strong>.
@@ -67,7 +73,7 @@ export default function SsoError() {
         type="quaternary"
         className="mt-4"
         as={Link}
-        href={paths.login.index()}>
+        href={paths.login.index({ requestId, organization })}>
         <Trans>Back to sign in</Trans>
       </LinkButton>
     </AuthCard>

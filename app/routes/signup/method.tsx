@@ -4,6 +4,7 @@ import { AuthFormFields } from '@/components/auth-form/auth-form-fields';
 import { BackLink } from '@/components/back-link/back-link';
 import { useAuthActionError } from '@/hooks/use-auth-action-error';
 import { readSessions, serializeSessions } from '@/modules/auth/session/cookie';
+import { MaxMindTracker, syncMaxMindTokenToRef } from '@/modules/fraud/maxmind-tracker';
 import { genericCheckYourEmail } from '@/resources/schemas/check-your-email.schema';
 import { resolveOrg } from '@/resources/shared/resolve-org';
 import {
@@ -22,6 +23,7 @@ import { getOrCreateFingerprintId, userAgentFromRequest } from '@/server/user-ag
 import { actionError } from '@/utils/errors/auth-error';
 import { Button } from '@datum-cloud/datum-ui/button';
 import { Trans } from '@lingui/react/macro';
+import { useRef } from 'react';
 import {
   data,
   redirect,
@@ -73,6 +75,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
       organization,
       requestId,
       deviceTrackingToken,
+      // Mounts MaxMindTracker below so a user who lingers on this intermediate screen (rather
+      // than submitting straight through from /signup) still gets device.js's capture window —
+      // previously this screen had no tracker mounted at all (see maxmind-tracker.tsx).
+      maxmindAccountId: env.MAXMIND_ACCOUNT_ID ?? '',
       view,
     },
     { headers }
@@ -196,6 +202,13 @@ interface HiddenContextProps {
   organization?: string;
   requestId?: string;
   deviceTrackingToken?: string;
+  /**
+   * Ref'd so the owning form's submit button can write a freshly-read MaxMind token into it at
+   * click time (syncMaxMindTokenToRef) — see the per-intent Button `onClick` handlers below.
+   * Each of the three forms on this screen renders its OWN HiddenContext instance, so each gets
+   * its own ref; a single shared ref would only ever point at the last-mounted instance.
+   */
+  deviceTokenRef?: React.RefObject<HTMLInputElement | null>;
 }
 
 function HiddenContext({
@@ -206,6 +219,7 @@ function HiddenContext({
   organization,
   requestId,
   deviceTrackingToken,
+  deviceTokenRef,
 }: HiddenContextProps) {
   return (
     <>
@@ -217,9 +231,16 @@ function HiddenContext({
       />
       <input type="hidden" name="firstName" value={firstName} />
       <input type="hidden" name="lastName" value={lastName} />
-      {deviceTrackingToken ? (
-        <input type="hidden" name="deviceTrackingToken" value={deviceTrackingToken} />
-      ) : null}
+      {/* Always rendered (unlike the old conditional): the submit-time sync needs a DOM node to
+          write into even when no token arrived via the URL yet — an empty string round-trips
+          identically to "absent" everywhere downstream (all deviceTrackingToken consumers use a
+          truthy check), so this is not a behavior change for the no-token case. */}
+      <input
+        type="hidden"
+        name="deviceTrackingToken"
+        ref={deviceTokenRef}
+        defaultValue={deviceTrackingToken ?? ''}
+      />
     </>
   );
 }
@@ -235,12 +256,19 @@ export default function SignupMethod() {
     organization,
     requestId,
     deviceTrackingToken,
+    maxmindAccountId,
     view,
   } = useLoaderData<typeof loader>();
 
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
   const submitting = navigation.state !== 'idle';
+
+  // One ref per form — see the HiddenContextProps.deviceTokenRef doc comment above for why a
+  // single shared ref would break with three independent forms on this screen.
+  const emailLinkTokenRef = useRef<HTMLInputElement>(null);
+  const passkeyTokenRef = useRef<HTMLInputElement>(null);
+  const passwordTokenRef = useRef<HTMLInputElement>(null);
 
   // The action error surfaces INLINE through <AuthCeremony error> (this
   // replaces the per-route toast).
@@ -273,71 +301,80 @@ export default function SignupMethod() {
   };
 
   return (
-    <AuthCeremony
-      title={<Trans>Finish creating your account</Trans>}
-      description={
-        <Trans>
-          You're almost done! <span className="font-medium">{loginName}</span>
-        </Trans>
-      }
-      error={errorMessage}>
-      <div className="flex w-full flex-col gap-3">
-        {/* Email-link (passwordless) — always shown when email entry is allowed */}
-        {view.showEmailLink ? (
-          <RRForm method="post">
-            <HiddenContext {...contextProps} />
-            <input type="hidden" name="intent" value="email-link" />
-            <Button
-              size="large"
-              className="h-13"
-              type="quaternary"
-              theme="outline"
-              block
-              htmlType="submit"
-              loading={submitting && navigation.formData?.get('intent') === 'email-link'}>
-              <Trans>Email me a sign-in link</Trans>
-            </Button>
-          </RRForm>
-        ) : null}
+    <>
+      {/* Mounted here too (in addition to /signup and /signup/password) so a user who lingers
+          on this intermediate screen before choosing a method still gets device.js's capture
+          window — see the loader comment above. */}
+      <MaxMindTracker accountId={maxmindAccountId} />
+      <AuthCeremony
+        title={<Trans>Finish creating your account</Trans>}
+        description={
+          <Trans>
+            You're almost done! <span className="font-medium">{loginName}</span>
+          </Trans>
+        }
+        error={errorMessage}>
+        <div className="flex w-full flex-col gap-3">
+          {/* Email-link (passwordless) — always shown when email entry is allowed */}
+          {view.showEmailLink ? (
+            <RRForm method="post">
+              <HiddenContext {...contextProps} deviceTokenRef={emailLinkTokenRef} />
+              <input type="hidden" name="intent" value="email-link" />
+              <Button
+                size="large"
+                className="h-13"
+                type="quaternary"
+                theme="outline"
+                block
+                htmlType="submit"
+                loading={submitting && navigation.formData?.get('intent') === 'email-link'}
+                onClick={() => syncMaxMindTokenToRef(emailLinkTokenRef)}>
+                <Trans>Email me a sign-in link</Trans>
+              </Button>
+            </RRForm>
+          ) : null}
 
-        {/* Passkey */}
-        {view.showPasskey ? (
-          <RRForm method="post">
-            <HiddenContext {...contextProps} />
-            <input type="hidden" name="intent" value="passkey" />
-            <Button
-              size="large"
-              className="h-13"
-              type="quaternary"
-              theme="outline"
-              block
-              htmlType="submit"
-              loading={submitting && navigation.formData?.get('intent') === 'passkey'}>
-              <Trans>Use a passkey</Trans>
-            </Button>
-          </RRForm>
-        ) : null}
+          {/* Passkey */}
+          {view.showPasskey ? (
+            <RRForm method="post">
+              <HiddenContext {...contextProps} deviceTokenRef={passkeyTokenRef} />
+              <input type="hidden" name="intent" value="passkey" />
+              <Button
+                size="large"
+                className="h-13"
+                type="quaternary"
+                theme="outline"
+                block
+                htmlType="submit"
+                loading={submitting && navigation.formData?.get('intent') === 'passkey'}
+                onClick={() => syncMaxMindTokenToRef(passkeyTokenRef)}>
+                <Trans>Use a passkey</Trans>
+              </Button>
+            </RRForm>
+          ) : null}
 
-        {/* Password */}
-        {view.showPassword ? (
-          <RRForm method="post">
-            <HiddenContext {...contextProps} />
-            <input type="hidden" name="intent" value="password" />
-            <Button
-              size="large"
-              className="h-13"
-              type="quaternary"
-              theme="outline"
-              block
-              htmlType="submit"
-              loading={submitting && navigation.formData?.get('intent') === 'password'}>
-              <Trans>Set a password</Trans>
-            </Button>
-          </RRForm>
-        ) : null}
-      </div>
+          {/* Password */}
+          {view.showPassword ? (
+            <RRForm method="post">
+              <HiddenContext {...contextProps} deviceTokenRef={passwordTokenRef} />
+              <input type="hidden" name="intent" value="password" />
+              <Button
+                size="large"
+                className="h-13"
+                type="quaternary"
+                theme="outline"
+                block
+                htmlType="submit"
+                loading={submitting && navigation.formData?.get('intent') === 'password'}
+                onClick={() => syncMaxMindTokenToRef(passwordTokenRef)}>
+                <Trans>Set a password</Trans>
+              </Button>
+            </RRForm>
+          ) : null}
+        </div>
 
-      <BackLink />
-    </AuthCeremony>
+        <BackLink />
+      </AuthCeremony>
+    </>
   );
 }

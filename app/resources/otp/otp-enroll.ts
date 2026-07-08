@@ -25,7 +25,11 @@ import { type AuthProvider } from '@/modules/auth/auth-provider';
 import { readSessions, byLoginName } from '@/modules/auth/session/cookie';
 import { ProviderError } from '@/modules/auth/types';
 import { setupSkipSchema } from '@/resources/mfa/mfa.schema';
-import { nextStepWithParams, threadParams } from '@/resources/shared/next-step-params';
+import {
+  nextStepWithParams,
+  threadParams,
+  loginBounceTarget,
+} from '@/resources/shared/next-step-params';
 import { resolveOrg } from '@/resources/shared/resolve-org';
 import { providerForRequest } from '@/server/auth-context.server';
 import { getCsrfToken, assertCsrf } from '@/server/csrf';
@@ -78,9 +82,7 @@ export interface OtpEnrollLoaderData {
  *   const actionData = useActionData() as OtpEnrollActionData | undefined;
  */
 export type OtpEnrollActionData =
-  | { error: 'INVALID_INPUT' }
-  | { error: 'SESSION_EXPIRED' }
-  | { error: 'ENROLL_FAILED' };
+  { error: 'INVALID_INPUT' } | { error: 'SESSION_EXPIRED' } | { error: 'ENROLL_FAILED' };
 
 // ── Factory config ───────────────────────────────────────────────────────────
 
@@ -113,7 +115,9 @@ export function createOtpEnrollHandlers(cfg: OtpEnrollConfig) {
     // Guard: require an active session for this loginName.
     const sessions = await readSessions(request);
     const entry = byLoginName(sessions, loginName, organization);
-    if (!entry) return redirect('/login');
+    // Bounce to /login WITH the ceremony context (requestId/organization, parsed above) so a
+    // dead session mid-OIDC/SAML/device ceremony can still resume after re-login.
+    if (!entry) return redirect(loginBounceTarget(requestId, organization));
 
     const [csrfToken, setCookie] = await getCsrfToken(request);
     const headers: Record<string, string> = {};

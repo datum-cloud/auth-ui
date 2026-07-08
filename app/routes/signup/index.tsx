@@ -5,7 +5,11 @@ import { OrDivider } from '@/components/auth-form/or-divider';
 import { FormError } from '@/components/form-error/form-error';
 import { useAuthActionError } from '@/hooks/use-auth-action-error';
 import SplitLayout from '@/layouts/split.layout';
-import { MaxMindTracker, readMaxMindTrackingToken } from '@/modules/fraud/maxmind-tracker';
+import {
+  MaxMindTracker,
+  readMaxMindTrackingToken,
+  syncMaxMindTokenToRef,
+} from '@/modules/fraud/maxmind-tracker';
 import { startIdpIntent } from '@/resources/login';
 import { loginIdpSchema } from '@/resources/login/login.schema';
 import { resolveOrg } from '@/resources/shared/resolve-org';
@@ -159,9 +163,13 @@ export default function Signup() {
 
   const deviceTokenRef = useRef<HTMLInputElement>(null);
 
-  // Keep the hidden deviceTrackingToken input populated from the token the
-  // MaxMindTracker mirrors into sessionStorage. The token may land a moment after
-  // mount, so re-read on a short interval until it appears (or the field unmounts).
+  // FALLBACK ONLY: keep the hidden deviceTrackingToken input populated from the token the
+  // MaxMindTracker mirrors into sessionStorage, while the user is still filling the form (and
+  // as a backstop for any submission path that bypasses the button's onClick, e.g. an
+  // implicit Enter-key submit some browsers dispatch without a synthetic button click). The
+  // AUTHORITATIVE, race-safe write happens synchronously at submit time via
+  // syncMaxMindTokenToRef on the SubmitButton's onClick below — that's what closes the fast-
+  // signup race; this interval is best-effort and may still be empty at the moment of submit.
   useEffect(() => {
     if (!maxmindAccountId) return;
     const sync = () => {
@@ -277,7 +285,9 @@ export default function Signup() {
                       />
                     </Form.Field>
                     <FormError>{errorMessage}</FormError>
-                    <SubmitButton loading={identifierSubmitting}>
+                    <SubmitButton
+                      loading={identifierSubmitting}
+                      onClick={() => syncMaxMindTokenToRef(deviceTokenRef)}>
                       <Trans>Continue</Trans>
                     </SubmitButton>
                   </Form.Root>

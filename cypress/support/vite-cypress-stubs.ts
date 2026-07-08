@@ -59,6 +59,7 @@ export function stubServerModulesForCypress(root: string): Plugin {
       export function sessionEntryFromSession(session, opts) { return { id: session?.id, token: session?.token, loginName: opts?.loginName, organization: opts?.organization, requestId: opts?.requestId }; }
       export function capSessions(_entries) { return _entries ?? []; }
       export function listSessions(_entries) { return _entries ?? []; }
+      export function tsMs(value) { const n = Number(value); return Number.isNaN(n) ? Date.parse(value) : n; }
       export const sessionsCookie = {
         serialize: async (_entries) => 'sessions=stub; Path=/id; HttpOnly',
         parse: async (_value) => [],

@@ -5,6 +5,7 @@
 // import — it only shells out to Bun, which runs the real services with full tsconfig-path
 // resolution (see run-scenario.ts / harness.ts). The verdict is returned to the spec, which makes
 // every assertion browser-side with Chai.
+import { runCeremonyGuard } from '../ceremony-guard';
 import type Cypress from 'cypress';
 import { execFileSync } from 'node:child_process';
 import { dirname, resolve } from 'node:path';
@@ -77,6 +78,12 @@ export function registerNodeTasks(on: Cypress.PluginEvents): void {
   on('task', {
     callService(scenario: unknown) {
       return runScenarioViaBun(scenario);
+    },
+    // Regression guardrail: static-analysis scan for ceremony-param-dropping literal patterns
+    // across app/routes/** + the shared redirect-target helpers. Pure Node fs — no Bun subprocess
+    // needed (see cypress/support/ceremony-guard.ts).
+    ceremonyGuard() {
+      return runCeremonyGuard();
     },
   });
 }

@@ -47,8 +47,17 @@ export function idpReturnUrls(
   if (opts?.organization) query.set('organization', opts.organization);
   if (opts?.deviceTrackingToken) query.set('deviceTrackingToken', opts.deviceTrackingToken);
   const qs = query.toString();
+  // The failure URL MUST carry requestId/organization too — the IdP broker redirects here
+  // DIRECTLY on a failed round-trip, and sso/provider/error.tsx needs them to route "Back to
+  // sign in" back into the live ceremony instead of dropping it (regression: dead-end on IdP
+  // failure). Only requestId/organization are relevant here (link/deviceTrackingToken are
+  // success-path-only concerns).
+  const failureQuery = new URLSearchParams();
+  if (opts?.requestId) failureQuery.set('requestId', opts.requestId);
+  if (opts?.organization) failureQuery.set('organization', opts.organization);
+  const failureQs = failureQuery.toString();
   return {
     success: `${base}/callback${qs ? `?${qs}` : ''}`,
-    failure: `${base}/error`,
+    failure: `${base}/error${failureQs ? `?${failureQs}` : ''}`,
   };
 }

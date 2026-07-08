@@ -62,4 +62,38 @@ describe('signup/complete — expired/invalid link', () => {
       });
     });
   });
+
+  it('surfaces requestId/organization alongside EXPIRED so "Start over" can resume the ceremony (regression: dropped on link expiry)', () => {
+    callService({
+      fn: 'signupCompleteLoader',
+      provider: 'singleton',
+      request: {
+        url:
+          'http://localhost/id/signup/complete?code=bad-code&userId=nonexistent-user' +
+          '&requestId=oidc_V2_123&organization=org-1',
+      },
+    }).then((v) => {
+      const body = v.response?.dataBody as Record<string, unknown>;
+      expect(v.response?.dataStatus).to.equal(400);
+      expect(body.error).to.equal('EXPIRED');
+      expect(body.requestId).to.equal('oidc_V2_123');
+      expect(body.organization).to.equal('org-1');
+    });
+  });
+
+  it('the structurally-invalid guard (missing code/userId) also surfaces requestId/organization', () => {
+    callService({
+      fn: 'signupCompleteLoader',
+      provider: 'singleton',
+      request: {
+        url: 'http://localhost/id/signup/complete?requestId=oidc_V2_456&organization=org-2',
+      },
+    }).then((v) => {
+      const body = v.response?.dataBody as Record<string, unknown>;
+      expect(v.response?.dataStatus).to.equal(400);
+      expect(body.error).to.equal('EXPIRED');
+      expect(body.requestId).to.equal('oidc_V2_456');
+      expect(body.organization).to.equal('org-2');
+    });
+  });
 });

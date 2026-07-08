@@ -73,9 +73,7 @@ export interface WebAuthnVerifyLoaderData {
  *   const actionData = useActionData() as WebAuthnVerifyActionData | undefined;
  */
 export type WebAuthnVerifyActionData =
-  | { error: 'INVALID_INPUT' }
-  | { error: 'SESSION_EXPIRED' }
-  | { error: 'INVALID_CREDENTIALS' };
+  { error: 'INVALID_INPUT' } | { error: 'SESSION_EXPIRED' } | { error: 'INVALID_CREDENTIALS' };
 
 // ── Factory config ───────────────────────────────────────────────────────────
 
@@ -111,7 +109,7 @@ export function createWebAuthnVerifyHandlers(cfg: WebAuthnVerifyConfig) {
         userVerificationRequirement: cfg.userVerificationRequirement,
         challengeAuditEvent: cfg.challengeAuditEvent,
       },
-      { loginName, organization, domain: url.hostname }
+      { loginName, requestId, organization, domain: url.hostname }
     );
     if (result.kind === 'redirect') return redirect(result.target);
 

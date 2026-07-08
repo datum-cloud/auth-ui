@@ -65,3 +65,81 @@ describe('/authorize — stale-cookie self-heal (validate before reuse)', () => 
     });
   });
 });
+
+// Read-after-write retry (Zitadel eventual consistency): a session THIS request just created
+// (the post-register /authorize handback is the concrete case) can transiently 404 on getSession
+// if the read lands on a replica that hasn't caught up with the write yet. healIfSessionDead
+// retries exactly once — but ONLY when the cookie entry's creationTs is fresh — before treating
+// a dead code as ground truth. See authorize.service.ts's RETRY_FRESHNESS_WINDOW_MS block for
+// the full scoping rationale.
+describe('/authorize — read-after-write retry on a freshly-created session (NOT_FOUND)', () => {
+  const NOW_MS = Date.parse('2026-06-24T12:00:00.000Z');
+
+  it('FRESH session (creationTs within the retry window): NOT_FOUND once then alive on retry → finalizes the callback (no self-heal)', () => {
+    callService({
+      fn: 'resolveAuthorize',
+      provider: 'singleton',
+      // Consumed by the FIRST getSession call; the retry then falls through to this seeded
+      // live session, simulating "the write landed, the first read just raced a lagging replica".
+      liveSessions: [{ id: 'fresh-race-1', token: 'tok-fresh-race-1' }],
+      sessionResults: { 'fresh-race-1': { mode: 'throw-once', code: 'NOT_FOUND' } },
+      nowMs: NOW_MS,
+      request: {
+        url: `http://localhost/id/authorize?requestId=oidc_${RAW_ID}&sessionId=fresh-race-1`,
+        sessions: [
+          {
+            id: 'fresh-race-1',
+            token: 'tok-fresh-race-1',
+            loginName: 'alice@acme.test',
+            // 2s old — well inside the retry window (this is the "just redirected back from
+            // register" case).
+            creationTs: new Date(NOW_MS - 2000).toISOString(),
+          },
+        ],
+      },
+    }).then((v) => {
+      expect(v.response?.status).to.equal(302);
+      const loc = v.response?.location ?? '';
+      expect(loc).to.include('client.acme.test/callback');
+      expect(loc).to.include(`code=fake_${RAW_ID}_fresh-race-1`);
+      expect(loc).to.not.include('/login');
+      // No self-heal fired — the retry recovered the session, so it must NOT look like the
+      // stale-cookie case above.
+      expect(v.audit.some((e) => e.event === 'session_stale')).to.equal(false);
+    });
+  });
+
+  it('OLD session (creationTs outside the retry window): NOT_FOUND self-heals immediately — no retry, anti-forgery preserved', () => {
+    callService({
+      fn: 'resolveAuthorize',
+      provider: 'singleton',
+      // Deliberately seeded so the retry WOULD succeed if it fired — proves the freshness gate,
+      // not merely "the session doesn't exist", is what's blocking the retry here.
+      liveSessions: [{ id: 'old-race-1', token: 'tok-old-race-1' }],
+      sessionResults: { 'old-race-1': { mode: 'throw-once', code: 'NOT_FOUND' } },
+      nowMs: NOW_MS,
+      request: {
+        url: `http://localhost/id/authorize?requestId=oidc_${RAW_ID}&sessionId=old-race-1`,
+        sessions: [
+          {
+            id: 'old-race-1',
+            token: 'tok-old-race-1',
+            loginName: 'alice@acme.test',
+            // 60s old — well outside RETRY_FRESHNESS_WINDOW_MS (5s): an old/stale/forged entry.
+            creationTs: new Date(NOW_MS - 60_000).toISOString(),
+          },
+        ],
+      },
+    }).then((v) => {
+      expect(v.response?.status).to.equal(302);
+      const loc = v.response?.location ?? '';
+      expect(loc).to.include('/login');
+      expect(loc).to.not.include('client.acme.test/callback');
+      const stale = find(v.audit, (e) => e.event === 'session_stale');
+      expect(stale !== undefined, 'session_stale event (immediate self-heal, no retry)').to.equal(
+        true
+      );
+      expect(stale?.sessionId).to.equal('old-race-1');
+    });
+  });
+});

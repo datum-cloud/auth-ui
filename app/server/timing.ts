@@ -11,8 +11,11 @@
 // Floor chosen to dominate the dispatch-vs-noop delta without adding meaningful UX latency.
 export const CONSTANT_TIME_FLOOR_MS = 150;
 
-type Sleep = (ms: number) => Promise<void>;
-const realSleep: Sleep = (ms) => new Promise<void>((r) => setTimeout(r, ms));
+// Exported so other call-sites that need an injectable backoff (e.g. the authorize/signup
+// eventual-consistency retries) share one canonical "real" implementation instead of each
+// re-declaring `new Promise(setTimeout)`.
+export type Sleep = (ms: number) => Promise<void>;
+export const realSleep: Sleep = (ms) => new Promise<void>((r) => setTimeout(r, ms));
 
 export async function constantTimeNoop(sleep: Sleep = realSleep): Promise<void> {
   await sleep(CONSTANT_TIME_FLOOR_MS);

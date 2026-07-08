@@ -381,3 +381,43 @@ describe('registerWithPassword / registerPasskeyFirst — session metadata + aud
     });
   });
 });
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Read-after-write retry (Zitadel eventual consistency): runEnumerationSafeRegister
+// previously only caught ALREADY_EXISTS from register()/persistSession() — a transient
+// NOT_FOUND (the register-side mirror of the authorize-side healIfSessionDead race, e.g. a
+// replica lag on a follow-up lookup) rethrew uncaught, surfacing to the route as a raw 400
+// instead of completing registration. retryOnceIfNotFound retries the failed step exactly once
+// before letting it propagate — this must NOT weaken the ALREADY_EXISTS enumeration-safe path
+// (covered above; untouched by this change) and must NOT loop on a genuine not-found.
+// ─────────────────────────────────────────────────────────────────────────────
+
+describe('registerWithPassword — read-after-write retry on a transient NOT_FOUND', () => {
+  it('register() throws NOT_FOUND once then succeeds on retry → registration completes normally (RED before the fix: verdict.ok is false, the error propagates uncaught)', () => {
+    run({
+      fn: 'registerWithPassword',
+      request: { url: `${BASE_URL}/signup/password` },
+      provider: 'singleton',
+      // Harness hook (fake-provider.ts + harness.ts): fails the FIRST register() call only,
+      // then delegates to the real fake register() — simulating "the write raced a lagging
+      // read replica once, then resolved".
+      registerErrorOnce: 'NOT_FOUND',
+      signupInput: {
+        email: 'retry-once@test.com',
+        firstName: 'Retry',
+        lastName: 'Once',
+        password: 'hunter2hunter2',
+        requireVerification: true,
+        origin: ORIGIN,
+      },
+    }).then((verdict) => {
+      // Before the fix this assertion is the RED signal: the uncaught NOT_FOUND propagates out
+      // of registerWithPassword, the harness's try/catch sets ok:false, and verdict.error holds
+      // the raw provider message — never reaching the sent-with-session outcome below.
+      expect(verdict.ok, verdict.error ?? 'registration should not have thrown').to.be.true;
+      const r = verdict.outcome as Record<string, unknown>;
+      expect(r.kind).to.equal('sent-with-session');
+      expect(r.email).to.equal('retry-once@test.com');
+    });
+  });
+});

@@ -6,7 +6,11 @@ import { PasswordRequirements } from '@/components/auth-form/password-requiremen
 import { useAuthActionError } from '@/hooks/use-auth-action-error';
 import { TrackOnMount } from '@/modules/analytics/fathom';
 import { readSessions, serializeSessions } from '@/modules/auth/session/cookie';
-import { MaxMindTracker, readMaxMindTrackingToken } from '@/modules/fraud/maxmind-tracker';
+import {
+  MaxMindTracker,
+  readMaxMindTrackingToken,
+  syncMaxMindTokenToRef,
+} from '@/modules/fraud/maxmind-tracker';
 import { resolveOrg } from '@/resources/shared/resolve-org';
 import { registerWithPassword } from '@/resources/signup';
 import { signupPasswordSchemaFor } from '@/resources/signup/signup.schema';
@@ -140,6 +144,8 @@ export default function SignupPassword() {
   // The hidden input is seeded (defaultValue) with the token handed off in the URL so
   // it survives even with JS disabled. When MaxMindTracker mirrors a fresh token into
   // sessionStorage, prefer that — re-read on a short interval until it appears.
+  // FALLBACK ONLY: the AUTHORITATIVE, race-safe write happens synchronously at submit time
+  // via syncMaxMindTokenToRef on the SubmitButton's onClick below.
   useEffect(() => {
     if (!maxmindAccountId) return;
     const sync = () => {
@@ -227,7 +233,7 @@ export default function SignupPassword() {
           <Form.Field name="confirm" label={t`Confirm password`} required>
             <Form.Input type="password" autoComplete="new-password" />
           </Form.Field>
-          <SubmitButton>
+          <SubmitButton onClick={() => syncMaxMindTokenToRef(deviceTokenRef)}>
             <Trans>Create account</Trans>
           </SubmitButton>
         </Form.Root>

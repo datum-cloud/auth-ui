@@ -151,6 +151,9 @@ export type ServiceFn =
   // off a Request, so they are node-bound (the Fetch spec forbids a Cookie header in the browser).
   | 'otpVerifyLoader'
   | 'otpVerifyAction'
+  // createOtpEnrollHandlers loader — same node-bound reason (signed sessions cookie off a real
+  // Request). Covers the guard-fail /login bounce (otp-enroll.ts) threading requestId/organization.
+  | 'otpEnrollLoader'
   // Parse a raw env object through the REAL env.server Zod schema (SEC-5 ALLOW_IDP_UNLINK
   // coercion). env.server is stubbed out of the browser bundle, so this must run node-side.
   | 'parseEnv'
@@ -216,6 +219,10 @@ export type ServiceFn =
   | 'securityKeyAction'
   | 'loginVerifyEmailLoader'
   | 'loginMethodLoader'
+  // login/mfa.tsx action: covers the SESSION_EXPIRED path now returning inline data() (instead
+  // of a hard redirect(paths.login.index())) so useAuthActionRecovery's banner can thread
+  // requestId/organization.
+  | 'loginMfaAction'
   // ── routes/device + routes/signup handlers (batch 13c) ───────────────────────
   // Route loaders/actions are node-bound: they call providerForRequest (server-only composition),
   // read signed cookies off a real Request (Cookie header blocked in the browser), and need REAL
@@ -248,7 +255,12 @@ export type ServiceFn =
   | 'verifyIndexLoader'
   | 'verifyIndexAction';
 
-export type SessionResultScript = { mode: 'null' } | { mode: 'throw'; code: ProviderErrorCode };
+export type SessionResultScript =
+  | { mode: 'null' }
+  | { mode: 'throw'; code: ProviderErrorCode }
+  // Fails the FIRST getSession call for that id, then falls through to the real fake behavior —
+  // drives the healIfSessionDead read-after-write retry tests ("fail once, then succeed").
+  | { mode: 'throw-once'; code: ProviderErrorCode };
 export type CallbackResultScript = { mode: 'throw'; code: ProviderErrorCode };
 
 export interface Scenario {
@@ -306,6 +318,10 @@ export interface Scenario {
   addIdpLinkError?: ProviderErrorCode;
   /** register throws ProviderError(code) — auto-create registration-failure reason mapping. */
   registerError?: ProviderErrorCode;
+  /** register throws ProviderError(code) on the FIRST call only, then delegates to the real fake
+   *  register() — drives the runEnumerationSafeRegister read-after-write retry test ("register
+   *  throws transient NOT_FOUND once then succeeds"). */
+  registerErrorOnce?: ProviderErrorCode;
   /** Opts for signInWithIdpIntent (the LDAP/callback shared sign-in helper). */
   signInOpts?: ScenarioSignInOpts;
   /** runSsoAction DI startIdpIntent rejects with ProviderError(code) — handled (no 500). */
@@ -320,7 +336,12 @@ export interface Scenario {
    *  The session list itself comes from `request.sessions` (mapped to SessionEntry[]). */
   mfaInput?: { loginName: string; requestId?: string; organization?: string };
   /** Ctx for requestPasskeyAttestation / requestU2FAttestation (`domain` = FIDO2 relying party). */
-  attestationInput?: { loginName: string; organization?: string; domain: string };
+  attestationInput?: {
+    loginName: string;
+    requestId?: string;
+    organization?: string;
+    domain: string;
+  };
   /** Ctx for dispatchEmailChallenge. `origin` is a TRUSTED value passed in (never the Host header). */
   emailChallengeInput?: {
     origin: string;
@@ -346,6 +367,11 @@ export interface Scenario {
     suppressChallengeOnCode?: boolean;
     nextParamHandling?: 'passkey-redirect' | 'none';
     writeLastUsedLogin?: 'email' | false;
+    verifyPath: string;
+  };
+  /** Config for createOtpEnrollHandlers (otpEnrollLoader). `enroll`/`factor` aren't needed for
+   *  the loader-only guard-fail coverage this drives, so only `verifyPath` is required. */
+  otpEnrollConfig?: {
     verifyPath: string;
   };
 

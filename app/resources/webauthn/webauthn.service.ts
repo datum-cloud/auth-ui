@@ -22,6 +22,7 @@ import { ProviderError } from '@/modules/auth/types';
 import {
   nextStepFromSession as sharedNextStepFromSession,
   threadParams,
+  loginBounceTarget,
 } from '@/resources/shared/next-step-params';
 import { resolveOrg } from '@/resources/shared/resolve-org';
 import { logAuthEvent, hashActor } from '@/server/observability';
@@ -73,6 +74,7 @@ export interface WebAuthnChallengeConfig {
 
 export interface WebAuthnChallengeInput {
   loginName: string;
+  requestId?: string;
   organization?: string;
   /** Request hostname — the FIDO2 relying-party domain for the challenge. */
   domain: string;
@@ -110,10 +112,10 @@ export async function requestWebAuthnChallenge(
   provider: AuthProvider,
   sessions: SessionEntry[],
   cfg: WebAuthnChallengeConfig,
-  { loginName, organization, domain }: WebAuthnChallengeInput
+  { loginName, requestId, organization, domain }: WebAuthnChallengeInput
 ): Promise<WebAuthnChallengeResult> {
   const entry = byLoginName(sessions, loginName, organization);
-  if (!entry) return { kind: 'redirect', target: '/login' };
+  if (!entry) return { kind: 'redirect', target: loginBounceTarget(requestId, organization) };
 
   let publicKeyCredentialRequestOptions: unknown = null;
   try {
@@ -268,6 +270,7 @@ async function resolveEnrollee(
 
 export interface AttestationLoaderInput {
   loginName: string;
+  requestId?: string;
   organization?: string;
   /** Request hostname — the FIDO2 relying-party domain for the attestation challenge. */
   domain: string;
@@ -308,10 +311,10 @@ export type PasskeyAttestationResult = AttestationLoaderRedirect | PasskeyAttest
 export async function requestPasskeyAttestation(
   provider: AuthProvider,
   sessions: SessionEntry[],
-  { loginName, organization, domain }: AttestationLoaderInput
+  { loginName, requestId, organization, domain }: AttestationLoaderInput
 ): Promise<PasskeyAttestationResult> {
   const resolved = await resolveEnrollee(provider, sessions, loginName, organization);
-  if (!resolved) return { kind: 'redirect', target: '/login' };
+  if (!resolved) return { kind: 'redirect', target: loginBounceTarget(requestId, organization) };
 
   const { userId } = resolved;
 
@@ -366,10 +369,10 @@ export type U2FAttestationResult = AttestationLoaderRedirect | U2FAttestationDat
 export async function requestU2FAttestation(
   provider: AuthProvider,
   sessions: SessionEntry[],
-  { loginName, organization, domain }: AttestationLoaderInput
+  { loginName, requestId, organization, domain }: AttestationLoaderInput
 ): Promise<U2FAttestationResult> {
   const resolved = await resolveEnrollee(provider, sessions, loginName, organization);
-  if (!resolved) return { kind: 'redirect', target: '/login' };
+  if (!resolved) return { kind: 'redirect', target: loginBounceTarget(requestId, organization) };
 
   const { userId } = resolved;
 

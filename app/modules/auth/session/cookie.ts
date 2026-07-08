@@ -146,5 +146,5 @@ export function sessionEntryFromSession(
 }
 
 // Re-export helpers so route loaders/actions import from one place
-export { mostRecent, removeSession, addSession, listSessions, byId, byLoginName };
+export { mostRecent, removeSession, addSession, listSessions, byId, byLoginName, tsMs };
 export type { SessionEntry };

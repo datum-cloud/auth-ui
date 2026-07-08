@@ -30,4 +30,27 @@ describe('idpReturnUrls', () => {
       'http://localhost:3000/id/sso/google/callback?deviceTrackingToken=mm-token-abc'
     );
   });
+
+  it('carries requestId/organization on the FAILURE url too, so a failed IdP round-trip can still resume the ceremony (regression: dead-end on IdP failure)', () => {
+    const { failure } = idpReturnUrls('http://localhost:3000', 'google', {
+      requestId: 'oidc_V2_123',
+      organization: 'org-1',
+    });
+    expect(failure).to.equal(
+      'http://localhost:3000/id/sso/google/error?requestId=oidc_V2_123&organization=org-1'
+    );
+  });
+
+  it('omits the failure query entirely when no requestId/organization is present (no bare "?")', () => {
+    const { failure } = idpReturnUrls('http://localhost:3000', 'google');
+    expect(failure).to.equal('http://localhost:3000/id/sso/google/error');
+  });
+
+  it('failure url never carries link/deviceTrackingToken (success-path-only concerns)', () => {
+    const { failure } = idpReturnUrls('http://localhost:3000', 'google', {
+      link: true,
+      deviceTrackingToken: 'mm-token-abc',
+    });
+    expect(failure).to.equal('http://localhost:3000/id/sso/google/error');
+  });
 });

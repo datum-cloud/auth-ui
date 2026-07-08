@@ -41,8 +41,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const requestId = url.searchParams.get('requestId') ?? undefined;
 
   // Guard: both code and userId are required — without them the link is structurally invalid.
+  // Surface requestId/organization alongside the error so "Start over" can resume the SAME
+  // ceremony instead of dropping into an unscoped /signup.
   if (!code || !userId) {
-    return data({ error: 'EXPIRED' as const }, { status: 400 });
+    return data({ error: 'EXPIRED' as const, requestId, organization }, { status: 400 });
   }
 
   const provider = providerForRequest(request);
@@ -53,7 +55,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     // of the friendly 'EXPIRED' state a second click on an old link should show.
     const user = await provider.getUser(userId);
     if (!user) {
-      return data({ error: 'EXPIRED' as const }, { status: 400 });
+      return data({ error: 'EXPIRED' as const, requestId, organization }, { status: 400 });
     }
     const sessions = await readSessions(request);
     // Ensure a fingerprintId cookie exists for this browser. Email-link signup lands here
@@ -81,7 +83,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     // expired state so a second click never causes a 500. Unexpected (non-provider)
     // errors propagate to the ErrorBoundary rather than masquerading as "expired".
     if (err instanceof ProviderError) {
-      return data({ error: 'EXPIRED' as const }, { status: 400 });
+      return data({ error: 'EXPIRED' as const, requestId, organization }, { status: 400 });
     }
     throw err;
   }
@@ -94,6 +96,13 @@ export default function SignupComplete() {
   const hasError = 'error' in loaderData && loaderData.error === 'EXPIRED';
 
   if (hasError) {
+    // Carry the ceremony context threaded by the loader so "Start over" resumes the SAME
+    // OIDC/SAML/device ceremony instead of dropping into an unscoped /signup.
+    const { requestId, organization } = loaderData as {
+      error: 'EXPIRED';
+      requestId?: string;
+      organization?: string;
+    };
     return (
       <AuthCard
         title={<Trans>Link expired</Trans>}
@@ -101,7 +110,12 @@ export default function SignupComplete() {
         <div className="flex flex-col gap-4 text-center">
           {/* LinkButton (single styled <a>) — NOT Button asChild, which emits
               <button><a> (nested-interactive axe violation in the prod build). */}
-          <LinkButton theme="link" type="quaternary" block as={Link} href={paths.signup.index()}>
+          <LinkButton
+            theme="link"
+            type="quaternary"
+            block
+            as={Link}
+            href={paths.signup.index({ requestId, organization })}>
             <Trans>Start over</Trans>
           </LinkButton>
         </div>

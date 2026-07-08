@@ -157,6 +157,7 @@ export function createWebAuthnEnrollHandlers(cfg: WebAuthnEnrollConfig) {
 
     const result = await cfg.requestAttestation(provider, sessions, {
       loginName,
+      requestId,
       organization,
       domain: url.hostname,
     });

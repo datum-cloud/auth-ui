@@ -43,6 +43,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const url = new URL(request.url);
   const candidate = url.searchParams.get('requestId') ?? undefined;
   const requestId = isAllowedRequestId(candidate) ? candidate : null;
+  // Thread the CURRENT ceremony organization alongside requestId — the loader previously never
+  // read it, so a mid-ceremony org scope silently dropped off "Add an account" and the
+  // switch/remove forms (regression: an org-scoped ceremony resumes org-less after /accounts).
+  const organization = url.searchParams.get('organization') ?? undefined;
   // Device-grant "change account": the stable user_code carries the device context so a switch
   // returns to /device/authorize (consent) with the now-active account, and "add account" logs
   // in for that device grant.
@@ -54,7 +58,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
   const { csrfToken, headers } = await loaderCsrf(request);
 
-  return data({ csrfToken, accounts, requestId, userCode, reauthMismatch }, { headers });
+  return data(
+    { csrfToken, accounts, requestId, organization, userCode, reauthMismatch },
+    { headers }
+  );
 }
 
 // ─── Action ──────────────────────────────────────────────────────────────────
@@ -71,7 +78,7 @@ export async function action({ request }: ActionFunctionArgs) {
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function AccountPicker() {
-  const { csrfToken, accounts, requestId, userCode, reauthMismatch } =
+  const { csrfToken, accounts, requestId, organization, userCode, reauthMismatch } =
     useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
 
@@ -81,10 +88,12 @@ export default function AccountPicker() {
 
   // "Add another account" target. In the device-grant "change account" sub-flow (userCode set)
   // log in for that device grant (device_<userCode>) so the fresh account auto-authorizes the
-  // device; otherwise carry the current ceremony requestId (or nothing for a standalone add).
+  // device; otherwise carry the current ceremony requestId/organization (or nothing for a
+  // standalone add). paths.login.index skips undefined values, so passing organization
+  // unconditionally is safe even when it's absent.
   const addAccountHref = userCode
-    ? paths.login.index({ requestId: `device_${userCode}` })
-    : paths.login.index(requestId ? { requestId } : undefined);
+    ? paths.login.index({ requestId: `device_${userCode}`, organization })
+    : paths.login.index({ requestId: requestId ?? undefined, organization });
 
   return (
     <AuthCard
@@ -131,7 +140,11 @@ export default function AccountPicker() {
                       mid-OIDC/SAML/device switch resolves back into the protocol callback
                       instead of a terminal /signed-in page. requestId is null when no ceremony
                       is active → coerced to undefined so the hidden input is omitted. */}
-                  <AuthFormFields csrf={csrfToken} requestId={requestId ?? undefined} />
+                  <AuthFormFields
+                    csrf={csrfToken}
+                    requestId={requestId ?? undefined}
+                    organization={organization}
+                  />
                   <input type="hidden" name="intent" value="switch" />
                   <input type="hidden" name="sessionId" value={account.sessionId} />
                   {/* Device "change account": return to /device/authorize consent after switch. */}
@@ -171,7 +184,11 @@ export default function AccountPicker() {
                 {/* Remove form — sibling, NOT nested in the switch button. */}
                 <RRForm method="POST" className="flex shrink-0 items-center pr-2">
                   {/* Preserve the ceremony id on the post-remove redirect back to /accounts. */}
-                  <AuthFormFields csrf={csrfToken} requestId={requestId ?? undefined} />
+                  <AuthFormFields
+                    csrf={csrfToken}
+                    requestId={requestId ?? undefined}
+                    organization={organization}
+                  />
                   <input type="hidden" name="intent" value="remove" />
                   <input type="hidden" name="sessionId" value={account.sessionId} />
                   {/* Device "change account": keep the device context after a mid-flow remove. */}

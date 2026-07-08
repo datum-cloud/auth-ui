@@ -25,6 +25,7 @@ import {
   signupCompleteUrlTemplate,
 } from '@/resources/verify/verify-url-template';
 import { logAuthEvent, hashActor } from '@/server/observability';
+import { realSleep, type Sleep } from '@/server/timing';
 
 /**
  * Zitadel session-metadata key for the MaxMind device-tracking token. This string is a
@@ -200,6 +201,39 @@ export type PasskeyFirstRegisterResult =
 
 type RegisteredUser = Awaited<ReturnType<AuthProvider['register']>>;
 
+// Short pause before the single retry below — long enough to give Zitadel's read replicas a
+// beat to catch up, short enough not to meaningfully delay registration for the rare case it
+// actually fires.
+const REGISTER_RETRY_BACKOFF_MS = 300;
+
+/**
+ * Zitadel is eventually consistent: a step here (register(), or the createSession lookup inside
+ * persistSession) can transiently return NOT_FOUND if it races a read replica that hasn't caught
+ * up with a preceding write yet — the mirror image of the authorize-side read-after-write race
+ * (see authorize.service.ts's healIfSessionDead retry). Retry the FAILED STEP exactly once, after
+ * a short backoff, before letting the error propagate to the ALREADY_EXISTS enumeration-safe
+ * catch in runEnumerationSafeRegister below.
+ *
+ * Deliberately narrow: only NOT_FOUND is retried, only once (a genuine not-found — e.g. the user
+ * really doesn't exist — fails again immediately on the retry and propagates exactly as before,
+ * never looping). ALREADY_EXISTS and every other code are rethrown untouched on the FIRST
+ * attempt, preserving the existing enumeration-safe handling exactly.
+ */
+async function retryOnceIfNotFound<T>(
+  step: () => Promise<T>,
+  sleep: Sleep = realSleep
+): Promise<T> {
+  try {
+    return await step();
+  } catch (error) {
+    if (error instanceof ProviderError && error.code === 'NOT_FOUND') {
+      await sleep(REGISTER_RETRY_BACKOFF_MS);
+      return step(); // single retry — if this also throws, it propagates to the caller as-is
+    }
+    throw error;
+  }
+}
+
 /**
  * Shared enumeration-safe register flow for the passkey-first and with-password
  * paths. Both share: the createSession → addSession wiring, the require-verification
@@ -246,8 +280,11 @@ async function runEnumerationSafeRegister(
 
   if (cfg.requireVerification) {
     try {
-      const user = await cfg.register();
-      const sessions = await persistSession(user);
+      // retryOnceIfNotFound wraps EACH step independently (not the try block as a whole) so a
+      // transient NOT_FOUND on register() doesn't also silently retry a persistSession() that
+      // never ran, and vice versa.
+      const user = await retryOnceIfNotFound(() => cfg.register());
+      const sessions = await retryOnceIfNotFound(() => persistSession(user));
       logAuthEvent('signup.requested', 'success', { actor: hashActor(email), organization });
       return { kind: 'sent-with-session', email, sessions };
     } catch (error) {
@@ -263,8 +300,8 @@ async function runEnumerationSafeRegister(
 
   // Verification not required: register and route forward.
   try {
-    const user = await cfg.register();
-    const sessions = await persistSession(user);
+    const user = await retryOnceIfNotFound(() => cfg.register());
+    const sessions = await retryOnceIfNotFound(() => persistSession(user));
     // Audit shape DIVERGES per path — parameterized, never collapsed to one event.
     cfg.noVerifySuccessAudit(user);
     const target = postRegisterStep({

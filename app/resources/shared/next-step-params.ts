@@ -36,12 +36,40 @@ export function authorizeHandbackTarget(requestId: string | undefined, sessionId
 }
 
 /**
+ * Login-bounce target for a resource-layer guard failure (dead/missing session): `/login`,
+ * carrying requestId/organization when a requestId is present. Resources must not import
+ * @/routes/paths (see otp-verify.ts), so this is the resource-layer twin of
+ * routes/login-bounce.ts's `redirectToLogin` — same verbatim
+ * `requestId ? { requestId, organization } : undefined` gate (organization only rides
+ * alongside an active requestId, never leaking into a bare /login bounce).
+ */
+export function loginBounceTarget(requestId?: string, organization?: string): string {
+  if (!requestId) return '/login';
+  const params = new URLSearchParams({ requestId });
+  if (organization) params.set('organization', organization);
+  return `/login?${params.toString()}`;
+}
+
+/**
  * The branded SSO error redirect location: /sso/<slug>/error?reason=<reason>. Both
  * segments are URL-encoded. Callers pass the already-mapped reason (e.g. via
  * providerErrorCode); the special-case idp.link ALREADY_EXISTS block stays bespoke.
+ *
+ * requestId/organization are OPTIONAL — threaded onto the redirect (unencoded values,
+ * URL-encoded via URLSearchParams) so sso/provider/error.tsx's "Back to sign in" link can
+ * resume the live OIDC/SAML ceremony instead of dropping it. Omitted entirely when absent
+ * (no bare `&` / empty params).
  */
-export function ssoErrorRedirect(slug: string, reason: string): string {
-  return `/sso/${encodeURIComponent(slug)}/error?reason=${encodeURIComponent(reason)}`;
+export function ssoErrorRedirect(
+  slug: string,
+  reason: string,
+  requestId?: string,
+  organization?: string
+): string {
+  const params = new URLSearchParams({ reason });
+  if (requestId) params.set('requestId', requestId);
+  if (organization) params.set('organization', organization);
+  return `/sso/${encodeURIComponent(slug)}/error?${params.toString()}`;
 }
 
 /**

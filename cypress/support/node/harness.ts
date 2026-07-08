@@ -54,6 +54,7 @@ import {
   dispatchEmailChallenge,
   submitOtpCode,
   createOtpVerifyHandlers,
+  createOtpEnrollHandlers,
   type OtpSessionEntry,
 } from '@/resources/otp';
 import {
@@ -106,6 +107,7 @@ import { loader as deviceIndexLoader } from '@/routes/device/index';
 // ── routes/login handlers (batch 13b) ─────────────────────────────────────────────────────────
 import { loader as loginLoader, action as loginAction } from '@/routes/login/index';
 import { loader as loginMethodLoader } from '@/routes/login/method';
+import { action as loginMfaAction } from '@/routes/login/mfa';
 import { action as loginPasswordAction } from '@/routes/login/password';
 import { action as securityKeyAction } from '@/routes/login/security-key';
 import { loader as loginVerifyEmailLoader } from '@/routes/login/verify/email';
@@ -336,6 +338,22 @@ function buildProvider(s: Scenario): FakeAuthProvider {
     const code = s.registerError as ConstructorParameters<typeof ProviderError>[0];
     provider.register = (async () => {
       throw new ProviderError(code, `scripted register ${String(code)}`);
+    }) as FakeAuthProvider['register'];
+  }
+  if (s.registerErrorOnce) {
+    // Fails the FIRST register() call, then delegates to the REAL fake register() — drives the
+    // runEnumerationSafeRegister retry-once test ("register throws transient NOT_FOUND once
+    // then succeeds"). Bound before overriding so the real implementation is still reachable
+    // through the closure once the script is consumed.
+    const code = s.registerErrorOnce as ConstructorParameters<typeof ProviderError>[0];
+    const realRegister = provider.register.bind(provider);
+    let thrown = false;
+    provider.register = (async (input: Parameters<FakeAuthProvider['register']>[0]) => {
+      if (!thrown) {
+        thrown = true;
+        throw new ProviderError(code, `scripted register ${String(code)} (once)`);
+      }
+      return realRegister(input);
     }) as FakeAuthProvider['register'];
   }
 
@@ -731,6 +749,22 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
         const { action } = createOtpVerifyHandlers(s.otpVerifyConfig);
         const { request: req } = await buildHandlerRequest(sr);
         const res = await action({ request: req } as never);
+        outcome = res;
+        response = await serializeResponse(res);
+        break;
+      }
+      case 'otpEnrollLoader': {
+        if (!s.otpEnrollConfig) throw new Error('otpEnrollLoader requires otpEnrollConfig');
+        // enroll/factor are unused by the LOADER (only the action's checkAfter branch reads
+        // cfg.verifyPath, and enroll/factor drive the action's enroll step) — this task only
+        // exercises the loader's guard-fail /login bounce, so a no-op stub is enough.
+        const { loader } = createOtpEnrollHandlers({
+          enroll: async () => {},
+          factor: 'otp_email',
+          verifyPath: s.otpEnrollConfig.verifyPath,
+        });
+        const { request: req } = await buildHandlerRequest(sr);
+        const res = await loader({ request: req } as never);
         outcome = res;
         response = await serializeResponse(res);
         break;
@@ -2432,6 +2466,19 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
           s.request ?? { url: 'http://localhost/id/accounts', csrf: true }
         );
         const result = await accountsAction({
+          request,
+          params: {},
+          context: {} as never,
+        } as never);
+        response = await serializeResponse(result);
+        break;
+      }
+
+      case 'loginMfaAction': {
+        const { request } = await buildHandlerRequest(
+          s.request ?? { url: 'http://localhost/id/login/mfa', csrf: true }
+        );
+        const result = await loginMfaAction({
           request,
           params: {},
           context: {} as never,

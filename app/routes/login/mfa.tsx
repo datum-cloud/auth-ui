@@ -5,7 +5,6 @@ import { useLoginContext } from '@/hooks/use-login-context';
 import { readSessions } from '@/modules/auth/session/cookie';
 import { resolveMfaPicker, chooseMfaMethod, type SecondFactorMethod } from '@/resources/mfa';
 import { readCeremonyParams } from '@/resources/shared/ceremony-params';
-import { paths } from '@/routes/paths';
 import { providerForRequest } from '@/server/auth-context.server';
 import { loaderCsrf, assertCsrf } from '@/server/csrf';
 import { assetUrl } from '@/utils/asset-url';
@@ -99,7 +98,11 @@ export async function action({ request }: ActionFunctionArgs) {
   });
 
   if (result.ok) return redirect(result.target);
-  if (result.error === 'SESSION_EXPIRED') return redirect(paths.login.index());
+  // SESSION_EXPIRED used to hard-redirect(paths.login.index()) here, dropping requestId/
+  // organization and dead-ending a mid-ceremony session expiry. Return it as action data
+  // instead — useAuthActionRecovery (wired below) already resolves SESSION_EXPIRED to an
+  // inline "Sign in again" banner whose recovery link threads requestId/organization (mirrors
+  // login/password.tsx's inline SESSION_EXPIRED recovery pattern).
   return data({ error: result.error }, { status: 400 });
 }
 

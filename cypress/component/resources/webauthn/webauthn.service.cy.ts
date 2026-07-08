@@ -110,6 +110,39 @@ describe('requestPasskeyAttestation / requestU2FAttestation — challenge audit 
       expect(o.kind).to.equal('redirect');
       expect(o.target).to.equal('/login');
     });
+
+    // Regression: the guard-fail redirect must thread requestId/organization when present —
+    // a dead session mid-OIDC/SAML/device ceremony must be able to resume after re-login.
+    callService({
+      fn: 'requestPasskeyAttestation',
+      provider: 'singleton',
+      request: { url: 'http://localhost/id/setup/passkey' }, // no sessions
+      attestationInput: {
+        loginName: 'ghost@nowhere.test',
+        domain: 'localhost',
+        requestId: 'oidc_V2_123',
+        organization: 'org-1',
+      },
+    }).then((v) => {
+      const o = v.outcome as { kind: string; target?: string };
+      expect(o.kind).to.equal('redirect');
+      expect(o.target).to.equal('/login?requestId=oidc_V2_123&organization=org-1');
+    });
+
+    callService({
+      fn: 'requestU2FAttestation',
+      provider: 'singleton',
+      request: { url: 'http://localhost/id/setup/security-key' }, // no sessions
+      attestationInput: {
+        loginName: 'ghost@nowhere.test',
+        domain: 'localhost',
+        requestId: 'oidc_V2_456',
+      },
+    }).then((v) => {
+      const o = v.outcome as { kind: string; target?: string };
+      expect(o.kind).to.equal('redirect');
+      expect(o.target).to.equal('/login?requestId=oidc_V2_456');
+    });
   });
 });
 

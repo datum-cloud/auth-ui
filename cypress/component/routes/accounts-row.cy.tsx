@@ -70,4 +70,28 @@ describe('accounts row — switch form structure', () => {
     mountAccounts({ csrfToken: 't', accounts: [account({ idpName: 'Google' })] });
     cy.contains('Google').should('exist');
   });
+
+  it('threads organization (alongside requestId) through the switch/remove hidden inputs and "Add another account" (regression: organization silently dropped)', () => {
+    mountAccounts({
+      csrfToken: 'csrf-tok',
+      accounts: [account()],
+      requestId: 'oidc_V2_123',
+      organization: 'org-1',
+      userCode: null,
+      reauthMismatch: false,
+    });
+    cy.get('form:has(input[name="intent"][value="switch"])').within(() => {
+      cy.get('input[name="requestId"]').should('have.value', 'oidc_V2_123');
+      cy.get('input[name="organization"]').should('have.value', 'org-1');
+    });
+    cy.get('form:has(input[name="intent"][value="remove"])').within(() => {
+      cy.get('input[name="requestId"]').should('have.value', 'oidc_V2_123');
+      cy.get('input[name="organization"]').should('have.value', 'org-1');
+    });
+    cy.contains('a', 'Add another account').should(
+      'have.attr',
+      'href',
+      '/login?requestId=oidc_V2_123&organization=org-1'
+    );
+  });
 });

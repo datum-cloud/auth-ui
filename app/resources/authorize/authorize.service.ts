@@ -18,6 +18,7 @@ import {
   byId,
   removeSession,
   serializeSessions,
+  tsMs,
   type SessionEntry,
 } from '@/modules/auth/session/cookie';
 import { ProviderError, type Session } from '@/modules/auth/types';
@@ -28,6 +29,7 @@ import {
 import { primaryFresh } from '@/resources/shared/lifetimes';
 import { resolveOrg } from '@/resources/shared/resolve-org';
 import { logAuthEvent } from '@/server/observability';
+import { realSleep, type Sleep } from '@/server/timing';
 import { type AuthErrorCode, providerErrorCode } from '@/utils/errors/auth-error';
 import { redirect } from 'react-router';
 
@@ -45,6 +47,58 @@ const DEAD_SESSION_CODES: ReadonlySet<ProviderError['code']> = new Set([
   'NOT_FOUND',
   'PERMISSION_DENIED',
 ]);
+
+// ── read-after-write retry (Zitadel eventual consistency) ───────────────────────
+//
+// A session THIS request just created (e.g. the post-register /authorize handback, which
+// redirects straight back here with the brand-new session id) can transiently 404 on
+// getSession if the read lands on a replica that hasn't caught up with the write yet. Without
+// this, healIfSessionDead below would self-heal a perfectly good, just-minted session straight
+// to /login on nothing but replication lag.
+//
+// SCOPE — this retry is intentionally narrow and must stay that way:
+//   • It only ever fires for a DEAD_SESSION_CODES code (NOT_FOUND/PERMISSION_DENIED) — never
+//     for transient/unknown codes, which already skip self-heal entirely (see healIfSessionDead).
+//   • It only fires when the cookie entry is FRESH (creationTs within RETRY_FRESHNESS_WINDOW_MS
+//     of `nowMs`). creationTs is signed into the cookie by US at session-creation time — it is
+//     NOT attacker-controlled, so an old/stale/forged entry can never masquerade as fresh to buy
+//     itself a retry. This preserves the existing anti-forgery guarantee: a stale post-logout
+//     cookie (or a genuinely forged sessionId) still self-heals to /login on the FIRST dead
+//     response, with zero added latency or leniency.
+//   • It retries AT MOST ONCE. If the retry still comes back dead (or errors again), the
+//     function falls through to the exact same self-heal path as if there had been no retry.
+const RETRY_FRESHNESS_WINDOW_MS = 5000; // 5s — covers redirect latency + replica lag, nothing more
+const RETRY_BACKOFF_MS = 350; // short pause before the single retry attempt
+
+/** True when `entry` was created within RETRY_FRESHNESS_WINDOW_MS of `nowMs`. A malformed or
+ *  missing creationTs (tsMs → NaN) is treated as NOT fresh — the safe default is the original,
+ *  no-retry, immediate-self-heal behavior. */
+function isFreshEntry(entry: SessionEntry, nowMs: number): boolean {
+  const createdMs = tsMs(entry.creationTs);
+  return Number.isFinite(createdMs) && nowMs - createdMs <= RETRY_FRESHNESS_WINDOW_MS;
+}
+
+/** One classified getSession attempt: alive session, confirmed-null, a DEAD_SESSION_CODES
+ *  error, or any other (transient/unknown) error. Kept as an explicit discriminated result
+ *  (rather than reusing shared mutable locals) so each branch below reads unambiguously —
+ *  this is the anti-forgery self-heal path, worth the extra verbosity. */
+type SessionProbe =
+  | { kind: 'alive'; session: Session }
+  | { kind: 'confirmed-dead' }
+  | { kind: 'dead-code'; code: ProviderError['code'] }
+  | { kind: 'transient'; code: ProviderError['code'] | undefined };
+
+async function probeSession(provider: AuthProvider, entry: SessionEntry): Promise<SessionProbe> {
+  try {
+    const session = await provider.getSession(entry.id, entry.token);
+    return session ? { kind: 'alive', session } : { kind: 'confirmed-dead' };
+  } catch (err) {
+    const code = err instanceof ProviderError ? err.code : undefined;
+    return code && DEAD_SESSION_CODES.has(code)
+      ? { kind: 'dead-code', code }
+      : { kind: 'transient', code };
+  }
+}
 
 // createCallback codes that mean THIS session can no longer finalize THIS auth request, even
 // though getSession reported it alive — a stale OIDC grant after RP-initiated logout (cloud-portal
@@ -177,10 +231,17 @@ function errorRedirect(url: URL, code: AuthErrorCode): Response {
  *     no-session bootstrap), emitting a DISTINCT `session_stale` event so the heal is traceable
  *     and never mistaken for a genuine error. (The post-logout stale-cookie case.)
  *
+ *     EXCEPT: a DEAD_SESSION_CODES code on a FRESH entry (isFreshEntry — see the retry block
+ *     above) gets ONE retry, after a short backoff, before this self-heal fires — see the
+ *     RETRY_FRESHNESS_WINDOW_MS comment for the full scoping rationale (Zitadel read-after-write
+ *     lag on a session THIS request just created). An old/stale/forged entry skips the retry
+ *     entirely and self-heals immediately, exactly as before.
+ *
  *   • TRANSIENT / UNKNOWN — any OTHER ProviderError code (UNAVAILABLE, DEADLINE_EXCEEDED, …):
  *     do NOT log the user out. Surface the loader's existing friendly error page and log an
  *     `oidc_callback` failure WITH the code so the transient is diagnosable. A Zitadel hiccup
- *     must never silently re-login a valid user, and must never be swallowed.
+ *     must never silently re-login a valid user, and must never be swallowed. Transient codes are
+ *     NEVER retried here — only a DEAD_SESSION_CODES code on a fresh entry is.
  *
  *   • ALIVE — return the live `Session` so the caller can inspect its factors (the prompt=login
  *     freshness gate needs `factors.*.verifiedAt`) before reusing it in createCallback.
@@ -193,28 +254,37 @@ async function healIfSessionDead(
   list: SessionEntry[],
   entry: SessionEntry,
   requestId: string,
-  rawId: string
+  rawId: string,
+  nowMs: number,
+  sleep: Sleep = realSleep
 ): Promise<AuthorizeOutcome | { session: Session }> {
-  let alive: Awaited<ReturnType<AuthProvider['getSession']>>;
-  try {
-    alive = await provider.getSession(entry.id, entry.token);
-  } catch (err) {
-    const code = err instanceof ProviderError ? err.code : undefined;
-    // Distinguish dead vs transient by error code — this precision is the whole point.
-    if (code && DEAD_SESSION_CODES.has(code)) {
-      return healStaleEntry(list, entry, requestId, rawId);
-    }
-    // Transient/unknown: surface the friendly error path; NEVER self-heal, NEVER swallow.
-    logAuthEvent('oidc_callback', 'failure', {
-      requestId: rawId,
-      sessionId: entry.id,
-      code: code ?? 'UNKNOWN',
-      stage: 'liveness_check',
-    });
-    return { kind: 'error-redirect', code: providerErrorCode(code) };
+  let probe = await probeSession(provider, entry);
+
+  // RETRY-ON-FRESH: see the RETRY_FRESHNESS_WINDOW_MS block above for the full scoping
+  // rationale. Bounded to exactly one retry, and ONLY for a dead-code result on a genuinely
+  // fresh cookie entry — every other case (already alive, confirmed-null, transient error, or a
+  // dead code on an old/stale/forged entry) falls straight through to the original behavior.
+  if (probe.kind === 'dead-code' && isFreshEntry(entry, nowMs)) {
+    await sleep(RETRY_BACKOFF_MS);
+    probe = await probeSession(provider, entry);
   }
-  if (!alive) return healStaleEntry(list, entry, requestId, rawId); // confirmed dead
-  return { session: alive }; // alive → caller proceeds to the freshness gate / createCallback
+
+  switch (probe.kind) {
+    case 'alive':
+      return { session: probe.session }; // caller proceeds to the freshness gate / createCallback
+    case 'confirmed-dead':
+    case 'dead-code':
+      return healStaleEntry(list, entry, requestId, rawId);
+    case 'transient':
+      // Transient/unknown: surface the friendly error path; NEVER self-heal, NEVER swallow.
+      logAuthEvent('oidc_callback', 'failure', {
+        requestId: rawId,
+        sessionId: entry.id,
+        code: probe.code ?? 'UNKNOWN',
+        stage: 'liveness_check',
+      });
+      return { kind: 'error-redirect', code: providerErrorCode(probe.code) };
+  }
 }
 
 /** Drop the stale entry, re-prompt /login, and emit a traceable session_stale event. */
@@ -353,7 +423,7 @@ async function resolveOidc(
     if (entry) {
       // Validate liveness BEFORE reuse: a stale post-logout cookie self-heals to /login here
       // instead of reaching createCallback on a terminated session (→ ALREADY_DONE → /error).
-      const gate = await healIfSessionDead(provider, list, entry, requestId, rawId);
+      const gate = await healIfSessionDead(provider, list, entry, requestId, rawId, nowMs);
       if ('kind' in gate) return gate; // dead/transient → outcome already decided
 
       // ANTI-FORGERY FRESHNESS GATE (prompt=login only). The sessionId is query-supplied, so a
@@ -390,7 +460,7 @@ async function resolveOidc(
     // Validate liveness BEFORE reuse (same self-heal as the explicit-sessionId path above). No
     // freshness gate here: for prompt=login decideAuthorize returns target '/login', never
     // 'callback', so this branch is unreachable under prompt=login (only none/default reuse).
-    const healed = await healIfSessionDead(provider, list, entry, requestId, rawId);
+    const healed = await healIfSessionDead(provider, list, entry, requestId, rawId, nowMs);
     if ('kind' in healed) return healed;
     return runCallback(provider, rawId, entry, list, requestId);
   }

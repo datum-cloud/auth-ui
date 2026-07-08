@@ -37,7 +37,7 @@ import {
   type OtpVerifyChannel,
   type SubmitOtpError,
 } from '@/resources/otp/otp.service';
-import { threadParams } from '@/resources/shared/next-step-params';
+import { threadParams, loginBounceTarget } from '@/resources/shared/next-step-params';
 import { providerForRequest } from '@/server/auth-context.server';
 import { assertCsrf, loaderCsrf } from '@/server/csrf';
 import { trustedAppOrigin } from '@/server/infra/app-origin.server';
@@ -107,7 +107,11 @@ export function createOtpVerifyHandlers(cfg: OtpVerifyConfig) {
     // Guard: require an active session for this loginName.
     const sessions = await readSessions(request);
     const entry = byLoginName(sessions, loginName, organization);
-    if (!entry) return redirect('/login');
+    // Bounce to /login WITH the ceremony context (requestId/organization, parsed above) so a
+    // dead session mid-OIDC/SAML/device ceremony can still resume after re-login — resources
+    // must not import @/routes/paths, so this mirrors routes/login-bounce.ts's redirectToLogin
+    // logic locally rather than importing it.
+    if (!entry) return redirect(loginBounceTarget(requestId, organization));
 
     // Send the challenge on first arrival. Suppress the duplicate send on the email link
     // path (code present) so a re-send doesn't rotate/invalidate the in-hand code.

@@ -24,6 +24,19 @@ describe('password/reset loader — guard when delivery is off', () => {
       expect(v.response!.location).to.equal('/login');
     });
   });
+
+  it('threads requestId/organization onto the /login redirect (regression: previously a bare /login mid-ceremony)', () => {
+    callService({
+      fn: 'passwordResetLoader',
+      env: ENV_OFF,
+      request: { url: `${BASE}?requestId=oidc_V2_123&organization=org-1` },
+    }).then((v) => {
+      expect(v.error).to.be.undefined;
+      expect(v.response!.isResponse).to.be.true;
+      expect(v.response!.status).to.equal(302);
+      expect(v.response!.location).to.equal('/login?requestId=oidc_V2_123&organization=org-1');
+    });
+  });
 });
 
 describe('password/reset action — guard when delivery is off', () => {

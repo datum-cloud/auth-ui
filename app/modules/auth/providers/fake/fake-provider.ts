@@ -31,7 +31,16 @@ import { ProviderError } from '@/modules/auth/types';
 // interface). Lets a unit test force a specific outcome per session id without reaching the
 // provider boundary — used by authorize.logout.test.ts to drive the validate-before-reuse
 // dead/transient/live cases through the real loader. Default (no override) = real fake behaviour.
-type FakeOutcomeScript = { mode: 'null' } | { mode: 'throw'; code: ProviderErrorCode };
+//
+// 'throw-once' additionally drives the read-after-write retry tests (healIfSessionDead): the
+// FIRST getSession call for that id throws the scripted code, then the script is CONSUMED (the
+// entry is deleted) so every subsequent call falls through to the real in-memory session lookup
+// — i.e. "fail once, then behave normally," which is exactly what a transient replica-lag 404
+// followed by a successful retry looks like.
+type FakeOutcomeScript =
+  | { mode: 'null' }
+  | { mode: 'throw'; code: ProviderErrorCode }
+  | { mode: 'throw-once'; code: ProviderErrorCode };
 
 export const FIXED_NOW = '2026-01-01T00:00:00.000Z'; // deterministic for tests (no Date.now())
 // Factor verifiedAt is `Date | null`. A frozen Date keeps the fake deterministic.
@@ -368,6 +377,12 @@ export class FakeAuthProvider implements AuthProvider {
     const scripted = this.sessionResults.get(id);
     if (scripted) {
       if (scripted.mode === 'null') return null;
+      if (scripted.mode === 'throw-once') {
+        // Consume the script BEFORE throwing so every later call (the retry, or any call after
+        // it) falls through to the real lookup below instead of throwing again.
+        this.sessionResults.delete(id);
+        throw new ProviderError(scripted.code, `scripted getSession ${scripted.code} (once)`);
+      }
       throw new ProviderError(scripted.code, `scripted getSession ${scripted.code}`);
     }
     const s = this.sessions.get(id);

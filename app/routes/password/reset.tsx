@@ -9,6 +9,7 @@ import { requestPasswordReset } from '@/resources/password';
 import { resetRequestSchema, resetRequestClientSchema } from '@/resources/password/password.schema';
 import { genericCheckYourEmail } from '@/resources/schemas/check-your-email.schema';
 import { resolveOrg } from '@/resources/shared/resolve-org';
+import { redirectToLogin } from '@/routes/login-bounce';
 import { providerForRequest } from '@/server/auth-context.server';
 import { loaderCsrf, assertCsrf } from '@/server/csrf';
 import { trustedAppOrigin } from '@/server/infra/app-origin.server';
@@ -31,8 +32,18 @@ import { Form as RRForm } from 'react-router';
 export const meta: MetaFunction = () => [{ title: 'Reset password' }];
 
 export async function loader({ request }: LoaderFunctionArgs) {
-  if (!env.AUTH_EMAIL_DELIVERY_ENABLED) return redirect('/login');
   const url = new URL(request.url);
+  // Guard-fail must thread requestId/organization (both are parsed below and used on the
+  // happy path via AuthFormFields) — a bare redirect('/login') here dead-ends a mid-OIDC/SAML/
+  // device ceremony when email delivery is disabled instance-wide.
+  if (!env.AUTH_EMAIL_DELIVERY_ENABLED) {
+    return redirect(
+      redirectToLogin(
+        url.searchParams.get('requestId') ?? undefined,
+        url.searchParams.get('organization') ?? undefined
+      )
+    );
+  }
   const { csrfToken, headers } = await loaderCsrf(request);
   const organization = url.searchParams.get('organization') ?? undefined;
   const provider = providerForRequest(request);

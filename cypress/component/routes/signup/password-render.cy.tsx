@@ -3,6 +3,7 @@
 // Render port of app/routes/signup/__tests__/password.render.test.tsx.
 // Pins shared-primitive adoption: AuthCeremony layout div, shared AuthFormFields
 // csrf input, ceremony-owned BackLink to /signup.
+import { MAXMIND_TOKEN_STORAGE_KEY } from '@/modules/fraud/maxmind-tracker';
 import SignupPassword from '@/routes/signup/password';
 import { ConformAdapter } from '@datum-cloud/datum-ui/form/adapters/conform';
 import { setupI18n } from '@lingui/core';
@@ -30,9 +31,26 @@ const LOADER_DATA = {
   maxmindAccountId: '',
 };
 
-function mountPassword() {
+function mountPassword(onSubmitFormData?: (form: FormData) => void) {
   const router = createMemoryRouter(
-    [{ id: 'signup-password', path: '/signup/password', element: <SignupPassword /> }],
+    [
+      {
+        id: 'signup-password',
+        path: '/signup/password',
+        element: <SignupPassword />,
+        // Captures the REAL submitted FormData so the MaxMind sync test below can assert on
+        // what actually went out on the wire, not on post-navigation DOM state — React Router
+        // treats a `<Form method="post">` submission as a real client-side navigation, which
+        // re-renders (and can recreate) the route's DOM afterward. A matching `loader`
+        // re-returning the same data keeps the post-submit revalidation from crashing (no
+        // loader ⇒ useLoaderData() is undefined ⇒ the destructure in the component throws).
+        action: async ({ request }) => {
+          onSubmitFormData?.(await request.formData());
+          return null;
+        },
+        loader: () => LOADER_DATA,
+      },
+    ],
     {
       initialEntries: ['/signup/password'],
       hydrationData: { loaderData: { 'signup-password': LOADER_DATA } },
@@ -57,5 +75,30 @@ describe('signup/password — render adoption', () => {
     cy.findByRole('link', { name: /not you/i })
       .should('have.attr', 'href')
       .and('match', /^\/signup(\?|$)/);
+  });
+});
+
+// RED→GREEN (fast-signup race fix): same submit-time sync as signup/index — the click-time read
+// must win over the periodic mirror-sync interval, which may not have ticked yet. Asserted on
+// the REAL submitted FormData (see mountPassword's action) rather than post-navigation DOM.
+describe('signup/password — MaxMind deviceTrackingToken submit-time sync', () => {
+  beforeEach(() => window.sessionStorage.clear());
+
+  it('submits the freshest sessionStorage token even though the periodic sync interval never ticked', () => {
+    const submitted: FormData[] = [];
+    mountPassword((form) => submitted.push(form));
+    cy.get('input[name="password"]', { timeout: 6000 }).type('correct-horse-battery');
+    cy.get('input[name="confirm"]').type('correct-horse-battery');
+    // Seed the token AFTER mount, simulating device.js/the mirror landing after render but
+    // before the periodic sync interval has had a chance to tick.
+    cy.window().then((win) => {
+      win.sessionStorage.setItem(MAXMIND_TOKEN_STORAGE_KEY, 'tok-fast-signup-pw');
+    });
+    cy.get('input[name="deviceTrackingToken"]').should('have.value', '');
+    cy.contains('button', 'Create account').click();
+    cy.wrap(submitted, { timeout: 6000 }).should('have.length', 1);
+    cy.then(() => {
+      expect(submitted[0].get('deviceTrackingToken')).to.equal('tok-fast-signup-pw');
+    });
   });
 });

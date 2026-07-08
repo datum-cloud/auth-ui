@@ -180,7 +180,18 @@ export async function runSsoAction(
     if (err instanceof ProviderError) {
       deps.onAuthEvent?.('idp_start', 'failure');
       logAuthEvent('idp_start', 'failure', { reason: err.code });
-      return { kind: 'redirect', location: ssoErrorRedirect(slug, providerErrorCode(err.code)) };
+      // NOTE: this action's 'start' schema carries no requestId (the /sso management page's
+      // "start link" forms don't post one — see sso/index.tsx), so only organization threads
+      // here. organization is what's in scope (payload.organization); requestId stays absent.
+      return {
+        kind: 'redirect',
+        location: ssoErrorRedirect(
+          slug,
+          providerErrorCode(err.code),
+          undefined,
+          payload.organization
+        ),
+      };
     }
     throw err; // unknown → root ErrorBoundary
   }

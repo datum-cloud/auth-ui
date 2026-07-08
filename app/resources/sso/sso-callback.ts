@@ -80,7 +80,15 @@ export async function processIdpCallback(
     ((id: string, token: string) => provider.retrieveIdpIntent(id, token));
 
   if (!parsed.success) {
-    return { kind: 'redirect', location: ssoErrorRedirect(slug, 'context-missing') };
+    // Validation failed (e.g. missing id/token) — parsed.data is unavailable, so read
+    // requestId/organization directly off the raw URL (best-effort; not re-validated here,
+    // it only rides through to the error page's "Back to sign in" link).
+    const rawRequestId = url.searchParams.get('requestId') ?? undefined;
+    const rawOrganization = url.searchParams.get('organization') ?? undefined;
+    return {
+      kind: 'redirect',
+      location: ssoErrorRedirect(slug, 'context-missing', rawRequestId, rawOrganization),
+    };
   }
 
   const { id, token, link, requestId, organization, deviceTrackingToken } = parsed.data;
@@ -228,7 +236,10 @@ export async function processIdpCallback(
     if (err instanceof ProviderError) {
       deps.onAuthEvent?.('idp.signin', 'failure');
       logAuthEvent('idp.signin', 'failure', { reason: err.code, requestId });
-      return { kind: 'redirect', location: ssoErrorRedirect(slug, providerErrorCode(err.code)) };
+      return {
+        kind: 'redirect',
+        location: ssoErrorRedirect(slug, providerErrorCode(err.code), requestId, organization),
+      };
     }
     throw err; // unknown → root ErrorBoundary renders the branded page
   }
@@ -260,7 +271,7 @@ export async function processIdpCallback(
           });
           return {
             kind: 'redirect',
-            location: ssoErrorRedirect(slug, providerErrorCode(err.code)),
+            location: ssoErrorRedirect(slug, providerErrorCode(err.code), requestId, organization),
           };
         }
         const reason = err instanceof Error ? err.message : 'unknown';
@@ -367,7 +378,7 @@ export async function processIdpCallback(
               : providerErrorCode(err.code);
           return {
             kind: 'redirect',
-            location: `/sso/${encodeURIComponent(slug)}/error?reason=${encodeURIComponent(reason)}`,
+            location: ssoErrorRedirect(slug, reason, requestId, organization),
           };
         }
         throw err; // unknown → root ErrorBoundary
@@ -443,7 +454,7 @@ export async function processIdpCallback(
             err.code === 'ALREADY_EXISTS' ? 'registration-conflict' : providerErrorCode(err.code);
           return {
             kind: 'redirect',
-            location: ssoErrorRedirect(slug, reason),
+            location: ssoErrorRedirect(slug, reason, requestId, organization),
           };
         }
         throw err; // unknown → root ErrorBoundary
@@ -456,7 +467,10 @@ export async function processIdpCallback(
         idpId: intent.information.idpId,
         requestId,
       });
-      return { kind: 'redirect', location: ssoErrorRedirect(slug, decision.reason) };
+      return {
+        kind: 'redirect',
+        location: ssoErrorRedirect(slug, decision.reason, requestId, organization),
+      };
     }
 
     default: {
