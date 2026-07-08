@@ -46,6 +46,23 @@ const DEAD_SESSION_CODES: ReadonlySet<ProviderError['code']> = new Set([
   'PERMISSION_DENIED',
 ]);
 
+// createCallback codes that mean THIS session can no longer finalize THIS auth request, even
+// though getSession reported it alive — a stale OIDC grant after RP-initiated logout (cloud-portal
+// revokes the grant but auth-ui's `sessions` cookie outlives it). Re-authenticate instead of
+// dead-ending on signin_failed: a fresh login mints a new session that completes the callback
+// (confirmed in staging — this fails ONLY for old/stale sessions; a fresh login always works, so
+// self-healing here cannot create a redirect loop).
+//   • FAILED_PRECONDITION — the exact code observed in staging logs for this failure.
+//   • ALREADY_DONE — mappers.ts normalizeError maps the SAME underlying gRPC FailedPrecondition
+//     (code 9) to ALREADY_DONE instead of FAILED_PRECONDITION whenever Zitadel's error message
+//     matches /verified|already/i (e.g. "auth request already handled"). createCallback goes
+//     through that same generic mapper, so a stale grant can surface as either code depending on
+//     Zitadel's wording — both must self-heal the same way.
+const DEAD_CALLBACK_CODES: ReadonlySet<ProviderError['code']> = new Set([
+  'FAILED_PRECONDITION',
+  'ALREADY_DONE',
+]);
+
 // Freshness window for honoring a query-handed-back sessionId against a prompt=login request.
 // The post-auth finalize redirect is near-immediate (the ceremony hands the just-authenticated
 // session id straight back to /authorize), so 2 minutes generously covers redirect latency +
@@ -220,7 +237,9 @@ async function healStaleEntry(
 async function runCallback(
   provider: AuthProvider,
   rawId: string,
-  entry: SessionEntry
+  entry: SessionEntry,
+  list: SessionEntry[],
+  requestId: string
 ): Promise<AuthorizeOutcome> {
   try {
     const { callbackUrl } = await provider.createCallback(rawId, {
@@ -231,11 +250,19 @@ async function runCallback(
     logAuthEvent('oidc_callback', 'success', { requestId: rawId, sessionId: entry.id });
     return { kind: 'redirect', location: callbackUrl };
   } catch (err) {
+    const code = err instanceof ProviderError ? err.code : undefined;
     logAuthEvent('oidc_callback', 'failure', {
       requestId: rawId,
       sessionId: entry.id,
-      code: err instanceof ProviderError ? err.code : 'UNKNOWN',
+      code: code ?? 'UNKNOWN',
     });
+    // A DEAD_CALLBACK_CODES code means the session is a stale post-logout grant, not a genuine
+    // failure: self-heal to /login (prune + re-auth) instead of dead-ending on signin_failed. Any
+    // other code (transient/unknown) keeps the conservative existing behavior — surface the error
+    // page rather than guessing that a re-login will help.
+    if (code && DEAD_CALLBACK_CODES.has(code)) {
+      return healStaleEntry(list, entry, requestId, rawId);
+    }
     return { kind: 'error-redirect', code: 'signin_failed' };
   }
 }
@@ -339,7 +366,7 @@ async function resolveOidc(
       const mustReauth =
         authRequest.prompt.includes('login') &&
         !primaryFresh(gate.session.factors, nowMs, await freshLoginWindowMs(provider, entry));
-      if (!mustReauth) return runCallback(provider, rawId, entry);
+      if (!mustReauth) return runCallback(provider, rawId, entry, list, requestId);
       // else: stale prompt=login → do NOT finalize; fall through to decideAuthorize below.
     }
   }
@@ -365,7 +392,7 @@ async function resolveOidc(
     // 'callback', so this branch is unreachable under prompt=login (only none/default reuse).
     const healed = await healIfSessionDead(provider, list, entry, requestId, rawId);
     if ('kind' in healed) return healed;
-    return runCallback(provider, rawId, entry);
+    return runCallback(provider, rawId, entry, list, requestId);
   }
   if (decision.target === 'error') {
     if (decision.error === 'NO_ACTIVE_SESSION') {
