@@ -143,6 +143,41 @@ describe('/authorize — read-after-write retry on a freshly-created session (NO
     });
   });
 
+  it('FRESH session that stays dead through ALL backoffs: NOT_FOUND on every probe → the loop is exhausted and falls through to the /login self-heal (session_stale)', () => {
+    callService({
+      fn: 'resolveAuthorize',
+      provider: 'singleton',
+      // Throws NOT_FOUND on EVERY getSession — the replica never catches up. Proves the bounded
+      // loop terminates (a for…of over a fixed tuple can't hang) and lands on the documented
+      // dead-code self-heal fall-through, rather than looping forever or reusing a dead session.
+      sessionResults: { 'fresh-race-3': { mode: 'throw', code: 'NOT_FOUND' } },
+      nowMs: NOW_MS,
+      request: {
+        url: `http://localhost/id/authorize?requestId=oidc_${RAW_ID}&sessionId=fresh-race-3`,
+        sessions: [
+          {
+            id: 'fresh-race-3',
+            token: 'tok-fresh-race-3',
+            loginName: 'alice@acme.test',
+            // 2s old — inside the retry window, so the loop DOES run (and exhausts).
+            creationTs: new Date(NOW_MS - 2000).toISOString(),
+          },
+        ],
+      },
+    }).then((v) => {
+      expect(v.response?.status).to.equal(302);
+      const loc = v.response?.location ?? '';
+      expect(loc).to.include('/login');
+      expect(loc).to.include(`requestId=oidc_${RAW_ID}`);
+      expect(loc).to.not.include('/callback');
+      // Exhausted retry self-heals: emit session_stale and prune the dead entry from the cookie.
+      expect(v.audit.some((e) => e.event === 'session_stale')).to.equal(true);
+      expect(v.response?.cookieEntries?.some((e) => e.id === 'fresh-race-3') ?? false).to.equal(
+        false
+      );
+    });
+  });
+
   it('OLD session (creationTs outside the retry window): NOT_FOUND self-heals immediately — no retry, anti-forgery preserved', () => {
     callService({
       fn: 'resolveAuthorize',

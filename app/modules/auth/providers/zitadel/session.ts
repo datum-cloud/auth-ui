@@ -15,6 +15,14 @@ import {
   ListSessionsRequestSchema,
 } from '@zitadel/proto/zitadel/session/v2/session_service_pb';
 
+// gRPC/Connect Code.NotFound — the code a not-yet-replicated read surfaces as (see mappers.ts's
+// GRPC_CODE table: 5 → NOT_FOUND). Used to gate the createSession read-retry below.
+const GRPC_CODE_NOT_FOUND = 5;
+// Backoffs for retrying ONLY the mandatory post-createSession read when it races replica lag
+// (~1.05s worst case beyond the initial read). The WRITE is never re-issued, so this can never
+// mint a duplicate/orphaned session — unlike an outer retry wrapped around the whole createSession.
+const CREATE_SESSION_READ_BACKOFFS_MS = [150, 300, 600];
+
 export function createSession(
   ctx: ZitadelCtx,
   checks: SessionChecks,
@@ -95,12 +103,29 @@ export function createSession(
     // exactly ONE follow-up getSession is REQUIRED here; it is not a redundant double-fetch.
     // Reconstructing the Session from the create response would be unsound, so we keep the one
     // necessary read.
-    const got = await sessions.getSession(
-      { sessionId: created.sessionId, sessionToken: created.sessionToken },
-      {}
-    );
-    if (!got.session) throw new Error('Could not load created session');
-    return toSession(got.session, created.sessionToken);
+    // Read-after-write lag: the session we JUST wrote may not be visible yet on the replica this
+    // follow-up read lands on — it can surface as a NotFound throw OR (rarely) an empty response.
+    // Retry the READ ONLY: it reuses created.sessionId/sessionToken and is idempotent, so — unlike
+    // an outer retry wrapped around createSession — it can never mint a second, orphaned session.
+    // Bounded + short; a genuine (non-NotFound) error propagates immediately, unchanged.
+    for (let attempt = 0; ; attempt++) {
+      try {
+        const got = await sessions.getSession(
+          { sessionId: created.sessionId, sessionToken: created.sessionToken },
+          {}
+        );
+        if (got.session) return toSession(got.session, created.sessionToken);
+      } catch (err) {
+        const grpcCode = (err as { code?: number } | null)?.code;
+        if (grpcCode !== GRPC_CODE_NOT_FOUND || attempt >= CREATE_SESSION_READ_BACKOFFS_MS.length) {
+          throw err;
+        }
+      }
+      if (attempt >= CREATE_SESSION_READ_BACKOFFS_MS.length) {
+        throw new Error('Could not load created session');
+      }
+      await new Promise<void>((r) => setTimeout(r, CREATE_SESSION_READ_BACKOFFS_MS[attempt]));
+    }
   });
 }
 

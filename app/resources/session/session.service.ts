@@ -381,6 +381,11 @@ export const removeSchema = z.object({
   // Preserve the CURRENT ceremony requestId on the redirect back to /accounts so removing an
   // account mid-ceremony doesn't drop it (only an allowlisted value is reflected onto the URL).
   requestId: z.string().optional(),
+  // Preserve the CURRENT ceremony organization on the redirect back to /accounts too — the remove
+  // form (accounts.tsx) submits it, and without a schema key Zod would strip it, so a mid-ceremony
+  // org scope would silently drop off "Add an account"/signup after a remove (→ wrong default org).
+  // Capped as defense-in-depth (Zitadel org ids are short).
+  organization: z.string().max(64).optional(),
   // Device-grant "change account" sub-flow: preserve the stable user_code on the redirect back
   // to /accounts (mirrors requestId for OIDC/SAML) so removing an account mid-device-grant keeps
   // the device context — a subsequent switch/add still returns to /device/authorize. Bounded to
@@ -544,7 +549,7 @@ export async function removeAccount(
   const parsed = removeSchema.safeParse(Object.fromEntries(form));
   if (!parsed.success) return { kind: 'error', error: 'INVALID_INPUT', status: 400 };
 
-  const { sessionId, requestId, userCode } = parsed.data;
+  const { sessionId, requestId, userCode, organization } = parsed.data;
   const cookieSessions = await readSessions(request);
   const entry = byId(cookieSessions, sessionId);
   if (!entry) {
@@ -569,13 +574,13 @@ export async function removeAccount(
 
   // Carry the live ceremony context back onto /accounts so a mid-ceremony remove keeps the flow.
   // Device grant (user_code) takes precedence over an OIDC/SAML requestId — the two are mutually
-  // exclusive in practice, but the device sub-flow is keyed on user_code. Build every branch
-  // through the typed paths.accounts() registry (no hand-rolled URL strings).
-  const location = userCode
-    ? paths.accounts({ user_code: userCode })
-    : isAllowedRequestId(requestId)
-      ? paths.accounts({ requestId })
-      : paths.accounts();
+  // exclusive in practice, but the device sub-flow is keyed on user_code. `organization` rides
+  // alongside whichever is present (withQuery drops it when undefined) so the org scope survives
+  // the round-trip. Build every branch through the typed paths.accounts() registry.
+  const location = paths.accounts({
+    ...(userCode ? { user_code: userCode } : isAllowedRequestId(requestId) ? { requestId } : {}),
+    organization,
+  });
 
   return { kind: 'redirect', location, setCookie: await serializeSessions(updated) };
 }

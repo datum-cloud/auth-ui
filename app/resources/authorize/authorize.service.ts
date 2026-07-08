@@ -70,10 +70,20 @@ const DEAD_SESSION_CODES: ReadonlySet<ProviderError['code']> = new Set([
 //     errors), the function falls through to the exact same self-heal path as if there had been no
 //     retry — the retry only ever *adds* patience for a fresh session, never leniency.
 const RETRY_FRESHNESS_WINDOW_MS = 5000; // 5s — covers redirect latency + replica lag, nothing more
-// Increasing backoffs between fresh-session liveness re-probes (~2.8s total max). A single short
-// retry loses the race when a replica lags >1 read cycle; a bounded poll rides out the write→read
-// replication for a session we KNOW we just created. Only ever applied to a fresh entry.
+// Increasing backoffs between fresh-session liveness re-probes (~2.8s base, ~3.4s worst-case with
+// jitter). A single short retry loses the race when a replica lags >1 read cycle; a bounded poll
+// rides out the write→read replication for a session we KNOW we just created. Only ever applied to
+// a fresh entry.
 const RETRY_BACKOFFS_MS = [300, 500, 800, 1200] as const;
+
+// ±20% jitter on each backoff so that many fresh-session retries happening at once (a burst of
+// signups/logins during a real replica outage) don't fire in lockstep and amplify read load in
+// synchronized waves against an already-struggling provider. Math.random is fine here — it only
+// spreads the WAIT; it feeds no security decision and the retry OUTCOME is unchanged.
+const RETRY_JITTER_RATIO = 0.2;
+function jitterBackoff(ms: number): number {
+  return Math.round(ms * (1 + (Math.random() * 2 - 1) * RETRY_JITTER_RATIO));
+}
 
 /** True when `entry` was created within RETRY_FRESHNESS_WINDOW_MS of `nowMs`. A malformed or
  *  missing creationTs (tsMs → NaN) is treated as NOT fresh — the safe default is the original,
@@ -276,7 +286,7 @@ async function healIfSessionDead(
   if (isFreshEntry(entry, nowMs)) {
     for (const backoff of RETRY_BACKOFFS_MS) {
       if (probe.kind !== 'dead-code') break;
-      await sleep(backoff);
+      await sleep(jitterBackoff(backoff));
       probe = await probeSession(provider, entry);
     }
   }

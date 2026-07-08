@@ -63,4 +63,29 @@ describe('removeAccount — ceremony requestId threading', () => {
       expect(o.location).to.equal(`/accounts?requestId=${encodeURIComponent('oidc_V3-current')}`);
     });
   });
+
+  it('carries the ceremony organization onto the /accounts redirect (regression: removeSchema dropped it)', () => {
+    callService({
+      fn: 'removeAccount',
+      seed,
+      liveSessions,
+      request: {
+        url: 'http://localhost/id/accounts',
+        sessions: cookie,
+        form: {
+          intent: 'remove',
+          sessionId: 's1',
+          requestId: 'oidc_V3-current',
+          organization: 'org-1',
+        },
+      },
+    }).then((v) => {
+      const o = v.outcome as Outcome;
+      expect(o.kind).to.equal('redirect');
+      // Both the ceremony id AND the org scope survive, so "Add an account"/signup after a remove
+      // resolves the correct org instead of falling back to the default.
+      expect(o.location).to.include(`requestId=${encodeURIComponent('oidc_V3-current')}`);
+      expect(o.location).to.include('organization=org-1');
+    });
+  });
 });

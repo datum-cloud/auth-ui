@@ -143,7 +143,7 @@ msgid "Change your password"
 msgstr "Change your password"
 
 #: app/routes/password/reset.tsx:109
-#: app/routes/signup/method.tsx:283
+#: app/routes/signup/method.tsx:284
 #: app/routes/signup/password.tsx:183
 msgid "Check your email"
 msgstr "Check your email"
@@ -246,7 +246,7 @@ msgstr "Email code"
 
 #: app/routes/login/index.tsx:395
 #: app/routes/login/method.tsx:117
-#: app/routes/signup/method.tsx:332
+#: app/routes/signup/method.tsx:333
 msgid "Email me a sign-in link"
 msgstr "Email me a sign-in link"
 
@@ -315,7 +315,7 @@ msgstr "Enter your password"
 msgid "Enter your SMS code"
 msgstr "Enter your SMS code"
 
-#: app/routes/signup/method.tsx:310
+#: app/routes/signup/method.tsx:311
 msgid "Finish creating your account"
 msgstr "Finish creating your account"
 
@@ -501,7 +501,7 @@ msgstr "Service temporarily unavailable. Please try again."
 msgid "Session active"
 msgstr "Session active"
 
-#: app/routes/signup/method.tsx:370
+#: app/routes/signup/method.tsx:371
 #: app/routes/signup/password.tsx:198
 msgid "Set a password"
 msgstr "Set a password"
@@ -698,7 +698,7 @@ msgstr "Unlink {providerLabel}?"
 msgid "Use a different account"
 msgstr "Use a different account"
 
-#: app/routes/signup/method.tsx:351
+#: app/routes/signup/method.tsx:352
 msgid "Use a passkey"
 msgstr "Use a passkey"
 
@@ -771,7 +771,7 @@ msgstr "We've sent a password reset link to <0>{0}</0>"
 
 #. placeholder {0}: (actionData as { email: string }).email
 #. placeholder {0}: actionData.email
-#: app/routes/signup/method.tsx:285
+#: app/routes/signup/method.tsx:286
 #: app/routes/signup/password.tsx:185
 msgid "We've sent a verification link to <0>{0}</0>"
 msgstr "We've sent a verification link to <0>{0}</0>"
@@ -821,7 +821,7 @@ msgstr "You signed in as a different account than the one you were re-authentica
 msgid "You'll be asked to sign in before authorizing."
 msgstr "You'll be asked to sign in before authorizing."
 
-#: app/routes/signup/method.tsx:312
+#: app/routes/signup/method.tsx:313
 msgid "You're almost done! <0>{loginName}</0>"
 msgstr "You're almost done! <0>{loginName}</0>"
 

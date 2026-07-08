@@ -222,4 +222,24 @@ describe('ZitadelAuthProvider — session/credential request building', () => {
       Cypress.sinon.match.any
     );
   });
+
+  it('createSession retries ONLY the post-write read on a replica-lag NOT_FOUND — the write fires exactly once (no duplicate session)', async () => {
+    const createSpy = cy.stub().resolves({ sessionId: 's1', sessionToken: 'tok' });
+    let getCalls = 0;
+    const getSpy = cy.stub().callsFake(async () => {
+      getCalls += 1;
+      // First read races a lagging replica → gRPC NotFound (code 5); the write already succeeded.
+      if (getCalls === 1) throw Object.assign(new Error('not found'), { code: 5 });
+      return { session: { id: 's1', factors: { user: { id: 'u1', loginName: 'a@b.c' } } } };
+    });
+    stubClient({ createSession: createSpy, getSession: getSpy });
+
+    const out = await provider().createSession({}, { userId: 'u1' });
+
+    expect(out.id).to.equal('s1');
+    // The WRITE is issued exactly once — the retry re-reads, it does NOT re-create the session.
+    expect(createSpy).to.have.callCount(1);
+    // The READ was retried after the lag NotFound.
+    expect(getSpy).to.have.callCount(2);
+  });
 });

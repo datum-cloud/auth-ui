@@ -81,10 +81,12 @@ export async function processIdpCallback(
 
   if (!parsed.success) {
     // Validation failed (e.g. missing id/token) — parsed.data is unavailable, so read
-    // requestId/organization directly off the raw URL (best-effort; not re-validated here,
-    // it only rides through to the error page's "Back to sign in" link).
-    const rawRequestId = url.searchParams.get('requestId') ?? undefined;
-    const rawOrganization = url.searchParams.get('organization') ?? undefined;
+    // requestId/organization directly off the raw URL (best-effort; it only rides through to the
+    // error page's "Back to sign in" link). Cap the length to match CallbackQuery's max(64)
+    // defense-in-depth — an oversized `organization` is itself one way to land in this branch, so
+    // don't let the raw read bypass the cap the validated path applies.
+    const rawRequestId = url.searchParams.get('requestId')?.slice(0, 64) ?? undefined;
+    const rawOrganization = url.searchParams.get('organization')?.slice(0, 64) ?? undefined;
     return {
       kind: 'redirect',
       location: ssoErrorRedirect(slug, 'context-missing', rawRequestId, rawOrganization),
