@@ -5,6 +5,7 @@ import {
   getLoginSettings,
   listAuthenticationMethodTypes,
 } from "@/lib/zitadel";
+import * as Sentry from "@sentry/nextjs";
 import { create } from "@zitadel/client";
 import {
   CreateCallbackRequestSchema,
@@ -86,19 +87,29 @@ export async function loginWithOIDCAndSession({
         requestId: `oidc_${authRequest}`,
       };
 
-      const res = await sendLoginname(command);
+      try {
+        const res = await sendLoginname(command);
 
-      if (res && "redirect" in res && res?.redirect) {
-        // Check if the redirect URL is already a full URL
-        if (
-          res.redirect.startsWith("http://") ||
-          res.redirect.startsWith("https://")
-        ) {
-          return NextResponse.redirect(res.redirect);
-        } else {
-          const absoluteUrl = constructUrl(request, res.redirect);
-          return NextResponse.redirect(absoluteUrl.toString());
+        if (res && "redirect" in res && res?.redirect) {
+          // Check if the redirect URL is already a full URL
+          if (
+            res.redirect.startsWith("http://") ||
+            res.redirect.startsWith("https://")
+          ) {
+            return NextResponse.redirect(res.redirect);
+          } else {
+            const absoluteUrl = constructUrl(request, res.redirect);
+            return NextResponse.redirect(absoluteUrl.toString());
+          }
         }
+      } catch (error) {
+        console.error(
+          `Failed to execute sendLoginname (authRequest=${authRequest}, sessionId=${sessionId}): ${error instanceof Error ? error.message : error}`,
+        );
+        Sentry.captureException(error, {
+          tags: { flow: "oidc", stage: "reauth_sendLoginname" },
+          extra: { authRequest, sessionId },
+        });
       }
     }
 
