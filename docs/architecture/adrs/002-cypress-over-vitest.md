@@ -86,4 +86,3 @@ Real-browser fidelity for _logic_ tests was explicitly **not** a driver. Most su
 
 - `package.json` — `test:unit`, `test:unit:debug`, `test:e2e`, `test:acceptance`
 - `cypress.config.ts`, `cypress/component/`, `cypress/e2e/`, `cypress/support/`
-- [Testing](../../development/testing.md)
