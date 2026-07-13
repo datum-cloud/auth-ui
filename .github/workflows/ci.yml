@@ -231,9 +231,24 @@ jobs:
             echo "✅ All jobs passed"
           fi
 
+  # Release publishes are production artifacts, so they must pass through the
+  # `production` GitHub environment and its protection rules (the legacy
+  # workflow did this inline). A job that calls a reusable workflow cannot
+  # declare `environment:`, so this no-op job carries it and the publish jobs
+  # depend on it. On push events it is skipped; the publish jobs' status-check
+  # conditions (!failure()/!cancelled()) let them run regardless.
+  release-gate:
+    name: Production Release Gate
+    if: ${{ github.event_name == 'release' }}
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Approve production publish
+        run: echo "Release ${{ github.ref_name }} cleared for production publish"
+
   publish-container-image:
     name: Publish Container Image
-    needs: [status-check]
+    needs: [status-check, release-gate]
     if: ${{ github.event_name != 'pull_request' && !failure() && !cancelled() }}
     permissions:
       id-token: write
