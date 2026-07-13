@@ -1,0 +1,325 @@
+name: CI
+
+on:
+  pull_request: {}
+  push:
+    branches: [refactor/auth-ui-rebuild, main]
+    paths-ignore:
+      - 'docs/**'
+      - 'README.md'
+  # Publishing a GitHub release ships the artifacts production tracks: the
+  # shared publish workflows tag by semver from the release ref, so a
+  # release of v1.0.0 produces auth-ui:v1.0.0 and auth-ui-kustomize:v1.0.0.
+  release:
+    types: [published]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  BUN_CACHE: ~/.bun/install/cache
+  CYPRESS_CACHE_FOLDER: ~/.cache/Cypress
+
+# Each job is self-sufficient: it restores the persistent bun *store* cache
+# (~/.bun/install/cache, which survives across runs) and runs its own
+# `bun install --frozen-lockfile`. We deliberately do NOT share node_modules
+# across jobs — a cache saved by the `install` job is not reliably visible to
+# needs-dependent jobs within the SAME run (GitHub Actions same-run cross-job
+# cache propagation gap), which previously left every downstream job with no
+# deps. With a warm store the per-job install is a few seconds; on a cold miss
+# it still produces a correct node_modules (just slower). The `install` job
+# warms the store once before the fan-out.
+
+jobs:
+  install:
+    name: Install Dependencies
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with: { bun-version: 1.3.14 } # renovate: datasource=docker depName=oven/bun
+      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        with:
+          path: ${{ env.BUN_CACHE }}
+          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lock', '**/package.json') }}
+      - run: bun install --frozen-lockfile
+
+  lint:
+    name: Lint
+    needs: install
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with: { bun-version: 1.3.14 } # renovate: datasource=docker depName=oven/bun
+      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        with:
+          path: ${{ env.BUN_CACHE }}
+          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lock', '**/package.json') }}
+      - run: bun install --frozen-lockfile
+      - run: bun run lint:ci
+
+  typecheck:
+    name: Type Check
+    needs: install
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with: { bun-version: 1.3.14 } # renovate: datasource=docker depName=oven/bun
+      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        with:
+          path: ${{ env.BUN_CACHE }}
+          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lock', '**/package.json') }}
+      - run: bun install --frozen-lockfile
+      - run: bun run typecheck
+      - run: bun run typecheck:cypress
+
+  unit-tests:
+    name: Unit Tests (component)
+    needs: install
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [0, 1, 2]
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with: { bun-version: 1.3.14 } # renovate: datasource=docker depName=oven/bun
+      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        with:
+          path: ${{ env.BUN_CACHE }}
+          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lock', '**/package.json') }}
+      - run: bun install --frozen-lockfile
+      - run: bunx cypress install
+      - run: CYPRESS=true bunx cypress run --component
+        env:
+          SPLIT: ${{ strategy.job-total }}
+          SPLIT_INDEX: ${{ strategy.job-index }}
+      - if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: component-artifacts-${{ github.run_id }}-shard-${{ matrix.shard }}
+          path: |
+            cypress/videos
+            cypress/screenshots
+          retention-days: 7
+          if-no-files-found: warn
+
+  i18n-check:
+    name: i18n Catalogs Fresh
+    needs: install
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with: { bun-version: 1.3.14 } # renovate: datasource=docker depName=oven/bun
+      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        with:
+          path: ${{ env.BUN_CACHE }}
+          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lock', '**/package.json') }}
+      - run: bun install --frozen-lockfile
+      # Catches commits made with --no-verify that bypass the lefthook i18n hook.
+      - run: bun run i18n:extract && bun run i18n:compile
+        env:
+          CI: '1'
+      - run: git diff --exit-code -- app/modules/i18n/locales
+
+  supply-chain:
+    name: Supply Chain (audit + SBOM)
+    needs: install
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with: { bun-version: 1.3.14 } # renovate: datasource=docker depName=oven/bun
+      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        with:
+          path: ${{ env.BUN_CACHE }}
+          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lock', '**/package.json') }}
+      - run: bun install --frozen-lockfile
+      - name: Dependency audit (blocking)
+        # No advisories are ignored: all known transitive vulns are REMEDIATED via
+        # package.json `overrides` (each parent's declared range accepts the patched version):
+        #   undici     ^7.28.0   jsdom accepts ^7.25.0          fixes 5 undici advisories (2 high)
+        #   form-data  ^4.0.6    cypress/axios accept ^4.0.x    fixes GHSA-hmw2-7cc7-3qxx (high)
+        #   dompurify  ^3.4.11   isomorphic-dompurify accepts ^3.4.8   fixes GHSA-cmwh-pvxp-8882
+        #   esbuild    ^0.28.1   vite accepts ^0.28; build + i18n extract verified   fixes GHSA-g7r4-m6w7-qqqr / GHSA-gv7w-rqvm-qjhr
+        # If a NEW transitive advisory appears with no override-compatible fix, add a
+        # documented `--ignore=<GHSA>` here as a temporary measure and open a remediation follow-up.
+        run: bun audit
+      - name: Generate SBOM (CycloneDX)
+        run: bunx @cyclonedx/cdxgen@11.10.0 -t js -o sbom.cdx.json --spec-version 1.5
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: sbom-cyclonedx
+          path: sbom.cdx.json
+          retention-days: 90
+
+  build:
+    name: Build
+    needs: [lint, typecheck, unit-tests, e2e, i18n-check, supply-chain]
+    runs-on: ubuntu-latest
+    if: ${{ !failure() && !cancelled() }}
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with: { bun-version: 1.3.14 } # renovate: datasource=docker depName=oven/bun
+      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        with:
+          path: ${{ env.BUN_CACHE }}
+          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lock', '**/package.json') }}
+      - run: bun install --frozen-lockfile
+      - run: bun run build
+      - run: bun run size
+      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        with:
+          path: build
+          key: build-${{ github.sha }}
+
+  e2e:
+    name: E2E (fast, fake provider)
+    needs: install
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # The dev server validates env at boot; the fake provider only requires a
+    # SESSION_SECRET (>= 32 chars). This is a throwaway CI value for the in-memory
+    # fake auth provider — NOT a real secret.
+    env:
+      SESSION_SECRET: ci-e2e-fake-provider-dummy-session-secret
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - uses: oven-sh/setup-bun@0c5077e51419868618aeaa5fe8019c62421857d6 # v2
+        with: { bun-version: 1.3.14 } # renovate: datasource=docker depName=oven/bun
+      - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
+        with:
+          path: ${{ env.BUN_CACHE }}
+          key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lock', '**/package.json') }}
+      - run: bun install --frozen-lockfile
+      - run: bunx cypress install
+      - run: bun run test:e2e:fast
+      - if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: e2e-artifacts-${{ github.run_id }}
+          path: |
+            cypress/videos
+            cypress/screenshots
+          retention-days: 7
+          if-no-files-found: warn
+
+  status-check:
+    name: Final Status Check
+    needs: [install, lint, typecheck, unit-tests, i18n-check, supply-chain, build, e2e]
+    if: always()
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Workflow Status
+        run: |
+          if [[ "${{ contains(needs.*.result, 'failure') }}" == "true" ]]; then
+            echo "❌ One or more jobs failed"
+            exit 1
+          elif [[ "${{ contains(needs.*.result, 'cancelled') }}" == "true" ]]; then
+            echo "⚠️ One or more jobs were cancelled"
+            exit 1
+          else
+            echo "✅ All jobs passed"
+          fi
+
+  # Release publishes are production artifacts, so they must pass through the
+  # `production` GitHub environment and its protection rules (the legacy
+  # workflow did this inline). A job that calls a reusable workflow cannot
+  # declare `environment:`, so this no-op job carries it and the publish jobs
+  # depend on it. On push events it is skipped; the publish jobs' status-check
+  # conditions (!failure()/!cancelled()) let them run regardless.
+  release-gate:
+    name: Production Release Gate
+    if: ${{ github.event_name == 'release' }}
+    runs-on: ubuntu-latest
+    environment: production
+    steps:
+      - name: Approve production publish
+        run: echo "Release ${{ github.ref_name }} cleared for production publish"
+
+  publish-container-image:
+    name: Publish Container Image
+    needs: [status-check, release-gate]
+    if: ${{ github.event_name != 'pull_request' && !failure() && !cancelled() }}
+    permissions:
+      id-token: write
+      contents: read
+      packages: write
+      attestations: write
+    uses: datum-cloud/actions/.github/workflows/publish-docker.yaml@545f34cd6f35e9688c9a04a7e890281bcdbaefd2 # v1.14.0
+    with:
+      image-name: auth-ui
+    # NOTE: `secrets: inherit` is required because the upstream workflow
+    # references `secrets.SENTRY_AUTH_TOKEN` without declaring it under
+    # `workflow_call.secrets`. Once upstream declares it, switch to an
+    # explicit `secrets:` block passing only SENTRY_AUTH_TOKEN.
+    secrets: inherit
+
+  publish-kustomize-bundle:
+    name: Publish Kustomize Bundle
+    needs: [publish-container-image]
+    if: ${{ github.event_name != 'pull_request' && !failure() && !cancelled() }}
+    permissions:
+      id-token: write
+      contents: read
+      packages: write
+    uses: datum-cloud/actions/.github/workflows/publish-kustomize-bundle.yaml@545f34cd6f35e9688c9a04a7e890281bcdbaefd2 # v1.14.0
+    with:
+      bundle-name: ghcr.io/datum-cloud/auth-ui-kustomize
+      bundle-path: config
+      image-overlays: config/base
+      image-name: ghcr.io/datum-cloud/auth-ui
+
+  pr-comment:
+    name: PR Test Summary
+    needs: [status-check]
+    runs-on: ubuntu-latest
+    # Run after the final gate, and even when it fails, so the summary still posts.
+    if: ${{ always() && github.event_name == 'pull_request' }}
+    permissions:
+      contents: read
+      pull-requests: write
+      actions: read
+    steps:
+      - name: Build test summary
+        uses: actions/github-script@3a2844b7e9c422d3c10d287c895573f7108da1b3 # v9
+        with:
+          script: |
+            const runId = context.runId;
+            const fs = require('fs');
+            const runUrl = `https://github.com/${context.repo.owner}/${context.repo.repo}/actions/runs/${runId}`;
+            const { data: jobs } = await github.rest.actions.listJobsForWorkflowRun({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              run_id: runId,
+            });
+            const testJobs = jobs.jobs.filter(j =>
+              j.name.startsWith('Unit Tests') || j.name.startsWith('E2E')
+            );
+            const statusEmoji = (c) => {
+              if (!c || c === 'skipped') return '⏭️';
+              if (c === 'success') return '✅';
+              if (c === 'failure') return '❌';
+              if (c === 'cancelled') return '🚫';
+              return '❓';
+            };
+            let table = '| Job | Status |\n|-----|--------|\n';
+            for (const job of testJobs.sort((a, b) => a.name.localeCompare(b.name))) {
+              table += `| ${job.name} | ${statusEmoji(job.conclusion)} ${job.conclusion || 'pending'} |\n`;
+            }
+            let body = `## 🧪 Test Summary\n\n${table}\n\n[View workflow run](${runUrl})`;
+            fs.writeFileSync('pr-summary.md', body);
+      - uses: peter-evans/create-or-update-comment@e8674b075228eee787fea43ef493e45ece1004c9 # v5
+        with:
+          issue-number: ${{ github.event.pull_request.number }}
+          body-path: pr-summary.md
+          edit-mode: replace

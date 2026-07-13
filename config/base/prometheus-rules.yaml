@@ -1,0 +1,105 @@
+apiVersion: monitoring.coreos.com/v1
+kind: PrometheusRule
+metadata:
+  name: auth-ui
+  labels:
+    alert-group: auth-ui
+spec:
+  groups:
+    - name: auth-ui.slos
+      rules:
+        # --- HTTP Error Rate ---
+        # Uses http_request_duration_seconds_count (the sample count side of the
+        # histogram) which prom-client emits for every observed request. The
+        # status_code label is the string form of the HTTP status (e.g. "500").
+        # 5xx is defined as status_code >= "500" matched via regex.
+        - alert: AuthUIHighErrorRate
+          expr: |
+            (
+              sum(rate(http_request_duration_seconds_count{
+                job="auth-ui",
+                status_code=~"5.."
+              }[5m]))
+              /
+              sum(rate(http_request_duration_seconds_count{
+                job="auth-ui"
+              }[5m]))
+            ) > 0.02
+          for: 10m
+          labels:
+            severity: critical
+            service: auth-ui
+          annotations:
+            summary: "auth-ui 5xx error rate > 2% (10m)"
+            description: |
+              auth-ui is returning 5xx responses for more than 2% of requests
+              over the past 5 minutes, sustained for 10 minutes.
+              Current ratio: {{ $value | humanizePercentage }}.
+              Check pod logs: kubectl -n auth-ui logs -l app.kubernetes.io/name=auth-ui --tail=100
+
+        # --- P95 Request Latency ---
+        # histogram_quantile requires the _bucket series. The route label keeps
+        # cardinality bounded because we record Hono's matched path pattern, not
+        # raw URLs.
+        - alert: AuthUIHighLatencyP95
+          expr: |
+            histogram_quantile(0.95,
+              sum by (le) (
+                rate(http_request_duration_seconds_bucket{
+                  job="auth-ui"
+                }[5m])
+              )
+            ) > 1
+          for: 10m
+          labels:
+            severity: warning
+            service: auth-ui
+          annotations:
+            summary: "auth-ui p95 request latency > 1s (10m)"
+            description: |
+              The 95th-percentile request latency for auth-ui has exceeded 1 second
+              for 10 consecutive minutes.
+              Current p95: {{ $value | humanizeDuration }}.
+              Possible causes: slow IdP upstream, GC pause, database contention.
+
+        # --- Sign-In Failure Spike ---
+        # "password_check" is the canonical sign-in event (login.password.tsx).
+        # We also include "ldap_signin" and "idp.signin" so the alert covers all
+        # first-factor paths.  MFA failures (mfa_totp, mfa_otp, passkey/u2f) are
+        # intentionally excluded — those represent second-factor errors, not
+        # credential-stuffing signals.
+        #
+        # The alert fires when the rolling failure rate exceeds 3× the success
+        # rate over 5 minutes, sustained for 10 minutes.  A pure failure counter
+        # (no successes) would produce +Inf; we guard with > 3 rather than a ratio
+        # to avoid spurious fires during quiet periods (both sides ≈ 0).
+        - alert: AuthUISignInFailureSpike
+          expr: |
+            (
+              sum(rate(auth_events_total{
+                job="auth-ui",
+                event=~"password_check|ldap_signin|idp\.signin",
+                outcome="failure"
+              }[5m]))
+              /
+              (
+                sum(rate(auth_events_total{
+                  job="auth-ui",
+                  event=~"password_check|ldap_signin|idp\.signin",
+                  outcome="success"
+                }[5m])) > 0
+              )
+            ) > 3
+          for: 10m
+          labels:
+            severity: warning
+            service: auth-ui
+          annotations:
+            summary: "auth-ui sign-in failure:success ratio elevated (possible credential stuffing)"
+            description: |
+              The ratio of first-factor sign-in failures to successes has exceeded 3:1
+              over the past 5 minutes, sustained for 10 minutes.
+              Current ratio: {{ $value | humanize }}.
+              Events covered: password_check, ldap_signin, idp.signin.
+              Investigate for credential-stuffing or brute-force activity.
+              Check rate-limit logs: kubectl -n auth-ui logs -l app.kubernetes.io/name=auth-ui | grep rate_limit

@@ -1,21 +1,29 @@
-.DS_Store
 node_modules
-.turbo
-*.log
-.next
-dist
-dist-ssr
+/build
+/.react-router
 *.local
 .env
-server/dist
-public/dist
-.vscode
-.idea
-.vercel
-.env*.local
-/blob-report/
-/out
-/docker
-/machinekey
-
-.cursor
+.env.*
+!.env.example
+.DS_Store
+/coverage
+/cypress/videos
+/cypress/screenshots
+.claude/settings.local.json
+app/modules/i18n/locales/*.ts
+app/modules/i18n/locales/*.js
+/.lighthouseci
+.playwright-mcp/
+dev-ca.crt
+# Local dev TLS material — never commit private keys
+dev-tls/
+*.pem
+# E2E run artifacts / scratch probes
+e2e-artifacts/
+*-failure.png
+# Internal working docs (planning/specs/issues — not part of the shipped repo)
+docs/issues/
+docs/superpowers/
+# Playwright run artifacts
+test-results/
+playwright-report/

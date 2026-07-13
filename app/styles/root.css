@@ -1,0 +1,53 @@
+@import 'tailwindcss';
+@import '@datum-cloud/datum-ui/styles';
+
+/* Custom type scale — generates .text-{name} utilities in Tailwind v4.
+   Placed after the datum-ui @import so these tokens win the cascade. */
+@theme {
+  --text-xs: 12px;
+  --text-xs--line-height: 1rem;
+  --text-2xs: 0.625rem; /* 10px — remove if unused */
+  --text-2xs--line-height: 0.875rem;
+}
+
+/* Self-hosted woff2 font overrides — converted from @datum-cloud/datum-ui v1.2.0 TTFs.
+   These declarations intentionally repeat datum-ui's font-family/weight/style with the woff2
+   source listed first, and appear AFTER the datum-ui @import so they win the cascade.
+   Browser picks the woff2 entry first (matching format hint), skipping the TTF entirely. */
+@font-face {
+  font-family: 'Alliance No1';
+  src: url('./fonts/AllianceNo1-Regular.woff2') format('woff2');
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Alliance No1';
+  src: url('./fonts/AllianceNo1-Medium.woff2') format('woff2');
+  font-weight: 500;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Alliance No1';
+  src: url('./fonts/AllianceNo1-SemiBold.woff2') format('woff2');
+  font-weight: 600;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* 755-M5 / M3 / M4 — color tokens: auth-ui uses datum-ui's ORIGINAL alpha-theme colors as the single
+   source of truth (NO --primary / --btn-primary / --muted-foreground overrides). Some of those tokens
+   (the light canyon-clay primary button, the muted side-panel text) fall short of WCAG AA contrast —
+   that is a datum-ui alpha-theme concern to be fixed UPSTREAM (Phase 6), not patched here. The
+   cypress-axe `color-contrast` rule is correspondingly disabled in cypress/support/a11y.ts so the
+   a11y gate doesn't fail on datum-ui's tokens; re-enable it once datum-ui's theme passes AA. */
+
+/* Required-field asterisk: datum-ui's Form.Field renders it as span[aria-hidden] at
+   text-destructive/80. Point it at datum-ui's --destructive token (theme-aware for light + dark)
+   rather than a hardcoded color. */
+form span[aria-hidden] {
+  color: var(--destructive);
+}

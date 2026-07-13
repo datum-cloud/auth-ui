@@ -1,9 +1,30 @@
-.next/
-.changeset/
-.github/
-dist/
-standalone/
-packages/zitadel-proto/google
-packages/zitadel-proto/protoc-gen-openapiv2
-packages/zitadel-proto/validate
-packages/zitadel-proto/zitadel
+node_modules
+bun.lock
+package-lock.json
+pnpm-lock.yaml
+Dockerfile
+
+# Build output / generated
+/build
+/.react-router
+/coverage
+/.lighthouseci
+
+# Env + secrets
+.env
+.env.*
+!.env.example
+*.pem
+dev-tls/
+dev-ca.crt
+
+# Generated i18n catalogs (lingui)
+app/modules/i18n/locales/
+
+# Test + scratch artifacts
+/cypress/videos
+/cypress/screenshots
+.playwright-mcp/
+e2e-artifacts/
+
+CHANGELOG.md

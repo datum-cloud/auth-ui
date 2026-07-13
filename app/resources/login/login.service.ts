@@ -1,0 +1,462 @@
+// app/resources/login/login.service.ts
+//
+// Pass 2 extraction: the loader/action BUSINESS logic for the login domain — the
+// /login → /authorize protocol-bridge decision, the IdP-intent start (return-URL
+// construction + provider.startIdpIntent + result mapping), the identifier flow
+// (findUser → createSession → decideAfterIdentifier → ceremony-session shaping),
+// and the password flow (session lookup → updateSession → nextStep routing with
+// the /authorize finalization carve-out). React rendering, CSRF, cookie I/O and
+// the final redirect()/data() wiring stay in the route modules.
+//
+// Each function takes a provider + plain inputs (already parsed/validated by the
+// route's schema) + the caller's current session list, and returns a typed result
+// the route turns into a redirect()/data() response. No Request parsing, no CSRF,
+// no raw cookie serialization lives here.
+import type { AuthProvider, SessionOpts } from '@/modules/auth/auth-provider';
+import { idpTypeToSlug } from '@/modules/auth/idp-slug';
+import {
+  addSession,
+  byLoginName,
+  sessionEntryFromSession,
+  type SessionEntry,
+} from '@/modules/auth/session/cookie';
+import type { LoginSettings } from '@/modules/auth/types';
+import { ProviderError } from '@/modules/auth/types';
+import { decideAfterIdentifier } from '@/resources/login/login-decision';
+import { isEmailLike } from '@/resources/login/login.schema';
+import { nextStepFromSession, threadParams } from '@/resources/shared/next-step-params';
+import { resolveOrg } from '@/resources/shared/resolve-org';
+import { idpReturnUrls } from '@/resources/sso/idp-return-urls';
+import { paths } from '@/routes/paths';
+import { logAuthEvent, hashActor } from '@/server/observability';
+
+// ── /login → /authorize protocol bridge ───────────────────────────────────────
+
+/**
+ * Zitadel's login-v2 base URI appends `/login?authRequest=…` (OIDC) or
+ * `?samlRequest=…` (SAML) — NOT `/authorize`. When either raw protocol entry is
+ * present the loader must forward to the /authorize orchestrator, which normalizes
+ * it to a requestId and threads the ceremony.
+ *
+ * Keyed on authRequest/samlRequest ONLY, so the post-identifier return from
+ * /authorize (which carries `?requestId=`) never re-triggers this (no loop). A
+ * plain /login (no protocol entry) is NOT bridged either.
+ */
+export function shouldBridgeToAuthorize(params: URLSearchParams): boolean {
+  return params.has('authRequest') || params.has('samlRequest');
+}
+
+// ── IdP intent start ("Continue with Google") ─────────────────────────────────
+
+export interface StartIdpInput {
+  idpId: string;
+  /**
+   * TRUSTED app origin (scheme + host) from trustedAppOrigin(request). SECURITY:
+   * MUST come from trusted config (PUBLIC_ORIGIN), never the client-controllable
+   * request Host header — the IdP success/failure return URLs are built from it,
+   * and Zitadel only accepts a registered (public-origin) redirect URI.
+   */
+  origin: string;
+  /** Carried through the IdP round-trip so the /sso callback can resume /authorize. */
+  requestId?: string;
+  /** Org scope to carry through the ceremony. */
+  organization?: string;
+  /**
+   * RE-AUTH best-effort: the loginName being re-authenticated. Appended to the IdP authorize URL
+   * as `login_hint` so providers that honor it (Google / generic OIDC) pre-select that account.
+   * Providers that don't (e.g. GitHub) ignore the unknown param — the callback's identity check
+   * is the real guard, this only improves the picker UX.
+   */
+  reauthHint?: string;
+  /** MaxMind device-fingerprint token captured client-side; attached as session metadata. */
+  deviceTrackingToken?: string;
+}
+
+export type StartIdpError = 'IDP_UNAVAILABLE';
+
+export type StartIdpResult = { ok: true; authUrl: string } | { ok: false; error: StartIdpError };
+
+/**
+ * Start an external-IdP intent. Builds the success/failure return URLs (threading
+ * requestId + organization via the success URL so they survive the IdP round-trip
+ * and arrive at the /sso callback), calls provider.startIdpIntent, and maps the
+ * result. A missing authUrl is a provider failure → IDP_UNAVAILABLE (502 at route).
+ */
+export async function startIdpIntent(
+  provider: AuthProvider,
+  { idpId, origin, requestId, organization, reauthHint, deviceTrackingToken }: StartIdpInput
+): Promise<StartIdpResult> {
+  const slug = idpTypeToSlug(idpId) ?? idpId;
+  const { success, failure } = idpReturnUrls(origin, slug, {
+    requestId,
+    organization,
+    deviceTrackingToken,
+  });
+  // Guard the provider call: a ProviderError (Zitadel unavailable / IdP intent rejected) is the
+  // designed IDP_UNAVAILABLE result (502 at route), NOT a crash to the error boundary. Unknown
+  // errors still propagate.
+  let result: Awaited<ReturnType<typeof provider.startIdpIntent>>;
+  try {
+    result = await provider.startIdpIntent(idpId, { success, failure });
+  } catch (err) {
+    if (!(err instanceof ProviderError)) throw err;
+    logAuthEvent('idp_start', 'failure', { idpId, reason: 'provider_error' });
+    return { ok: false, error: 'IDP_UNAVAILABLE' };
+  }
+  if (!result.authUrl) {
+    logAuthEvent('idp_start', 'failure', { idpId, reason: 'no_auth_url' });
+    return { ok: false, error: 'IDP_UNAVAILABLE' };
+  }
+  logAuthEvent('idp_start', 'success', { idpId });
+  return { ok: true, authUrl: withLoginHint(result.authUrl, reauthHint) };
+}
+
+/**
+ * Best-effort re-auth pre-selection: append `login_hint=<loginName>` to the IdP authorize URL so
+ * providers that honor it (Google / generic OIDC) pre-select the account being re-authenticated.
+ * Unknown params are ignored by providers that don't (e.g. GitHub). A malformed authUrl is
+ * returned untouched — this is a UX nicety, never load-bearing (the callback's identity check is
+ * the real guard).
+ */
+function withLoginHint(authUrl: string, reauthHint?: string): string {
+  if (!reauthHint) return authUrl;
+  try {
+    const url = new URL(authUrl);
+    url.searchParams.set('login_hint', reauthHint);
+    return url.toString();
+  } catch {
+    return authUrl;
+  }
+}
+
+// ── identifier flow ────────────────────────────────────────────────────────────
+
+export interface ResolveIdentifierInput {
+  loginName: string;
+  requestId?: string;
+  organization?: string;
+  emailDeliveryEnabled: boolean;
+  userAgent?: SessionOpts['userAgent'];
+  /**
+   * The login settings the caller has ALREADY fetched for
+   * `organization` (the /login route reads them for its phone-rejection gate just
+   * before calling here). When supplied, the inner happy-path re-fetch is skipped —
+   * fewer RPCs, identical result. OPTIONAL → existing callers are unchanged.
+   *
+   * Only reused when the resolved org still equals the caller's `organization`; if
+   * domain-discovery shifts `org` to a different org, these settings describe the
+   * wrong org and the inner read for the discovered org still runs.
+   */
+  settings?: LoginSettings;
+}
+
+export type ResolveIdentifierError = 'USER_NOT_FOUND' | 'EMAIL_LOGIN_DISABLED';
+
+/**
+ * A "identifier accepted, persist the ceremony session and redirect to the next
+ * factor screen" outcome. The route serializes `sessions` into the cookie and
+ * `redirect()`s to `target?<params>`.
+ */
+export interface ResolveIdentifierRedirect {
+  ok: true;
+  target: string;
+  params: URLSearchParams;
+  sessions: SessionEntry[];
+}
+
+/**
+ * Domain-discovery single-IdP outcome: the resolved org disallows password and exposes exactly one
+ * external IdP, so the identifier step should start that IdP intent directly (skipping the
+ * password screen). The route converts this into `startIdpIntent(...)` + `redirect(authUrl)` —
+ * it CANNOT be a plain redirect to `/sso`, which is a session-gated management page that cannot
+ * start an intent and would bounce a fresh user back to `/login`.
+ */
+export interface ResolveIdentifierStartIdp {
+  ok: true;
+  startIdp: { idpId: string; organization: string; loginName: string; requestId?: string };
+  sessions: SessionEntry[];
+}
+
+export type ResolveIdentifierResult =
+  | ResolveIdentifierRedirect
+  | ResolveIdentifierStartIdp
+  | { ok: false; error: ResolveIdentifierError };
+
+/** Lowercased domain of an email-style identifier, or null when it is not an email. */
+function emailDomain(loginName: string): string | null {
+  const at = loginName.lastIndexOf('@');
+  if (at <= 0 || at === loginName.length - 1) return null;
+  return loginName.slice(at + 1).toLowerCase();
+}
+
+/**
+ * Identifier step: resolve the user, create the ceremony session, decide the next
+ * factor screen, and shape the ceremony-session entry + threaded query params.
+ *
+ * Enumeration note (Phase 1): an unknown identifier surfaces a generic USER_NOT_FOUND
+ * (the route renders generic copy); register/ignoreUnknown handled in Phase 2.
+ *
+ * The threaded `requestId` (oidc_/saml_/device_) rides on the redirect params so the
+ * next screen — and ultimately /authorize — can resume the ceremony.
+ */
+export async function resolveIdentifier(
+  provider: AuthProvider,
+  list: SessionEntry[],
+  {
+    loginName,
+    requestId,
+    organization,
+    emailDeliveryEnabled,
+    userAgent,
+    settings: threadedSettings,
+  }: ResolveIdentifierInput
+): Promise<ResolveIdentifierResult> {
+  // allowDomainDiscovery (settings-gated, DEFAULT-OFF): when the caller pinned no org and the
+  // BASE/instance policy enables discovery, map an email domain → org and thread it through the
+  // rest of the ceremony. The base settings (getLoginSettings(undefined)) govern WHETHER discovery
+  // runs — the org isn't known yet — and the discovered org's settings re-drive the gating below.
+  // Off / explicit-org / non-email / no-hit ⇒ org stays === the caller's organization, i.e.
+  // byte-identical to today.
+  let org = organization;
+  if (!org) {
+    const baseSettings = await provider.getLoginSettings(undefined);
+    if (baseSettings.allowDomainDiscovery === true) {
+      const domain = emailDomain(loginName);
+      const found = domain ? await provider.findOrgByDomain(domain) : null;
+      if (found) {
+        org = found.orgId;
+        // Single auto-redirect IdP: the discovered org disallows password but exposes exactly
+        // one external IdP → route straight to that IdP intent (skip the identifier/password screen).
+        const orgSettings = await provider.getLoginSettings(org);
+        // Org-first / default-org fallback for completeness: `org` is already the discovered org
+        // here, so resolveOrg is a pass-through, but routing every getActiveIdPs-for-display read
+        // through it keeps the org-resolution policy in one place.
+        const idps = await provider.getActiveIdPs(await resolveOrg(provider, org));
+        if (!orgSettings.allowPassword && orgSettings.allowExternalIdp && idps.length === 1) {
+          logAuthEvent('identifier', 'success', { actor: hashActor(loginName) });
+          // Signal the route to start the IdP intent directly (see ResolveIdentifierStartIdp).
+          // A plain redirect to /sso cannot start an intent and dead-ends session-less users.
+          return {
+            ok: true,
+            startIdp: { idpId: idps[0].id, organization: org, loginName, requestId },
+            sessions: list,
+          };
+        }
+      }
+    }
+  }
+
+  const user = await provider.findUser(loginName, org);
+  if (!user) {
+    // ignoreUnknownUsernames (settings-gated, DEFAULT-OFF): with the flag off this is
+    // byte-identical to before (USER_NOT_FOUND). With it on, proceed to the password
+    // step bound to the typed loginName but with NO user attached — the credential check
+    // then fails generically, identical to a wrong password for a real account.
+    // Org-first: resolve the org (explicit wins; else default org) before reading the policy that
+    // gates ignoreUnknownUsernames / disableLoginWithEmail. Reading raw `org` (often undefined
+    // here) returned INSTANCE settings, so these gates could diverge from the default org's policy.
+    const settings = await provider.getLoginSettings(await resolveOrg(provider, org));
+    if (settings.ignoreUnknownUsernames !== true) {
+      // disableLoginWithEmail (settings-gated, DEFAULT-OFF): an email is never a valid loginname
+      // under this policy, so the lookup already failed. Refine the generic not-found into a
+      // distinct EMAIL_LOGIN_DISABLED so the route can guide the user to their username.
+      // isEmailLike is copy-only (never blocks) — see login.schema.ts. Gated behind the
+      // ignoreUnknownUsernames check above so the anti-enumeration path reveals nothing.
+      if (settings.disableLoginWithEmail === true && isEmailLike(loginName)) {
+        logAuthEvent('identifier', 'failure', {
+          actor: hashActor(loginName),
+          reason: 'email_login_disabled',
+        });
+        return { ok: false, error: 'EMAIL_LOGIN_DISABLED' };
+      }
+      logAuthEvent('identifier', 'failure', { actor: hashActor(loginName), reason: 'not_found' });
+      return { ok: false, error: 'USER_NOT_FOUND' };
+    }
+    logAuthEvent('identifier', 'success', { actor: hashActor(loginName) });
+    const ghostSession = await provider.createSession({}, { requestId, orgId: org, userAgent });
+    const ghostSessions = addSession(
+      list,
+      sessionEntryFromSession(ghostSession, { loginName, organization: org, requestId })
+    );
+    const ghostParams = new URLSearchParams(threadParams(loginName, requestId, org));
+    return { ok: true, target: '/login/password', params: ghostParams, sessions: ghostSessions };
+  }
+  logAuthEvent('identifier', 'success', { actor: hashActor(loginName) });
+
+  const session = await provider.createSession(
+    {},
+    { requestId, orgId: org, userId: user.id, userAgent }
+  );
+  const methods = await provider.listAuthMethods(user.id);
+  // The effective org for post-identifier decisions is the org the FOUND USER belongs
+  // to — not the caller's (possibly default-org) ceremony org. When no explicit org was
+  // pinned and domain-discovery didn't run (org === undefined), the user may live in a
+  // different org than the default. Use user.orgId as the authoritative org so the
+  // settings (allowPassword, passkeysType, …) match the user's actual policies.
+  // The caller's threadedSettings are only reused when both the caller pinned an explicit
+  // org AND the user's org matches it (org !== undefined && org === organization).
+  const userOrg = org ?? user.orgId;
+  const settings =
+    threadedSettings && org !== undefined && org === organization
+      ? threadedSettings
+      : await provider.getLoginSettings(userOrg);
+  const decision = decideAfterIdentifier({
+    methods,
+    settings,
+    emailDeliveryEnabled,
+    context: { role: 'primary' }, // post-identifier decision is the primary flow
+  });
+
+  // Persist the ceremony session into the (to-be-serialized) cookie list. Supersede any prior
+  // entry for the SAME identity (loginName+org): a fresh login — including re-authenticating a
+  // "Needs re-authentication" account whose dead entry is intentionally kept until now —
+  // replaces the stale session for that identity rather than leaving a duplicate that would
+  // shadow the live one in byLoginName lookups. Different identities (add another account) are
+  // left untouched.
+  const base = list.filter((s) => !(s.loginName === user.loginName && s.organization === org));
+  const sessions = addSession(
+    base,
+    sessionEntryFromSession(session, { loginName: user.loginName, organization: org, requestId })
+  );
+
+  const params = new URLSearchParams({ loginName: user.loginName });
+  if (requestId) params.set('requestId', requestId);
+  if (org) params.set('organization', org);
+
+  // Consume the Decision union by `kind` exhaustively (the compat shims are gone).
+  // 'redirect' → thread any decision params onto the ceremony query and target d.path;
+  // 'error'    → the post-identifier policy errors (PASSWORD_NOT_ALLOWED / NO_SUPPORTED_METHOD)
+  //              route to /error, byte-identical to the old decisionTarget()='/error' leg
+  //              (the error variant carried no params, and today's error legs never did either).
+  switch (decision.kind) {
+    case 'redirect': {
+      Object.entries(decision.params ?? {}).forEach(([k, v]) => params.set(k, v));
+      return { ok: true, target: decision.path, params, sessions };
+    }
+    case 'error':
+      return { ok: true, target: paths.error(), params, sessions };
+  }
+}
+
+// ── password flow ───────────────────────────────────────────────────────────────
+
+export interface VerifyLoginPasswordInput {
+  password: string;
+  loginName: string;
+  requestId?: string;
+  organization?: string;
+}
+
+export type VerifyLoginPasswordError = 'SESSION_EXPIRED' | 'INVALID_CREDENTIALS';
+
+/**
+ * A "password verified, persist the (possibly rotated) session and redirect"
+ * outcome. The route serializes `sessions` into the cookie and `redirect()`s to
+ * `target`.
+ */
+export interface VerifyLoginPasswordRedirect {
+  ok: true;
+  target: string;
+  sessions: SessionEntry[];
+}
+
+export interface VerifyLoginPasswordCredentialFailure {
+  ok: false;
+  error: 'INVALID_CREDENTIALS';
+  failedAttempts?: number;
+  maxAttempts?: number;
+}
+
+export type VerifyLoginPasswordResult =
+  | VerifyLoginPasswordRedirect
+  | { ok: false; error: 'SESSION_EXPIRED' }
+  | VerifyLoginPasswordCredentialFailure;
+
+/**
+ * Password step: look up the ceremony session entry (by loginName, from the SIGNED
+ * cookie — the route supplies the list), verify the password via updateSession,
+ * then resolve the next step.
+ *
+ * TOKEN ROTATION: Zitadel may issue a new token on setSession; we write the
+ * (potentially rotated) token back to the ceremony entry so any subsequent
+ * getSession / createCallback / deleteSession call uses the live token.
+ *
+ * /authorize carve-out: when nextStep resolves to /signed-in (fully authenticated)
+ * AND a requestId is present, the session must be finalized via /authorize instead
+ * (which calls createCallback and redirects back to the OIDC client). We surface the
+ * authorize target with the same persisted session list.
+ *
+ * INVALID_CREDENTIALS is mapped to a typed failure (carrying failed/max attempts);
+ * other ProviderErrors re-throw. Never logs the password.
+ */
+export async function verifyLoginPassword(
+  provider: AuthProvider,
+  list: SessionEntry[],
+  { password, loginName, requestId, organization }: VerifyLoginPasswordInput
+): Promise<VerifyLoginPasswordResult> {
+  const entry = byLoginName(list, loginName, organization);
+  if (!entry) return { ok: false, error: 'SESSION_EXPIRED' };
+
+  let session;
+  try {
+    session = await provider.updateSession(entry.id, entry.token, { password });
+  } catch (error) {
+    if (error instanceof ProviderError && error.code === 'INVALID_CREDENTIALS') {
+      // Emit failure event — never log the password.
+      logAuthEvent('password_check', 'failure', { actor: hashActor(loginName) });
+      return {
+        ok: false,
+        error: 'INVALID_CREDENTIALS',
+        failedAttempts: error.detail?.failedAttempts,
+        maxAttempts: error.detail?.maxAttempts,
+      };
+    }
+    throw error;
+  }
+
+  logAuthEvent('password_check', 'success', { userId: session.user?.id, sessionId: session.id });
+
+  const userId = session.user?.id ?? '';
+  const [methods, settings] = await Promise.all([
+    provider.listAuthMethods(userId),
+    // Org-first, consistent with mfa/otp/webauthn: resolve to the default org when unset so the
+    // policy/next-step routing matches the org's login settings, not the instance defaults.
+    provider.getLoginSettings(await resolveOrg(provider, organization)),
+  ]);
+
+  // TOKEN ROTATION — write the (potentially rotated) token back to the ceremony entry.
+  const sessions = addSession(list, {
+    ...entry,
+    token: session.token,
+    changeTs: session.changedAt,
+    expirationTs: session.expiresAt,
+  });
+
+  const targetUrl = nextStepFromSession({
+    session,
+    methods,
+    settings,
+    // CAVEAT: pass the RAW typed loginName — the password step must NOT defer to
+    // session.user?.loginName here (preserves the original login behavior).
+    loginName,
+    mfaInitSkippedAt: session.user?.mfaInitSkippedAt ?? null,
+    requestId,
+    organization,
+  });
+
+  // /authorize finalization carve-out (see doc above).
+  const isSignedIn = targetUrl === '/signed-in' || targetUrl.startsWith('/signed-in?');
+  // A `device_` requestId must NOT take the /authorize carve-out. It has to reach
+  // `/signed-in?requestId=device_…`, where resolveSignedIn hands it back to the /device/authorize
+  // consent screen (an explicit CSRF-protected Approve). Only oidc_/saml_ go through /authorize.
+  const isDeviceFlow = requestId?.startsWith('device_') ?? false;
+  if (isSignedIn && requestId && !isDeviceFlow) {
+    const authorizeParams = new URLSearchParams({ requestId, sessionId: session.id });
+    return { ok: true, target: `/authorize?${authorizeParams.toString()}`, sessions };
+  }
+
+  return { ok: true, target: targetUrl, sessions };
+}
+
+// Re-exported so callers/tests can reach the identifier decision through the barrel.
+export { decideAfterIdentifier };

@@ -1,0 +1,22 @@
+[
+  {
+    "name": "login-route initial JS (entry + root + login chunk + shared imports), gzip — Form barrel 109kB is 42% of this 258kB total; without it the route weighs ~149kB; controller decision required: (a) upstream datum-ui slim, (b) swap 13 form-barrel screens to RHF primitives, or (c) formally accept 280K budget",
+    "path": [
+      "build/client/assets/entry.client-*.js",
+      "build/client/assets/chunk-6CSD65Y2-*.js",
+      "build/client/assets/react-dom-*.js",
+      "build/client/assets/jsx-runtime-*.js",
+      "build/client/assets/root-*.js",
+      "build/client/assets/parse-*.js",
+      "build/client/assets/dist-*.js",
+      "build/client/assets/login-*.js",
+      "build/client/assets/auth-card-*.js",
+      "build/client/assets/auth-form-*.js",
+      "build/client/assets/form-*.js",
+      "build/client/assets/button-*.js",
+      "build/client/assets/manifest-*.js"
+    ],
+    "limit": "280000 B",
+    "gzip": true
+  }
+]

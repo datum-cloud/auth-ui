@@ -1,206 +1,140 @@
-# Contributing
+# Contributing to auth-ui
 
-:attention: In this CONTRIBUTING.md you read about contributing to this very repository.
-If you want to develop your own login UI, please refer [to the README.md](./README.md).
+Thanks for contributing to `datum-cloud/auth-ui` — Datum's authentication UI. This
+guide gets you from a clean checkout to a green pull request. It is repo-specific:
+every command below is the one this project actually runs.
 
-## Introduction
+## Prerequisites
 
-Thank you for your interest about how to contribute!
+- **[Bun](https://bun.sh)** is the package manager and script runner. This repo pins
+  its dependency graph in `bun.lock` (Bun's lockfile) — use Bun, not npm/yarn/pnpm, so
+  the lock stays authoritative. Bun also runs the dev server and the toolchain
+  (`bunx eslint`, `bunx tsc`, `bunx vitest`, `bunx cypress`).
+- **An auth provider.** auth-ui talks to an identity provider through a single
+  `AuthProvider` adapter selected by the `AUTH_PROVIDER` env var:
+  - `AUTH_PROVIDER=fake` — an in-memory provider that seeds its own users
+    (e.g. `alice@acme.test` / `hunter2`). **No Zitadel needed.** This is the
+    recommended path for local dev and the fast e2e suite.
+  - `AUTH_PROVIDER=zitadel` (default when unset) — a real Zitadel Session API
+    backend. Requires `ZITADEL_API_URL` and `ZITADEL_SERVICE_USER_TOKEN`, plus
+    `PUBLIC_ORIGIN` in production. Only needed if you are changing Zitadel-specific
+    behavior.
 
-:attention: If you notice a possible **security vulnerability**, please don't hesitate to disclose any concern by contacting [security@zitadel.com](mailto:security@zitadel.com).
-You don't have to be perfectly sure about the nature of the vulnerability.
-We will give them a high priority and figure them out.
-
-We also appreciate all your other ideas, thoughts and feedback and will take care of them as soon as possible.
-We love to discuss in an open space using [GitHub issues](https://github.com/zitadel/typescript/issues),
-[GitHub discussions in the core repo](https://github.com/zitadel/zitadel/discussions)
-or in our [chat on Discord](https://zitadel.com/chat).
-For private discussions,
-you have [more contact options on our Website](https://zitadel.com/contact).
-
-## Pull Requests
-
-Please consider the following guidelines when creating a pull request.
-
-- The latest changes are always in `main`, so please make your pull request against that branch.
-- pull requests should be raised for any change
-- Pull requests need approval of a Zitadel core engineer @zitadel/engineers before merging
-- We use ESLint/Prettier for linting/formatting, so please run `pnpm lint:fix` before committing to make resolving conflicts easier (VSCode users, check out [this ESLint extension](https://marketplace.visualstudio.com/items?itemName=dbaeumer.vscode-eslint) and [this Prettier extension](https://marketplace.visualstudio.com/items?itemName=esbenp.prettier-vscode) to fix lint and formatting issues in development)
-- If you add new functionality, please provide the corresponding documentation as well and make it part of the pull request
-
-### Setting up local environment
-
-```sh
-# Install dependencies. Developing requires Node.js v20
-pnpm install
-
-# Generate gRPC stubs
-pnpm generate
-
-# Start a local development server for the login and manually configure apps/login/.env.local
-pnpm dev
-```
-
-The application is now available at `http://localhost:3000`
-
-Configure apps/login/.env.local to target the Zitadel instance of your choice.
-The login app live-reloads on changes, so you can start developing right away.
-
-### <a name="latest"></a>Developing Against A Local Latest Zitadel Release
-
-The following command uses Docker to run a local Zitadel instance and the login application in live-reloading dev mode.
-Additionally, it runs a Traefik reverse proxy that exposes the login with a self-signed certificate at https://127.0.0.1.sslip.io
-127.0.0.1.sslip.io is a special domain that resolves to your localhost, so it's safe to allow your browser to proceed with loading the page.
-
-```sh
-# Install dependencies. Developing requires Node.js v20
-pnpm install
-
-# Generate gRPC stubs
-pnpm generate
-
-# Start a local development server and have apps/login/.env.test.local configured for you to target the local Zitadel instance.
-pnpm dev:local
-```
-
-Log in at https://127.0.0.1.sslip.io/ui/v2/login/loginname and use the following credentials:
-**Loginname**: *zitadel-admin@zitadel.127.0.0.1.sslip.io*
-**Password**: _Password1!_.
-
-The login app live-reloads on changes, so you can start developing right away.
-
-### <a name="local"></a>Developing Against A Locally Compiled Zitadel
-
-To develop against a locally compiled version of Zitadel, you need to build the Zitadel docker image first.
-Clone the [Zitadel repository](https://github.com/zitadel/zitadel.git) and run the following command from its root:
-
-```sh
-# This compiles a Zitadel binary if it does not exist at ./zitadel already and copies it into a Docker image.
-# If you want to recompile the binary, run `make compile` first
-make login_dev
-```
-
-Open another terminal session at zitadel/zitadel/login and run the following commands to start the dev server.
+## Setup (fake-provider quickstart)
 
 ```bash
-# Install dependencies. Developing requires Node.js v20
-pnpm install
-
-# Start a local development server and have apps/login/.env.test.local configured for you to target the local Zitadel instance.
-NODE_ENV=test pnpm dev
+bun install
+cp .env.example .env
 ```
 
-Log in at https://127.0.0.1.sslip.io/ui/v2/login/loginname and use the following credentials:
-**Loginname**: *zitadel-admin@zitadel.127.0.0.1.sslip.io*
-**Password**: _Password1!_.
+`.env.example` is the documented superset of every env key (it groups them into
+*Always required*, *FAKE provider*, *ZITADEL provider*, *Observability*, and
+*Analytics & fraud*) and ships **placeholders only** — `.env` is gitignored; never
+commit real secrets. For local dev with the fake provider you only need a
+`SESSION_SECRET` (generate one with `openssl rand -base64 32`).
 
-The login app live-reloads on changes, so you can start developing right away.
+Run the app against the fake provider — no Zitadel, no extra config:
 
-### Quality Assurance
-
-Use `make` commands to test the quality of your code against a production build without installing any dependencies besides Docker.
-Using `make` commands, you can reproduce and debug the CI pipelines locally.
-
-```sh
-# Reproduce the whole CI pipeline in docker
-make login_quality
-# Show other options with make
-make help
+```bash
+AUTH_PROVIDER=fake bun run dev
 ```
 
-Use `pnpm` commands to run the tests in dev mode with live reloading and debugging capabilities.
+The dev server comes up on `http://localhost:3000` (health check at `/healthz`).
+Sign in with one of the seeded fake users.
 
-#### Linting and formatting
+## The local gate
 
-Check the formatting and linting of the code in docker
+### Pre-commit (automatic)
 
-```sh
-make login_lint
+A [lefthook](https://github.com/evilmartians/lefthook) `pre-commit` hook is installed
+by the `prepare` script during `bun install`. On every commit it runs, in parallel,
+against your **staged** files:
+
+1. **prettier** — `bunx prettier --write` (auto-formats and re-stages).
+2. **eslint** — `bunx eslint --fix` (includes the `no-console` rule; do not leave
+   `console.*` calls in shipped code, and never log raw PII).
+3. **typecheck** — `bunx tsc --noEmit`.
+4. **i18n** — re-extracts and compiles the Lingui catalog when `app/**` changes.
+
+If any step fails, the commit is blocked. Fix the issue and re-commit.
+
+### Full gate (run manually before opening a PR)
+
+The pre-commit hook only sees staged files. Before pushing, run the full gate the
+way CI does:
+
+```bash
+bun run typecheck        # react-router typegen + tsc, whole project
+bun run lint:ci          # eslint with no --fix (must be clean, incl. no-console)
+bun run test:unit        # vitest run — all unit/integration tests
+bun run test:coverage    # vitest --coverage; must stay at/above the ratchet floor
+bun run test:e2e:fast    # build + fake-provider Cypress core-signin smoke
+bun run lint:boundaries  # dependency-cruiser architecture-fitness check
+bun run size             # size-limit first-load JS (gzip) budget
 ```
 
-Check the linting of the code using pnpm
+Coverage is ratcheted: it may go **up**, never down. If your change lowers coverage
+below the current floor, add tests rather than lowering the threshold.
 
-```sh
-pnpm lint
-pnpm format
+### Running a single test
+
+```bash
+# One unit/integration test file (or a directory):
+bunx vitest run app/modules/auth/providers/fake/fake-provider.test.ts
+
+# One Cypress e2e spec:
+bunx cypress run --spec cypress/e2e/core-signin.cy.ts
 ```
 
-Fix the linting of your code
+## Conventions
 
-```sh
-pnpm lint:fix
-pnpm format:fix
+- **Conventional Commits.** Prefix every commit with a type:
+  `feat` / `fix` / `refactor` / `chore` / `docs` / `test` / `perf`.
+  Example: `fix(session): scope last-used-login cookie to /id`.
+- **Branch from `main`.** Open one PR per logical change.
+- **Use the PR template** (`.github/pull_request_template.md`) and fill in the
+  checklist.
+- **URLs are byte-frozen.** Routes, redirects, and the URL-resolution behavior are
+  contractually stable. Do **not** change a route path, redirect target, or
+  query-param contract without going through the URL-resolution e2e gate — that suite
+  asserts the exact byte-for-byte URLs and will fail on any drift.
+- **No new `console.*`** in `app/` code (enforced by lint), and **no raw PII in
+  logs** — hash or redact actor identifiers.
+
+## SPDX header policy
+
+New or substantially-rewritten source files **SHOULD** begin with an SPDX identifier
+declaring the project license (MIT). For `.ts` / `.tsx` files use the one-line form
+as the very first line:
+
+```ts
+// SPDX-License-Identifier: MIT
 ```
 
-#### Running Unit Tests
+A repo-wide header sweep across existing files is tracked as a separate cleanup task;
+for now, apply the header to files you create or rewrite.
 
-Run the tests in docker
+## Where things live
 
-```sh
-make login_test_unit
-```
+The app is layered front-to-back: **`app/routes`** are the HTTP entry points (the
+byte-frozen URL surface) → **`app/resources`** hold the per-flow loaders, actions, and
+Zod schemas (one folder per auth flow: `login`, `signup`, `mfa`, `otp`, `password`,
+`webauthn`, `sso`, `session`, …) → **`app/modules`** are the domain modules, where
+`modules/auth/providers/{fake,zitadel}` implement the `AuthProvider` adapter boundary
+(plus `analytics`, `fraud`, and `i18n`) → the **providers** layer is that adapter
+seam the rest of the app depends on instead of any concrete IdP. Server runtime and
+boot wiring live in **`app/server/`**, and presentational UI lives in
+**`app/components/`**. Cross-layer dependency rules are enforced by
+`bun run lint:boundaries`. For the full architecture rationale see
+[`docs/audit/2026-06-20/ENTERPRISE-STRUCTURE-BLUEPRINT.md`](docs/audit/2026-06-20/ENTERPRISE-STRUCTURE-BLUEPRINT.md)
+and [`docs/audit/2026-06-20/IMPLEMENTATION-DESIGN.md`](docs/audit/2026-06-20/IMPLEMENTATION-DESIGN.md).
 
-Run unit tests with live-reloading
+## Security
 
-```sh
-pnpm test:unit
-```
+Found a vulnerability? **Do not** open a public issue or PR — follow
+[`SECURITY.md`](SECURITY.md) and use GitHub's private vulnerability reporting.
 
-#### Running Integration Tests
+## License
 
-Run the test in docker
-
-```sh
-make login_test_integration
-```
-
-Alternatively, run a live-reloading development server with an interactive Cypress test suite.
-First, set up your local test environment.
-
-```sh
-# Install dependencies. Developing requires Node.js v20
-pnpm install
-
-# Generate gRPC stubs
-pnpm generate
-
-# Start a local development server and use apps/login/.env.test to use the locally mocked Zitadel API.
-pnpm test:integration:setup
-```
-
-Now, in another terminal session, open the interactive Cypress integration test suite.
-
-```sh
-pnpm test:integration open
-```
-
-Show more options with Cypress
-
-```sh
-pnpm test:integration help
-```
-
-#### Running Acceptance Tests
-
-To run the tests in docker against the latest release of Zitadel, use the following command:
-
-:warning: The acceptance tests are not reliable at the moment :construction:
-
-```sh
-make login_test_acceptance
-```
-
-Alternatively, run can use a live-reloading development server with an interactive Playwright test suite.
-Set up your local environment by running the commands either for [developing against a local latest Zitadel release](latest) or for [developing against a locally compiled Zitadel](compiled).
-
-Now, in another terminal session, open the interactive Playwright acceptance test suite.
-
-```sh
-pnpm test:acceptance open
-```
-
-Show more options with Playwright
-
-```sh
-pnpm test:acceptance help
-```
+By contributing, you agree your contributions are licensed under the project's
+[MIT License](LICENSE).
