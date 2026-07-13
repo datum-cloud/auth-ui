@@ -30,7 +30,7 @@ release. Pull requests build and test but never publish.
 push to main / GitHub release
         |
         v
-   status-check  (lint, typecheck, component + e2e + acceptance suites)
+   status-check  (lint, typecheck, component tests, e2e, i18n, supply-chain, build)
         |
         +--> release-gate  (release events only; `production` GitHub environment)
         |
