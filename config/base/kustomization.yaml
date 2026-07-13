@@ -1,4 +1,7 @@
 resources:
   - deployment.yaml
+  - pdb.yaml
   - service.yaml
   - http-route.yaml
+  - service-monitor.yaml
+  - prometheus-rules.yaml

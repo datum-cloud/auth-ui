@@ -1,0 +1,29 @@
+pre-commit:
+  parallel: true
+  commands:
+    eslint:
+      glob: '*.{js,jsx,ts,tsx}'
+      exclude: '**/locales/**'
+      run: bunx eslint --cache --cache-location node_modules/.cache/eslint/ {staged_files} --fix
+      auto_add: true
+    prettier:
+      glob: '*.{js,jsx,ts,tsx,json}'
+      exclude: '**/locales/**'
+      run: bunx prettier --write {staged_files}
+      auto_add: true
+    typecheck:
+      glob: '*.{ts,tsx}'
+      run: bunx tsc --noEmit
+      stage_fixed: false
+    i18n:
+      glob: 'app/**/*.{ts,tsx}'
+      env:
+        CI: '1'
+      run: bunx lingui extract --clean && bunx lingui compile --typescript && git add app/modules/i18n/locales/
+      auto_add: true
+    typecheck:cypress:
+      # Fast Cypress spec typecheck — runs in ~2s, catches import/type errors in
+      # cypress/**/*.ts before they reach CI. Full component suite runs in CI only.
+      glob: 'cypress/**/*.{ts,tsx}'
+      run: bunx tsc -p cypress/tsconfig.json --noEmit
+      stage_fixed: false
