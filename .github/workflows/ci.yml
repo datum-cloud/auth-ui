@@ -7,6 +7,11 @@ on:
     paths-ignore:
       - 'docs/**'
       - 'README.md'
+  # Publishing a GitHub release ships the artifacts production tracks: the
+  # shared publish workflows tag by semver from the release ref, so a
+  # release of v1.0.0 produces auth-ui:v1.0.0 and auth-ui-kustomize:v1.0.0.
+  release:
+    types: [published]
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -229,7 +234,7 @@ jobs:
   publish-container-image:
     name: Publish Container Image
     needs: [status-check]
-    if: ${{ github.event_name == 'push' && !failure() && !cancelled() }}
+    if: ${{ github.event_name != 'pull_request' && !failure() && !cancelled() }}
     permissions:
       id-token: write
       contents: read
@@ -247,7 +252,7 @@ jobs:
   publish-kustomize-bundle:
     name: Publish Kustomize Bundle
     needs: [publish-container-image]
-    if: ${{ github.event_name == 'push' && !failure() && !cancelled() }}
+    if: ${{ github.event_name != 'pull_request' && !failure() && !cancelled() }}
     permissions:
       id-token: write
       contents: read
