@@ -20,7 +20,7 @@ Do **not** write one for library bumps, refactors with no behavioural consequenc
 | **Proposed**   | Written, under review; not yet binding                               |
 | **Accepted**   | In force — the code reflects it and new code must respect it         |
 | **Deprecated** | No longer applies; nothing replaces it                               |
-| **Superseded** | Replaced by a later ADR (link it: _Superseded by [00X](./00X-….md)_) |
+| **Superseded** | Replaced by a later ADR — add an italic _Superseded by ADR NNN_ note at the top, linked to that ADR |
 
 ## Naming Convention
 
