@@ -17,7 +17,9 @@ picker), `nofactor-user@acme.test` (enrollment) — all with the same password. 
 
 ## 2. Run the local gate
 
-Run this before every push. It is the same set of checks CI runs:
+Run this before every push. It is a subset of what CI runs — CI additionally runs
+`typecheck:cypress`, `bun run size`, an i18n-freshness check, a supply-chain audit (`bun audit` +
+SBOM), and `test:e2e:fast`:
 
 ```bash
 bun run lint && bun run typecheck && bun run i18n:compile && bun run test:unit && bun run build

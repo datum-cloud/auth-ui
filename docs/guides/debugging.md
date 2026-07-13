@@ -83,6 +83,6 @@ For service logic that genuinely cannot run in a browser (cookies, sessions, aud
 
 - [Configuration](../operations/configuration.md) — every environment variable
 - [Session & Security](../architecture/session-and-security.md) — sessions, CSRF, rate limiting, CSP
-- [Testing](../development/testing.md) — the three suites and how they are wired
+- [Testing](../development/testing.md) — the four suites and how they are wired
 - [Troubleshooting](../operations/troubleshooting.md) — production symptoms and their causes
 - [Auth Flows](../architecture/auth-flows.md) — what the SSO callback is actually doing

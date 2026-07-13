@@ -34,7 +34,7 @@ This is not a convention — it is a lint gate.
 bun run lint:boundaries   # depcruise app --config .dependency-cruiser.cjs
 ```
 
-The `only-composition-imports-providers` rule in `.dependency-cruiser.cjs` fails the build on any import into `app/modules/auth/providers/` from outside that tree, other than the exemptions above. Three sibling rules keep the rest of the layering honest:
+The `only-composition-imports-providers` rule in `.dependency-cruiser.cjs` fails the build on any import into `app/modules/auth/providers/` from outside that tree, other than the exemptions above. Four sibling rules keep the rest of the layering honest:
 
 | Rule                        | What it forbids                                                                       |
 | --------------------------- | ------------------------------------------------------------------------------------- |

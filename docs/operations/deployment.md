@@ -11,7 +11,7 @@ in overlays in the infra repo, not here.
 
 | File | What it declares |
 | --- | --- |
-| `deployment.yaml` | The `auth-ui` Deployment: image, port `3000`, probes on `/healthz`, non-schema-visible env (`ZITADEL_API_URL`, the `PUBLIC_ORIGIN` placeholder) and a `secretRef` to the `auth-ui` Secret for the rest |
+| `deployment.yaml` | The `auth-ui` Deployment: image, port `3000`, `livenessProbe` on `/healthz` and `readinessProbe` on `/readyz`, env vars `ZITADEL_API_URL` and a `PUBLIC_ORIGIN` placeholder (both are schema-validated — see [Configuration](./configuration.md) — `PUBLIC_ORIGIN` ships as `REPLACE_ME`, which the production boot guard rejects) and a `secretRef` to the `auth-ui` Secret for the rest |
 | `service.yaml` | ClusterIP Service on port `3000`, port name `http` |
 | `http-route.yaml` | Gateway API `HTTPRoute` — path prefix `/id` on the `external-gateway` |
 | `pdb.yaml` | PodDisruptionBudget |
@@ -23,11 +23,14 @@ not part of the Kustomize `resources` list.
 
 ## Artifacts
 
-`.github/workflows/ci.yml` publishes on every push to `main` and on every published GitHub
-release. Pull requests build and test but never publish.
+`.github/workflows/ci.yml` triggers on pull requests, on pushes to `main` and
+`refactor/auth-ui-rebuild`, and on published GitHub releases. The publish jobs
+(`publish-container-image`, `publish-kustomize-bundle`) gate on `github.event_name !=
+'pull_request'`, so they run after every one of those non-PR triggers — not just `main` and
+releases. Pull requests build and test but never publish.
 
 ```
-push to main / GitHub release
+push to main / refactor/auth-ui-rebuild / GitHub release
         |
         v
    status-check  (lint, typecheck, component tests, e2e, i18n, supply-chain, build)

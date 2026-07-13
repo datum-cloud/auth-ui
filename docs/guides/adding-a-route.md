@@ -21,7 +21,7 @@ export async function action({ request }: Route.ActionArgs) {
   const form = await request.formData();
   const result = await redeemBackupCode(request, form); // ← the resource does the work
   if (!result.ok) return { error: result.code };
-  return redirect(paths.signedIn);
+  return redirect(paths.signedIn());
 }
 
 export default function BackupCode({ actionData }: Route.ComponentProps) {

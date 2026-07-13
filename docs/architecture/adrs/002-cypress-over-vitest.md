@@ -32,7 +32,7 @@ The sibling repo `cloud-portal` had already settled this question: no Vitest, Cy
 - The old suite was pruned **risk-based, with no quota**, and re-expressed as Cypress specs. What survived: token/claim mappers, redirect and post-logout allowlists, reauth guards, session cookie scoping, SSO callback identity matching, OTP/MFA challenge logic, CSRF and CSP behaviour. What was cut: render-only assertions, implementation-detail tests, exhaustive permutations, and anything an e2e spec already covered end to end.
 - Genuinely node-bound logic (real RFC-6238 TOTP over `node:crypto`) is **not** forced into a browser — it stays validated at the e2e layer, which computes live TOTP in `cypress.config.ts`.
 
-The tree today: 196 component specs and 24 e2e specs, plus a live-Zitadel acceptance spec. No `vitest.config.ts`, no `vitest` dependency, no `app/**/*.test.ts(x)`.
+The tree today: 196 component specs and 24 e2e specs, plus nine live-Zitadel acceptance specs in `acceptance/` — though `bun run test:acceptance` runs only the `core-signin` spec by default; the other eight (`device-grant`, `ldap-signin`, `logout`, `oidc-authorize`, `saml-authorize`, `signup-email`, `signup-passwordless`, `totp-enroll`) are run directly, e.g. `bunx cypress run --spec acceptance/totp-enroll.acceptance.cy.ts`. No `vitest.config.ts`, no `vitest` dependency, no `app/**/*.test.ts(x)`.
 
 ## Rationale
 

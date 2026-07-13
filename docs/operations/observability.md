@@ -87,4 +87,4 @@ Alert rules in `config/base/prometheus-rules.yaml`, group `auth-ui.slos`:
 
 ## Health
 
-`/healthz` (liveness) and `/readyz` (readiness). The Deployment's probes use `/healthz`.
+`/healthz` (liveness) and `/readyz` (readiness). The Deployment's `livenessProbe` uses `/healthz` and its `readinessProbe` uses `/readyz`.

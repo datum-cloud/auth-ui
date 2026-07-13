@@ -89,6 +89,6 @@ Both `locales/**` are excluded from the lint and format hooks — the catalogs a
 ## Related Documentation
 
 - [Provider Seam](../architecture/provider-seam.md) — the boundary `lint:boundaries` protects
-- [Testing](./testing.md) — the three suites
+- [Testing](./testing.md) — the four suites
 - [Internationalization](./i18n.md) — what the `i18n` pre-commit hook regenerates
 - [Project Structure](./project-structure.md) — the layering the rules encode
