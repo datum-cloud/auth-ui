@@ -84,6 +84,36 @@ describe('byLoginName', () => {
     expect(byLoginName([alice], 'alice@acme.test', 'other-org')).to.be.undefined;
     expect(byLoginName([alice, bob], 'charlie@acme.test')).to.be.undefined;
   });
+
+  // Fix B (fix/dead-session-recovery): a stale ceremony entry left behind by an RP-initiated
+  // logout (organization: undefined, the caller's RAW query org) can shadow a fresh entry
+  // created moments later by signup/resolveIdentifier (organization: the RESOLVED org id) —
+  // `undefined !== '<orgId>'` so login.service.ts's prior-entry filter never supersedes it, and
+  // addSession appends the fresh entry AFTER the stale one. When the caller queries with NO
+  // organization (the common case — VerifyLoginPasswordInput.organization is usually undefined),
+  // both entries match by loginName; byLoginName must prefer the MOST RECENT (by changeTs, the
+  // same comparison mostRecent uses) rather than the first (insertion-order) match.
+  it('prefers the MOST RECENT match when duplicate loginName entries differ only by organization (stale vs. resolved-org shadowing)', () => {
+    const stale: SessionEntry = {
+      ...base,
+      id: 'stale',
+      loginName: 'bob@acme.test',
+      organization: undefined,
+      changeTs: '1',
+    };
+    const fresh: SessionEntry = {
+      ...base,
+      id: 'fresh',
+      loginName: 'bob@acme.test',
+      organization: 'org-123',
+      changeTs: '2',
+    };
+    // Stale inserted first, fresh appended after (mirrors addSession ordering) — first-match
+    // (pre-fix) would return `stale`; recency-based lookup must return `fresh`.
+    expect(byLoginName([stale, fresh], 'bob@acme.test')).to.deep.equal(fresh);
+    // Order-independent: the fix must not be a positional accident.
+    expect(byLoginName([fresh, stale], 'bob@acme.test')).to.deep.equal(fresh);
+  });
 });
 
 describe('needsLivenessCheck', () => {

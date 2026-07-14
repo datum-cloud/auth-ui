@@ -17,10 +17,11 @@ import { idpTypeToSlug } from '@/modules/auth/idp-slug';
 import {
   addSession,
   byLoginName,
+  removeSession,
   sessionEntryFromSession,
   type SessionEntry,
 } from '@/modules/auth/session/cookie';
-import type { LoginSettings } from '@/modules/auth/types';
+import type { LoginSettings, ProviderErrorCode } from '@/modules/auth/types';
 import { ProviderError } from '@/modules/auth/types';
 import { decideAfterIdentifier } from '@/resources/login/login-decision';
 import { isEmailLike } from '@/resources/login/login.schema';
@@ -369,8 +370,23 @@ export interface VerifyLoginPasswordCredentialFailure {
 
 export type VerifyLoginPasswordResult =
   | VerifyLoginPasswordRedirect
-  | { ok: false; error: 'SESSION_EXPIRED' }
+  // `sessions` is populated ONLY by the dead-session-recovery branch below (a pruned list the
+  // route must re-serialize into the cookie); the "no entry found" early-return below has
+  // nothing to prune, so it omits it (the route makes no cookie change in that case).
+  | { ok: false; error: 'SESSION_EXPIRED'; sessions?: SessionEntry[] }
   | VerifyLoginPasswordCredentialFailure;
+
+// updateSession failures that are genuinely transient backend problems (NOT a dead session): these
+// still throw so real outages stay visible/alertable. Every OTHER ProviderError — including
+// ALREADY_DONE, which is how normalizeError classifies Zitadel's real
+// "[failed_precondition] Session already terminated" response (see mappers.ts) — means the
+// stored session token is stale/revoked, not a live backend failure. Mirrors the account-switch
+// precedent (session.service.ts's SWITCH_TRANSIENT_CODES + reauthRedirect).
+const TRANSIENT_CODES = new Set<ProviderErrorCode>([
+  'UNAVAILABLE',
+  'DEADLINE_EXCEEDED',
+  'RATE_LIMITED',
+]);
 
 /**
  * Password step: look up the ceremony session entry (by loginName, from the SIGNED
@@ -386,8 +402,12 @@ export type VerifyLoginPasswordResult =
  * (which calls createCallback and redirects back to the OIDC client). We surface the
  * authorize target with the same persisted session list.
  *
- * INVALID_CREDENTIALS is mapped to a typed failure (carrying failed/max attempts);
- * other ProviderErrors re-throw. Never logs the password.
+ * INVALID_CREDENTIALS is mapped to a typed failure (carrying failed/max attempts).
+ * DEAD-SESSION RECOVERY: any other NON-transient ProviderError means the ceremony entry's
+ * session is dead server-side (e.g. a stale entry left by an RP-initiated logout, since
+ * /logout/success does not clear the `sessions` cookie) — prune it and surface a recoverable
+ * SESSION_EXPIRED instead of letting the error escape to the route's uncaught-error boundary.
+ * Only genuinely transient codes still re-throw. Never logs the password.
  */
 export async function verifyLoginPassword(
   provider: AuthProvider,
@@ -410,6 +430,17 @@ export async function verifyLoginPassword(
         failedAttempts: error.detail?.failedAttempts,
         maxAttempts: error.detail?.maxAttempts,
       };
+    }
+    // Dead-session recovery (see TRANSIENT_CODES doc above): a non-transient ProviderError here
+    // means the ceremony entry's session is dead, not a live outage. Prune it and hand the
+    // pruned list back so the route can re-serialize the cookie without the stale entry.
+    if (error instanceof ProviderError && !TRANSIENT_CODES.has(error.code)) {
+      logAuthEvent('password_check', 'failure', {
+        actor: hashActor(loginName),
+        reason: error.code,
+        recovery: 'session_expired',
+      });
+      return { ok: false, error: 'SESSION_EXPIRED', sessions: removeSession(list, entry.id) };
     }
     throw error;
   }
