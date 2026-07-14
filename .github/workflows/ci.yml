@@ -3,7 +3,7 @@ name: CI
 on:
   pull_request: {}
   push:
-    branches: [refactor/auth-ui-rebuild, main]
+    branches: [main]
     paths-ignore:
       - 'docs/**'
       - 'README.md'
