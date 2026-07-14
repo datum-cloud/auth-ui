@@ -1,72 +1,64 @@
-# auth-ui
+<p align="center">
+  <img
+    width="64px"
+    src="docs/assets/logo.png"
+    style="border: 1px solid #e5e7eb; border-radius: 0.5rem;"
+  />
 
-Custom login UI for [Zitadel](https://zitadel.com), served under the base path `/id`. This is a ground-up rebuild on the Datum stack, replacing the upstream Zitadel login UI with a fully-owned React application.
+  <h1 align="center">Datum Auth UI</h1>
 
-## Stack
+  <p align="center">
+    Authentication for Datum Cloud
+  </p>
+</p>
 
-| Layer         | Package                               |
-| ------------- | ------------------------------------- |
-| Runtime       | Bun 1.3.x                             |
-| Framework     | React Router v7 (framework/SSR mode)  |
-| BFF           | Hono via `react-router-hono-server`   |
-| UI            | Tailwind v4 + `@datum-cloud/datum-ui` |
-| i18n          | Lingui 6                              |
-| Data fetching | TanStack Query                        |
-| Validation    | Zod                                   |
-| Unit tests    | Vitest                                |
-| E2E tests     | Cypress                               |
+---
 
-## Setup
+## About
+
+Datum Auth UI is the login experience for [Datum Cloud](https://datum.net), served at `/id`. It replaces Zitadel's hosted login with a fully-owned React application built on the Datum stack, talking to [Zitadel](https://zitadel.com) over its v2 APIs.
+
+Every authentication ceremony — password, passkey, MFA, SSO, device authorization, password reset — is implemented here, behind a provider seam that keeps Zitadel out of the routes and flows.
+
+### Key Features
+
+- **Complete auth ceremonies** — password, passkeys/WebAuthn, TOTP and OTP, email link, device authorization, password reset and change
+- **SSO with identity linking** — Google and GitHub identity providers, auto-create, explicit link and unlink ceremonies
+- **Provider seam** — routes and resources depend on an `AuthProvider` interface, never on Zitadel directly, so the identity backend stays swappable
+- **Security by default** — signed sessions, CSRF protection, rate limiting, strict CSP and secure headers, fraud signals
+- **Internationalized** — Lingui message catalogs with locale detection
+- **Production-tested** — Cypress component, end-to-end, and real-Zitadel acceptance suites
+
+### Built With
+
+- **[Bun](https://bun.sh)** — runtime and package manager
+- **[React Router 7](https://reactrouter.com)** — SSR framework mode
+- **[Hono](https://hono.dev)** — backend-for-frontend server
+- **[Zitadel](https://zitadel.com)** — identity platform (v2 APIs)
+- **[Tailwind CSS](https://tailwindcss.com) + [datum-ui](https://github.com/datum-cloud/datum-ui)** — styling and components
+- **[Lingui](https://lingui.dev)** — internationalization
+- **[Cypress](https://cypress.io)** — component, e2e, and acceptance testing
+
+---
+
+## Quick Start
 
 ```bash
 bun install
-cp .env.example .env   # fill in SESSION_SECRET and ZITADEL_API_URL
+cp .env.example .env    # set SESSION_SECRET, ZITADEL_API_URL, ZITADEL_SERVICE_USER_TOKEN, PUBLIC_ORIGIN
 bun run dev
 ```
 
-See `.env.example` for all required variables.
+No Zitadel to hand? Run against the built-in fake provider: `AUTH_PROVIDER=fake bun run dev`
 
-## Commands
+---
 
-| Command                | Purpose                                   |
-| ---------------------- | ----------------------------------------- |
-| `bun run dev`          | Start dev server (requires `.env`)        |
-| `bun run test:unit`    | Run Vitest unit tests                     |
-| `bun run test:e2e`     | Start server + run Cypress                |
-| `bun run lint`         | ESLint with auto-fix                      |
-| `bun run typecheck`    | Generate route types + `tsc`              |
-| `bun run i18n:compile` | Compile `.po` catalogs to `.ts` artifacts |
-| `bun run build`        | Production build                          |
+## Documentation
 
-Full local gate before pushing:
+Full documentation lives in **[docs/README.md](docs/README.md)** — architecture, configuration, development guides, and operations.
 
-```bash
-bun run lint && bun run typecheck && bun run i18n:compile && bun run test:unit && bun run build
-```
+---
 
-## Provider-seam rule
+## License
 
-Routes and flows import **only** `providers/auth-provider`, never `providers/zitadel` directly.
-
-```
-app/routes/   →   providers/auth-provider   (AuthProvider interface)
-app/flows/    →   providers/auth-provider
-                        ↑
-              providers/zitadel (Phase 1 adapter — behind the seam)
-```
-
-The Zitadel adapter lives behind this seam so it can be swapped or mocked without touching route logic. `app/session/` is shared infrastructure consumed by the interface layer, not by the adapter.
-
-## Adding a locale
-
-1. Drop a new catalog file at `app/modules/i18n/locales/<code>.po`.
-2. Add the locale code to `lingui.config.ts` in the `locales` array.
-3. Add the same code to the `SUPPORTED_LOCALES` constant in `app/modules/i18n/lingui.ts`.
-4. Run `bun run i18n:compile`.
-
-The compiled `.ts` artifacts (`locales/*.ts`) are gitignored — the Lingui Vite plugin consumes the `.po` files directly at build time.
-
-## Repo layout notes
-
-- `docs/` — rebuild plan specs and session context
-- `config/base/` — Kustomize deployment base (Kubernetes manifests)
+[MIT](LICENSE)

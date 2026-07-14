@@ -1,38 +1,49 @@
-<!--
-Thanks for contributing to datum-cloud/auth-ui.
-Fill in each section. Keep the PR focused — one logical change per PR.
--->
+# Pull Request Guidelines
 
-## Summary
+## Title
 
-What does this PR change, and why? Describe the behavior before and after.
+Write a clear, descriptive title that summarizes your changes. For example:
 
-## Linked issue
+- "Fix login redirect loop in authentication flow"
+- "Add Microsoft Entra ID to the provider seam"
+- "Update React Router and related dependencies"
 
-<!-- e.g. Closes #123 / Refs #456 -->
+## Description
 
-## Type
+Briefly describe what this PR changes and why. Focus on:
 
-- [ ] feat — new user-facing capability
-- [ ] fix — bug fix
-- [ ] refactor — behavior-preserving restructure
-- [ ] chore — tooling, deps, or housekeeping
-- [ ] docs — documentation only
-- [ ] test — tests only
-- [ ] perf — performance improvement
+- What problem is being solved or what feature is being added
+- The impact of the change
+- The related issue number, if applicable (e.g., "Fixes #123" or "Closes #456")
+
+## Labels
+
+Please add the appropriate label(s) to your PR:
+
+- `bug` — fixing a bug or a broken behavior
+- `enhancement` — new feature or improvement
+- `documentation` — documentation-only changes
+- `invalid` — the PR is incorrect or unnecessary (typically when closing it)
+
+## Changelog
+
+`CHANGELOG.md` is maintained by hand and follows
+[Keep a Changelog](https://keepachangelog.com/en/1.1.0/). If this change is
+user-facing, add an entry under `## [Unreleased]` in the same PR.
 
 ## Checklist
 
 - [ ] `bun run typecheck` passes
-- [ ] `bun run lint:ci` passes (no new `console.*` — guarded by the `no-console` rule)
-- [ ] `bun run test:unit` passes
-- [ ] **URLs are byte-frozen** — no route, redirect, or callback URL changed
-      without going through the URL-resolution gate
-- [ ] **No raw PII in logs** — login names / emails are hashed (`hashActor`) or
-      redacted; no secrets, tokens, or cookies logged
-- [ ] `CHANGELOG.md` `[Unreleased]` updated (if this change is user-facing)
-- [ ] Boundary layers respected (`routes` → `resources` → `modules` →
-      `providers`); `bun run lint:boundaries` passes if layers were touched
+- [ ] `bun run lint:ci` passes (the `no-console` rule allows only `console.error`
+      and `console.warn` in shipped `app/` source)
+- [ ] `bun run test:unit` passes (Cypress component tests)
+- [ ] **Public URLs unchanged** — route, redirect, and callback URLs are a frozen
+      contract (`app/routes/paths.ts`); changing one is a breaking change and needs
+      explicit sign-off
+- [ ] **No raw PII in logs** — login names / emails go through `hashActor`; no
+      secrets, tokens, or cookies logged
+- [ ] Architectural boundaries hold — `bun run lint:boundaries` passes (provider
+      seam, `shared` is a leaf, no cycles; see `.dependency-cruiser.cjs`)
 
 ## Screenshots
 
