@@ -60,7 +60,14 @@ export async function action({ request }: ActionFunctionArgs) {
 
   if (!result.ok) {
     if (result.error === 'SESSION_EXPIRED') {
-      return data({ error: 'SESSION_EXPIRED' as const }, { status: 400 });
+      // Dead-session recovery (see login.service.ts): when the stale entry was pruned, thread
+      // the pruned list back into the cookie so the browser actually drops it — otherwise the
+      // same dead entry would keep shadowing the fresh one on every retry.
+      const headers = new Headers();
+      if (result.sessions) {
+        headers.append('set-cookie', await serializeSessions(result.sessions));
+      }
+      return data({ error: 'SESSION_EXPIRED' as const }, { status: 400, headers });
     }
     return data(
       {

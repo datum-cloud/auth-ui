@@ -56,14 +56,24 @@ export function needsLivenessCheck(entry: SessionEntry): boolean {
   return entry.expirationTs === '';
 }
 
+/**
+ * Duplicate entries for the same identity can survive a superseding write (e.g. a stale entry
+ * left by an RP-initiated logout — /logout/success does NOT clear the `sessions` cookie — next
+ * to a fresh entry created moments later whose `organization` was resolved to an org id while
+ * the caller's raw query org was undefined; `undefined !== '<orgId>'` means the old entry's
+ * superseding filter never dropped it). When multiple entries match, prefer the MOST RECENT one
+ * (mirrors `mostRecent`'s changeTs comparison) rather than array order, so a shadowed stale entry
+ * never wins over the live one it was meant to replace.
+ */
 export function byLoginName(
   list: SessionEntry[],
   loginName: string,
   organization?: string
 ): SessionEntry | undefined {
-  return list.find(
+  const matches = list.filter(
     (s) => s.loginName === loginName && (!organization || s.organization === organization)
   );
+  return mostRecent(matches);
 }
 
 // Pure cookie-size guard (spec §7): keep newest sessions; evict oldest by changeTs

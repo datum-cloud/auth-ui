@@ -40,6 +40,18 @@ describe('normalizeError (ConnectError → ProviderError)', () => {
     // FAILED_PRECONDITION/UNKNOWN.
     const mapped = normalizeError({ code: 9, message: 'totp already verified' });
     expect(mapped.code).to.equal('ALREADY_DONE');
+
+    // Dead-session-recovery trap (fix/dead-session-recovery): the REAL Zitadel staging message
+    // for updateSession on a session an RP-initiated logout already terminated is
+    // FailedPrecondition/9 with "Session already terminated" — normalizeError MUST classify
+    // this as ALREADY_DONE, NOT FAILED_PRECONDITION. login.service.ts's dead-session recovery
+    // (verifyLoginPassword) keys off this exact classification, so a "fix" that reclassifies
+    // code 9 + "already" as FAILED_PRECONDITION would silently break it.
+    const deadSession = normalizeError({
+      code: 9,
+      message: '[failed_precondition] Session already terminated (COMMAND-Hewfq)',
+    });
+    expect(deadSession.code).to.equal('ALREADY_DONE');
   });
 });
 
