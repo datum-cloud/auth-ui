@@ -1,5 +1,5 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
-import { TrackOnMount } from '@/modules/analytics/fathom';
+import { TrackOnMount } from '@/modules/analytics/rybbit';
 import { LinkButton } from '@datum-cloud/datum-ui/button';
 import { Trans } from '@lingui/react/macro';
 import {

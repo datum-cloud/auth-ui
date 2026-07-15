@@ -60,7 +60,8 @@ All five default to **false** (fail-closed). Only the exact string `true` enable
 | --- | --- | --- | --- |
 | `SENTRY_DSN` | No | unset → disabled | Sentry error monitoring and tracing. Must be a valid `https://` DSN when set — an invalid value fails fast at startup. Unset is a true no-op. |
 | `SENTRY_TRACES_SAMPLE_RATE` | No | `0.1` | Fraction of requests sampled for performance tracing (`0.0`–`1.0`). |
-| `FATHOM_ID` | No | unset → disabled | Fathom analytics site id. Exposure to the client is additionally prod-gated server-side, so dev and preview never contact Fathom even when this is set. |
+| `RYBBIT_SITE_ID` | No | unset → disabled | Rybbit analytics site id. Active in every environment (dev, staging, preview, production) once set — no server-side environment gating. |
+| `RYBBIT_TAG` | No | unset → no `data-tag` | Rybbit `data-tag` cohort-segmentation attribute, e.g. `production` / `staging` / `preview`. |
 | `MAXMIND_ACCOUNT_ID` | No | unset → disabled | MaxMind minFraud device-fingerprinting account id used by the signup device tracker. Optional in every environment. Unset means no `device.js` is loaded and no token is captured. |
 
 ## Development

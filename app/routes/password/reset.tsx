@@ -4,7 +4,7 @@ import { AuthFormFields } from '@/components/auth-form/auth-form-fields';
 import { BackLink } from '@/components/back-link/back-link';
 import { FormError } from '@/components/form-error/form-error';
 import { useAuthActionError } from '@/hooks/use-auth-action-error';
-import { TrackOnMount } from '@/modules/analytics/fathom';
+import { TrackOnMount } from '@/modules/analytics/rybbit';
 import { requestPasswordReset } from '@/resources/password';
 import { resetRequestSchema, resetRequestClientSchema } from '@/resources/password/password.schema';
 import { genericCheckYourEmail } from '@/resources/schemas/check-your-email.schema';

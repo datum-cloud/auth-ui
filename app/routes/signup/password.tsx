@@ -4,7 +4,7 @@ import { SubmitButton } from '@/components/auth-form/auth-form';
 import { AuthFormFields } from '@/components/auth-form/auth-form-fields';
 import { PasswordRequirements } from '@/components/auth-form/password-requirements';
 import { useAuthActionError } from '@/hooks/use-auth-action-error';
-import { TrackOnMount } from '@/modules/analytics/fathom';
+import { TrackOnMount } from '@/modules/analytics/rybbit';
 import { readSessions, serializeSessions } from '@/modules/auth/session/cookie';
 import {
   MaxMindTracker,

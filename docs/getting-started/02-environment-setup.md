@@ -74,7 +74,7 @@ PUBLIC_ORIGIN=http://localhost:3000
 
 ## Everything else
 
-Sentry, Fathom, MaxMind, IdP link/unlink switches, the forward-host allowlist, the
+Sentry, Rybbit, MaxMind, IdP link/unlink switches, the forward-host allowlist, the
 post-logout allowlist, frame ancestors — all optional, all documented with their defaults and
 fail-closed behaviour in **[Configuration](../operations/configuration.md)**. `.env.example`
 carries the same list inline.

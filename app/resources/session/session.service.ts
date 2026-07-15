@@ -46,7 +46,8 @@ import { z } from 'zod';
  * configured post-login destination) or the terminal "You are signed in" data() payload.
  */
 export type SignedInOutcome =
-  { kind: 'redirect'; location: string } | { kind: 'page'; loginName: string | null };
+  | { kind: 'redirect'; location: string }
+  | { kind: 'page'; loginName: string | null; userId: string | null };
 
 /**
  * Config the /signed-in loader needs from the route (env values are owned by the route's
@@ -106,7 +107,7 @@ export async function resolveSignedIn(
   if (!recent) return { kind: 'redirect', location: '/login' };
 
   type Settings = Awaited<ReturnType<typeof provider.getLoginSettings>>;
-  const [settings, isAdmin] = await Promise.all([
+  const [settings, isAdmin, session] = await Promise.all([
     // Org-first: the session's org wins, else the default org (old app's `organization ?? getDefaultOrg()`).
     provider.getLoginSettings(recent.organization ?? (await resolveOrg(provider))).catch((err) => {
       // Surface transient backend failure in the audit trail; behavior
@@ -122,6 +123,14 @@ export async function resolveSignedIn(
       });
       return false;
     }),
+    // Best-effort: resolves the Zitadel user id for client-side analytics identify() on the
+    // terminal page. A failure here never blocks the redirect/page resolution below.
+    provider.getSession(recent.id, recent.token).catch((err) => {
+      logAuthEvent('post_login_identity_fetch', 'failure', {
+        reason: err instanceof Error ? err.message : String(err),
+      });
+      return null;
+    }),
   ]);
 
   const { dest, source } = postLoginDestinationWithSource({
@@ -136,7 +145,7 @@ export async function resolveSignedIn(
   if (dest) return { kind: 'redirect', location: dest };
 
   // Nothing configured → terminal "You are signed in" page.
-  return { kind: 'page', loginName: recent.loginName ?? null };
+  return { kind: 'page', loginName: recent.loginName ?? null, userId: session?.user?.id ?? null };
 }
 
 // ─── /accounts — session listing + enrichment ────────────────────────────────

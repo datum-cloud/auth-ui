@@ -5,7 +5,7 @@ import { DynamicFaviconLinks } from './components/misc/dynamic-favicon';
 import allianceFontRegularUrl from './styles/fonts/AllianceNo1-Regular.woff2?url';
 import './styles/root.css';
 import { AuthCard } from '@/components/auth-card/auth-card';
-import { FathomAnalytics, resolveFathomSiteId } from '@/modules/analytics/fathom';
+import { RybbitAnalytics, resolveRybbitSiteId } from '@/modules/analytics/rybbit';
 import { MaxMindTracker } from '@/modules/fraud/maxmind-tracker';
 import { loadMessages } from '@/modules/i18n/lingui';
 import { detectLocale } from '@/modules/i18n/lingui.server';
@@ -58,7 +58,8 @@ export async function loader({
     locale,
     messages,
     cspNonce: context?.cspNonce,
-    fathomSiteId: resolveFathomSiteId(env.NODE_ENV, env.FATHOM_ID),
+    rybbitSiteId: resolveRybbitSiteId(env.RYBBIT_SITE_ID),
+    rybbitTag: env.RYBBIT_TAG,
     maxmindAccountId: env.MAXMIND_ACCOUNT_ID ?? '',
   };
 }
@@ -85,6 +86,8 @@ export function Layout({ children }: { children: React.ReactNode }) {
             enableSystem + defaultTheme="system" → a fresh visitor follows prefers-color-scheme;
             the persisted ThemeToggle choice (localStorage) overrides it on return visits. */}
         <ThemeScript nonce={data?.cspNonce} attribute="class" defaultTheme="system" enableSystem />
+
+        <RybbitAnalytics siteId={data?.rybbitSiteId} tag={data?.rybbitTag} nonce={data?.cspNonce} />
       </head>
       <body>
         {children}
@@ -96,7 +99,7 @@ export function Layout({ children }: { children: React.ReactNode }) {
 }
 
 export default function App() {
-  const { locale, messages, fathomSiteId, maxmindAccountId } = useLoaderData<typeof loader>();
+  const { locale, messages, maxmindAccountId } = useLoaderData<typeof loader>();
 
   // Hydration marker: lets e2e tests wait until React has attached its handlers
   // before interacting with forms. With the conform adapter the forms submit
@@ -116,7 +119,6 @@ export default function App() {
     <ThemeProvider attribute="class" defaultTheme="system" enableSystem disableTransitionOnChange>
       <I18nProvider i18n={i18nInstance}>
         <ConformAdapter>
-          <FathomAnalytics siteId={fathomSiteId} />
           <MaxMindTracker accountId={maxmindAccountId} />
           <Outlet />
           <Toaster position="top-right" />
