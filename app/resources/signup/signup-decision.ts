@@ -1,5 +1,5 @@
 import type { Decision } from '@/resources/login/login-decision';
-import { parseNameFromEmail } from '@/resources/signup/parse-name';
+import { placeholderNameFromEmail } from '@/resources/signup/placeholder-name';
 
 // The pure signup branch logic lifted out of routes/signup/index.tsx. The /signup
 // identifier screen makes two routing decisions; each returns the shared Decision union
@@ -27,7 +27,8 @@ export interface AfterSignupIdentifierInput {
 }
 
 /**
- * Email-identifier branch: parse a best-effort name from the email and route to
+ * Email-identifier branch: derive the duplicated placeholder name from the email (so the
+ * complete-profile flow fires downstream — see placeholderNameFromEmail) and route to
  * /signup/method, threading the optional context as typed params. Absent context keys are
  * omitted entirely (never emitted as empty strings) so the route's paths.signup.method(params)
  * produces the same querystring the hand-built URLSearchParams did.
@@ -38,7 +39,7 @@ export function decideAfterSignupIdentifier({
   requestId,
   deviceTrackingToken,
 }: AfterSignupIdentifierInput): Decision {
-  const { firstName, lastName } = parseNameFromEmail(email);
+  const { firstName, lastName } = placeholderNameFromEmail(email);
   const params: Record<string, string> = { loginName: email, firstName, lastName };
   if (organization) params.organization = organization;
   if (requestId) params.requestId = requestId;
