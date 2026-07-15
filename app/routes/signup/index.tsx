@@ -133,7 +133,7 @@ export async function action({ request }: ActionFunctionArgs) {
     }
   }
 
-  // Identifier flow: collect email, parse name, forward to /signup/method.
+  // Identifier flow: collect email, derive the placeholder name, forward to /signup/method.
   const parsed = signupIdentifierSchema.safeParse(Object.fromEntries(form));
   if (!parsed.success) return data({ error: 'INVALID_INPUT' as const }, { status: 400 });
 
@@ -144,7 +144,7 @@ export async function action({ request }: ActionFunctionArgs) {
     requestId,
     deviceTrackingToken,
   });
-  // The identifier branch only ever produces a redirect (parseNameFromEmail can't fail);
+  // The identifier branch only ever produces a redirect (placeholderNameFromEmail can't fail);
   // switch exhaustively so a future error variant can't silently fall through.
   switch (decision.kind) {
     case 'redirect':

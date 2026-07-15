@@ -23,18 +23,18 @@ describe('decideSignupIdpIntent', () => {
 });
 
 describe('decideAfterSignupIdentifier', () => {
-  it('routes to /signup/method with parsed name, threads optional org/requestId, and omits absent keys', () => {
+  it('routes to /signup/method with the duplicated placeholder name, threads optional org/requestId, and omits absent keys', () => {
     const withContext = decideAfterSignupIdentifier({
-      email: 'alice@example.com',
+      email: 'alice.smith@example.com',
       organization: 'acme',
       requestId: 'req-abc',
     });
     if (withContext.kind !== 'redirect') throw new Error('expected redirect');
     expect(withContext.path).to.equal('/signup/method');
     expect(withContext.params).to.deep.equal({
-      loginName: 'alice@example.com',
-      firstName: 'Alice',
-      lastName: 'Alice',
+      loginName: 'alice.smith@example.com',
+      firstName: 'alice.smith',
+      lastName: 'alice.smith',
       organization: 'acme',
       requestId: 'req-abc',
     });

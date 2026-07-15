@@ -9,7 +9,7 @@ import { callService } from '../../../support/node/call-service';
 // ── Action: email identifier ──────────────────────────────────────────────────
 
 describe('signup/index — action: email identifier', () => {
-  it('redirects (302) to /signup/method with parsed loginName/firstName/lastName', () => {
+  it('redirects (302) to /signup/method with loginName and the duplicated placeholder name', () => {
     callService({
       fn: 'signupIndexAction',
       provider: 'singleton',
@@ -25,8 +25,10 @@ describe('signup/index — action: email identifier', () => {
       const url = new URL(loc, 'http://localhost');
       expect(url.pathname).to.equal('/signup/method');
       expect(url.searchParams.get('loginName')).to.equal('john.doe@example.com');
-      expect(url.searchParams.get('firstName')).to.equal('John');
-      expect(url.searchParams.get('lastName')).to.equal('Doe');
+      // Identical placeholder (never a split/title-cased guess) so milo's
+      // name-review annotation fires and cloud-portal forces profile completion.
+      expect(url.searchParams.get('firstName')).to.equal('john.doe');
+      expect(url.searchParams.get('lastName')).to.equal('john.doe');
     });
   });
 });
