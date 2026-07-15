@@ -66,6 +66,12 @@ const schema = z
     // Rybbit `data-tag` cohort-segmentation attribute (e.g. "production"/"staging"/"preview").
     // Optional — unset means the script tag omits data-tag.
     RYBBIT_TAG: z.string().optional(),
+    // Rybbit server-side tracking API key (POST /api/track), used ONLY for signup moments
+    // that never render an auth-ui page (e.g. an IdP signup completing mid-OIDC-ceremony,
+    // which redirects the browser straight to the relying party — see
+    // app/modules/analytics/rybbit.server.ts). Optional: unauthenticated track calls still
+    // work, just without bot/domain-spoofing protection.
+    RYBBIT_API_KEY: z.string().optional(),
     // MaxMind minFraud device-fingerprinting account id. Optional in EVERY environment
     // (staging may want fraud detection too). Unset ⇒ the signup MaxMind tracker is a
     // true no-op (no device.js loaded, no token captured). Exposed to the client only

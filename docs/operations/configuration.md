@@ -62,6 +62,7 @@ All five default to **false** (fail-closed). Only the exact string `true` enable
 | `SENTRY_TRACES_SAMPLE_RATE` | No | `0.1` | Fraction of requests sampled for performance tracing (`0.0`–`1.0`). |
 | `RYBBIT_SITE_ID` | No | unset → disabled | Rybbit analytics site id. Active in every environment (dev, staging, preview, production) once set — no server-side environment gating. |
 | `RYBBIT_TAG` | No | unset → no `data-tag` | Rybbit `data-tag` cohort-segmentation attribute, e.g. `production` / `staging` / `preview`. |
+| `RYBBIT_API_KEY` | No | unset → unauthenticated | Rybbit server-side tracking API key (see `app/modules/analytics/rybbit.server.ts`), used for signup moments that never render an auth-ui page (IdP signups completing mid-OIDC-ceremony). Unauthenticated calls still track, just without bot/domain-spoofing protection. |
 | `MAXMIND_ACCOUNT_ID` | No | unset → disabled | MaxMind minFraud device-fingerprinting account id used by the signup device tracker. Optional in every environment. Unset means no `device.js` is loaded and no token is captured. |
 
 ## Development

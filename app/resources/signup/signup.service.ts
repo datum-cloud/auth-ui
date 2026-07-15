@@ -17,6 +17,7 @@ import {
   type SessionEntry,
 } from '@/modules/auth/session/cookie';
 import { ProviderError } from '@/modules/auth/types';
+import { trackServerEvent } from '@/modules/analytics/rybbit.server';
 import { authorizeHandbackTarget } from '@/resources/shared/next-step-params';
 import { resolveOrg } from '@/resources/shared/resolve-org';
 import { postRegisterStep } from '@/resources/signup/post-register';
@@ -140,6 +141,11 @@ export async function registerAndLinkIdp(
     sessionEntryFromSession(session, { loginName: user.loginName, organization, requestId })
   );
   logAuthEvent('signup.requested', 'success', { actor: hashActor(user.loginName), organization });
+  // This is the only caller of registerAndLinkIdp (the IdP auto-create path) — no branch
+  // check needed, reaching this line already means a brand-new account was just created.
+  // Fired server-side (not the client trackAuthEvent) because this ceremony redirects the
+  // browser straight through /authorize to the relying party without ever rendering a page.
+  trackServerEvent('signup_submitted', { userId: user.id, properties: { channel: 'idp' } });
   // Thread the just-created session id so /authorize finishes the callback via resolveOidc's
   // explicit-sessionId hand-back (runCallback) instead of re-running decideAuthorize — without it
   // a brand-new IdP user completing a prompt=select_account / prompt=login ceremony loops straight
