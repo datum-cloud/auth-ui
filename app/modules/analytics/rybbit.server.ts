@@ -23,7 +23,10 @@ interface TrackServerEventInput {
  * failure here should not affect auth — it's only logged (as `rybbit_server_track` in the
  * snake_case audit-event inventory) for our own observability.
  */
-export function trackServerEvent(eventName: AuthEventName, input: TrackServerEventInput = {}): void {
+export function trackServerEvent(
+  eventName: AuthEventName,
+  input: TrackServerEventInput = {}
+): void {
   const siteId = env.RYBBIT_SITE_ID;
   if (!siteId) return;
 

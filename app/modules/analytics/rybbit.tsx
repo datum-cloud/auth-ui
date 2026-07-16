@@ -5,9 +5,18 @@ declare global {
     rybbit?: {
       event: (name: string, properties?: Record<string, unknown>) => void;
       identify: (userId: string, traits?: Record<string, unknown>) => void;
+      clearUserId: () => void;
       pageview: () => void;
     };
   }
+}
+
+/** Traits with special handling in Rybbit's dashboard — see identifyUser. */
+export interface RybbitUserTraits {
+  email?: string;
+  name?: string;
+  username?: string;
+  [key: string]: unknown;
 }
 
 /**
@@ -43,11 +52,26 @@ export function trackAuthEvent(name: AuthEventName): void {
 
 /**
  * Stitches this app's events to the same user's events in cloud-portal. Call once the
- * authenticated user's id is known (e.g. on the terminal /signed-in page).
+ * authenticated user's id is known (e.g. on the terminal /signed-in page). Traits are
+ * optional metadata shown in Rybbit's dashboard — email/name/username get special
+ * display treatment there; anything else is a plain custom field.
  */
-export function identifyUser(userId: string): void {
+export function identifyUser(userId: string, traits?: RybbitUserTraits): void {
   if (typeof window === 'undefined') return;
-  window.rybbit?.identify(userId);
+  if (traits) {
+    window.rybbit?.identify(userId, traits);
+  } else {
+    window.rybbit?.identify(userId);
+  }
+}
+
+/**
+ * Clears the stored user id so a shared/public device doesn't keep attributing
+ * events to the previous user after logout. Call once, on the terminal logout page.
+ */
+export function clearIdentifiedUser(): void {
+  if (typeof window === 'undefined') return;
+  window.rybbit?.clearUserId();
 }
 
 interface RybbitAnalyticsProps {

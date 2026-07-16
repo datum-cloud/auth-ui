@@ -12,10 +12,11 @@ import {
   RybbitAnalytics,
   TrackOnMount,
   identifyUser,
+  clearIdentifiedUser,
 } from '@/modules/analytics/rybbit';
 
 interface RybbitCall {
-  fn: 'event' | 'identify' | 'pageview';
+  fn: 'event' | 'identify' | 'pageview' | 'clearUserId';
   args: unknown[];
 }
 
@@ -27,6 +28,7 @@ beforeEach(() => {
   window.rybbit = {
     event: (...args) => rybbitCalls().push({ fn: 'event', args }),
     identify: (...args) => rybbitCalls().push({ fn: 'identify', args }),
+    clearUserId: (...args) => rybbitCalls().push({ fn: 'clearUserId', args }),
     pageview: (...args) => rybbitCalls().push({ fn: 'pageview', args }),
   };
 });
@@ -73,5 +75,18 @@ describe('TrackOnMount + identifyUser', () => {
   it('identifyUser calls window.rybbit.identify with the given user id', () => {
     identifyUser('user-42');
     expect(rybbitCalls().find((c) => c.fn === 'identify')?.args).to.deep.equal(['user-42']);
+  });
+
+  it('identifyUser passes traits through when given', () => {
+    identifyUser('user-42', { email: 'user@example.com' });
+    expect(rybbitCalls().find((c) => c.fn === 'identify')?.args).to.deep.equal([
+      'user-42',
+      { email: 'user@example.com' },
+    ]);
+  });
+
+  it('clearIdentifiedUser calls window.rybbit.clearUserId', () => {
+    clearIdentifiedUser();
+    expect(rybbitCalls().filter((c) => c.fn === 'clearUserId')).to.have.length(1);
   });
 });

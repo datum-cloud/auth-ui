@@ -1,13 +1,18 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
-import { TrackOnMount } from '@/modules/analytics/rybbit';
+import { TrackOnMount, clearIdentifiedUser } from '@/modules/analytics/rybbit';
 import { LinkButton } from '@datum-cloud/datum-ui/button';
 import { Trans } from '@lingui/react/macro';
+import { useEffect } from 'react';
 import { Link } from 'react-router';
 import type { MetaFunction } from 'react-router';
 
 export const meta: MetaFunction = () => [{ title: 'Signed out' }];
 
 export default function LogoutSuccess() {
+  useEffect(() => {
+    clearIdentifiedUser();
+  }, []);
+
   return (
     <AuthCard
       title={<Trans>You've been signed out</Trans>}

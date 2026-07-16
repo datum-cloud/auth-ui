@@ -34,8 +34,8 @@ export default function SignedIn() {
   const { loginName, userId, csrfToken } = useLoaderData<typeof loader>();
 
   useEffect(() => {
-    if (userId) identifyUser(userId);
-  }, [userId]);
+    if (userId) identifyUser(userId, loginName ? { email: loginName } : undefined);
+  }, [userId, loginName]);
 
   return (
     <AuthCard

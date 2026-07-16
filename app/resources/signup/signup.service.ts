@@ -10,6 +10,7 @@
 // route's schema) + the caller's current session list, and returns a typed result
 // the route turns into a redirect()/data() response. No Request parsing, no CSRF,
 // no cookie I/O lives here.
+import { trackServerEvent } from '@/modules/analytics/rybbit.server';
 import type { AuthProvider, SessionOpts } from '@/modules/auth/auth-provider';
 import {
   addSession,
@@ -17,7 +18,6 @@ import {
   type SessionEntry,
 } from '@/modules/auth/session/cookie';
 import { ProviderError } from '@/modules/auth/types';
-import { trackServerEvent } from '@/modules/analytics/rybbit.server';
 import { authorizeHandbackTarget } from '@/resources/shared/next-step-params';
 import { resolveOrg } from '@/resources/shared/resolve-org';
 import { postRegisterStep } from '@/resources/signup/post-register';
