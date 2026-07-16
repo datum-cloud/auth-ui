@@ -165,27 +165,13 @@ export function stubServerModulesForCypress(root: string): Plugin {
       export function __resetCreateServiceClientImpl() { _createServiceClientImpl = null; }
     `,
   };
-  // Task 9b: fathom-client is a THIRD-PARTY analytics SDK (calls the Fathom CDN). The original
-  // vitest test used vi.mock('fathom-client', …); the browser bundle has no vi.mock equivalent, so
-  // we resolve the bare specifier to a virtual recorder module that pushes every call into
-  // window.__fathomCalls. This doubles only the EXTERNAL SDK (never the code under test, fathom.tsx)
-  // — exactly what vi.mock did — so the spec asserts on real load/trackPageview/trackEvent wiring.
-  const FATHOM_VIRTUAL = '\0virtual:fathom-client-cypress-stub';
-  const fathomStub = `
-    const init = () => (globalThis.__fathomCalls ??= { load: [], trackPageview: [], trackEvent: [] });
-    init();
-    export const load = (...args) => { init().load.push(args); };
-    export const trackPageview = (...args) => { init().trackPageview.push(args); };
-    export const trackEvent = (...args) => { init().trackEvent.push(args); };
-  `;
+  // Rybbit has no npm module (raw <script> tag integration), so unlike the old fathom-client
+  // stub there is nothing to virtualize here — window.rybbit is stubbed directly in the spec
+  // (see cypress/component/modules/analytics/rybbit.cy.tsx), same as any other browser global.
   return {
     name: 'stub-server-modules-for-cypress',
     enforce: 'pre',
-    resolveId(source) {
-      return source === 'fathom-client' ? FATHOM_VIRTUAL : null;
-    },
     load(id) {
-      if (id === FATHOM_VIRTUAL) return fathomStub;
       return stubs[id] ?? null;
     },
   };

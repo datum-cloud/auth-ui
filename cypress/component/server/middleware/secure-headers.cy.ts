@@ -7,9 +7,9 @@ import { cspDirectives, resolveFrameAncestors } from '@/server/middleware/secure
 import { NONCE } from 'hono/secure-headers';
 
 describe('cspDirectives', () => {
-  it('allows the Fathom beacon domain in connectSrc in production', () => {
+  it('allows the Rybbit beacon domain in connectSrc in production', () => {
     const csp = cspDirectives(false);
-    expect(csp.connectSrc).to.include('https://cdn.usefathom.com');
+    expect(csp.connectSrc).to.include('https://app.rybbit.io');
     expect(csp.connectSrc).to.include("'self'");
     expect(csp.connectSrc).not.to.include('ws:');
   });

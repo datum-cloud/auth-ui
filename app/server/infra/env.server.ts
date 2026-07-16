@@ -58,11 +58,20 @@ const schema = z
       .optional()
       .transform((v) => (v !== undefined ? parseFloat(v) : 0.1))
       .pipe(z.number().min(0).max(1)),
-    // Fathom analytics site id. OPTIONAL — unset means analytics is a true no-op
-    // everywhere. Exposure to the client is additionally prod-gated in the root
-    // loader (see resolveFathomSiteId in app/modules/analytics/fathom.tsx): dev and
-    // preview never contact Fathom even when this is set.
-    FATHOM_ID: z.string().optional(),
+    // Rybbit analytics site id. OPTIONAL — unset means analytics is a true no-op
+    // everywhere. Active in EVERY environment (dev, staging, preview, production) once set —
+    // no environment gating in the root loader (see resolveRybbitSiteId in
+    // app/modules/analytics/rybbit.tsx).
+    RYBBIT_SITE_ID: z.string().optional(),
+    // Rybbit `data-tag` cohort-segmentation attribute (e.g. "production"/"staging"/"preview").
+    // Optional — unset means the script tag omits data-tag.
+    RYBBIT_TAG: z.string().optional(),
+    // Rybbit server-side tracking API key (POST /api/track), used ONLY for signup moments
+    // that never render an auth-ui page (e.g. an IdP signup completing mid-OIDC-ceremony,
+    // which redirects the browser straight to the relying party — see
+    // app/modules/analytics/rybbit.server.ts). Optional: unauthenticated track calls still
+    // work, just without bot/domain-spoofing protection.
+    RYBBIT_API_KEY: z.string().optional(),
     // MaxMind minFraud device-fingerprinting account id. Optional in EVERY environment
     // (staging may want fraud detection too). Unset ⇒ the signup MaxMind tracker is a
     // true no-op (no device.js loaded, no token captured). Exposed to the client only

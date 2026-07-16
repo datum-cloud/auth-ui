@@ -1,12 +1,13 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
 import { AuthFormFields } from '@/components/auth-form/auth-form-fields';
-import { TrackOnMount } from '@/modules/analytics/fathom';
+import { TrackOnMount, identifyUser } from '@/modules/analytics/rybbit';
 import { resolveSignedIn } from '@/resources/session';
 import { providerForRequest } from '@/server/auth-context.server';
 import { loaderCsrf } from '@/server/csrf';
 import { env } from '@/server/infra/env.server';
 import { Button } from '@datum-cloud/datum-ui/button';
 import { Trans } from '@lingui/react/macro';
+import { useEffect } from 'react';
 import { data, redirect, useLoaderData, type LoaderFunctionArgs } from 'react-router';
 import type { MetaFunction } from 'react-router';
 
@@ -26,11 +27,15 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
   // Terminal "You are signed in" page — mint a CSRF token for the sign-out form.
   const { csrfToken, headers } = await loaderCsrf(request);
-  return data({ loginName: outcome.loginName, csrfToken }, { headers });
+  return data({ loginName: outcome.loginName, userId: outcome.userId, csrfToken }, { headers });
 }
 
 export default function SignedIn() {
-  const { loginName, csrfToken } = useLoaderData<typeof loader>();
+  const { loginName, userId, csrfToken } = useLoaderData<typeof loader>();
+
+  useEffect(() => {
+    if (userId) identifyUser(userId, loginName ? { email: loginName } : undefined);
+  }, [userId, loginName]);
 
   return (
     <AuthCard

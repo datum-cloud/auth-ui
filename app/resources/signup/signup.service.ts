@@ -10,6 +10,7 @@
 // route's schema) + the caller's current session list, and returns a typed result
 // the route turns into a redirect()/data() response. No Request parsing, no CSRF,
 // no cookie I/O lives here.
+import { trackServerEvent } from '@/modules/analytics/rybbit.server';
 import type { AuthProvider, SessionOpts } from '@/modules/auth/auth-provider';
 import {
   addSession,
@@ -140,6 +141,11 @@ export async function registerAndLinkIdp(
     sessionEntryFromSession(session, { loginName: user.loginName, organization, requestId })
   );
   logAuthEvent('signup.requested', 'success', { actor: hashActor(user.loginName), organization });
+  // This is the only caller of registerAndLinkIdp (the IdP auto-create path) — no branch
+  // check needed, reaching this line already means a brand-new account was just created.
+  // Fired server-side (not the client trackAuthEvent) because this ceremony redirects the
+  // browser straight through /authorize to the relying party without ever rendering a page.
+  trackServerEvent('signup_submitted', { userId: user.id, properties: { channel: 'idp' } });
   // Thread the just-created session id so /authorize finishes the callback via resolveOidc's
   // explicit-sessionId hand-back (runCallback) instead of re-running decideAuthorize — without it
   // a brand-new IdP user completing a prompt=select_account / prompt=login ceremony loops straight

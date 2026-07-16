@@ -68,3 +68,44 @@ describe('resolveSignedIn — no-session redirect', () => {
     });
   });
 });
+
+describe('resolveSignedIn — terminal page carries the analytics-identify userId', () => {
+  it("resolves the provider session's user id onto the terminal page outcome", () => {
+    callService({
+      fn: 'resolveSignedIn',
+      provider: 'fresh',
+      seed: {},
+      liveSessions: [
+        { id: 's1', token: 't1', user: { id: 'user-42', loginName: 'alice@acme.test' } },
+      ],
+      signedInConfig: cfg(),
+      request: {
+        url: 'http://localhost/id/signed-in',
+        sessions: COOKIE({ id: 's1', token: 't1' }),
+      },
+    }).then((v) => {
+      const o = v.outcome as { kind: string; loginName?: string | null; userId?: string | null };
+      expect(o.kind).to.equal('page');
+      expect(o.loginName).to.equal('alice@acme.test');
+      expect(o.userId).to.equal('user-42');
+    });
+  });
+
+  it('degrades userId to null when the cookie session does not resolve against the provider (e.g. a stale/mismatched token), without blocking the page', () => {
+    callService({
+      fn: 'resolveSignedIn',
+      provider: 'fresh',
+      seed: {},
+      liveSessions: [{ id: 's1', token: 't1' }],
+      signedInConfig: cfg(),
+      request: {
+        url: 'http://localhost/id/signed-in',
+        sessions: COOKIE({ id: 's1', token: 'wrong-token' }),
+      },
+    }).then((v) => {
+      const o = v.outcome as { kind: string; userId?: string | null };
+      expect(o.kind).to.equal('page');
+      expect(o.userId).to.equal(null);
+    });
+  });
+});

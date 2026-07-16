@@ -69,7 +69,7 @@ export function cspDirectives(isDev: boolean, frameAncestors: readonly string[] 
     // Revisit if Radix/sonner ship CSP-nonce support.
     styleSrc: ["'self'", "'unsafe-inline'"],
     imgSrc: ["'self'", 'data:', 'https:'],
-    // Fathom analytics beacons POST to https://cdn.usefathom.com — without this
+    // Rybbit analytics beacons POST to https://app.rybbit.io — without this
     // connect-src entry the browser blocks them. script-src needs no change:
     // 'strict-dynamic' already trusts scripts injected by our nonce'd bundle.
     // MaxMind's device.js (loaded via MaxMindTracker) submits the fingerprint exchange to a
@@ -79,7 +79,7 @@ export function cspDirectives(isDev: boolean, frameAncestors: readonly string[] 
     // is ever captured — this was diagnosed live via a browser CSP violation on staging.
     connectSrc: [
       "'self'",
-      'https://cdn.usefathom.com',
+      'https://app.rybbit.io',
       'https://device.maxmind.com',
       'https://*.mmapiws.com',
       ...(isDev ? ['ws:'] : []),
