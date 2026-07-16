@@ -310,6 +310,13 @@ async function runEnumerationSafeRegister(
     const sessions = await retryOnceIfNotFound(() => persistSession(user));
     // Audit shape DIVERGES per path — parameterized, never collapsed to one event.
     cfg.noVerifySuccessAudit(user);
+    // Fired server-side (not the client trackAuthEvent) because this path redirects the
+    // browser straight to postRegisterStep's target without ever rendering the
+    // "Check your email" page that carries the client-side TrackOnMount.
+    trackServerEvent('signup_submitted', {
+      userId: user.id,
+      properties: { channel: cfg.hasPassword ? 'password' : 'passkey' },
+    });
     const target = postRegisterStep({
       hasPassword: cfg.hasPassword,
       emailVerified: false,
