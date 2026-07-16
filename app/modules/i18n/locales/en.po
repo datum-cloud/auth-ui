@@ -542,7 +542,7 @@ msgid "Sign in"
 msgstr "Sign in"
 
 #: app/routes/login/password.tsx:179
-#: app/routes/logout/success.tsx:22
+#: app/routes/logout/success.tsx:27
 #: app/utils/errors/auth-error-recovery.tsx:47
 msgid "Sign in again"
 msgstr "Sign in again"
@@ -825,7 +825,7 @@ msgstr "You'll be asked to sign in before authorizing."
 msgid "You're almost done! <0>{loginName}</0>"
 msgstr "You're almost done! <0>{loginName}</0>"
 
-#: app/routes/logout/success.tsx:13
+#: app/routes/logout/success.tsx:18
 msgid "You've been signed out"
 msgstr "You've been signed out"
 
@@ -849,7 +849,7 @@ msgstr "Your email is verified"
 msgid "Your password has expired. Please reset it to continue."
 msgstr "Your password has expired. Please reset it to continue."
 
-#: app/routes/logout/success.tsx:15
+#: app/routes/logout/success.tsx:20
 msgid "Your session has ended and you've been securely signed out of Datum. You can safely close this tab, or sign back in any time to pick up where you left off."
 msgstr "Your session has ended and you've been securely signed out of Datum. You can safely close this tab, or sign back in any time to pick up where you left off."
 
