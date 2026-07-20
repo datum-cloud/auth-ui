@@ -8,7 +8,7 @@
 // are covered by inline-action-error.cy.tsx which uses the same approach. Second-pass
 // trim: keeps the CSRF-bearing switch form, the separate-remove-form safety property,
 // and the IdP badge branch; requestId-threading and plain-login-link permutations cut.
-import AccountPicker from '@/routes/accounts';
+import AccountPicker, { addAccountHref } from '@/routes/accounts';
 import { ConformAdapter } from '@datum-cloud/datum-ui/form/adapters/conform';
 import { setupI18n } from '@lingui/core';
 import { I18nProvider } from '@lingui/react';
@@ -92,6 +92,26 @@ describe('accounts row — switch form structure', () => {
       'have.attr',
       'href',
       '/login?requestId=oidc_V2_123&organization=org-1'
+    );
+  });
+});
+
+describe('addAccountHref', () => {
+  it('carries an OIDC ceremony requestId and organization', () => {
+    expect(
+      addAccountHref({ requestId: 'oidc_abc', organization: 'org-1', userCode: null })
+    ).to.equal('/login?requestId=oidc_abc&organization=org-1');
+  });
+
+  it('prefers the device user_code, rewriting it as a device_ requestId', () => {
+    expect(
+      addAccountHref({ requestId: 'oidc_abc', organization: undefined, userCode: 'WDJB-MJHT' })
+    ).to.equal('/login?requestId=device_WDJB-MJHT');
+  });
+
+  it('omits absent values rather than emitting empty params', () => {
+    expect(addAccountHref({ requestId: null, organization: undefined, userCode: null })).to.equal(
+      '/login'
     );
   });
 });

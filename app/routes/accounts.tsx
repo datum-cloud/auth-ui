@@ -75,6 +75,30 @@ export async function action({ request }: ActionFunctionArgs) {
   return accountActionOutcomeToResponse(outcome);
 }
 
+/**
+ * The "add another account" target, shared by the component's link and the loader's
+ * empty-picker redirect so the two can never drift apart.
+ *
+ * In the device-grant "change account" sub-flow (userCode set) log in for that device grant
+ * (device_<userCode>) so the fresh account auto-authorizes the device; otherwise carry the
+ * current ceremony requestId/organization (or nothing for a standalone add).
+ * paths.login.index skips undefined values, so passing organization unconditionally is safe
+ * even when it's absent.
+ */
+export function addAccountHref({
+  requestId,
+  organization,
+  userCode,
+}: {
+  requestId: string | null;
+  organization: string | undefined;
+  userCode: string | null;
+}): string {
+  return userCode
+    ? paths.login.index({ requestId: `device_${userCode}`, organization })
+    : paths.login.index({ requestId: requestId ?? undefined, organization });
+}
+
 // ─── Component ───────────────────────────────────────────────────────────────
 
 export default function AccountPicker() {
@@ -86,14 +110,7 @@ export default function AccountPicker() {
   // banner near the top of the accounts content — no toast.
   const errorMessage = useAuthActionError(actionData);
 
-  // "Add another account" target. In the device-grant "change account" sub-flow (userCode set)
-  // log in for that device grant (device_<userCode>) so the fresh account auto-authorizes the
-  // device; otherwise carry the current ceremony requestId/organization (or nothing for a
-  // standalone add). paths.login.index skips undefined values, so passing organization
-  // unconditionally is safe even when it's absent.
-  const addAccountHref = userCode
-    ? paths.login.index({ requestId: `device_${userCode}`, organization })
-    : paths.login.index({ requestId: requestId ?? undefined, organization });
+  const addAccountTarget = addAccountHref({ requestId, organization, userCode });
 
   return (
     <AuthCard
@@ -122,7 +139,7 @@ export default function AccountPicker() {
             {/* Carry the ceremony requestId so a fresh "add account" login resumes the
                 OIDC/SAML/device callback (like the switch form) rather than dead-ending at
                 the default post-login redirect. */}
-            <LinkButton theme="link" type="quaternary" as={Link} href={addAccountHref}>
+            <LinkButton theme="link" type="quaternary" as={Link} href={addAccountTarget}>
               <Trans>Add an account</Trans>
             </LinkButton>
           </div>
@@ -214,7 +231,7 @@ export default function AccountPicker() {
               type="quaternary"
               className="text-muted-foreground text-sm"
               as={Link}
-              href={addAccountHref}>
+              href={addAccountTarget}>
               <Trans>Add another account</Trans>
             </LinkButton>
           </>
