@@ -4,7 +4,7 @@ import { FormError } from '@/components/form-error/form-error';
 import { IdpIcon } from '@/components/idp-icon/idp-icon';
 import { useAuthActionError } from '@/hooks/use-auth-action-error';
 import { inferIdpType } from '@/modules/auth/idp-detect';
-import { isAllowedRequestId } from '@/resources/authorize';
+import { isAllowedRequestId, normalizeRequestId } from '@/resources/authorize';
 import { userCodeSchema } from '@/resources/schemas/user-code';
 import {
   listAccounts,
@@ -42,8 +42,14 @@ export async function loader({ request }: LoaderFunctionArgs) {
   // Thread the CURRENT ceremony requestId (a mid-OIDC/SAML/device account switch reaches the
   // picker at /accounts?requestId=…). Only an allowlisted (oidc_/saml_/device_) id is carried;
   // anything else is treated as absent so a switch/remove never reflects an arbitrary value.
+  //
+  // normalizeRequestId also folds Zitadel's RAW param shapes (?authRequest= → oidc_<id>,
+  // ?samlRequest= → saml_<id>) into the same value, preferring an already-threaded requestId.
+  // Without it a ceremony arriving raw — e.g. the legacy /ui/v2/login/accounts?authRequest=…
+  // 301, which preserves the query verbatim — went undetected, so the picker rendered its
+  // empty state and "Add an account" dropped the ceremony.
   const url = new URL(request.url);
-  const candidate = url.searchParams.get('requestId') ?? undefined;
+  const candidate = normalizeRequestId(url);
   const requestId = isAllowedRequestId(candidate) ? candidate : null;
   // Thread the CURRENT ceremony organization alongside requestId — the loader previously never
   // read it, so a mid-ceremony org scope silently dropped off "Add an account" and the

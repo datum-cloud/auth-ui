@@ -61,6 +61,40 @@ describe('accounts loader', () => {
   // ── issue #99: an empty picker mid-ceremony is a dead end ───────────────────────────
   // The harness has no sessions cookie, so listAccounts() returns [] for every case below.
 
+  // A ceremony legitimately arrives in Zitadel's RAW param shape (?authRequest=/?samlRequest=)
+  // as well as the threaded ?requestId=. normalizeRequestId folds all three into one value, so
+  // the raw shapes must be detected as a ceremony too — otherwise the legacy
+  // /ui/v2/login/accounts?authRequest=… 301 lands on an empty picker whose "Add an account"
+  // link drops the ceremony entirely.
+  it('empty + raw authRequest → 302 to /login?requestId=oidc_<id>', () => {
+    callService({
+      fn: 'accountsLoader',
+      request: { url: `${BASE}?authRequest=abc` },
+    }).then((v) => {
+      expect(v.response!.isResponse).to.be.true;
+      expect(v.response!.location).to.equal('/login?requestId=oidc_abc');
+    });
+  });
+
+  it('empty + raw samlRequest → 302 to /login?requestId=saml_<id>', () => {
+    callService({
+      fn: 'accountsLoader',
+      request: { url: `${BASE}?samlRequest=xyz` },
+    }).then((v) => {
+      expect(v.response!.isResponse).to.be.true;
+      expect(v.response!.location).to.equal('/login?requestId=saml_xyz');
+    });
+  });
+
+  it('a threaded requestId wins over a raw authRequest', () => {
+    callService({
+      fn: 'accountsLoader',
+      request: { url: `${BASE}?requestId=oidc_threaded&authRequest=raw` },
+    }).then((v) => {
+      expect(v.response!.location).to.equal('/login?requestId=oidc_threaded');
+    });
+  });
+
   it('empty + ceremony requestId → 302 to /login carrying the ceremony', () => {
     callService({
       fn: 'accountsLoader',
