@@ -31,6 +31,7 @@ import type { Session, AuthMethod, LoginSettings, ProviderErrorCode } from '@/mo
 import { ProviderError } from '@/modules/auth/types';
 import { isAllowedRequestId } from '@/resources/authorize';
 import { postLoginDestinationWithSource } from '@/resources/login/post-login-destination';
+import { userCodeSchema } from '@/resources/schemas/user-code';
 import { nextStepWithParams } from '@/resources/shared/next-step-params';
 import { resolveOrg } from '@/resources/shared/resolve-org';
 import { paths } from '@/routes/paths';
@@ -377,11 +378,7 @@ export const switchSchema = z.object({
   // user reviews and authorizes — instead of the normal post-login destination. Bounded to the
   // OAuth device user_code shape (alphanumeric + - / _) so a malformed value can't pollute the
   // device_<code> requestId or the redirect.
-  userCode: z
-    .string()
-    .max(64)
-    .regex(/^[A-Za-z0-9_-]+$/)
-    .optional(),
+  userCode: userCodeSchema,
 });
 
 export const removeSchema = z.object({
@@ -399,11 +396,7 @@ export const removeSchema = z.object({
   // to /accounts (mirrors requestId for OIDC/SAML) so removing an account mid-device-grant keeps
   // the device context — a subsequent switch/add still returns to /device/authorize. Bounded to
   // the OAuth device user_code shape so a malformed value can't be reflected onto the redirect.
-  userCode: z
-    .string()
-    .max(64)
-    .regex(/^[A-Za-z0-9_-]+$/)
-    .optional(),
+  userCode: userCodeSchema,
 });
 
 export type AccountActionError =
