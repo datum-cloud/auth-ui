@@ -5,6 +5,7 @@ import { IdpIcon } from '@/components/idp-icon/idp-icon';
 import { useAuthActionError } from '@/hooks/use-auth-action-error';
 import { inferIdpType } from '@/modules/auth/idp-detect';
 import { isAllowedRequestId } from '@/resources/authorize';
+import { userCodeSchema } from '@/resources/schemas/user-code';
 import {
   listAccounts,
   resolveAccountAction,
@@ -20,6 +21,7 @@ import { Trans } from '@lingui/react/macro';
 import { Trash2 } from 'lucide-react';
 import {
   data,
+  redirect,
   useLoaderData,
   useActionData,
   type ActionFunctionArgs,
@@ -50,11 +52,32 @@ export async function loader({ request }: LoaderFunctionArgs) {
   // Device-grant "change account": the stable user_code carries the device context so a switch
   // returns to /device/authorize (consent) with the now-active account, and "add account" logs
   // in for that device grant.
-  const userCode = url.searchParams.get('user_code') ?? null;
+  // Validate against the OAuth device user_code shape BEFORE it can reach a redirect target.
+  // switchSchema/removeSchema already bound it for the action path; the loader is the third
+  // consumer and the only one that now feeds an automatic 302 rather than a link a human clicks.
+  const parsedUserCode = userCodeSchema.safeParse(url.searchParams.get('user_code') ?? undefined);
+  const userCode = parsedUserCode.success ? (parsedUserCode.data ?? null) : null;
   // Re-auth landed here because the account that authenticated differs from the one being
   // re-authenticated (see reauthRedirect / the login + IdP identity guards). Surface a banner so
   // the user knows both accounts are kept and they should pick how to continue.
   const reauthMismatch = url.searchParams.get('reauthMismatch') === '1';
+
+  // An empty picker mid-ceremony is a dead end: there is nothing to select and the only
+  // control is "Add an account". Bounce straight to the identifier screen, carrying the
+  // ceremony so login resumes the OIDC/SAML/device callback instead of falling through to
+  // the default post-login redirect.
+  //
+  // Scoped to ceremony-present on purpose. A BARE empty /accounts still renders the empty
+  // state — that is the correct answer for a logout probe, a bookmark, or the legacy
+  // /ui/v2/login/accounts 301, and acceptance/logout.acceptance.cy.ts depends on it as a
+  // security assertion (a signed-out session must not resolve to /signed-in).
+  //
+  // Placed BEFORE loaderCsrf so a discarded token is never minted. reauthMismatch cannot
+  // co-occur with an empty list (both accounts are deliberately kept), and if it somehow
+  // did, its "choose an account" banner is meaningless with zero accounts.
+  if (accounts.length === 0 && (requestId || userCode)) {
+    return redirect(addAccountHref({ requestId, organization, userCode }));
+  }
 
   const { csrfToken, headers } = await loaderCsrf(request);
 

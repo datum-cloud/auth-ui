@@ -57,6 +57,56 @@ describe('accounts loader', () => {
       expect(body.organization).to.equal(undefined);
     });
   });
+
+  // ── issue #99: an empty picker mid-ceremony is a dead end ───────────────────────────
+  // The harness has no sessions cookie, so listAccounts() returns [] for every case below.
+
+  it('empty + ceremony requestId → 302 to /login carrying the ceremony', () => {
+    callService({
+      fn: 'accountsLoader',
+      request: { url: `${BASE}?requestId=oidc_abc&organization=org-1` },
+    }).then((v) => {
+      expect(v.response!.isResponse).to.be.true;
+      expect(v.response!.status).to.equal(302);
+      expect(v.response!.location).to.equal('/login?requestId=oidc_abc&organization=org-1');
+    });
+  });
+
+  it('empty + device user_code → 302 to /login?requestId=device_<code>', () => {
+    callService({
+      fn: 'accountsLoader',
+      request: { url: `${BASE}?user_code=WDJB-MJHT` },
+    }).then((v) => {
+      expect(v.response!.isResponse).to.be.true;
+      expect(v.response!.location).to.equal('/login?requestId=device_WDJB-MJHT');
+    });
+  });
+
+  it('empty + malformed user_code → no redirect, no polluted target — SECURITY', () => {
+    callService({
+      fn: 'accountsLoader',
+      request: { url: `${BASE}?user_code=${encodeURIComponent('X&loginName=admin')}` },
+    }).then((v) => {
+      expect(v.response!.isResponse).to.be.false;
+      const body = v.response!.dataBody as Record<string, unknown>;
+      expect(body.userCode).to.equal(null);
+    });
+  });
+
+  it('empty + BARE url → renders the empty state (logout probe must stay put)', () => {
+    callService({ fn: 'accountsLoader', request: { url: BASE } }).then((v) => {
+      expect(v.response!.isResponse).to.be.false;
+    });
+  });
+
+  it('empty + non-allowlisted requestId → no redirect — SECURITY', () => {
+    callService({
+      fn: 'accountsLoader',
+      request: { url: `${BASE}?requestId=evil_payload` },
+    }).then((v) => {
+      expect(v.response!.isResponse).to.be.false;
+    });
+  });
 });
 
 describe('accounts action', () => {
