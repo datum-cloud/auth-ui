@@ -45,8 +45,15 @@ export function decideAuthorize({
   const baseParams = org ? { organization: org } : undefined;
 
   if (authRequest.prompt.includes('create')) return { target: '/signup', params: baseParams };
+  // An account picker with nothing to pick is a dead end — its only control is "Add an
+  // account". With no sessions, bootstrap straight into the identifier screen instead.
+  // Mirrors the SAML no-session branch (authorize.service.ts:391-396), which was already
+  // hardened against exactly this. Issue #99: datumctl sends prompt=select_account
+  // unconditionally, so a first-time login hit the empty picker.
   if (authRequest.prompt.includes('select_account'))
-    return { target: '/accounts', params: baseParams };
+    return hasSessions
+      ? { target: '/accounts', params: baseParams }
+      : { target: '/login', params: baseParams };
 
   if (authRequest.prompt.includes('login')) {
     const params: Record<string, string> = { ...(baseParams ?? {}) };
