@@ -7,9 +7,13 @@ import type { ErrorEvent, Event } from '@sentry/react-router';
 const LOGIN_NAME = 'alice@victim.example.com';
 const USER_ID = 'user-9f3c-secret';
 const PROVIDER_PROTO = 'zitadel.session.v2.CheckPassword: PERMISSION_DENIED (grpc code 7)';
-const ACCESS_TOKEN = 'eyJhbGciOiJSUzI1NiJ9.PAYLOAD.SIGNATURE';
-const TOKEN_URL = `https://auth.localtest.me/id/login?access_token=${ACCESS_TOKEN}&loginName=${LOGIN_NAME}`;
-const COOKIE = `__session=${ACCESS_TOKEN}; csrf=deadbeef`;
+// Stand-in for a bearer credential. Deliberately NOT JWT-shaped: a real base64 JWT header
+// prefix trips secret scanners, and the shape buys the assertions nothing — scrubEvent is
+// an allowlist that rebuilds the event from known-safe fields and never inspects values,
+// so any distinctive opaque string exercises the identical path.
+const SYNTHETIC_TOKEN = 'not-a-real-token.synthetic-fixture.value';
+const TOKEN_URL = `https://auth.localtest.me/id/login?access_token=${SYNTHETIC_TOKEN}&loginName=${LOGIN_NAME}`;
+const COOKIE = `__session=${SYNTHETIC_TOKEN}; csrf=deadbeef`;
 const APP_CODE = 'INVALID_CREDENTIALS';
 const TRACE_ID = 'a1b2c3d4e5f60718293a4b5c6d7e8f90';
 const SPAN_ID = '0011223344556677';
@@ -34,7 +38,7 @@ function hostileEvent(): ErrorEvent {
               {
                 filename: '/app/auth.ts',
                 function: 'checkPassword',
-                vars: { loginName: LOGIN_NAME, token: ACCESS_TOKEN },
+                vars: { loginName: LOGIN_NAME, token: SYNTHETIC_TOKEN },
               },
             ],
           },
@@ -45,20 +49,20 @@ function hostileEvent(): ErrorEvent {
     request: {
       url: TOKEN_URL,
       method: 'POST',
-      query_string: `access_token=${ACCESS_TOKEN}&loginName=${LOGIN_NAME}`,
-      cookies: { __session: ACCESS_TOKEN },
+      query_string: `access_token=${SYNTHETIC_TOKEN}&loginName=${LOGIN_NAME}`,
+      cookies: { __session: SYNTHETIC_TOKEN },
       headers: {
         cookie: COOKIE,
-        authorization: `Bearer ${ACCESS_TOKEN}`,
+        authorization: `Bearer ${SYNTHETIC_TOKEN}`,
         'user-agent': 'evil/1.0',
       },
       data: { loginName: LOGIN_NAME, password: 'hunter2' },
     },
-    extra: { providerDetail: PROVIDER_PROTO, loginName: LOGIN_NAME, token: ACCESS_TOKEN },
+    extra: { providerDetail: PROVIDER_PROTO, loginName: LOGIN_NAME, token: SYNTHETIC_TOKEN },
     breadcrumbs: [
-      { category: 'auth', message: `login ${LOGIN_NAME}`, data: { token: ACCESS_TOKEN } },
+      { category: 'auth', message: `login ${LOGIN_NAME}`, data: { token: SYNTHETIC_TOKEN } },
     ],
-    tags: { traceId: TRACE_ID, code: APP_CODE, loginName: LOGIN_NAME, secretTag: ACCESS_TOKEN },
+    tags: { traceId: TRACE_ID, code: APP_CODE, loginName: LOGIN_NAME, secretTag: SYNTHETIC_TOKEN },
     contexts: {
       trace: {
         trace_id: TRACE_ID,
@@ -78,7 +82,15 @@ function serialize(event: Event | null): string {
   return JSON.stringify(event ?? {});
 }
 
-const FORBIDDEN = [LOGIN_NAME, USER_ID, PROVIDER_PROTO, ACCESS_TOKEN, COOKIE, TOKEN_URL, 'hunter2'];
+const FORBIDDEN = [
+  LOGIN_NAME,
+  USER_ID,
+  PROVIDER_PROTO,
+  SYNTHETIC_TOKEN,
+  COOKIE,
+  TOKEN_URL,
+  'hunter2',
+];
 
 describe('scrubEvent — allowlist (egress neutrality)', () => {
   it('drops EVERY forbidden string (loginName, provider proto, token URL, cookies)', () => {
