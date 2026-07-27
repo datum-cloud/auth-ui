@@ -61,7 +61,10 @@ function mountMethod() {
             }),
             action: async ({ request }: { request: Request }) => {
               capturedPosts.push(Object.fromEntries(await request.formData()));
-              return null; // surface stays; redirect-following is RR-internal, not under test
+              // Truthy (not null) — mirrors a real completed action so the ceremony's
+              // busy-until-idle effect doesn't stay stuck (see index.cy.tsx for the failure
+              // this caused once sibling controls started disabling on ceremony.phase).
+              return {};
             },
           },
         ],

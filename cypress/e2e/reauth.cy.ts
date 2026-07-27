@@ -34,8 +34,24 @@ describe('/id/reauth — verify one enrolled factor onto the existing session', 
   it('lists Passkey for a passkey-enrolled user', () => {
     loginAndGetSession('passkey-user@acme.test');
     cy.visit('/id/reauth?returnTo=/passkeys');
-    cy.contains('a', 'Passkey').should('be.visible');
+    cy.contains('button', 'Passkey').should('be.visible');
     cy.contains('a', 'Password').should('be.visible');
+  });
+
+  it('Passkey completes the ceremony in place with a single click (no ?method=passkey navigation)', () => {
+    loginAndGetSession('passkey-user@acme.test');
+    cy.visit('/id/reauth?returnTo=/passkeys', {
+      onBeforeLoad: (win) => {
+        win.__CYPRESS_HYDRATE__ = true; // ceremony fetcher needs JS
+      },
+    });
+    cy.settleHydration();
+
+    cy.contains('button', 'Passkey').click();
+
+    // Success → redirect straight to the validated returnTo. A single click, never
+    // a navigation to ?method=passkey / the old "Verify with passkey" second step.
+    cy.location('pathname').should('eq', '/id/passkeys');
   });
 
   it('falls back to /id/passkeys when returnTo is tampered (//evil.test)', () => {

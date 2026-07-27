@@ -119,15 +119,11 @@ describe('/id/passkeys — UI contract', () => {
     cy.get('ul').should('not.exist');
   });
 
-  it('shows the active login name, a "Use a different account" switch link, and a sign-out action', () => {
+  it('shows the active login name, a "Not you?" switch link, and a sign-out action', () => {
     mountPasskeys();
     cy.contains('Logged in as').should('be.visible');
     cy.contains('mia@acme.test').should('be.visible');
-    cy.findByRole('link', { name: /use a different account/i }).should(
-      'have.attr',
-      'href',
-      '/accounts'
-    );
+    cy.findByRole('link', { name: /not you\?/i }).should('have.attr', 'href', '/accounts');
     cy.contains('button', 'Sign out').should('be.visible');
   });
 

@@ -423,7 +423,7 @@ export default function Login() {
             theme="outline"
             block
             htmlType="button"
-            disabled={ceremonyBusy}
+            loading={ceremonyBusy}
             onClick={() => ceremony.begin()}>
             <Trans>Continue with passkey</Trans>
           </Button>
@@ -439,6 +439,7 @@ export default function Login() {
               submittingIdpId={submittingIdpId}
               relative
               lastUsedLogin={lastUsedLogin}
+              disabled={ceremonyBusy}
             />
           ) : null}
 
@@ -454,7 +455,7 @@ export default function Login() {
               theme="outline"
               block
               htmlType="button"
-              disabled={ceremonyBusy}
+              loading={ceremonyBusy}
               onClick={() => ceremony.begin()}
               iconPosition="left"
               icon={<Icon icon={UserKey} />}>
@@ -474,6 +475,7 @@ export default function Login() {
                   type="quaternary"
                   theme="outline"
                   block
+                  disabled={ceremonyBusy}
                   iconPosition="left"
                   icon={<Icon icon={Mail} />}
                   onClick={() => setShowEmailField(true)}>
@@ -507,7 +509,7 @@ export default function Login() {
                       className="h-9"
                     />
                   </Form.Field>
-                  <SubmitButton loading={identifierSubmitting}>
+                  <SubmitButton loading={identifierSubmitting} disabled={ceremonyBusy}>
                     <Trans>Continue</Trans>
                   </SubmitButton>
                   {view.showEmailLink ? (
@@ -515,8 +517,8 @@ export default function Login() {
                       type="submit"
                       name="intent"
                       value="email-link"
-                      className="text-foreground/70 hover:text-foreground mt-1 w-full text-center text-sm underline underline-offset-2 transition-colors"
-                      disabled={navigation.state !== 'idle'}>
+                      className="text-foreground/70 hover:text-foreground mt-1 w-full text-center text-sm underline underline-offset-2 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                      disabled={navigation.state !== 'idle' || ceremonyBusy}>
                       <Trans>Email me a sign-in link</Trans>
                     </button>
                   ) : null}

@@ -209,6 +209,27 @@ export class ProviderError extends Error {
   }
 }
 
+// Codes that indicate a genuine transient backend problem (NOT a dead/stale session) — mirrors
+// session.service.ts's SWITCH_TRANSIENT_CODES. Kept here so any caller re-validating a STORED
+// session (not one just created in the same request) can share the same classification.
+const TRANSIENT_PROVIDER_CODES = new Set<ProviderErrorCode>([
+  'UNAVAILABLE',
+  'DEADLINE_EXCEEDED',
+  'RATE_LIMITED',
+]);
+
+/**
+ * True when a thrown error means a stored session token is stale/revoked rather than a
+ * genuine backend outage — i.e. any ProviderError except the transient ones. Callers
+ * re-validating a stored session (e.g. from a cookie, possibly created in a different
+ * browser/tab) should treat this as "needs re-authentication" and recover by redirecting,
+ * instead of letting it crash the request. NOT appropriate for a session just created earlier
+ * in the SAME request (a real failure there is a genuine error, not staleness).
+ */
+export function isStaleSessionError(err: unknown): boolean {
+  return err instanceof ProviderError && !TRANSIENT_PROVIDER_CODES.has(err.code);
+}
+
 // ── external IdP (Phase 4) ────────────────────────────────────
 export interface IdpIntentRef {
   idpIntentId: string;

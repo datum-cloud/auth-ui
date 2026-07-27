@@ -88,7 +88,12 @@ function mountLogin(opts?: {
               opts?.passkeyAction ??
               (async ({ request }: { request: Request }) => {
                 capturedPosts.push(Object.fromEntries(await request.formData()));
-                return null; // surface stays; redirect-following is RR-internal, not under test
+                // Truthy (not null) — mirrors a real completed action (redirect navigates away;
+                // a rejection returns a truthy {error} object). A falsy return would leave the
+                // ceremony's busy-until-idle effect (submitFetcher.data truthiness) stuck forever,
+                // which is never reachable in production but would wrongly keep sibling controls
+                // disabled here since redirect-following is RR-internal and not under test.
+                return {};
               }),
           },
         ],

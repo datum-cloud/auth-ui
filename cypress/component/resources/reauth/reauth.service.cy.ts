@@ -36,6 +36,7 @@ describe('reauth.service — verify one factor onto the EXISTING session', () =>
       method: null,
       domain: 'localhost',
       emailDeliveryEnabled: false,
+      consoleUrl: 'https://console.acme.test',
     });
     expect(v.kind).to.equal('view');
     if (v.kind === 'view') {
@@ -43,6 +44,37 @@ describe('reauth.service — verify one factor onto the EXISTING session', () =>
       expect(v.returnTo).to.equal('/passkeys');
     }
   });
+
+  it('loadReauth falls back to the Zitadel-configured default destination when returnTo is absent', async () => {
+    // Mirrors /signed-in's own fallback priority (admin console → Zitadel default →
+    // env default → /passkeys) — reauth is reached from multiple flows (passkeys,
+    // sso, ...), so a caller-less visit shouldn't blindly land on /passkeys.
+    const { fake, sessions } = await seeded();
+    fake.setLoginDefaultRedirectUri('https://app.acme.test/dashboard');
+    const v = await loadReauth(fake, sessions, {
+      returnTo: null,
+      method: null,
+      domain: 'localhost',
+      emailDeliveryEnabled: false,
+      consoleUrl: 'https://console.acme.test',
+    });
+    expect(v.kind).to.equal('view');
+    if (v.kind === 'view') expect(v.returnTo).to.equal('https://app.acme.test/dashboard');
+  });
+
+  it('loadReauth falls back to /passkeys when returnTo is absent AND nothing is configured', async () => {
+    const { fake, sessions } = await seeded();
+    const v = await loadReauth(fake, sessions, {
+      returnTo: null,
+      method: null,
+      domain: 'localhost',
+      emailDeliveryEnabled: false,
+      consoleUrl: 'https://console.acme.test',
+    });
+    expect(v.kind).to.equal('view');
+    if (v.kind === 'view') expect(v.returnTo).to.equal('/passkeys');
+  });
+
   it('performReauth(password) updates the SAME session id, rotates the token, and targets returnTo', async () => {
     const { fake, sessions } = await seeded();
     const r = await performReauth(fake, sessions, {
@@ -70,5 +102,39 @@ describe('reauth.service — verify one factor onto the EXISTING session', () =>
       returnTo: null,
     });
     expect(dead).to.deep.equal({ ok: false, error: 'SESSION_EXPIRED' });
+  });
+
+  it('loadReauth recovers to /login (not a crash) when getSession throws a non-transient ProviderError', async () => {
+    // Reproduces the live bug: a stored session token from a DIFFERENT browser/tab is stale or
+    // revoked, and the real Zitadel backend throws PERMISSION_DENIED on getSession instead of
+    // returning null. Before the fix this propagated uncaught and 500'd the whole request.
+    const { fake, sessions } = await seeded();
+    fake.setSessionResult(sessions[0].id, { mode: 'throw', code: 'PERMISSION_DENIED' });
+    const v = await loadReauth(fake, sessions, {
+      returnTo: '/passkeys',
+      method: 'passkey',
+      domain: 'localhost',
+      emailDeliveryEnabled: false,
+      consoleUrl: 'https://console.acme.test',
+    });
+    expect(v).to.deep.equal({ kind: 'redirect', target: '/login' });
+  });
+
+  it('loadReauth re-throws a genuinely transient ProviderError (real outage) instead of masking it', async () => {
+    const { fake, sessions } = await seeded();
+    fake.setSessionResult(sessions[0].id, { mode: 'throw', code: 'UNAVAILABLE' });
+    let threw: unknown;
+    try {
+      await loadReauth(fake, sessions, {
+        returnTo: '/passkeys',
+        method: null,
+        domain: 'localhost',
+        emailDeliveryEnabled: false,
+        consoleUrl: 'https://console.acme.test',
+      });
+    } catch (err) {
+      threw = err;
+    }
+    expect(threw).to.exist;
   });
 });

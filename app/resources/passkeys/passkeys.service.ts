@@ -8,7 +8,7 @@ import type { AuthProvider } from '@/modules/auth/auth-provider';
 // Pure helpers from session/session (not cookie.ts) — cookie.ts is stubbed to no-ops
 // in the Cypress component bundle; identical at runtime (cookie.ts re-exports it).
 import { mostRecent, type SessionEntry } from '@/modules/auth/session/session';
-import { ProviderError } from '@/modules/auth/types';
+import { ProviderError, isStaleSessionError } from '@/modules/auth/types';
 import { validateReturnTo } from '@/resources/shared/return-to';
 import { isSudoFresh } from '@/resources/shared/sudo';
 import { paths } from '@/routes/paths';
@@ -49,11 +49,27 @@ async function resolveActive(
 } | null> {
   const entry = mostRecent(sessions);
   if (!entry) return null;
-  const session = await provider.getSession(entry.id, entry.token);
-  if (!session) return null;
-  const userId = session.user?.id ?? (await provider.findUser(entry.loginName))?.id;
-  if (!userId) return null;
-  return { entry, factors: session.factors, userId };
+  // The stored session token may belong to a DIFFERENT browser/tab than the one hitting this
+  // route right now, and may be stale or revoked provider-side. getSession/findUser throw
+  // (rather than returning null) when that's the case — treat any non-transient ProviderError
+  // the same as a null session (return null; the caller already redirects to /login). A
+  // genuinely transient error (real backend outage) still propagates.
+  try {
+    const session = await provider.getSession(entry.id, entry.token);
+    if (!session) return null;
+    const userId = session.user?.id ?? (await provider.findUser(entry.loginName))?.id;
+    if (!userId) return null;
+    return { entry, factors: session.factors, userId };
+  } catch (err) {
+    if (isStaleSessionError(err)) {
+      logAuthEvent('passkeys', 'failure', {
+        actor: hashActor(entry.loginName),
+        reason: err instanceof ProviderError ? err.code : 'UNKNOWN',
+      });
+      return null;
+    }
+    throw err;
+  }
 }
 
 /**

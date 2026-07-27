@@ -178,7 +178,11 @@ export function WebAuthnButton({
   useEffect(() => {
     setMounted(true);
   }, []);
-  const isSubmitting = loading ?? navigation.state !== 'idle';
+  // 'submitting' means THIS form's own action is in flight. 'loading' also covers an
+  // unrelated navigation elsewhere on the page (e.g. clicking the BackLink or an
+  // identity "Not you?" link) — using navigation.state !== 'idle' here made this
+  // button flash busy/disabled for a click it had nothing to do with.
+  const isSubmitting = loading ?? navigation.state === 'submitting';
 
   async function handleClick() {
     setError(null);

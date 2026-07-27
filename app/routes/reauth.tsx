@@ -7,8 +7,10 @@ import { AuthCard } from '@/components/auth-card/auth-card';
 import { SubmitButton } from '@/components/auth-form/auth-form';
 import { AuthFormFields } from '@/components/auth-form/auth-form-fields';
 import { FormError } from '@/components/form-error/form-error';
-import { WebAuthnButton } from '@/components/webauthn-button/webauthn-button';
+import { IdentityBadge } from '@/components/identity-badge/identity-badge';
+import { WebAuthnButton, WebAuthnReasonCopy } from '@/components/webauthn-button/webauthn-button';
 import { useAuthActionError } from '@/hooks/use-auth-action-error';
+import { usePasskeyReauthCeremony } from '@/hooks/use-passkey-reauth-ceremony';
 import { readSessions, serializeSessions } from '@/modules/auth/session/cookie';
 import {
   loadReauth,
@@ -21,9 +23,10 @@ import { providerForRequest } from '@/server/auth-context.server';
 import { getCsrfToken, assertCsrf } from '@/server/csrf';
 import { env } from '@/server/infra/env.server';
 import { actionError } from '@/utils/errors/auth-error';
-import { LinkButton } from '@datum-cloud/datum-ui/button';
+import { Button, LinkButton } from '@datum-cloud/datum-ui/button';
 import { Form } from '@datum-cloud/datum-ui/form';
 import { Icon } from '@datum-cloud/datum-ui/icons';
+import { cn } from '@datum-cloud/datum-ui/utils';
 import { Trans, useLingui } from '@lingui/react/macro';
 import { Key, Lock, Mail } from 'lucide-react';
 import { useRef } from 'react';
@@ -46,7 +49,7 @@ const METHOD_PARAMS = ['passkey', 'password', 'otp_email'] as const;
 
 type ReauthView = Extract<ReauthLoadResult, { kind: 'view' }>;
 
-interface ReauthLoaderData {
+export interface ReauthLoaderData {
   csrfToken: string;
   view: ReauthView;
 }
@@ -66,6 +69,8 @@ export async function loader({ request }: LoaderFunctionArgs) {
     method,
     domain: url.hostname,
     emailDeliveryEnabled: env.AUTH_EMAIL_DELIVERY_ENABLED,
+    consoleUrl: `${env.ZITADEL_API_URL}/ui/console`,
+    defaultAppUrl: env.DEFAULT_APP_URL,
   });
   if (result.kind === 'redirect') return redirect(result.target);
 
@@ -113,27 +118,51 @@ export async function action({ request }: ActionFunctionArgs) {
   }
 }
 
+// The in-place passkey ceremony (usePasskeyReauthCeremony) loads THIS route's own
+// loader (?method=passkey) for a challenge via fetcher, then submits the assertion
+// to THIS route's action. RR's default post-submit revalidation would re-run the
+// loader and mint a FRESH WebAuthn challenge on the Zitadel session, invalidating
+// the just-signed assertion mid-flight (same class of bug as WEBAU-3M9si in
+// login/passkey.tsx). Suppress ONLY that self-triggered revalidation — the hook
+// tags its submit with passkeyCeremony. A full-page visit or retry (no marker)
+// revalidates normally, so it always renders a fresh challenge.
+export function shouldRevalidate({
+  formData,
+  defaultShouldRevalidate,
+}: {
+  formData?: FormData;
+  defaultShouldRevalidate: boolean;
+}) {
+  if (formData?.get('passkeyCeremony') === '1') return false;
+  return defaultShouldRevalidate;
+}
+
 // ── chooser row ────────────────────────────────────────────────────────────────
 
 function MethodRow({
   href,
   icon,
   children,
+  disabled,
 }: {
   href: string;
   icon: React.ReactNode;
   children: React.ReactNode;
+  /** Inert while a sibling ceremony (the Passkey row) is busy. */
+  disabled?: boolean;
 }) {
   // LinkButton (single styled <a>) — NOT Button asChild (nested-interactive axe violation).
   return (
     <LinkButton
       size="large"
-      className="h-13 gap-3"
+      className={cn('h-13 gap-3', disabled && 'pointer-events-none opacity-50')}
       type="quaternary"
       theme="outline"
       block
       as={Link}
       href={href}
+      aria-disabled={disabled}
+      onClick={(e) => disabled && e.preventDefault()}
       iconPosition="left"
       icon={icon}>
       {children}
@@ -149,7 +178,13 @@ export default function Reauth() {
   const formRef = useRef<HTMLFormElement>(null);
   const errorMessage = useAuthActionError(actionData);
 
-  const { methods, method, returnTo, publicKeyCredentialRequestOptions } = view;
+  const { loginName, methods, method, returnTo, publicKeyCredentialRequestOptions } = view;
+
+  // In-place passkey ceremony — fires from the chooser (method === null) without
+  // navigating to the two-step ?method=passkey verify screen below.
+  const passkeyCeremony = usePasskeyReauthCeremony({ returnTo });
+  const passkeyCeremonyError = useAuthActionError(passkeyCeremony.actionData);
+  const passkeyBusy = passkeyCeremony.phase !== 'idle';
 
   // Extract the inner publicKey object that marshalAssertion expects.
   const publicKey =
@@ -163,28 +198,58 @@ export default function Reauth() {
     <AuthCard
       title={<Trans>Confirm it's you</Trans>}
       description={
-        <Trans>For your security, verify one of your sign-in methods to continue.</Trans>
+        <>
+          <Trans>For your security, verify one of your sign-in methods to continue.</Trans>
+          {loginName && (
+            <IdentityBadge
+              loginName={loginName}
+              verb={<Trans>Logged in as</Trans>}
+              linkLabel={<Trans>Not you?</Trans>}
+              linkTarget={paths.accounts()}
+            />
+          )}
+        </>
       }>
       {method === null ? (
         <div className="flex flex-col gap-3">
+          {passkeyCeremony.reason ? (
+            <FormError>
+              <WebAuthnReasonCopy reason={passkeyCeremony.reason} />
+            </FormError>
+          ) : passkeyCeremonyError ? (
+            <FormError>{passkeyCeremonyError}</FormError>
+          ) : null}
           {methods.includes('passkey') ? (
-            <MethodRow
-              href={paths.reauth({ method: 'passkey', returnTo })}
+            // Button (not MethodRow/LinkButton) — fires the ceremony IN PLACE (lazy
+            // challenge via fetcher) instead of navigating to ?method=passkey. The
+            // chooser stays visible as the fallback on failure.
+            <Button
+              size="large"
+              className="h-13 gap-3"
+              type="quaternary"
+              theme="outline"
+              block
+              htmlType="button"
+              loading={passkeyBusy}
+              onClick={() => passkeyCeremony.begin()}
+              iconPosition="left"
               icon={<Icon icon={Key} />}>
               <Trans>Passkey</Trans>
-            </MethodRow>
+            </Button>
           ) : null}
           {methods.includes('password') ? (
             <MethodRow
               href={paths.reauth({ method: 'password', returnTo })}
-              icon={<Icon icon={Lock} />}>
+              icon={<Icon icon={Lock} />}
+              disabled={passkeyBusy}>
               <Trans>Password</Trans>
             </MethodRow>
           ) : null}
           {methods.includes('otp_email') ? (
             <MethodRow
               href={paths.reauth({ method: 'otp_email', returnTo })}
-              icon={<Icon icon={Mail} />}>
+              icon={<Icon icon={Mail} />}
+              disabled={passkeyBusy}>
               <Trans>Email me a code</Trans>
             </MethodRow>
           ) : null}

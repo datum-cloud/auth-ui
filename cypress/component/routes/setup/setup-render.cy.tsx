@@ -116,4 +116,41 @@ describe('setup/* — BackLink renders to the predecessor', () => {
     mountRoute(SetupMfa, 'mfa', { ...IDENTITY, offerableKeys: ['passkey'] });
     cy.get('a[href*="/login/password"]').should('not.exist');
   });
+
+  it('clicking Back on /setup/passkey does not disable "Register passkey" while the predecessor loads', () => {
+    // Regression: WebAuthnButton's busy state defaulted to navigation.state !== 'idle',
+    // which is also true for an UNRELATED Link navigation elsewhere on the page (the
+    // BackLink). Registers a real /setup/mfa route whose loader never resolves, so the
+    // Back navigation stays pending — proving the CURRENT page's WebAuthnButton stays
+    // interactive throughout, since it has nothing to do with that click.
+    const router = createMemoryRouter(
+      [
+        { id: 'setup-passkey', path: '/setup/passkey', element: <SetupPasskey /> },
+        {
+          id: 'setup-mfa',
+          path: '/setup/mfa',
+          element: <SetupMfa />,
+          loader: () => new Promise(() => {}),
+        },
+      ],
+      {
+        initialEntries: ['/setup/passkey'],
+        hydrationData: {
+          loaderData: {
+            'setup-passkey': {
+              ...IDENTITY,
+              credentialId: 'pk1',
+              publicKey: null,
+              challengeFailed: false,
+            },
+          },
+        },
+      }
+    );
+    mount(withProviders(<RouterProvider router={router} />));
+
+    cy.contains('button', 'Register passkey').should('not.be.disabled');
+    cy.contains('a', 'Back').click();
+    cy.contains('button', 'Register passkey').should('not.be.disabled');
+  });
 });

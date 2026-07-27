@@ -24,7 +24,7 @@ msgstr "{0, plural, one {# attempt remaining.} other {# attempts remaining.}}"
 
 #. placeholder {0}: idp.name
 #. placeholder {0}: r.label
-#: app/components/auth-form/idp-button-list.tsx:81
+#: app/components/auth-form/idp-button-list.tsx:85
 #: app/routes/setup/mfa.tsx:186
 msgid "{0}"
 msgstr "{0}"
@@ -172,7 +172,7 @@ msgstr "Choose a new password"
 msgid "Choose an account"
 msgstr "Choose an account"
 
-#: app/routes/login/method.tsx:89
+#: app/routes/login/method.tsx:90
 msgid "Choose how to sign in"
 msgstr "Choose how to sign in"
 
@@ -188,12 +188,12 @@ msgstr "Choose your login method"
 msgid "Code expired"
 msgstr "Code expired"
 
-#: app/routes/reauth.tsx:223
-#: app/routes/reauth.tsx:245
+#: app/routes/reauth.tsx:288
+#: app/routes/reauth.tsx:310
 msgid "Confirm"
 msgstr "Confirm"
 
-#: app/routes/reauth.tsx:164
+#: app/routes/reauth.tsx:199
 msgid "Confirm it's you"
 msgstr "Confirm it's you"
 
@@ -211,7 +211,7 @@ msgid "Connected accounts"
 msgstr "Connected accounts"
 
 #: app/routes/device/index.tsx:73
-#: app/routes/login/index.tsx:511
+#: app/routes/login/index.tsx:513
 #: app/routes/signup/index.tsx:291
 msgid "Continue"
 msgstr "Continue"
@@ -220,7 +220,7 @@ msgstr "Continue"
 msgid "Continue with passkey"
 msgstr "Continue with passkey"
 
-#: app/routes/login/method.tsx:171
+#: app/routes/login/method.tsx:178
 msgid "Continue with your provider"
 msgstr "Continue with your provider"
 
@@ -240,7 +240,7 @@ msgstr "Couldn't sign in"
 msgid "Create a new account"
 msgstr "Create a new account"
 
-#: app/routes/login/index.tsx:543
+#: app/routes/login/index.tsx:545
 #: app/routes/signup/password.tsx:237
 msgid "Create account"
 msgstr "Create account"
@@ -268,7 +268,7 @@ msgid "Device denied"
 msgstr "Device denied"
 
 #: app/routes/login/index.tsx:350
-#: app/routes/login/index.tsx:480
+#: app/routes/login/index.tsx:482
 #: app/routes/signup/index.tsx:250
 #: app/routes/signup/index.tsx:275
 msgid "Email"
@@ -278,12 +278,12 @@ msgstr "Email"
 msgid "Email code"
 msgstr "Email code"
 
-#: app/routes/reauth.tsx:188
+#: app/routes/reauth.tsx:253
 msgid "Email me a code"
 msgstr "Email me a code"
 
-#: app/routes/login/index.tsx:520
-#: app/routes/login/method.tsx:141
+#: app/routes/login/index.tsx:522
+#: app/routes/login/method.tsx:144
 #: app/routes/signup/method.tsx:339
 msgid "Email me a sign-in link"
 msgstr "Email me a sign-in link"
@@ -357,7 +357,7 @@ msgstr "Enter your SMS code"
 msgid "Finish creating your account"
 msgstr "Finish creating your account"
 
-#: app/routes/reauth.tsx:166
+#: app/routes/reauth.tsx:202
 msgid "For your security, verify one of your sign-in methods to continue."
 msgstr "For your security, verify one of your sign-in methods to continue."
 
@@ -398,6 +398,7 @@ msgid "Linked accounts"
 msgstr "Linked accounts"
 
 #: app/routes/passkeys.tsx:227
+#: app/routes/reauth.tsx:206
 #: app/routes/sso/index.tsx:137
 msgid "Logged in as"
 msgstr "Logged in as"
@@ -427,7 +428,7 @@ msgstr "No account was found and sign-up is not available."
 msgid "No passkeys yet."
 msgstr "No passkeys yet."
 
-#: app/routes/reauth.tsx:193
+#: app/routes/reauth.tsx:258
 msgid "No sign-in method is available for re-authentication."
 msgstr "No sign-in method is available for re-authentication."
 
@@ -443,13 +444,18 @@ msgstr "No signed-in accounts."
 msgid "Not now"
 msgstr "Not now"
 
-#: app/routes/login/index.tsx:541
+#: app/routes/login/index.tsx:543
 msgid "Not registered?"
 msgstr "Not registered?"
 
 #: app/components/identity-badge/identity-badge.tsx:30
+#: app/routes/device/authorize.tsx:122
 #: app/routes/login/index.tsx:416
-#: app/routes/login/method.tsx:98
+#: app/routes/login/method.tsx:99
+#: app/routes/passkeys.tsx:228
+#: app/routes/reauth.tsx:207
+#: app/routes/signed-in.tsx:49
+#: app/routes/sso/index.tsx:138
 msgid "Not you?"
 msgstr "Not you?"
 
@@ -465,9 +471,9 @@ msgstr "or"
 msgid "Or import this URI in your authenticator app"
 msgstr "Or import this URI in your authenticator app"
 
-#: app/routes/login/index.tsx:461
-#: app/routes/login/method.tsx:126
-#: app/routes/reauth.tsx:174
+#: app/routes/login/index.tsx:462
+#: app/routes/login/method.tsx:127
+#: app/routes/reauth.tsx:237
 #: app/routes/setup/mfa.tsx:46
 msgid "Passkey"
 msgstr "Passkey"
@@ -504,9 +510,9 @@ msgstr "Passkeys"
 msgid "Passkeys let you sign in with your fingerprint, face, or device PIN."
 msgstr "Passkeys let you sign in with your fingerprint, face, or device PIN."
 
-#: app/routes/login/method.tsx:156
-#: app/routes/reauth.tsx:181
-#: app/routes/reauth.tsx:218
+#: app/routes/login/method.tsx:161
+#: app/routes/reauth.tsx:245
+#: app/routes/reauth.tsx:283
 #: app/routes/signup/password.tsx:229
 #: app/routes/sso/ldap.tsx:80
 msgid "Password"
@@ -688,7 +694,7 @@ msgstr "Sign out of"
 msgid "Sign out other sessions"
 msgstr "Sign out other sessions"
 
-#: app/routes/login/index.tsx:530
+#: app/routes/login/index.tsx:532
 msgid "Sign-in is currently unavailable for this account. Please contact your administrator."
 msgstr "Sign-in is currently unavailable for this account. Please contact your administrator."
 
@@ -706,7 +712,7 @@ msgstr "Signing in as"
 msgid "Signing in as <0>{0}</0>."
 msgstr "Signing in as <0>{0}</0>."
 
-#: app/routes/login/method.tsx:92
+#: app/routes/login/method.tsx:93
 msgid "Signing in as <0>{loginName}</0>."
 msgstr "Signing in as <0>{loginName}</0>."
 
@@ -843,13 +849,6 @@ msgstr "Unlink"
 msgid "Unlink {providerLabel}?"
 msgstr "Unlink {providerLabel}?"
 
-#: app/routes/device/authorize.tsx:122
-#: app/routes/passkeys.tsx:228
-#: app/routes/signed-in.tsx:49
-#: app/routes/sso/index.tsx:138
-msgid "Use a different account"
-msgstr "Use a different account"
-
 #: app/routes/signup/method.tsx:358
 msgid "Use a passkey"
 msgstr "Use a passkey"
@@ -867,7 +866,7 @@ msgstr "Use your security key to verify your identity."
 msgid "Username"
 msgstr "Username"
 
-#: app/routes/reauth.tsx:240
+#: app/routes/reauth.tsx:305
 #: app/routes/verify/index.tsx:159
 msgid "Verification code"
 msgstr "Verification code"
@@ -883,7 +882,7 @@ msgstr "Verify"
 msgid "Verify and enable"
 msgstr "Verify and enable"
 
-#: app/components/webauthn-button/webauthn-button.tsx:273
+#: app/components/webauthn-button/webauthn-button.tsx:277
 #: app/routes/login/passkey.tsx:92
 msgid "Verify with passkey"
 msgstr "Verify with passkey"
@@ -917,7 +916,7 @@ msgstr "We couldn't set up your passkey. Please try again."
 msgid "We couldn't start passkey setup. Please try again."
 msgstr "We couldn't start passkey setup. Please try again."
 
-#: app/routes/reauth.tsx:238
+#: app/routes/reauth.tsx:303
 msgid "We sent a verification code to your email address."
 msgstr "We sent a verification code to your email address."
 
@@ -993,7 +992,7 @@ msgstr "You've been signed out"
 msgid "Your account is temporarily locked after too many attempts."
 msgstr "Your account is temporarily locked after too many attempts."
 
-#: app/components/webauthn-button/webauthn-button.tsx:253
+#: app/components/webauthn-button/webauthn-button.tsx:257
 msgid "Your browser does not support passkeys. Please use a supported browser."
 msgstr "Your browser does not support passkeys. Please use a supported browser."
 

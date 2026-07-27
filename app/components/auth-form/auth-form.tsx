@@ -6,6 +6,8 @@ interface SubmitButtonProps {
   children: ReactNode;
   /** Override the auto navigation-state loading (e.g. when using a fetcher). */
   loading?: boolean;
+  /** Force-disable regardless of navigation state (e.g. a sibling ceremony is busy). */
+  disabled?: boolean;
   className?: string;
   /**
    * Optional click handler, fired before the browser's native form submission (see
@@ -21,7 +23,13 @@ interface SubmitButtonProps {
  * router's navigation state so it reflects the in-flight server action — NOT RHF's
  * isSubmitting, which resolves instantly under the native-RR-submit pattern.
  */
-export function SubmitButton({ children, loading, className, onClick }: SubmitButtonProps) {
+export function SubmitButton({
+  children,
+  loading,
+  disabled,
+  className,
+  onClick,
+}: SubmitButtonProps) {
   const navigation = useNavigation();
   const isSubmitting = loading ?? navigation.state === 'submitting';
   return (
@@ -31,6 +39,7 @@ export function SubmitButton({ children, loading, className, onClick }: SubmitBu
       block
       htmlType="submit"
       loading={isSubmitting}
+      disabled={disabled}
       className={className}
       onClick={onClick}>
       {children}

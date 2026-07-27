@@ -13,6 +13,7 @@ import { providerForRequest } from '@/server/auth-context.server';
 import { env } from '@/server/infra/env.server';
 import { Button, LinkButton } from '@datum-cloud/datum-ui/button';
 import { Icon } from '@datum-cloud/datum-ui/icons';
+import { cn } from '@datum-cloud/datum-ui/utils';
 import { Trans } from '@lingui/react/macro';
 import { Key, Lock, Mail, UserCircle } from 'lucide-react';
 import { redirect, useLoaderData, type LoaderFunctionArgs, type MetaFunction } from 'react-router';
@@ -119,7 +120,7 @@ export default function LoginMethod() {
             theme="outline"
             block
             htmlType="button"
-            disabled={passkeyBusy}
+            loading={passkeyBusy}
             onClick={() => ceremony.begin()}
             iconPosition="left"
             icon={<Icon icon={Key} />}>
@@ -130,12 +131,14 @@ export default function LoginMethod() {
         {methods.includes('otp_email') ? (
           <LinkButton
             size="large"
-            className="h-13 gap-3"
+            className={cn('h-13 gap-3', passkeyBusy && 'pointer-events-none opacity-50')}
             type="quaternary"
             theme="outline"
             block
             as={Link}
             href={paths.login.verify.email(query)}
+            aria-disabled={passkeyBusy}
+            onClick={(e) => passkeyBusy && e.preventDefault()}
             iconPosition="left"
             icon={<Icon icon={Mail} />}>
             <Trans>Email me a sign-in link</Trans>
@@ -145,12 +148,14 @@ export default function LoginMethod() {
         {methods.includes('password') ? (
           <LinkButton
             size="large"
-            className="h-13 gap-3"
+            className={cn('h-13 gap-3', passkeyBusy && 'pointer-events-none opacity-50')}
             type="quaternary"
             theme="outline"
             block
             as={Link}
             href={paths.login.password(query)}
+            aria-disabled={passkeyBusy}
+            onClick={(e) => passkeyBusy && e.preventDefault()}
             iconPosition="left"
             icon={<Icon icon={Lock} />}>
             <Trans>Password</Trans>
@@ -160,12 +165,14 @@ export default function LoginMethod() {
         {methods.includes('idp') ? (
           <LinkButton
             size="large"
-            className="h-13 gap-3"
+            className={cn('h-13 gap-3', passkeyBusy && 'pointer-events-none opacity-50')}
             type="quaternary"
             theme="outline"
             block
             as={Link}
             href={paths.sso.index(query)}
+            aria-disabled={passkeyBusy}
+            onClick={(e) => passkeyBusy && e.preventDefault()}
             iconPosition="left"
             icon={<Icon icon={UserCircle} />}>
             <Trans>Continue with your provider</Trans>

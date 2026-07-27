@@ -23,6 +23,8 @@ export interface IdpButtonListProps {
   submittingIdpId: string | null;
   relative?: boolean;
   lastUsedLogin?: string | null;
+  /** Force-disable every row regardless of submittingIdpId (e.g. a sibling ceremony is busy). */
+  disabled?: boolean;
 }
 
 export function IdpButtonList({
@@ -33,6 +35,7 @@ export function IdpButtonList({
   submittingIdpId,
   relative = false,
   lastUsedLogin,
+  disabled = false,
 }: IdpButtonListProps): React.JSX.Element {
   // MaxMind mirrors the captured device-fingerprint token into sessionStorage asynchronously
   // (see modules/fraud/maxmind-tracker) — read it client-side only (post-mount) so SSR and the
@@ -63,6 +66,7 @@ export function IdpButtonList({
               block
               htmlType="submit"
               loading={submittingIdpId === idp.id}
+              disabled={disabled}
               iconPosition="left"
               icon={
                 // Span wrapper keeps the Button's `icon` slot a single element; the optimistic

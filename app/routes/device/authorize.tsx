@@ -119,7 +119,7 @@ export default function DeviceAuthorize() {
             <IdentityBadge
               loginName={activeLoginName}
               verb={<Trans>Authorizing as</Trans>}
-              linkLabel={<Trans>Use a different account</Trans>}
+              linkLabel={<Trans>Not you?</Trans>}
               linkTarget={paths.accounts({ user_code: userCode })}
             />
           ) : (

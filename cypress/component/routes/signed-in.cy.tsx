@@ -1,7 +1,7 @@
 // cypress/component/routes/signed-in.cy.tsx
 //
 // /signed-in previously showed loginName as bare text with no switch-account
-// affordance at all. Adds "Use a different account" (mirrors device/authorize.tsx).
+// affordance at all. Adds "Not you?" (mirrors device/authorize.tsx).
 import SignedIn from '@/routes/signed-in';
 import { ConformAdapter } from '@datum-cloud/datum-ui/form/adapters/conform';
 import { setupI18n } from '@lingui/core';
@@ -34,15 +34,11 @@ function mountSignedIn(loginName: string | null = 'mia@acme.test') {
 }
 
 describe('/signed-in — identity + switch-account link + sign-out', () => {
-  it('shows "You are signed in as <loginName>" with a "Use a different account" link to /accounts', () => {
+  it('shows "You are signed in as <loginName>" with a "Not you?" link to /accounts', () => {
     mountSignedIn();
     cy.contains('You are signed in as').should('be.visible');
     cy.contains('mia@acme.test').should('be.visible');
-    cy.findByRole('link', { name: /use a different account/i }).should(
-      'have.attr',
-      'href',
-      '/accounts'
-    );
+    cy.findByRole('link', { name: /not you\?/i }).should('have.attr', 'href', '/accounts');
   });
 
   it('the Sign out form posts to /id/logout?index', () => {

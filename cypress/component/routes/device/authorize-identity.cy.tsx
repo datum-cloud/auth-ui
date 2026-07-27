@@ -1,6 +1,6 @@
 // cypress/component/routes/device/authorize-identity.cy.tsx
 //
-// Pins the "Authorizing as X — Use a different account" identity row now rendered
+// Pins the "Authorizing as X — Not you?" identity row now rendered
 // through the shared IdentityBadge component instead of bespoke flex markup.
 import DeviceAuthorize from '@/routes/device/authorize';
 import { ConformAdapter } from '@datum-cloud/datum-ui/form/adapters/conform';
@@ -43,11 +43,11 @@ function mountAuthorize() {
 }
 
 describe('/device/authorize — identity via shared IdentityBadge', () => {
-  it('shows "Authorizing as <loginName>" with a "Use a different account" link to /accounts?user_code=...', () => {
+  it('shows "Authorizing as <loginName>" with a "Not you?" link to /accounts?user_code=...', () => {
     mountAuthorize();
     cy.contains('Authorizing as').should('be.visible');
     cy.contains(LOADER_DATA.activeLoginName).should('be.visible');
-    cy.findByRole('link', { name: /use a different account/i })
+    cy.findByRole('link', { name: /not you\?/i })
       .should('have.attr', 'href')
       .and('include', '/accounts')
       .and('include', 'user_code=ABC123');

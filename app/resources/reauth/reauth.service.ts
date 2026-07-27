@@ -12,7 +12,9 @@ import type { SessionChecks } from '@/modules/auth/auth-provider';
 // and identical at runtime (cookie.ts re-exports it).
 import { mostRecent, addSession, type SessionEntry } from '@/modules/auth/session/session';
 import type { Session } from '@/modules/auth/types';
-import { ProviderError } from '@/modules/auth/types';
+import { ProviderError, isStaleSessionError } from '@/modules/auth/types';
+import { postLoginDestinationWithSource } from '@/resources/login/post-login-destination';
+import { resolveOrg } from '@/resources/shared/resolve-org';
 import { validateReturnTo } from '@/resources/shared/return-to';
 import { paths } from '@/routes/paths';
 import { logAuthEvent, hashActor } from '@/server/observability';
@@ -25,6 +27,10 @@ export interface ReauthLoadInput {
   /** Request hostname — the FIDO2 relying-party domain for the assertion challenge. */
   domain: string;
   emailDeliveryEnabled: boolean;
+  /** `${ZITADEL_API_URL}/ui/console` — where instance admins land when returnTo is unset. */
+  consoleUrl: string;
+  /** DEFAULT_APP_URL env — fallback when Zitadel has no default configured. */
+  defaultAppUrl?: string;
 }
 
 export type ReauthLoadResult =
@@ -37,6 +43,32 @@ export type ReauthLoadResult =
       publicKeyCredentialRequestOptions: unknown;
       returnTo: string;
     };
+
+/**
+ * Same admin console → Zitadel default → env default priority /signed-in uses
+ * (postLoginDestinationWithSource), falling back to /passkeys only when nothing is
+ * configured at all. Best-effort: a failed settings/admin-check read degrades to
+ * the /passkeys fallback rather than failing the whole reauth load.
+ */
+async function resolveDefaultReturnTo(
+  provider: AuthProvider,
+  entry: SessionEntry,
+  input: Pick<ReauthLoadInput, 'consoleUrl' | 'defaultAppUrl'>
+): Promise<string> {
+  const [settings, isAdmin] = await Promise.all([
+    provider
+      .getLoginSettings(entry.organization ?? (await resolveOrg(provider)))
+      .catch(() => ({}) as { defaultRedirectUri?: string }),
+    provider.isInstanceAdmin({ id: entry.id, token: entry.token }).catch(() => false),
+  ]);
+  const { dest } = postLoginDestinationWithSource({
+    isAdmin,
+    consoleUrl: input.consoleUrl,
+    defaultRedirectUri: settings.defaultRedirectUri,
+    defaultAppUrl: input.defaultAppUrl,
+  });
+  return dest ?? paths.passkeys();
+}
 
 /**
  * Resolve the reauth view: enrolled-methods chooser (constrained to reauth-capable
@@ -53,19 +85,42 @@ export async function loadReauth(
   const entry = mostRecent(sessions);
   if (!entry) return { kind: 'redirect', target: paths.login.index() };
 
-  const session = await provider.getSession(entry.id, entry.token);
-  if (!session) return { kind: 'redirect', target: paths.login.index() };
+  // The stored session token may belong to a DIFFERENT browser/tab than the one hitting this
+  // route right now, and may be stale or revoked provider-side. getSession/findUser/listAuthMethods
+  // throw (rather than returning null) when that's the case — treat any non-transient
+  // ProviderError the same as a null session: bounce to /login instead of crashing the request.
+  // A genuinely transient error (real backend outage) still propagates.
+  let userId: string | undefined;
+  let enrolled: Awaited<ReturnType<typeof provider.listAuthMethods>>;
+  try {
+    const session = await provider.getSession(entry.id, entry.token);
+    if (!session) return { kind: 'redirect', target: paths.login.index() };
+    userId = session.user?.id ?? (await provider.findUser(entry.loginName))?.id;
+    if (!userId) return { kind: 'redirect', target: paths.login.index() };
+    enrolled = await provider.listAuthMethods(userId);
+  } catch (err) {
+    if (isStaleSessionError(err)) {
+      logAuthEvent('reauth', 'failure', {
+        actor: hashActor(entry.loginName),
+        reason: err instanceof ProviderError ? err.code : 'UNKNOWN',
+      });
+      return { kind: 'redirect', target: paths.login.index() };
+    }
+    throw err;
+  }
 
-  const userId = session.user?.id ?? (await provider.findUser(entry.loginName))?.id;
-  if (!userId) return { kind: 'redirect', target: paths.login.index() };
-
-  const enrolled = await provider.listAuthMethods(userId);
   const methods: ReauthMethod[] = [];
   if (enrolled.includes('passkey') && provider.capabilities.passkey) methods.push('passkey');
   if (enrolled.includes('password')) methods.push('password');
   if (enrolled.includes('otp_email') && input.emailDeliveryEnabled) methods.push('otp_email');
 
-  const returnTo = validateReturnTo(input.returnTo) ?? paths.passkeys();
+  // No caller-supplied returnTo (or a tampered one) — resolve the SAME post-login
+  // destination /signed-in uses (admin console → Zitadel default → env default),
+  // rather than blindly landing every reauth on /passkeys regardless of which flow
+  // sent the user here. Only done when actually needed — the common case (an explicit
+  // returnTo from the caller) skips these extra provider calls entirely.
+  const returnTo =
+    validateReturnTo(input.returnTo) ?? (await resolveDefaultReturnTo(provider, entry, input));
 
   let publicKeyCredentialRequestOptions: unknown = null;
   if (input.method === 'passkey') {

@@ -46,7 +46,7 @@ export default function SignedIn() {
           <IdentityBadge
             loginName={loginName}
             verb={<Trans>You are signed in as</Trans>}
-            linkLabel={<Trans>Use a different account</Trans>}
+            linkLabel={<Trans>Not you?</Trans>}
             linkTarget={paths.accounts()}
           />
         ) : null

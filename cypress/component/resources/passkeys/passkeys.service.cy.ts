@@ -56,6 +56,16 @@ describe('passkeys.service — /id/passkeys management', () => {
     }
   });
 
+  it('a stale/revoked session token (getSession throws PERMISSION_DENIED) recovers to /login, not a crash', async () => {
+    // Mirrors the reauth.service.ts fix: a stored session token from a different browser/tab
+    // may be stale or revoked provider-side, and the real Zitadel backend throws
+    // PERMISSION_DENIED on getSession instead of returning null.
+    const { fake, sessions } = await seeded();
+    fake.setSessionResult(sessions[0].id, { mode: 'throw', code: 'PERMISSION_DENIED' });
+    const v = await loadPasskeysView(fake, sessions, { returnTo: '/passkeys', nowMs: Date.now() });
+    expect(v).to.deep.equal({ kind: 'redirect', target: '/login' });
+  });
+
   it('stale sudo ⇒ loader redirects to /reauth AND removeUserPasskey refuses server-side', async () => {
     const { fake, sessions } = await seeded();
     const staleNow = Date.now() + SUDO_TTL_MS + 1;
