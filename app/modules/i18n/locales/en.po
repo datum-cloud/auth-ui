@@ -173,7 +173,7 @@ msgstr "Choose a new password"
 msgid "Choose an account"
 msgstr "Choose an account"
 
-#: app/routes/login/method.tsx:90
+#: app/routes/login/method.tsx:107
 msgid "Choose how to sign in"
 msgstr "Choose how to sign in"
 
@@ -218,6 +218,7 @@ msgid "Continue"
 msgstr "Continue"
 
 #. placeholder {0}: idp.name ?? idp.idpId
+#: app/routes/login/method.tsx:197
 #: app/routes/reauth.tsx:292
 msgid "Continue with {0}"
 msgstr "Continue with {0}"
@@ -225,10 +226,6 @@ msgstr "Continue with {0}"
 #: app/routes/login/index.tsx:428
 msgid "Continue with passkey"
 msgstr "Continue with passkey"
-
-#: app/routes/login/method.tsx:178
-msgid "Continue with your provider"
-msgstr "Continue with your provider"
 
 #: app/routes/login/password.tsx:114
 msgid "Could not verify password"
@@ -293,7 +290,7 @@ msgid "Email me a code"
 msgstr "Email me a code"
 
 #: app/routes/login/index.tsx:522
-#: app/routes/login/method.tsx:144
+#: app/routes/login/method.tsx:161
 #: app/routes/signup/method.tsx:339
 msgid "Email me a sign-in link"
 msgstr "Email me a sign-in link"
@@ -461,7 +458,7 @@ msgstr "Not registered?"
 #: app/components/identity-badge/identity-badge.tsx:30
 #: app/routes/device/authorize.tsx:122
 #: app/routes/login/index.tsx:416
-#: app/routes/login/method.tsx:99
+#: app/routes/login/method.tsx:116
 #: app/routes/passkeys.tsx:228
 #: app/routes/reauth.tsx:242
 #: app/routes/signed-in.tsx:49
@@ -482,7 +479,7 @@ msgid "Or import this URI in your authenticator app"
 msgstr "Or import this URI in your authenticator app"
 
 #: app/routes/login/index.tsx:462
-#: app/routes/login/method.tsx:127
+#: app/routes/login/method.tsx:144
 #: app/routes/reauth.tsx:272
 #: app/routes/setup/mfa.tsx:46
 msgid "Passkey"
@@ -520,7 +517,7 @@ msgstr "Passkeys"
 msgid "Passkeys let you sign in with your fingerprint, face, or device PIN."
 msgstr "Passkeys let you sign in with your fingerprint, face, or device PIN."
 
-#: app/routes/login/method.tsx:161
+#: app/routes/login/method.tsx:178
 #: app/routes/reauth.tsx:301
 #: app/routes/reauth.tsx:339
 #: app/routes/signup/password.tsx:229
@@ -722,7 +719,7 @@ msgstr "Signing in as"
 msgid "Signing in as <0>{0}</0>."
 msgstr "Signing in as <0>{0}</0>."
 
-#: app/routes/login/method.tsx:93
+#: app/routes/login/method.tsx:110
 msgid "Signing in as <0>{loginName}</0>."
 msgstr "Signing in as <0>{loginName}</0>."
 

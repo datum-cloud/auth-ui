@@ -19,6 +19,7 @@ const LOGIN_CONTEXT = {
 const METHOD_LOADER_DATA = {
   methods: ['passkey', 'password'],
   branding: null,
+  linkedIdps: [],
 };
 
 const capturedPosts: Array<Record<string, unknown>> = [];
@@ -106,6 +107,42 @@ describe('/login/method — identity header + in-place passkey ceremony', () => 
     });
     // No navigation happened — the chooser is still on screen as the fallback.
     // Password stays a plain link (unchanged), so it's matched by its <a> tag.
+    cy.contains('a', 'Password').should('be.visible');
+  });
+
+  it('renders a link per linked IdP, named after the actual provider', () => {
+    const methodData = {
+      methods: ['idp', 'password'],
+      branding: null,
+      linkedIdps: [{ idpId: 'idp-google', name: 'Google', type: 'GOOGLE' }],
+    };
+    const router = createMemoryRouter(
+      [
+        {
+          id: 'login',
+          path: '/login',
+          loader: () => LOGIN_CONTEXT,
+          children: [
+            {
+              id: 'method',
+              path: 'method',
+              element: <LoginMethod />,
+              loader: async () => methodData,
+            },
+          ],
+        },
+      ],
+      {
+        initialEntries: ['/login/method?loginName=mia%40acme.test'],
+        hydrationData: {
+          loaderData: { login: LOGIN_CONTEXT, method: methodData },
+        },
+      }
+    );
+    mount(withI18n(<RouterProvider router={router} />));
+
+    // Named after the actual provider ("Google"), not the generic "your provider" copy.
+    cy.contains('a', 'Continue with Google').should('be.visible').and('have.attr', 'href');
     cy.contains('a', 'Password').should('be.visible');
   });
 });

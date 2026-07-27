@@ -1,4 +1,5 @@
 import { FormError } from '@/components/form-error/form-error';
+import { IdpIcon } from '@/components/idp-icon/idp-icon';
 import { WebAuthnReasonCopy } from '@/components/webauthn-button/webauthn-button';
 import { useAuthActionError } from '@/hooks/use-auth-action-error';
 import { useLoginContext } from '@/hooks/use-login-context';
@@ -7,6 +8,9 @@ import SplitLayout from '@/layouts/split.layout';
 import { decideAfterIdentifier } from '@/resources/login/login-decision';
 import { readCeremonyParams } from '@/resources/shared/ceremony-params';
 import { resolveOrg } from '@/resources/shared/resolve-org';
+import { joinLinkedIdps } from '@/resources/sso';
+import { getActiveIdPs } from '@/resources/sso/idp-providers';
+import type { LinkedIdpView } from '@/resources/sso/sso-management';
 import { redirectToLogin } from '@/routes/login-bounce';
 import { paths } from '@/routes/paths';
 import { providerForRequest } from '@/server/auth-context.server';
@@ -15,7 +19,7 @@ import { Button, LinkButton } from '@datum-cloud/datum-ui/button';
 import { Icon } from '@datum-cloud/datum-ui/icons';
 import { cn } from '@datum-cloud/datum-ui/utils';
 import { Trans } from '@lingui/react/macro';
-import { Key, Lock, Mail, UserCircle } from 'lucide-react';
+import { Key, Lock, Mail } from 'lucide-react';
 import { redirect, useLoaderData, type LoaderFunctionArgs, type MetaFunction } from 'react-router';
 import { Link } from 'react-router';
 
@@ -47,7 +51,20 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const available: Array<'passkey' | 'password' | 'otp_email' | 'idp'> = [];
   if (methods.includes('passkey') && settings.passkeysType !== 'not_allowed')
     available.push('passkey');
-  if (methods.includes('idp') && settings.allowExternalIdp) available.push('idp');
+
+  // Resolve the user's linked (redirect-based) IdPs for real icon/name rendering —
+  // mirrors reauth.service.ts's loadReauth idp-resolution exactly, including the LDAP
+  // exclusion (LDAP needs its own credential form, not an OAuth round-trip).
+  let linkedIdps: LinkedIdpView[] = [];
+  if (methods.includes('idp') && settings.allowExternalIdp) {
+    const [links, active] = await Promise.all([
+      provider.listIdpLinks(user.id),
+      getActiveIdPs(provider, settingsOrg),
+    ]);
+    linkedIdps = joinLinkedIdps(links, active).filter((l) => l.type !== 'LDAP');
+    if (linkedIdps.length > 0) available.push('idp');
+  }
+
   if (methods.includes('password') && settings.allowPassword) available.push('password');
   if (methods.includes('otp_email') && env.AUTH_EMAIL_DELIVERY_ENABLED) available.push('otp_email');
 
@@ -68,11 +85,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
     return redirect(`${target}?${params.toString()}`);
   }
 
-  return { loginName, requestId, organization, methods: available, branding };
+  return { loginName, requestId, organization, methods: available, branding, linkedIdps };
 }
 
 export default function LoginMethod() {
-  const { methods, branding } = useLoaderData<typeof loader>();
+  const { methods, branding, linkedIdps } = useLoaderData<typeof loader>();
   const { loginName, requestId, organization } = useLoginContext();
 
   // Typed paths.* emit the identical query string buildParams produced
@@ -162,22 +179,25 @@ export default function LoginMethod() {
           </LinkButton>
         ) : null}
 
-        {methods.includes('idp') ? (
-          <LinkButton
-            size="large"
-            className={cn('h-13 gap-3', passkeyBusy && 'pointer-events-none opacity-50')}
-            type="quaternary"
-            theme="outline"
-            block
-            as={Link}
-            href={paths.sso.index(query)}
-            aria-disabled={passkeyBusy}
-            onClick={(e) => passkeyBusy && e.preventDefault()}
-            iconPosition="left"
-            icon={<Icon icon={UserCircle} />}>
-            <Trans>Continue with your provider</Trans>
-          </LinkButton>
-        ) : null}
+        {methods.includes('idp')
+          ? linkedIdps.map((idp) => (
+              <LinkButton
+                key={idp.idpId}
+                size="large"
+                className={cn('h-13 gap-3', passkeyBusy && 'pointer-events-none opacity-50')}
+                type="quaternary"
+                theme="outline"
+                block
+                as={Link}
+                href={paths.sso.index(query)}
+                aria-disabled={passkeyBusy}
+                onClick={(e) => passkeyBusy && e.preventDefault()}
+                iconPosition="left"
+                icon={<IdpIcon type={idp.type} logoUrl={idp.logoUrl} />}>
+                <Trans>Continue with {idp.name ?? idp.idpId}</Trans>
+              </LinkButton>
+            ))
+          : null}
       </div>
     </SplitLayout>
   );
