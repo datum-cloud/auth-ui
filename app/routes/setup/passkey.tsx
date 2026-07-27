@@ -56,6 +56,12 @@ export default function SetupPasskey() {
   // (name the held credential). The AAGUID exists only in the returned attestation,
   // so the pre-fill is computed at this transition.
   const [held, setHeld] = useState<HeldCredential | null>(null);
+  // A step-2 (Save) failure means navigator.credentials.create() ALREADY ran and the
+  // credential already exists in the user's authenticator/password manager — dropping back
+  // to step 1 silently, with no warning, means the next "Register passkey" click creates a
+  // SECOND credential and orphans the first (there is no WebAuthn API to cancel/delete it
+  // remotely). Persists across the reset so step 1 can warn instead of silently duplicating.
+  const [orphanRisk, setOrphanRisk] = useState(false);
 
   // Inline message + a recovery <Link> for recoverable codes (SESSION_EXPIRED → "Sign in again").
   const { message: errorMessage, recovery } = useAuthActionRecovery(actionData, {
@@ -68,13 +74,17 @@ export default function SetupPasskey() {
   // revalidation has already fetched a fresh challenge, so one click retries the
   // full ceremony.
   useEffect(() => {
-    if (actionData?.error) setHeld(null);
+    if (actionData?.error) {
+      setOrphanRisk(true);
+      setHeld(null);
+    }
   }, [actionData]);
 
   function handleCredential(credential: Record<string, unknown>) {
     const att = (credential.response as { attestationObject?: string } | undefined)
       ?.attestationObject;
     const aaguid = att ? aaguidFromAttestationObject(att) : null;
+    setOrphanRisk(false);
     setHeld({
       credential,
       defaultName: defaultPasskeyName(aaguid, navigator.userAgent),
@@ -168,6 +178,16 @@ export default function SetupPasskey() {
               <FormError>
                 <Trans>We couldn't start passkey setup. Please try again.</Trans>
               </FormError>
+            ) : null}
+
+            {orphanRisk ? (
+              <p className="text-foreground/60 text-xs">
+                <Trans>
+                  Your previous attempt may have already created a passkey on this device. Retrying
+                  will register a new one — you can remove the unused entry later from your device
+                  or password manager.
+                </Trans>
+              </p>
             ) : null}
 
             <WebAuthnButton

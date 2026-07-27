@@ -125,7 +125,12 @@ export async function action({ request }: ActionFunctionArgs) {
   if (!loginName) return redirect(redirectToLogin(requestId, organization));
 
   const user = await provider.findUser(loginName, organization);
-  if (!user) return redirect(redirectToLogin(requestId, organization));
+  // This action is unauthenticated (driven by the loginName ceremony param, not a session).
+  // "Unknown user" and "known user, idp not linked" must return the IDENTICAL response —
+  // previously the former redirected to /login while the latter returned this 400, making the
+  // action a linked-IdP identity oracle (redirect vs 400 vs the eventual 302-to-provider on
+  // success let an attacker probe both account existence and which IdP a given address uses).
+  if (!user) return data({ error: 'INVALID_INPUT' as const }, { status: 400 });
 
   // Defensive server-side re-check: never trust the client's idpId — confirm it
   // resolves to one of THIS identified user's own linked, active, non-LDAP providers

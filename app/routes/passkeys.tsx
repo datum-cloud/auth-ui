@@ -111,6 +111,7 @@ export async function action({ request }: ActionFunctionArgs) {
 function RemoveConfirmDialog({ row, csrfToken }: { row: PasskeyRow; csrfToken: string }) {
   const [open, setOpen] = useState(false);
   const actionData = useActionData();
+  const { t } = useLingui();
   // Close when any action result lands: on success the row unmounts anyway, but on a
   // refusal (LAST_METHOD) the inline error must not hide behind the modal overlay.
   useEffect(() => {
@@ -125,8 +126,8 @@ function RemoveConfirmDialog({ row, csrfToken }: { row: PasskeyRow; csrfToken: s
           type="danger"
           htmlType="button"
           className="text-muted-foreground hover:text-destructive shrink-0 p-0 transition-colors"
-          aria-label={`Remove ${row.name}`}
-          title={`Remove ${row.name}`}>
+          aria-label={t`Remove ${row.name}`}
+          title={t`Remove ${row.name}`}>
           <Icon icon={Trash2} size={16} />
         </Button>
       </Dialog.Trigger>
@@ -293,7 +294,13 @@ export default function Passkeys() {
           theme="outline"
           block
           as={Link}
-          href={paths.setup.passkey({ loginName, returnTo: paths.passkeys() })}
+          href={paths.setup.passkey({
+            loginName,
+            // Preserve the page's OWN external returnTo (the portal round-trip that produced
+            // the "Back" button below) across the add-passkey round-trip — hardcoding
+            // paths.passkeys() here silently dropped it, so "Back" was gone after adding a key.
+            returnTo: paths.passkeys({ returnTo: returnTo ?? undefined }),
+          })}
           iconPosition="left"
           icon={<Icon icon={Plus} />}>
           <Trans>Add passkey</Trans>

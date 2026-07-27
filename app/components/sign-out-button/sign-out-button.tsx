@@ -1,4 +1,5 @@
 import { AuthFormFields } from '@/components/auth-form/auth-form-fields';
+import { APP_BASENAME } from '@/resources/shared/app-basename';
 import { Button } from '@datum-cloud/datum-ui/button';
 import { Trans } from '@lingui/react/macro';
 
@@ -19,7 +20,7 @@ export interface SignOutButtonProps {
  */
 export function SignOutButton({ csrf, emphasis = 'secondary' }: SignOutButtonProps) {
   return (
-    <form method="post" action="/id/logout?index">
+    <form method="post" action={`${APP_BASENAME}/logout?index`}>
       <AuthFormFields csrf={csrf} />
       {emphasis === 'primary' ? (
         <Button type="primary" theme="solid" htmlType="submit" block>

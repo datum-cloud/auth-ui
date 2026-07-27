@@ -31,7 +31,9 @@ function readArg(c: Cursor, info: number): number {
   if (info === 24) return readByte(c);
   if (info === 25) return (readByte(c) << 8) | readByte(c);
   if (info === 26)
-    return (readByte(c) << 24) | (readByte(c) << 16) | (readByte(c) << 8) | readByte(c);
+    // `>>> 0` forces an unsigned 32-bit result — `<<` alone yields a signed int, wrong in
+    // principle for a CBOR length/value even though attestation objects never approach 2^31.
+    return ((readByte(c) << 24) | (readByte(c) << 16) | (readByte(c) << 8) | readByte(c)) >>> 0;
   // 64-bit / indefinite lengths never appear in attestation objects.
   throw new RangeError(`cbor: unsupported additional info ${info}`);
 }

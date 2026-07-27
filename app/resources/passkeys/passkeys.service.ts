@@ -29,7 +29,6 @@ export type PasskeysViewResult =
   | {
       kind: 'view';
       loginName: string;
-      userId: string;
       passkeys: PasskeyRow[];
       methodCount: number;
       returnTo: string | null;
@@ -104,7 +103,6 @@ export async function loadPasskeysView(
   return {
     kind: 'view',
     loginName: active.entry.loginName,
-    userId: active.userId,
     passkeys,
     methodCount: usable.length,
     returnTo: validateReturnTo(input.returnTo),
@@ -169,12 +167,16 @@ export async function removeUserPasskey(
       provider.listAuthMethods(userId),
       provider.getLoginSettings(await resolveOrg(provider, organization)),
     ]);
-    // Refuse removing the user's FINAL USABLE sign-in method: at most one passkey left
+    // Refuse removing the user's FINAL USABLE sign-in method: at most one ACTIVE passkey left
     // AND no other method that's both enrolled AND currently allowed by org/instance
     // policy — an enrolled-but-policy-disabled method (e.g. password auth turned off
-    // after the user set one) is not a real backup.
+    // after the user set one) is not a real backup. listPasskeys returns BOTH active and
+    // inactive rows (the UI renders an "Inactive" badge for the latter) — counting raw
+    // passkeys.length let a passkey-only account with 1 active + 1 inactive slip past the
+    // guard (length === 2), remove the active one, and be locked out with only a dead entry.
+    const activePasskeys = passkeys.filter((p) => p.state === 'active');
     const usable = usableSignInMethods(methods, settings, emailDeliveryEnabled);
-    if (passkeys.length <= 1 && !usable.some((m) => m !== 'passkey')) {
+    if (activePasskeys.length <= 1 && !usable.some((m) => m !== 'passkey')) {
       logAuthEvent('passkey_remove', 'failure', {
         userId,
         reason: 'last_method',

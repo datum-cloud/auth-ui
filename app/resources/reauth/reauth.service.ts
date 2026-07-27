@@ -8,13 +8,13 @@
 import type { AuthProvider } from '@/modules/auth/auth-provider';
 import type { SessionChecks } from '@/modules/auth/auth-provider';
 import { idpTypeToSlug } from '@/modules/auth/idp-slug';
-import { withLoginHint } from '@/resources/login/login.service';
 // NOTE: import the PURE helpers from session/session (not cookie.ts) — cookie.ts is
 // stubbed to no-ops in the Cypress component bundle; the pure module is browser-safe
 // and identical at runtime (cookie.ts re-exports it).
 import { mostRecent, addSession, type SessionEntry } from '@/modules/auth/session/session';
 import type { Session } from '@/modules/auth/types';
 import { ProviderError, isStaleSessionError } from '@/modules/auth/types';
+import { withLoginHint } from '@/resources/login/login.service';
 import { postLoginDestinationWithSource } from '@/resources/login/post-login-destination';
 import { APP_BASENAME } from '@/resources/shared/app-basename';
 import { resolveOrg } from '@/resources/shared/resolve-org';
