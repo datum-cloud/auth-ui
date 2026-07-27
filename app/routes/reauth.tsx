@@ -8,19 +8,25 @@ import { SubmitButton } from '@/components/auth-form/auth-form';
 import { AuthFormFields } from '@/components/auth-form/auth-form-fields';
 import { FormError } from '@/components/form-error/form-error';
 import { IdentityBadge } from '@/components/identity-badge/identity-badge';
+import { IdpIcon } from '@/components/idp-icon/idp-icon';
 import { WebAuthnButton, WebAuthnReasonCopy } from '@/components/webauthn-button/webauthn-button';
 import { useAuthActionError } from '@/hooks/use-auth-action-error';
 import { usePasskeyReauthCeremony } from '@/hooks/use-passkey-reauth-ceremony';
-import { readSessions, serializeSessions } from '@/modules/auth/session/cookie';
+import { mostRecent, readSessions, serializeSessions } from '@/modules/auth/session/cookie';
 import {
   loadReauth,
   performReauth,
+  startReauthIdpIntent,
   type ReauthLoadResult,
   type ReauthMethod,
 } from '@/resources/reauth/reauth.service';
+import { resolveOrg } from '@/resources/shared/resolve-org';
+import { validateReturnTo } from '@/resources/shared/return-to';
+import { getActiveIdPs } from '@/resources/sso/idp-providers';
 import { paths } from '@/routes/paths';
 import { providerForRequest } from '@/server/auth-context.server';
 import { getCsrfToken, assertCsrf } from '@/server/csrf';
+import { trustedAppOrigin } from '@/server/infra/app-origin.server';
 import { env } from '@/server/infra/env.server';
 import { actionError } from '@/utils/errors/auth-error';
 import { Button, LinkButton } from '@datum-cloud/datum-ui/button';
@@ -93,6 +99,34 @@ export async function action({ request }: ActionFunctionArgs) {
   const provider = providerForRequest(request);
   const form = await request.formData();
   await assertCsrf(request, form);
+
+  if (form.get('intent') === 'idp-reauth') {
+    const idpId = String(form.get('idpId') ?? '');
+    const returnTo = validateReturnTo(String(form.get('returnTo') ?? '')) ?? paths.passkeys();
+    if (!idpId) return data({ error: 'INVALID_INPUT' as const }, { status: 400 });
+
+    const sessions = await readSessions(request);
+    const entry = mostRecent(sessions);
+    if (!entry) return redirect(paths.login.index());
+
+    // Defensive server-side re-check: never trust the client's idpId — confirm it
+    // resolves to an ACTIVE, non-LDAP provider before starting the round-trip. Scoped
+    // to the SAME org loadReauth used to build the chooser's linkedIdps (Task 3), so
+    // this never rejects a provider the user legitimately just saw a button for.
+    const active = await getActiveIdPs(provider, await resolveOrg(provider, entry.organization));
+    const targetIdp = active.find((i) => i.id === idpId);
+    if (!targetIdp || targetIdp.type === 'LDAP') {
+      return data({ error: 'INVALID_INPUT' as const }, { status: 400 });
+    }
+
+    const result = await startReauthIdpIntent(provider, {
+      idpId,
+      origin: trustedAppOrigin(request),
+      returnTo,
+    });
+    if (!result.ok) return data({ error: result.error }, { status: 502 });
+    return redirect(result.authUrl);
+  }
 
   const parsed = reauthActionSchema.safeParse(Object.fromEntries(form));
   if (!parsed.success) return data({ error: 'INVALID_INPUT' as const }, { status: 400 });
@@ -178,7 +212,8 @@ export default function Reauth() {
   const formRef = useRef<HTMLFormElement>(null);
   const errorMessage = useAuthActionError(actionData);
 
-  const { loginName, methods, method, returnTo, publicKeyCredentialRequestOptions } = view;
+  const { loginName, methods, method, returnTo, linkedIdps, publicKeyCredentialRequestOptions } =
+    view;
 
   // In-place passkey ceremony — fires from the chooser (method === null) without
   // navigating to the two-step ?method=passkey verify screen below.
@@ -237,6 +272,27 @@ export default function Reauth() {
               <Trans>Passkey</Trans>
             </Button>
           ) : null}
+          {methods.includes('idp') &&
+            linkedIdps.map((idp) => (
+              <RRForm key={idp.idpId} method="post">
+                <AuthFormFields csrf={csrfToken} />
+                <input type="hidden" name="intent" value="idp-reauth" />
+                <input type="hidden" name="idpId" value={idp.idpId} />
+                <input type="hidden" name="returnTo" value={returnTo} />
+                <Button
+                  size="large"
+                  className="h-13 gap-3"
+                  type="quaternary"
+                  theme="outline"
+                  block
+                  htmlType="submit"
+                  disabled={passkeyBusy}
+                  iconPosition="left"
+                  icon={<IdpIcon type={idp.type} logoUrl={idp.logoUrl} />}>
+                  <Trans>Continue with {idp.name ?? idp.idpId}</Trans>
+                </Button>
+              </RRForm>
+            ))}
           {methods.includes('password') ? (
             <MethodRow
               href={paths.reauth({ method: 'password', returnTo })}

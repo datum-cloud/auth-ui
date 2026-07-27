@@ -18,6 +18,7 @@ const CHOOSER_VIEW = {
   method: null,
   publicKeyCredentialRequestOptions: null,
   returnTo: '/passkeys',
+  linkedIdps: [],
 };
 
 const capturedPosts: Array<Record<string, unknown>> = [];
@@ -139,5 +140,57 @@ describe('/reauth — in-place passkey ceremony', () => {
     // Busy state clears once the ceremony finishes; Password is interactive again.
     cy.contains('button', 'Passkey').should('not.be.disabled');
     cy.contains('a', 'Password').should('have.attr', 'aria-disabled', 'false');
+  });
+});
+
+describe('/reauth — idp chooser entry', () => {
+  it('renders a button per linked IdP and posts intent=idp-reauth to start the round-trip', () => {
+    const capturedIdpPosts: Array<Record<string, unknown>> = [];
+    const router = createMemoryRouter(
+      [
+        {
+          id: 'reauth',
+          path: '/reauth',
+          element: <Reauth />,
+          loader: async () => ({
+            csrfToken: 'tok-1',
+            view: {
+              ...CHOOSER_VIEW,
+              methods: ['idp', 'password'] as const,
+              linkedIdps: [{ idpId: 'idp-google', name: 'Google', type: 'GOOGLE' }],
+            },
+          }),
+          action: async ({ request }: { request: Request }) => {
+            const body = Object.fromEntries(await request.formData());
+            capturedIdpPosts.push(body);
+            return null;
+          },
+        },
+      ],
+      {
+        initialEntries: ['/reauth?returnTo=/passkeys'],
+        hydrationData: {
+          loaderData: {
+            reauth: {
+              csrfToken: 'tok-1',
+              view: {
+                ...CHOOSER_VIEW,
+                methods: ['idp', 'password'],
+                linkedIdps: [{ idpId: 'idp-google', name: 'Google', type: 'GOOGLE' }],
+              },
+            },
+          },
+        },
+      }
+    );
+    mount(withI18n(<RouterProvider router={router} />));
+
+    cy.contains('button', 'Google').click();
+    cy.wrap(null).should(() => {
+      expect(capturedIdpPosts).to.have.length(1);
+      expect(capturedIdpPosts[0].intent).to.equal('idp-reauth');
+      expect(capturedIdpPosts[0].idpId).to.equal('idp-google');
+      expect(capturedIdpPosts[0].returnTo).to.equal('/passkeys');
+    });
   });
 });

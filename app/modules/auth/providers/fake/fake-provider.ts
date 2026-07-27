@@ -515,6 +515,25 @@ export class FakeAuthProvider implements AuthProvider {
       };
     }
 
+    if (checks.idpIntent !== undefined) {
+      // Mirrors the password branch's fidelity note: real Zitadel checks the session's
+      // OWN user; the users[0] fallback exists for single-user seeds. Multi-user
+      // fixtures MUST pass metadata.userId (via createSession's opts.userId) or the
+      // check silently targets the first seeded user.
+      const sessionUserId = (s.user ?? this.users[0])?.id;
+      const intent = this.idpIntents[checks.idpIntent.idpIntentId];
+      if (!intent || intent.userId !== sessionUserId) {
+        // Matches real Zitadel's actual code/message for this exact case (observed in
+        // production logs) — NOT INVALID_CREDENTIALS, which performReauth's catch used to
+        // assume and therefore let this case fall through uncaught.
+        throw new ProviderError('FAILED_PRECONDITION', 'Intent meant for another user');
+      }
+      updated = {
+        ...updated,
+        factors: { ...updated.factors, idpIntent: { verifiedAt: this.stamp() } },
+      };
+    }
+
     // P5 — challenge requests: ride back on the returned session copy, NOT persisted.
     // Early return intentionally skips factor-check persistence when a challenge is requested;
     // no current caller combines challenge + factor checks in the same call, and Zitadel
@@ -769,6 +788,15 @@ export class FakeAuthProvider implements AuthProvider {
   }
   setLoginDefaultRedirectUri(uri: string | undefined): void {
     this.loginDefaultRedirectUri = uri;
+  }
+  // Override the active-IdP list getActiveIdPs returns (P4 seed default: seed.idps ?? []).
+  setActiveIdPs(list: IdProvider[]): void {
+    this.idps = list;
+  }
+  // Overwrite (not append) a user's linked-IdP rows — a deterministic seam for reauth/sso
+  // specs that need a specific link set without going through addIdpLink's upsert-by-idpId.
+  setIdpLinks(userId: string, links: IdpLink[]): void {
+    this.idpLinks.set(userId, links);
   }
   // Override the instance Default Organization getDefaultOrg returns (null ⇒ no default org).
   setDefaultOrg(id: string | null): void {

@@ -122,6 +122,7 @@ import {
   loader as passwordResetLoader,
   action as passwordResetAction,
 } from '@/routes/password/reset';
+import { loader as reauthProviderCallbackLoader } from '@/routes/reauth/provider/callback';
 import { loader as setupAuthenticatorLoader } from '@/routes/setup/authenticator';
 import { loader as signupCompleteLoader } from '@/routes/signup/complete';
 import { loader as signupIndexLoader, action as signupIndexAction } from '@/routes/signup/index';
@@ -616,6 +617,29 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
       case 'signInWithIdpIntent': {
         if (!s.signInOpts) throw new Error('signInWithIdpIntent requires signInOpts');
         outcome = await signInWithIdpIntent(provider, request, s.signInOpts);
+        break;
+      }
+      case 'reauthProviderCallback': {
+        // The route loader resolves its own provider via providerForRequest → getAuthProvider('fake')
+        // → providerRegistry.fake(), which is INDEPENDENT of the `provider` this harness already
+        // built above (buildProvider constructs a FRESH FakeAuthProvider whenever `seed` is present —
+        // and this fn's tests always seed idpIntents/users). Without this bridge the loader would see
+        // the unrelated process-fake singleton (no seeded idpIntent, no seeded live session) instead
+        // of the one this scenario actually configured. Point the registry at the SAME seeded
+        // provider for the duration of this call only, then restore it.
+        const originalFake = providerRegistry.fake;
+        providerRegistry.fake = () => provider;
+        try {
+          const { request: req } = await buildHandlerRequest(sr);
+          const res = await reauthProviderCallbackLoader({
+            request: req,
+            params: { provider: s.slug ?? 'idp' },
+          } as never);
+          outcome = res;
+          response = await serializeResponse(res);
+        } finally {
+          providerRegistry.fake = originalFake;
+        }
         break;
       }
       case 'submitLdapCredentials': {

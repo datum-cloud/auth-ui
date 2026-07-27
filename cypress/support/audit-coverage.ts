@@ -376,9 +376,11 @@ export const REQUIRED_EVENTS = [
   // --- Sudo re-auth + passkey management (snake_case per the P5+ convention) ---
   // reauth: one enrolled factor re-verified onto the EXISTING session (/id/reauth action).
   // reauth_challenge: assertion/OTP challenge request failure on the reauth loader path.
+  // reauth_idp_start: OAuth round-trip initiated for IdP re-verification via startReauthIdpIntent.
   // passkey_remove: sudo-gated passkey removal (success / sudo_required / last_method).
   'reauth',
   'reauth_challenge',
+  'reauth_idp_start',
   'passkey_remove',
   // --- Password ---
   'password.change',

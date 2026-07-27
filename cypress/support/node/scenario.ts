@@ -43,6 +43,13 @@ export interface ScenarioSeed {
   capabilities?: Partial<Record<string, boolean>>;
   deviceAuths?: Array<{ userCode: string; id: string; appName?: string; scope: string[] }>;
   samlRequests?: Array<{ id: string; clientId: string; binding: 'redirect' | 'post' }>;
+  /** FakeAuthProvider's own idpIntents seed, narrowed to the one field the idp-reauth
+   *  tests read (userId) — the real IdpIntentResult also carries information/draft,
+   *  unused by updateSession's idpIntent check. */
+  idpIntents?: Record<
+    string,
+    { idpIntentId: string; idpIntentToken: string; userId: string | null }
+  >;
 }
 
 /** A live session to inject via provider.seedLiveSession (getSession/listSessions resolve it). */
@@ -127,6 +134,7 @@ export type ServiceFn =
   // ── sso (batch 8b) ──
   | 'processIdpCallback'
   | 'signInWithIdpIntent'
+  | 'reauthProviderCallback'
   | 'submitLdapCredentials'
   | 'runSsoAction'
   // sso IdP-DISPLAY flows: org-first / default-org fallback probes. Each reads a real Request +

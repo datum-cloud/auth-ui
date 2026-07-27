@@ -7,6 +7,7 @@
 // returnTo (default /passkeys).
 import type { AuthProvider } from '@/modules/auth/auth-provider';
 import type { SessionChecks } from '@/modules/auth/auth-provider';
+import { idpTypeToSlug } from '@/modules/auth/idp-slug';
 // NOTE: import the PURE helpers from session/session (not cookie.ts) — cookie.ts is
 // stubbed to no-ops in the Cypress component bundle; the pure module is browser-safe
 // and identical at runtime (cookie.ts re-exports it).
@@ -14,12 +15,24 @@ import { mostRecent, addSession, type SessionEntry } from '@/modules/auth/sessio
 import type { Session } from '@/modules/auth/types';
 import { ProviderError, isStaleSessionError } from '@/modules/auth/types';
 import { postLoginDestinationWithSource } from '@/resources/login/post-login-destination';
+import { APP_BASENAME } from '@/resources/shared/app-basename';
 import { resolveOrg } from '@/resources/shared/resolve-org';
 import { validateReturnTo } from '@/resources/shared/return-to';
+import { joinLinkedIdps } from '@/resources/sso';
+import { getActiveIdPs } from '@/resources/sso/idp-providers';
 import { paths } from '@/routes/paths';
 import { logAuthEvent, hashActor } from '@/server/observability';
 
-export type ReauthMethod = 'passkey' | 'password' | 'otp_email';
+export type ReauthMethod = 'passkey' | 'password' | 'otp_email' | 'idp';
+
+/** A redirect-based (OAuth/OIDC) IdP the user can reauth with. LDAP is excluded — it needs
+ *  its own credential form, not an OAuth round-trip (see sso/ldap.tsx). */
+export interface ReauthLinkedIdp {
+  idpId: string;
+  name?: string;
+  type?: string;
+  logoUrl?: string;
+}
 
 export interface ReauthLoadInput {
   returnTo: string | null;
@@ -42,6 +55,7 @@ export type ReauthLoadResult =
       method: ReauthMethod | null;
       publicKeyCredentialRequestOptions: unknown;
       returnTo: string;
+      linkedIdps: ReauthLinkedIdp[];
     };
 
 /**
@@ -114,6 +128,24 @@ export async function loadReauth(
   if (enrolled.includes('password')) methods.push('password');
   if (enrolled.includes('otp_email') && input.emailDeliveryEnabled) methods.push('otp_email');
 
+  // idp: only redirect-based (non-LDAP) linked providers count — LDAP needs its own
+  // credential form (sso/ldap.tsx), not an OAuth round-trip.
+  let linkedIdps: ReauthLinkedIdp[] = [];
+  if (enrolled.includes('idp')) {
+    const [links, active] = await Promise.all([
+      provider.listIdpLinks(userId),
+      getActiveIdPs(provider, await resolveOrg(provider, entry.organization)),
+    ]);
+    // joinLinkedIdps always sets a `logoUrl` key (even when the matched provider has none),
+    // which would otherwise leave `logoUrl: undefined` as an own enumerable property — harmless
+    // at runtime, but it trips up strict deep-equal assertions on the chooser payload. Drop it
+    // when absent instead of forwarding the key.
+    linkedIdps = joinLinkedIdps(links, active)
+      .filter((l) => l.type !== 'LDAP')
+      .map(({ logoUrl, ...rest }) => (logoUrl === undefined ? rest : { ...rest, logoUrl }));
+    if (linkedIdps.length > 0) methods.push('idp');
+  }
+
   // No caller-supplied returnTo (or a tampered one) — resolve the SAME post-login
   // destination /signed-in uses (admin console → Zitadel default → env default),
   // rather than blindly landing every reauth on /passkeys regardless of which flow
@@ -152,6 +184,7 @@ export async function loadReauth(
     method: input.method,
     publicKeyCredentialRequestOptions,
     returnTo,
+    linkedIdps,
   };
 }
 
@@ -161,6 +194,9 @@ export interface ReauthPerformInput {
   credential?: string;
   password?: string;
   code?: string;
+  /** factor='idp' — resolved from the IdP callback's ?id=&token= query params. */
+  idpIntentId?: string;
+  idpIntentToken?: string;
   returnTo: string | null;
 }
 
@@ -192,7 +228,12 @@ export async function performReauth(
   } else if (input.factor === 'otp_email') {
     if (!input.code) return { ok: false, error: 'INVALID_INPUT' };
     checks = { otpEmail: input.code };
-  } else {
+  } else if (input.factor === 'idp') {
+    if (!input.idpIntentId || !input.idpIntentToken) return { ok: false, error: 'INVALID_INPUT' };
+    checks = {
+      idpIntent: { idpIntentId: input.idpIntentId, idpIntentToken: input.idpIntentToken },
+    };
+  } else if (input.factor === 'passkey') {
     if (!input.credential) return { ok: false, error: 'INVALID_INPUT' };
     let credentialAssertionData: unknown;
     try {
@@ -201,6 +242,9 @@ export async function performReauth(
       return { ok: false, error: 'INVALID_INPUT' };
     }
     checks = { webAuthN: { credentialAssertionData } };
+  } else {
+    const exhaustive: never = input.factor;
+    return exhaustive;
   }
 
   let session: Session;
@@ -211,7 +255,15 @@ export async function performReauth(
       actor: hashActor(entry.loginName),
       factor: input.factor,
     });
-    if (err instanceof ProviderError && err.code === 'INVALID_CREDENTIALS') {
+    if (
+      err instanceof ProviderError &&
+      (err.code === 'INVALID_CREDENTIALS' ||
+        // Real Zitadel rejects an idpIntent verified against a DIFFERENT user with
+        // FAILED_PRECONDITION ("Intent meant for another user"), not INVALID_CREDENTIALS —
+        // scoped to the idp factor only, since FAILED_PRECONDITION means something else
+        // entirely for the other factors.
+        (input.factor === 'idp' && err.code === 'FAILED_PRECONDITION'))
+    ) {
       return { ok: false, error: 'INVALID_CREDENTIALS' };
     }
     throw err;
@@ -228,4 +280,55 @@ export async function performReauth(
   });
 
   return { ok: true, target: validateReturnTo(input.returnTo) ?? paths.passkeys(), sessions: next };
+}
+
+export interface StartReauthIdpInput {
+  idpId: string;
+  /** TRUSTED app origin from trustedAppOrigin(request) — never the raw request Host header. */
+  origin: string;
+  /** Where to land after a successful reauth (already validated by the caller). */
+  returnTo: string;
+}
+
+export type StartReauthIdpResult =
+  { ok: true; authUrl: string } | { ok: false; error: 'IDP_UNAVAILABLE' };
+
+/** Build the /reauth/:provider/callback + /reauth/:provider/error return URLs — the reauth
+ *  analog of sso's idpReturnUrls, pointed at the dedicated reauth callback instead. */
+function reauthIdpReturnUrls(
+  origin: string,
+  slug: string,
+  returnTo: string
+): { success: string; failure: string } {
+  const qs = `returnTo=${encodeURIComponent(returnTo)}`;
+  const base = `${origin}${APP_BASENAME}/reauth/${encodeURIComponent(slug)}`;
+  return { success: `${base}/callback?${qs}`, failure: `${base}/error?${qs}` };
+}
+
+/**
+ * Start a fresh OAuth round-trip to re-verify the CURRENT session's identity via one of
+ * its linked IdPs (the 'idp' reauth method). Mirrors login.service.ts's startIdpIntent —
+ * same try/catch shape, same IDP_UNAVAILABLE mapping — but points the return URLs at the
+ * dedicated /reauth/:provider/callback|error routes instead of /sso/:provider/....
+ */
+export async function startReauthIdpIntent(
+  provider: AuthProvider,
+  { idpId, origin, returnTo }: StartReauthIdpInput
+): Promise<StartReauthIdpResult> {
+  const slug = idpTypeToSlug(idpId) ?? idpId;
+  const { success, failure } = reauthIdpReturnUrls(origin, slug, returnTo);
+  let result: Awaited<ReturnType<typeof provider.startIdpIntent>>;
+  try {
+    result = await provider.startIdpIntent(idpId, { success, failure });
+  } catch (err) {
+    if (!(err instanceof ProviderError)) throw err;
+    logAuthEvent('reauth_idp_start', 'failure', { idpId, reason: 'provider_error' });
+    return { ok: false, error: 'IDP_UNAVAILABLE' };
+  }
+  if (!result.authUrl) {
+    logAuthEvent('reauth_idp_start', 'failure', { idpId, reason: 'no_auth_url' });
+    return { ok: false, error: 'IDP_UNAVAILABLE' };
+  }
+  logAuthEvent('reauth_idp_start', 'success', { idpId });
+  return { ok: true, authUrl: result.authUrl };
 }

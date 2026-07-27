@@ -71,6 +71,12 @@ export const paths = {
   // Passkey management + sudo re-auth interstitial.
   passkeys: (q?: Query) => withQuery('/passkeys', q),
   reauth: (q?: Query) => withQuery('/reauth', q),
+  /** Separate from `reauth` (a callable function, unlike paths.sso's object shape) —
+   *  see the Global Constraints note in the reauth-idp-verification plan for why. */
+  reauthIdp: {
+    callback: (provider: string, q?: Query) => withQuery(`/reauth/${provider}/callback`, q),
+    error: (provider: string, q?: Query) => withQuery(`/reauth/${provider}/error`, q),
+  },
   accounts: (q?: Query) => withQuery('/accounts', q),
   signedIn: (q?: Query) => withQuery('/signed-in', q),
   error: (q?: Query) => withQuery('/error', q),

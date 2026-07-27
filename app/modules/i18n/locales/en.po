@@ -137,6 +137,7 @@ msgstr "Available accounts to link"
 msgid "Back"
 msgstr "Back"
 
+#: app/routes/reauth/provider/error.tsx:39
 #: app/routes/sso/provider/error.tsx:77
 msgid "Back to sign in"
 msgstr "Back to sign in"
@@ -188,12 +189,12 @@ msgstr "Choose your login method"
 msgid "Code expired"
 msgstr "Code expired"
 
-#: app/routes/reauth.tsx:288
-#: app/routes/reauth.tsx:310
+#: app/routes/reauth.tsx:344
+#: app/routes/reauth.tsx:366
 msgid "Confirm"
 msgstr "Confirm"
 
-#: app/routes/reauth.tsx:199
+#: app/routes/reauth.tsx:234
 msgid "Confirm it's you"
 msgstr "Confirm it's you"
 
@@ -216,6 +217,11 @@ msgstr "Connected accounts"
 msgid "Continue"
 msgstr "Continue"
 
+#. placeholder {0}: idp.name ?? idp.idpId
+#: app/routes/reauth.tsx:292
+msgid "Continue with {0}"
+msgstr "Continue with {0}"
+
 #: app/routes/login/index.tsx:428
 msgid "Continue with passkey"
 msgstr "Continue with passkey"
@@ -235,6 +241,10 @@ msgstr "Couldn't complete sign-in. Return to your application and try again."
 #: app/routes/sso/provider/error.tsx:68
 msgid "Couldn't sign in"
 msgstr "Couldn't sign in"
+
+#: app/routes/reauth/provider/error.tsx:32
+msgid "Couldn't verify"
+msgstr "Couldn't verify"
 
 #: app/routes/signup/index.tsx:216
 msgid "Create a new account"
@@ -278,7 +288,7 @@ msgstr "Email"
 msgid "Email code"
 msgstr "Email code"
 
-#: app/routes/reauth.tsx:253
+#: app/routes/reauth.tsx:309
 msgid "Email me a code"
 msgstr "Email me a code"
 
@@ -357,7 +367,7 @@ msgstr "Enter your SMS code"
 msgid "Finish creating your account"
 msgstr "Finish creating your account"
 
-#: app/routes/reauth.tsx:202
+#: app/routes/reauth.tsx:237
 msgid "For your security, verify one of your sign-in methods to continue."
 msgstr "For your security, verify one of your sign-in methods to continue."
 
@@ -398,7 +408,7 @@ msgid "Linked accounts"
 msgstr "Linked accounts"
 
 #: app/routes/passkeys.tsx:227
-#: app/routes/reauth.tsx:206
+#: app/routes/reauth.tsx:241
 #: app/routes/sso/index.tsx:137
 msgid "Logged in as"
 msgstr "Logged in as"
@@ -428,7 +438,7 @@ msgstr "No account was found and sign-up is not available."
 msgid "No passkeys yet."
 msgstr "No passkeys yet."
 
-#: app/routes/reauth.tsx:258
+#: app/routes/reauth.tsx:314
 msgid "No sign-in method is available for re-authentication."
 msgstr "No sign-in method is available for re-authentication."
 
@@ -453,7 +463,7 @@ msgstr "Not registered?"
 #: app/routes/login/index.tsx:416
 #: app/routes/login/method.tsx:99
 #: app/routes/passkeys.tsx:228
-#: app/routes/reauth.tsx:207
+#: app/routes/reauth.tsx:242
 #: app/routes/signed-in.tsx:49
 #: app/routes/sso/index.tsx:138
 msgid "Not you?"
@@ -473,7 +483,7 @@ msgstr "Or import this URI in your authenticator app"
 
 #: app/routes/login/index.tsx:462
 #: app/routes/login/method.tsx:127
-#: app/routes/reauth.tsx:237
+#: app/routes/reauth.tsx:272
 #: app/routes/setup/mfa.tsx:46
 msgid "Passkey"
 msgstr "Passkey"
@@ -511,8 +521,8 @@ msgid "Passkeys let you sign in with your fingerprint, face, or device PIN."
 msgstr "Passkeys let you sign in with your fingerprint, face, or device PIN."
 
 #: app/routes/login/method.tsx:161
-#: app/routes/reauth.tsx:245
-#: app/routes/reauth.tsx:283
+#: app/routes/reauth.tsx:301
+#: app/routes/reauth.tsx:339
 #: app/routes/signup/password.tsx:229
 #: app/routes/sso/ldap.tsx:80
 msgid "Password"
@@ -737,6 +747,7 @@ msgstr "SMS one-time code"
 msgid "SMS OTP"
 msgstr "SMS OTP"
 
+#: app/routes/reauth/provider/error.tsx:27
 #: app/routes/sso/provider/error.tsx:63
 msgid "Something went wrong with <0>{provider}</0>."
 msgstr "Something went wrong with <0>{provider}</0>."
@@ -766,6 +777,7 @@ msgstr "That device code isn't valid. Check the code on your device and try agai
 msgid "That device code was not found. Check the code on your device and try again."
 msgstr "That device code was not found. Check the code on your device and try again."
 
+#: app/routes/reauth/provider/error.tsx:17
 #: app/routes/sso/provider/error.tsx:13
 #: app/routes/sso/provider/error.tsx:18
 msgid "That identity belongs to a different account."
@@ -783,6 +795,7 @@ msgstr "The passkey verification failed. Please try again."
 msgid "The request timed out. Please try again."
 msgstr "The request timed out. Please try again."
 
+#: app/routes/reauth/provider/error.tsx:18
 #: app/routes/sso/provider/error.tsx:12
 msgid "The sign-in link was incomplete or expired."
 msgstr "The sign-in link was incomplete or expired."
@@ -866,7 +879,7 @@ msgstr "Use your security key to verify your identity."
 msgid "Username"
 msgstr "Username"
 
-#: app/routes/reauth.tsx:305
+#: app/routes/reauth.tsx:361
 #: app/routes/verify/index.tsx:159
 msgid "Verification code"
 msgstr "Verification code"
@@ -916,7 +929,7 @@ msgstr "We couldn't set up your passkey. Please try again."
 msgid "We couldn't start passkey setup. Please try again."
 msgstr "We couldn't start passkey setup. Please try again."
 
-#: app/routes/reauth.tsx:303
+#: app/routes/reauth.tsx:359
 msgid "We sent a verification code to your email address."
 msgstr "We sent a verification code to your email address."
 

@@ -81,6 +81,14 @@ const ALLOWLIST: Record<string, string> = {
     'The "Enter a new code" recovery link for a stale/expired device code. The device flow is ' +
     "keyed by user_code/deviceAuthId, not requestId; /device's code-entry screen takes no " +
     'ceremony query params, and a stale code has nothing left to resume.',
+  'reauth.tsx':
+    'The idp-reauth action branch bounces a session-less request straight to /login. ' +
+    '/reauth is a returnTo-scoped sudo interstitial with no OIDC/SAML/device requestId in ' +
+    'its own contract — there is no ceremony to preserve on a dead session.',
+  'reauth/provider/callback.tsx':
+    'The idp-reauth callback bounces a session-less request straight to /login. Same ' +
+    'reasoning as reauth.tsx: this callback only ever completes a returnTo-scoped sudo ' +
+    'reauth, never an OIDC/SAML/device ceremony, so there is nothing to carry forward.',
 };
 
 const PATTERNS: ReadonlyArray<{ name: string; re: RegExp }> = [
