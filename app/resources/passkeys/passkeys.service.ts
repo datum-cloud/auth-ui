@@ -108,6 +108,30 @@ export type RemovePasskeyResult =
   | { ok: true; removedName: string | null }
   | { ok: false; error: 'SESSION_EXPIRED' | 'SUDO_REQUIRED' | 'LAST_METHOD' };
 
+// Per-user in-process mutex for the last-method read-check-remove sequence below: two
+// concurrent removals of DIFFERENT passkeys could otherwise both read "2 passkeys left,
+// no other method" and both pass the guard, leaving zero sign-in methods. Zitadel's
+// removePasskey has no conditional-delete primitive to make this atomic server-side, and
+// this app has no external lock store — an in-process queue per userId is the realistic
+// mitigation available here (closes the window for the common case: a double-click or
+// two tabs hitting the SAME instance; a multi-instance deployment would need a real
+// distributed lock, out of scope for this fix).
+const userRemovalQueues = new Map<string, Promise<unknown>>();
+
+function withUserRemovalLock<T>(userId: string, fn: () => Promise<T>): Promise<T> {
+  const prior = userRemovalQueues.get(userId) ?? Promise.resolve();
+  const run = prior.then(fn, fn);
+  const settled = run.then(
+    () => undefined,
+    () => undefined
+  );
+  userRemovalQueues.set(userId, settled);
+  void settled.finally(() => {
+    if (userRemovalQueues.get(userId) === settled) userRemovalQueues.delete(userId);
+  });
+  return run;
+}
+
 /**
  * Sudo-gated passkey removal with the server-side last-method guard
  * (listAuthMethods IS Zitadel's listAuthenticationMethodTypes — refuse removing the
@@ -129,33 +153,36 @@ export async function removeUserPasskey(
     return { ok: false, error: 'SUDO_REQUIRED' };
   }
 
-  const [passkeys, methods] = await Promise.all([
-    provider.listPasskeys(active.userId),
-    provider.listAuthMethods(active.userId),
-  ]);
-  // Refuse removing the user's FINAL sign-in method: at most one passkey left AND no
-  // other method enrolled.
-  if (passkeys.length <= 1 && !methods.some((m) => m !== 'passkey')) {
-    logAuthEvent('passkey_remove', 'failure', {
-      userId: active.userId,
-      reason: 'last_method',
-    });
-    return { ok: false, error: 'LAST_METHOD' };
-  }
-
-  const removedName = passkeys.find((p) => p.id === input.passkeyId)?.name ?? null;
-  try {
-    await provider.removePasskey(active.userId, input.passkeyId);
-  } catch (err) {
-    if (!(err instanceof ProviderError && err.code === 'NOT_FOUND')) {
-      logAuthEvent('passkey_remove', 'failure', { userId: active.userId });
-      throw err;
+  const userId = active.userId;
+  return withUserRemovalLock(userId, async () => {
+    const [passkeys, methods] = await Promise.all([
+      provider.listPasskeys(userId),
+      provider.listAuthMethods(userId),
+    ]);
+    // Refuse removing the user's FINAL sign-in method: at most one passkey left AND no
+    // other method enrolled.
+    if (passkeys.length <= 1 && !methods.some((m) => m !== 'passkey')) {
+      logAuthEvent('passkey_remove', 'failure', {
+        userId,
+        reason: 'last_method',
+      });
+      return { ok: false, error: 'LAST_METHOD' };
     }
-    // Removal race — the passkey is already gone; treat as success.
-  }
 
-  logAuthEvent('passkey_remove', 'success', { userId: active.userId });
-  return { ok: true, removedName };
+    const removedName = passkeys.find((p) => p.id === input.passkeyId)?.name ?? null;
+    try {
+      await provider.removePasskey(userId, input.passkeyId);
+    } catch (err) {
+      if (!(err instanceof ProviderError && err.code === 'NOT_FOUND')) {
+        logAuthEvent('passkey_remove', 'failure', { userId });
+        throw err;
+      }
+      // Removal race — the passkey is already gone; treat as success.
+    }
+
+    logAuthEvent('passkey_remove', 'success', { userId });
+    return { ok: true, removedName };
+  });
 }
 
 export type SignOutOthersResult =

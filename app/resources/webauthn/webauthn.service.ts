@@ -18,7 +18,7 @@
 import type { AuthProvider } from '@/modules/auth/auth-provider';
 import { byLoginName, addSession, type SessionEntry } from '@/modules/auth/session/cookie';
 import type { Session } from '@/modules/auth/types';
-import { ProviderError } from '@/modules/auth/types';
+import { ProviderError, isStaleSessionError } from '@/modules/auth/types';
 import {
   nextStepFromSession as sharedNextStepFromSession,
   threadParams,
@@ -492,7 +492,24 @@ async function verifyEnrollment(
   // verified within the sudo window. Runs before the provider verify so a hijacked or
   // unattended stale session can never plant a persistent credential.
   if (cfg.requireSudo) {
-    const sudoSession = await provider.getSession(entry.id, entry.token);
+    // A stored session token can be stale/revoked (e.g. created in a different browser)
+    // by the time this route sees it — getSession throws a non-transient ProviderError
+    // in that case rather than returning null. Same recovery as passkeys.service.ts's
+    // resolveActive: treat it as no session at all, not an unhandled 500.
+    let sudoSession: Session | null;
+    try {
+      sudoSession = await provider.getSession(entry.id, entry.token);
+    } catch (err) {
+      if (isStaleSessionError(err)) {
+        logAuthEvent('mfa_enroll', 'failure', {
+          userId,
+          factor: cfg.factor,
+          reason: 'session_expired',
+        });
+        return { ok: false, error: 'SESSION_EXPIRED' };
+      }
+      throw err;
+    }
     if (!sudoSession || !isSudoFresh(sudoSession.factors, Date.now())) {
       logAuthEvent('mfa_enroll', 'failure', {
         userId,

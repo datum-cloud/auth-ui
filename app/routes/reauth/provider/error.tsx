@@ -36,7 +36,7 @@ export default function ReauthProviderError() {
         className="mt-4"
         as={Link}
         href={paths.reauth({ returnTo })}>
-        <Trans>Back to sign in</Trans>
+        <Trans>Try again</Trans>
       </LinkButton>
     </AuthCard>
   );

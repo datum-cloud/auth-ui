@@ -62,6 +62,35 @@ describe('reauth.service — verify one factor onto the EXISTING session', () =>
     if (v.kind === 'view') expect(v.returnTo).to.equal('https://app.acme.test/dashboard');
   });
 
+  it('performReauth preserves the Zitadel-configured default returnTo across the full round-trip', async () => {
+    // Continues the scenario above: the resolved absolute default lands in the form's
+    // hidden returnTo field and gets echoed back on submit. performReauth must NOT let it
+    // fall through to a hardcoded /passkeys just because it's an absolute URL not on
+    // POST_LOGOUT_ALLOWLIST — it re-resolves the SAME configured default server-side
+    // instead of trusting the client-echoed absolute URL.
+    const { fake, sessions } = await seeded();
+    fake.setLoginDefaultRedirectUri('https://app.acme.test/dashboard');
+    const v = await loadReauth(fake, sessions, {
+      returnTo: null,
+      method: null,
+      domain: 'localhost',
+      emailDeliveryEnabled: false,
+      consoleUrl: 'https://console.acme.test',
+    });
+    expect(v.kind).to.equal('view');
+    if (v.kind !== 'view') return;
+    expect(v.returnTo).to.equal('https://app.acme.test/dashboard');
+
+    const r = await performReauth(fake, sessions, {
+      factor: 'password',
+      password: 'Password1!',
+      returnTo: v.returnTo,
+      consoleUrl: 'https://console.acme.test',
+    });
+    expect(r.ok).to.equal(true);
+    if (r.ok) expect(r.target).to.equal('https://app.acme.test/dashboard');
+  });
+
   it('loadReauth falls back to /passkeys when returnTo is absent AND nothing is configured', async () => {
     const { fake, sessions } = await seeded();
     const v = await loadReauth(fake, sessions, {

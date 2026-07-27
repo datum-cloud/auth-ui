@@ -198,6 +198,11 @@ export interface ReauthPerformInput {
   idpIntentId?: string;
   idpIntentToken?: string;
   returnTo: string | null;
+  /** Same context loadReauth's resolveDefaultReturnTo needs — used ONLY to re-resolve the
+   *  configured destination server-side when `returnTo` doesn't validate (never trust an
+   *  absolute URL echoed back from the client, even one the server itself set moments ago). */
+  consoleUrl: string;
+  defaultAppUrl?: string;
 }
 
 export type ReauthPerformResult =
@@ -279,7 +284,19 @@ export async function performReauth(
     expirationTs: session.expiresAt,
   });
 
-  return { ok: true, target: validateReturnTo(input.returnTo) ?? paths.passkeys(), sessions: next };
+  // Never trust an absolute URL echoed back from the client, even one the server itself
+  // set as loadReauth's resolved default moments ago — re-derive it server-side instead of
+  // falling back to a hardcoded /passkeys, which silently dropped the configured
+  // destination (admin console / Zitadel default / env default) whenever it wasn't on
+  // POST_LOGOUT_ALLOWLIST (a different allowlist, for a different purpose).
+  const target =
+    validateReturnTo(input.returnTo) ??
+    (await resolveDefaultReturnTo(provider, entry, {
+      consoleUrl: input.consoleUrl,
+      defaultAppUrl: input.defaultAppUrl,
+    }));
+
+  return { ok: true, target, sessions: next };
 }
 
 export interface StartReauthIdpInput {

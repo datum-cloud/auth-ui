@@ -7,13 +7,20 @@ import { performReauth } from '@/resources/reauth/reauth.service';
 import { validateReturnTo } from '@/resources/shared/return-to';
 import { paths } from '@/routes/paths';
 import { providerForRequest } from '@/server/auth-context.server';
+import { env } from '@/server/infra/env.server';
 import { redirect, type LoaderFunctionArgs } from 'react-router';
 
 export async function loader({ request, params }: LoaderFunctionArgs) {
   const url = new URL(request.url);
   const idpIntentId = url.searchParams.get('id');
   const idpIntentToken = url.searchParams.get('token');
-  const returnTo = validateReturnTo(url.searchParams.get('returnTo')) ?? paths.passkeys();
+  const rawReturnTo = url.searchParams.get('returnTo');
+  // Degraded fallback for the two error-redirect paths below (context-missing /
+  // access-denied) — just carrying a best-effort value forward for a retry, always safe
+  // since /reauth re-validates it. The SUCCESS path passes rawReturnTo (not this) to
+  // performReauth so its own default-resolution logic runs when this doesn't validate,
+  // instead of prematurely collapsing to /passkeys before performReauth ever sees it.
+  const returnTo = validateReturnTo(rawReturnTo) ?? paths.passkeys();
   const providerSlug = params.provider ?? 'idp';
 
   const provider = providerForRequest(request);
@@ -28,7 +35,9 @@ export async function loader({ request, params }: LoaderFunctionArgs) {
     factor: 'idp',
     idpIntentId,
     idpIntentToken,
-    returnTo,
+    returnTo: rawReturnTo,
+    consoleUrl: `${env.ZITADEL_API_URL}/ui/console`,
+    defaultAppUrl: env.DEFAULT_APP_URL,
   });
   if (!result.ok) {
     // The only failure performReauth's idp branch returns (rather than throws) is an

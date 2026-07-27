@@ -115,6 +115,9 @@ interface Seed {
     string,
     Array<{ id: string; state: 'active' | 'inactive'; name: string; createdAt?: string }>
   >;
+  /** Pre-linked IdP identities (userId → links) — a constructor-time convenience for the
+   *  same data setIdpLinks/addIdpLink set post-construction. */
+  idpLinks?: Record<string, IdpLink[]>;
   /**
    * Stamp factor verifiedAt with REAL Date (new Date()) instead of FIXED_NOW_DATE.
    * Sudo freshness compares against real Date.now() at the route layer, so the e2e singleton
@@ -205,6 +208,8 @@ export class FakeAuthProvider implements AuthProvider {
     // Passkey inventory seed + real-time factor stamps flag.
     for (const [uid, list] of Object.entries(seed.passkeys ?? {}))
       this.passkeys.set(uid, [...list]);
+    for (const [uid, links] of Object.entries(seed.idpLinks ?? {}))
+      this.idpLinks.set(uid, [...links]);
     this.realFactorTimestamps = seed.realFactorTimestamps ?? false;
     this.passwordComplexity = seed.passwordComplexity ?? {
       minLength: 8,
@@ -680,6 +685,15 @@ export class FakeAuthProvider implements AuthProvider {
       const set = new Set(this.enrolled.get(userId) ?? []);
       set.delete('passkey');
       this.enrolled.set(userId, set);
+      // listAuthMethods unions this dynamic set with the SEEDED static authMethods entry —
+      // without also clearing 'passkey' there, a test seeding both authMethods: ['passkey']
+      // and a passkeys array would still report it enrolled after the last one is removed.
+      if (this.authMethods[userId]) {
+        this.authMethods = {
+          ...this.authMethods,
+          [userId]: this.authMethods[userId].filter((m) => m !== 'passkey'),
+        };
+      }
     }
   }
 

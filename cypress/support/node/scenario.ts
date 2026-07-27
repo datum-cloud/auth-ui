@@ -50,6 +50,10 @@ export interface ScenarioSeed {
     string,
     { idpIntentId: string; idpIntentToken: string; userId: string | null }
   >;
+  /** Active org IdPs (getActiveIdPs) — narrowed to the fields joinLinkedIdps reads. */
+  idps?: Array<{ id: string; name: string; type: string; logoUrl?: string }>;
+  /** Pre-linked IdP identities (userId → links), narrowed to the fields joinLinkedIdps reads. */
+  idpLinks?: Record<string, Array<{ idpId: string; idpUserId: string; idpUserName?: string }>>;
 }
 
 /** A live session to inject via provider.seedLiveSession (getSession/listSessions resolve it). */
@@ -134,6 +138,7 @@ export type ServiceFn =
   // ── sso (batch 8b) ──
   | 'processIdpCallback'
   | 'signInWithIdpIntent'
+  | 'reauthAction'
   | 'reauthProviderCallback'
   | 'submitLdapCredentials'
   | 'runSsoAction'
@@ -228,6 +233,7 @@ export type ServiceFn =
   | 'securityKeyAction'
   | 'loginVerifyEmailLoader'
   | 'loginMethodLoader'
+  | 'loginMethodAction'
   // login/mfa.tsx action: covers the SESSION_EXPIRED path now returning inline data() (instead
   // of a hard redirect(paths.login.index())) so useAuthActionRecovery's banner can thread
   // requestId/organization.

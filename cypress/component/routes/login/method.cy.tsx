@@ -19,7 +19,8 @@ const LOGIN_CONTEXT = {
 const METHOD_LOADER_DATA = {
   methods: ['passkey', 'password'],
   branding: null,
-  linkedIdps: [],
+  idps: [],
+  csrfToken: 'tok-1',
 };
 
 const capturedPosts: Array<Record<string, unknown>> = [];
@@ -110,12 +111,14 @@ describe('/login/method — identity header + in-place passkey ceremony', () => 
     cy.contains('a', 'Password').should('be.visible');
   });
 
-  it('renders a link per linked IdP, named after the actual provider', () => {
+  it("posts intent=idp + idpId to this route's own action instead of navigating to /sso", () => {
     const methodData = {
       methods: ['idp', 'password'],
       branding: null,
-      linkedIdps: [{ idpId: 'idp-google', name: 'Google', type: 'GOOGLE' }],
+      idps: [{ id: 'idp-google', name: 'Google', type: 'GOOGLE' }],
+      csrfToken: 'tok-1',
     };
+    const capturedIdpPosts: Array<Record<string, unknown>> = [];
     const router = createMemoryRouter(
       [
         {
@@ -128,6 +131,10 @@ describe('/login/method — identity header + in-place passkey ceremony', () => 
               path: 'method',
               element: <LoginMethod />,
               loader: async () => methodData,
+              action: async ({ request }: { request: Request }) => {
+                capturedIdpPosts.push(Object.fromEntries(await request.formData()));
+                return null;
+              },
             },
           ],
         },
@@ -141,8 +148,15 @@ describe('/login/method — identity header + in-place passkey ceremony', () => 
     );
     mount(withI18n(<RouterProvider router={router} />));
 
-    // Named after the actual provider ("Google"), not the generic "your provider" copy.
-    cy.contains('a', 'Continue with Google').should('be.visible').and('have.attr', 'href');
+    // Named after the actual provider ("Google") — IdpButtonList's own copy, matching
+    // /login's own idp buttons — rendered as a submit button (not an <a> to /sso), since
+    // starting sign-in is a provider-side call that has to happen in an action.
+    cy.contains('button', 'Google').click();
+    cy.wrap(null).should(() => {
+      expect(capturedIdpPosts).to.have.length(1);
+      expect(capturedIdpPosts[0].intent).to.equal('idp');
+      expect(capturedIdpPosts[0].idpId).to.equal('idp-google');
+    });
     cy.contains('a', 'Password').should('be.visible');
   });
 });

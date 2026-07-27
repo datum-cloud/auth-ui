@@ -13,6 +13,7 @@ import { WebAuthnButton, WebAuthnReasonCopy } from '@/components/webauthn-button
 import { useAuthActionError } from '@/hooks/use-auth-action-error';
 import { usePasskeyReauthCeremony } from '@/hooks/use-passkey-reauth-ceremony';
 import { mostRecent, readSessions, serializeSessions } from '@/modules/auth/session/cookie';
+import { isStaleSessionError } from '@/modules/auth/types';
 import {
   loadReauth,
   performReauth,
@@ -22,6 +23,7 @@ import {
 } from '@/resources/reauth/reauth.service';
 import { resolveOrg } from '@/resources/shared/resolve-org';
 import { validateReturnTo } from '@/resources/shared/return-to';
+import { joinLinkedIdps } from '@/resources/sso';
 import { getActiveIdPs } from '@/resources/sso/idp-providers';
 import { paths } from '@/routes/paths';
 import { providerForRequest } from '@/server/auth-context.server';
@@ -109,13 +111,34 @@ export async function action({ request }: ActionFunctionArgs) {
     const entry = mostRecent(sessions);
     if (!entry) return redirect(paths.login.index());
 
+    // Resolve the session's own user — needed to verify idpId is actually linked to
+    // THEM, not just any active org provider. Same stale-session recovery loadReauth
+    // uses: getSession can throw a non-transient ProviderError for a revoked/stale
+    // cross-browser token instead of returning null.
+    let userId: string | undefined;
+    try {
+      const session = await provider.getSession(entry.id, entry.token);
+      if (!session) return redirect(paths.login.index());
+      userId = session.user?.id ?? (await provider.findUser(entry.loginName))?.id;
+      if (!userId) return redirect(paths.login.index());
+    } catch (err) {
+      if (isStaleSessionError(err)) return redirect(paths.login.index());
+      throw err;
+    }
+
     // Defensive server-side re-check: never trust the client's idpId — confirm it
-    // resolves to an ACTIVE, non-LDAP provider before starting the round-trip. Scoped
-    // to the SAME org loadReauth used to build the chooser's linkedIdps (Task 3), so
-    // this never rejects a provider the user legitimately just saw a button for.
-    const active = await getActiveIdPs(provider, await resolveOrg(provider, entry.organization));
-    const targetIdp = active.find((i) => i.id === idpId);
-    if (!targetIdp || targetIdp.type === 'LDAP') {
+    // resolves to an ACTIVE, non-LDAP provider AND is actually linked to THIS user
+    // before starting the round-trip (the chooser only ever shows linked providers;
+    // this must match, not just re-check "is some org IdP active"). Scoped to the SAME
+    // org loadReauth used to build the chooser's linkedIdps (Task 3).
+    const [links, active] = await Promise.all([
+      provider.listIdpLinks(userId),
+      getActiveIdPs(provider, await resolveOrg(provider, entry.organization)),
+    ]);
+    const isLinked = joinLinkedIdps(links, active).some(
+      (l) => l.idpId === idpId && l.type !== 'LDAP'
+    );
+    if (!isLinked) {
       return data({ error: 'INVALID_INPUT' as const }, { status: 400 });
     }
 
@@ -139,6 +162,8 @@ export async function action({ request }: ActionFunctionArgs) {
       code: parsed.data.code,
       credential: parsed.data.credential,
       returnTo: parsed.data.returnTo ?? null,
+      consoleUrl: `${env.ZITADEL_API_URL}/ui/console`,
+      defaultAppUrl: env.DEFAULT_APP_URL,
     });
     if (!result.ok) {
       const status = result.error === 'INVALID_CREDENTIALS' ? 401 : 400;

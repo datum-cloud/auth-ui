@@ -76,6 +76,30 @@ describe('passkeys.service — /id/passkeys management', () => {
     expect(r).to.deep.equal({ ok: false, error: 'SUDO_REQUIRED' });
   });
 
+  it('last-method guard serializes concurrent removes: only one of two racing removals succeeds', async () => {
+    // Without the per-user lock, two concurrent removes of DIFFERENT passkeys could both
+    // read "2 passkeys left, no other method" before either completed, both pass the
+    // guard, and both proceed — leaving zero sign-in methods. The lock forces the second
+    // call's read to happen AFTER the first's removal completes, so it correctly sees 1
+    // passkey left and refuses.
+    const solo = await seeded({
+      authMethods: ['passkey'],
+      passkeys: [
+        { id: 'pk-1', state: 'active', name: 'Laptop' },
+        { id: 'pk-2', state: 'active', name: 'Phone' },
+      ],
+    });
+    const [a, b] = await Promise.all([
+      removeUserPasskey(solo.fake, solo.sessions, { passkeyId: 'pk-1', nowMs: Date.now() }),
+      removeUserPasskey(solo.fake, solo.sessions, { passkeyId: 'pk-2', nowMs: Date.now() }),
+    ]);
+    const results = [a, b];
+    expect(results.filter((r) => r.ok)).to.have.length(1);
+    expect(results.filter((r) => !r.ok && r.error === 'LAST_METHOD')).to.have.length(1);
+    // Exactly one passkey remains — not zero.
+    expect(await solo.fake.listPasskeys('u1')).to.have.length(1);
+  });
+
   it('last-method guard: passkey-only user with one passkey ⇒ LAST_METHOD; password backup ⇒ ok', async () => {
     const solo = await seeded({ authMethods: ['passkey'] });
     const refused = await removeUserPasskey(solo.fake, solo.sessions, {

@@ -34,6 +34,8 @@ import {
 } from './webauthn.service';
 import type { AuthProvider } from '@/modules/auth/auth-provider';
 import { readSessions, byLoginName, type SessionEntry } from '@/modules/auth/session/cookie';
+import type { Session } from '@/modules/auth/types';
+import { isStaleSessionError } from '@/modules/auth/types';
 import { credentialSchema, setupSkipSchema } from '@/resources/mfa/mfa.schema';
 import { validateReturnTo } from '@/resources/shared/return-to';
 import { isSudoFresh } from '@/resources/shared/sudo';
@@ -185,7 +187,18 @@ export function createWebAuthnEnrollHandlers(cfg: WebAuthnEnrollConfig) {
     if (cfg.requireSudo) {
       const entry = byLoginName(sessions, loginName, organization);
       if (entry) {
-        const session = await provider.getSession(entry.id, entry.token);
+        // The stored session token may be stale/revoked by the time this route sees it
+        // (e.g. created in a different browser) — getSession throws a non-transient
+        // ProviderError in that case rather than returning null. Recover the same way
+        // passkeys.service.ts/reauth.service.ts do instead of crashing — this pre-check
+        // is UX only, requestAttestation re-enforces the actual sudo gate below.
+        let session: Session | null;
+        try {
+          session = await provider.getSession(entry.id, entry.token);
+        } catch (err) {
+          if (!isStaleSessionError(err)) throw err;
+          session = null;
+        }
         if (!session || !isSudoFresh(session.factors, Date.now())) {
           return redirect(
             paths.reauth({

@@ -40,4 +40,20 @@ describe('FakeAuthProvider — passkey inventory (port mirror)', () => {
     });
     expect(await fake.listPasskeys('u1')).to.have.length(1);
   });
+
+  it('removePasskey also clears a SEEDED static authMethods entry, not just the dynamic enrolled set', async () => {
+    // listAuthMethods unions the dynamic `enrolled` set with the seed-time `authMethods`
+    // array — a test seeding BOTH (the e2e-fixture pattern) would otherwise still see
+    // 'passkey' reported as enrolled after the last passkey is removed, since only the
+    // dynamic set was ever cleared.
+    const fake = new FakeAuthProvider({
+      users: [seedUser],
+      authMethods: { u1: ['passkey'] },
+      passkeys: { u1: [{ id: 'pk-s', state: 'active', name: 'Seeded key' }] },
+    });
+    expect(await fake.listAuthMethods('u1')).to.include('passkey');
+    await fake.removePasskey('u1', 'pk-s');
+    expect(await fake.listPasskeys('u1')).to.deep.equal([]);
+    expect(await fake.listAuthMethods('u1')).to.not.include('passkey');
+  });
 });

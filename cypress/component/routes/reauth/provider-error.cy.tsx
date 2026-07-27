@@ -25,7 +25,7 @@ describe('/reauth/:provider/error', () => {
   it('names the provider and links back to /reauth preserving returnTo', () => {
     mountError('/reauth/idp-google/error?returnTo=%2Fpasskeys');
     cy.contains('idp-google').should('be.visible');
-    cy.contains('a', 'Back to sign in').should('have.attr', 'href', '/reauth?returnTo=%2Fpasskeys');
+    cy.contains('a', 'Try again').should('have.attr', 'href', '/reauth?returnTo=%2Fpasskeys');
   });
 
   it('shows the access-denied copy instead of the generic provider-name fallback', () => {

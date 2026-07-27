@@ -107,7 +107,7 @@ import { loader as deviceCompleteLoader } from '@/routes/device/complete';
 import { loader as deviceIndexLoader } from '@/routes/device/index';
 // ── routes/login handlers (batch 13b) ─────────────────────────────────────────────────────────
 import { loader as loginLoader, action as loginAction } from '@/routes/login/index';
-import { loader as loginMethodLoader } from '@/routes/login/method';
+import { loader as loginMethodLoader, action as loginMethodAction } from '@/routes/login/method';
 import { action as loginMfaAction } from '@/routes/login/mfa';
 import { action as loginPasswordAction } from '@/routes/login/password';
 import { action as securityKeyAction } from '@/routes/login/security-key';
@@ -122,6 +122,7 @@ import {
   loader as passwordResetLoader,
   action as passwordResetAction,
 } from '@/routes/password/reset';
+import { action as reauthAction } from '@/routes/reauth';
 import { loader as reauthProviderCallbackLoader } from '@/routes/reauth/provider/callback';
 import { loader as setupAuthenticatorLoader } from '@/routes/setup/authenticator';
 import { loader as signupCompleteLoader } from '@/routes/signup/complete';
@@ -619,6 +620,25 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
         outcome = await signInWithIdpIntent(provider, request, s.signInOpts);
         break;
       }
+      case 'reauthAction': {
+        const originalFake = providerRegistry.fake;
+        providerRegistry.fake = () => provider;
+        try {
+          const { request } = await buildHandlerRequest(
+            s.request ?? { url: 'http://localhost/id/reauth', csrf: true }
+          );
+          const result = await reauthAction({
+            request,
+            params: {},
+            context: {} as never,
+          } as never);
+          response = await serializeResponse(result);
+        } finally {
+          providerRegistry.fake = originalFake;
+        }
+        break;
+      }
+
       case 'reauthProviderCallback': {
         // The route loader resolves its own provider via providerForRequest → getAuthProvider('fake')
         // → providerRegistry.fake(), which is INDEPENDENT of the `provider` this harness already
@@ -2202,20 +2222,42 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
       }
 
       case 'loginMethodLoader': {
-        const { request } = await buildHandlerRequest(
-          s.request ?? { url: 'http://localhost/id/login/method' }
-        );
-        const result = await loginMethodLoader({
-          request,
-          params: {},
-          context: {} as never,
-        } as never);
-        if (result instanceof Response) {
+        // Same providerRegistry.fake bridge as reauthProviderCallback below — this loader
+        // resolves its own provider via providerForRequest, independent of the `provider`
+        // this harness built above whenever the scenario passes a custom `seed`.
+        const originalFake = providerRegistry.fake;
+        providerRegistry.fake = () => provider;
+        try {
+          const { request } = await buildHandlerRequest(
+            s.request ?? { url: 'http://localhost/id/login/method' }
+          );
+          const result = await loginMethodLoader({
+            request,
+            params: {},
+            context: {} as never,
+          } as never);
           response = await serializeResponse(result);
-        } else {
-          // loginMethodLoader returns a plain object (not data()-wrapped like most loaders), so
-          // serializeResponse would lose the payload. Carry it directly as dataBody.
-          response = { isResponse: false, dataBody: result as Record<string, unknown> };
+        } finally {
+          providerRegistry.fake = originalFake;
+        }
+        break;
+      }
+
+      case 'loginMethodAction': {
+        const originalFake = providerRegistry.fake;
+        providerRegistry.fake = () => provider;
+        try {
+          const { request } = await buildHandlerRequest(
+            s.request ?? { url: 'http://localhost/id/login/method', csrf: true }
+          );
+          const result = await loginMethodAction({
+            request,
+            params: {},
+            context: {} as never,
+          } as never);
+          response = await serializeResponse(result);
+        } finally {
+          providerRegistry.fake = originalFake;
         }
         break;
       }
