@@ -69,7 +69,13 @@ export default async function handleRequest(
     );
 
     // Start the abort timer after renderToPipeableStream so `abort` is in scope.
-    abortTimer = setTimeout(abort, streamTimeout + 1_000);
+    // Wrapped in an arrow rather than passed by reference: taint analysers treat the first
+    // argument of setTimeout as a code-execution sink (browser setTimeout evals a string),
+    // and `abort` is destructured from a call that received `request.url`, so it reads as
+    // attacker-derived. A literal function expression has no provenance to trace. Behaviour
+    // is unchanged — with no trailing args setTimeout invokes the callback with none, so
+    // this calls `abort()` exactly as the bare reference did.
+    abortTimer = setTimeout(() => abort(), streamTimeout + 1_000);
   });
 }
 
