@@ -13,6 +13,7 @@
 import { ZitadelAuthProvider } from '@/modules/auth/providers/zitadel/index';
 import * as transport from '@/modules/auth/providers/zitadel/transport';
 import { ProviderError } from '@/modules/auth/types';
+import { AuthFactorState } from '@zitadel/proto/zitadel/user/v2/user_pb';
 
 const provider = () => new ZitadelAuthProvider({ serviceUrl: 'https://z.test', serviceToken: 't' });
 
@@ -241,5 +242,120 @@ describe('ZitadelAuthProvider — session/credential request building', () => {
     expect(createSpy).to.have.callCount(1);
     // The READ was retried after the lag NotFound.
     expect(getSpy).to.have.callCount(2);
+  });
+});
+
+// ── Passkey created-at metadata — best-effort scopes ──────────────────────
+//
+// verifyPasskey/listPasskeys/removePasskey each touch a user-metadata RPC (set/list/delete)
+// in its own ctx.call scope specifically so that RPC can NEVER fail the primary operation.
+// These tests drive that metadata RPC into failure and assert the primary operation still
+// resolves, plus the listPasskeys join behaviour (present/absent createdAt per row).
+describe('ZitadelAuthProvider — passkey metadata best-effort scopes', () => {
+  it('verifyPasskey resolves even when the setUserMetadata created-at stamp throws', async () => {
+    const verifySpy = cy.stub().resolves({});
+    stubClient({
+      verifyPasskeyRegistration: verifySpy,
+      setUserMetadata: async () => {
+        throw new Error('metadata backend down');
+      },
+    });
+    // Must not throw — enrollment is not allowed to fail because of the best-effort stamp.
+    await provider().verifyPasskey('u1', 'pk1', { fake: true });
+    expect(verifySpy).to.have.callCount(1);
+  });
+
+  it('listPasskeys degrades to date-less rows (all createdAt absent) when listUserMetadata throws', async () => {
+    stubClient({
+      listUserMetadata: async () => {
+        throw new Error('metadata backend down');
+      },
+      listPasskeys: async () => ({
+        result: [
+          { id: 'pk1', state: AuthFactorState.READY, name: 'Laptop' },
+          { id: 'pk2', state: AuthFactorState.NOT_READY, name: 'Phone' },
+        ],
+      }),
+    });
+    const rows = await provider().listPasskeys('u1');
+    expect(rows).to.have.length(2);
+    expect(rows[0]).to.deep.equal({ id: 'pk1', state: 'active', name: 'Laptop' });
+    expect(rows[1]).to.deep.equal({ id: 'pk2', state: 'inactive', name: 'Phone' });
+    for (const row of rows) {
+      expect(row).to.not.have.property('createdAt');
+    }
+  });
+
+  it('listPasskeys joins createdAt from a matching passkey:<id>:created entry; unmatched rows omit the property', async () => {
+    const createdAt = '2026-07-01T00:00:00.000Z';
+    const seconds = Math.floor(new Date(createdAt).getTime() / 1000);
+    stubClient({
+      listUserMetadata: async () => ({
+        metadata: [
+          { key: 'passkey:pk1:created', creationDate: { seconds: BigInt(seconds), nanos: 0 } },
+        ],
+      }),
+      listPasskeys: async () => ({
+        result: [
+          { id: 'pk1', state: AuthFactorState.READY, name: 'Laptop' },
+          { id: 'pk2', state: AuthFactorState.NOT_READY, name: 'Phone' },
+        ],
+      }),
+    });
+    const rows = await provider().listPasskeys('u1');
+    const pk1 = rows.find((r) => r.id === 'pk1');
+    const pk2 = rows.find((r) => r.id === 'pk2');
+    expect(pk1?.createdAt).to.equal(createdAt);
+    // Absence must be a missing property (omitted via the `...(createdAt ? {...} : {})` spread),
+    // not just an undefined value.
+    expect(pk2).to.not.have.property('createdAt');
+  });
+
+  it('removePasskey resolves even when the deleteUserMetadata cleanup throws', async () => {
+    const removeSpy = cy.stub().resolves({});
+    stubClient({
+      removePasskey: removeSpy,
+      deleteUserMetadata: async () => {
+        throw new Error('metadata backend down');
+      },
+    });
+    // Must not throw — removal succeeded; an orphaned metadata key is harmless.
+    await provider().removePasskey('u1', 'pk1');
+    expect(removeSpy).to.have.callCount(1);
+  });
+});
+
+// ── Cross-device session methods ───────────────────────────────────────────
+
+describe('ZitadelAuthProvider — cross-device session methods', () => {
+  it('listUserSessions searches by userIdQuery and maps sessions with token ""', async () => {
+    let captured: unknown;
+    stubClient({
+      listSessions: async (req: unknown) => {
+        captured = req;
+        return { sessions: [{ id: 's1' }, { id: 's2' }] };
+      },
+    });
+    const rows = await provider().listUserSessions('u1');
+    const q = (captured as { queries: Array<{ query: { case: string; value: { id?: string } } }> })
+      .queries[0].query;
+    expect(q.case).to.equal('userIdQuery');
+    expect(q.value.id).to.equal('u1');
+    expect(rows).to.have.length(2);
+    expect(rows[0].id).to.equal('s1');
+    expect(rows[0].token).to.equal('');
+  });
+
+  it('deleteUserSession sends sessionId WITHOUT a sessionToken field', async () => {
+    let captured: unknown;
+    stubClient({
+      deleteSession: async (req: Record<string, unknown>) => {
+        captured = req;
+        return {};
+      },
+    });
+    await provider().deleteUserSession('s2');
+    expect((captured as { sessionId: string }).sessionId).to.equal('s2');
+    expect(captured).to.not.have.property('sessionToken');
   });
 });

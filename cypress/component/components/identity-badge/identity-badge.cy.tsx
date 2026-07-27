@@ -18,4 +18,29 @@ describe('IdentityBadge', () => {
     cy.get('p').should('not.exist');
     cy.get('a').should('not.exist');
   });
+
+  it('supports a custom verb, link label, and link target (defaults unchanged)', () => {
+    cy.mount(
+      <IdentityBadge
+        loginName="bob@acme.test"
+        verb="Signing up as"
+        linkLabel="Not you?"
+        linkTarget="/signup?requestId=oidc_z"
+      />
+    );
+    cy.contains('Signing up as').should('exist');
+    cy.contains('bob@acme.test').should('exist');
+    cy.findByRole('link', { name: /not you/i }).should(
+      'have.attr',
+      'href',
+      '/signup?requestId=oidc_z'
+    );
+  });
+
+  it('renders no link at all when showLink is false', () => {
+    cy.mount(<IdentityBadge loginName="carol@acme.test" verb="Sign out of" showLink={false} />);
+    cy.contains('Sign out of').should('exist');
+    cy.contains('carol@acme.test').should('exist');
+    cy.get('a').should('not.exist');
+  });
 });

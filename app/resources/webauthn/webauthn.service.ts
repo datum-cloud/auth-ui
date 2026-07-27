@@ -25,6 +25,7 @@ import {
   loginBounceTarget,
 } from '@/resources/shared/next-step-params';
 import { resolveOrg } from '@/resources/shared/resolve-org';
+import { isSudoFresh } from '@/resources/shared/sudo';
 import { logAuthEvent, hashActor } from '@/server/observability';
 
 // ── shared: derive the post-ceremony next step from a session ─────────────────
@@ -399,7 +400,12 @@ export async function requestU2FAttestation(
 
 // ── SETUP enrollment action (shared shape) ────────────────────────────────────
 
-export type EnrollError = 'INVALID_INPUT' | 'SESSION_EXPIRED' | 'INVALID_CREDENTIALS';
+export type EnrollError =
+  | 'INVALID_INPUT'
+  | 'SESSION_EXPIRED'
+  | 'INVALID_CREDENTIALS'
+  // Passkey enrollment requires a fresh authentication factor (sudo).
+  | 'SUDO_REQUIRED';
 
 export type EnrollResult = { ok: true; target: string } | { ok: false; error: EnrollError };
 
@@ -412,6 +418,8 @@ export interface PasskeyEnrollInput {
   organization?: string;
   /** When 'true', route straight into the matching verify screen after enrollment. */
   checkAfter?: 'true' | 'false';
+  /** User-typed or AAGUID-derived label, set-once via verifyPasskey. */
+  passkeyName?: string;
 }
 
 /**
@@ -438,6 +446,13 @@ interface EnrollmentConfig {
   factor: 'passkey' | 'u2f';
   verify: (provider: AuthProvider, userId: string, parsedCredential: unknown) => Promise<void>;
   checkAfterPath: '/login/passkey' | '/login/security-key';
+  /**
+   * Require a fresh authentication factor (sudo window) on the ACTIVE
+   * session before accepting the enrollment. Server-side enforcement — deep-linking
+   * /setup/passkey with a stale session is rejected here regardless of entry route.
+   * Passkey only; U2F enrollment is unchanged.
+   */
+  requireSudo?: boolean;
 }
 
 /** Fields shared by every enrollment-verify input (factor-specific ids live in the cfg closure). */
@@ -471,6 +486,21 @@ async function verifyEnrollment(
     parsedCredential = JSON.parse(credential) as unknown;
   } catch {
     return { ok: false, error: 'INVALID_INPUT' };
+  }
+
+  // Sudo gate — the active session must carry an authentication factor
+  // verified within the sudo window. Runs before the provider verify so a hijacked or
+  // unattended stale session can never plant a persistent credential.
+  if (cfg.requireSudo) {
+    const sudoSession = await provider.getSession(entry.id, entry.token);
+    if (!sudoSession || !isSudoFresh(sudoSession.factors, Date.now())) {
+      logAuthEvent('mfa_enroll', 'failure', {
+        userId,
+        factor: cfg.factor,
+        reason: 'sudo_required',
+      });
+      return { ok: false, error: 'SUDO_REQUIRED' };
+    }
   }
 
   try {
@@ -518,15 +548,26 @@ async function verifyEnrollment(
 export async function verifyPasskeyEnrollment(
   provider: AuthProvider,
   sessions: SessionEntry[],
-  { credential, passkeyId, loginName, requestId, organization, checkAfter }: PasskeyEnrollInput
+  {
+    credential,
+    passkeyId,
+    loginName,
+    requestId,
+    organization,
+    checkAfter,
+    passkeyName,
+  }: PasskeyEnrollInput
 ): Promise<EnrollResult> {
   return verifyEnrollment(
     provider,
     sessions,
     {
       factor: 'passkey',
-      verify: (p, userId, cred) => p.verifyPasskey(userId, passkeyId, cred),
+      // Thread the label; the Zitadel adapter's 'Passkey' fallback
+      // still covers an empty submission.
+      verify: (p, userId, cred) => p.verifyPasskey(userId, passkeyId, cred, passkeyName),
       checkAfterPath: '/login/passkey',
+      requireSudo: true, // Passkey add is sudo-gated; U2F unchanged
     },
     { credential, loginName, requestId, organization, checkAfter }
   );

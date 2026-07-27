@@ -144,6 +144,12 @@ const SHARED_FACTORY_PATHS: Record<string, string | string[]> = {
   // provider→service→redirect/data translators. Registered here so the delegation + registry
   // checks resolve those events at their new call site in resources/login/login.service.ts.
   'login.service.ts': join(RESOURCES_DIR, 'login/login.service.ts'),
+  // The reauth route (reauth.tsx) delegates its action logic (incl. the reauth /
+  // reauth_challenge logAuthEvent calls) to the reauth domain service.
+  'reauth.service.ts': join(RESOURCES_DIR, 'reauth/reauth.service.ts'),
+  // The passkeys route (passkeys.tsx) delegates its action logic (incl. the
+  // passkey_remove / logout logAuthEvent calls) to the passkeys domain service.
+  'passkeys.service.ts': join(RESOURCES_DIR, 'passkeys/passkeys.service.ts'),
 };
 
 // ---------------------------------------------------------------------------
@@ -289,6 +295,10 @@ const DELEGATED_TO_SHARED: Record<string, string[]> = {
   // login/password.tsx) lives in resources/login/login.service.ts.
   'login/index.tsx': ['login.service.ts'],
   'login/password.tsx': ['login.service.ts'],
+  // The reauth + passkeys routes are thin — their action logic (and the reauth /
+  // passkey_remove logAuthEvent calls) lives in the reauth / passkeys domain services.
+  'reauth.tsx': ['reauth.service.ts'],
+  'passkeys.tsx': ['passkeys.service.ts'],
 };
 
 /**
@@ -363,6 +373,13 @@ export const REQUIRED_EVENTS = [
   'device_authorize',
   // --- Session ---
   'logout',
+  // --- Sudo re-auth + passkey management (snake_case per the P5+ convention) ---
+  // reauth: one enrolled factor re-verified onto the EXISTING session (/id/reauth action).
+  // reauth_challenge: assertion/OTP challenge request failure on the reauth loader path.
+  // passkey_remove: sudo-gated passkey removal (success / sudo_required / last_method).
+  'reauth',
+  'reauth_challenge',
+  'passkey_remove',
   // --- Password ---
   'password.change',
   'password.reset.completed',

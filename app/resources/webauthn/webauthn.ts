@@ -23,10 +23,45 @@ export class WebAuthnUnsupportedError extends Error {
   }
 }
 
-export class WebAuthnCeremonyCancelledError extends Error {
-  constructor() {
-    super('WebAuthn ceremony was cancelled or returned no credential');
-    this.name = 'WebAuthnCeremonyCancelledError';
+/**
+ * Stable, UI-facing classification of why a WebAuthn ceremony failed. The browser surfaces
+ * failures as thrown DOMExceptions (or a null return on user-cancel); `classifyWebAuthnError`
+ * collapses those into this closed set so the button can show reason-specific copy.
+ */
+export type WebAuthnReason =
+  'not-allowed' | 'already-registered' | 'unsupported' | 'security' | 'unknown';
+
+/** Thrown by the ceremony wrappers when navigator.credentials.create/get fails (throw or null). */
+export class WebAuthnCeremonyError extends Error {
+  readonly reason: WebAuthnReason;
+  constructor(reason: WebAuthnReason) {
+    super(`WebAuthn ceremony failed: ${reason}`);
+    this.name = 'WebAuthnCeremonyError';
+    this.reason = reason;
+  }
+}
+
+/**
+ * Map a value thrown by navigator.credentials.create()/get() to a stable reason.
+ * Real failures are DOMExceptions whose `.name` disambiguates the cause; any non-DOMException
+ * value (or an unmapped DOMException name) is treated as 'unknown'.
+ */
+export function classifyWebAuthnError(err: unknown): WebAuthnReason {
+  if (!(err instanceof DOMException)) return 'unknown';
+  switch (err.name) {
+    case 'NotAllowedError':
+    case 'AbortError':
+    case 'TimeoutError':
+      return 'not-allowed';
+    case 'InvalidStateError':
+      return 'already-registered';
+    case 'NotSupportedError':
+    case 'ConstraintError':
+      return 'unsupported';
+    case 'SecurityError':
+      return 'security';
+    default:
+      return 'unknown';
   }
 }
 
@@ -57,14 +92,20 @@ export async function marshalAssertion(
       id: base64UrlToBuffer(c.id),
     })),
   };
-  // navigator.credentials.get resolves null on user cancel; cast + deref without
-  // a null check would throw an opaque TypeError. Throw a named error instead.
-  // Cast pk through unknown: the spread rebuilds a valid options shape but TypeScript cannot
-  // verify that all required DOM fields (e.g. allowCredentials[].type) are present.
-  const cred = (await navigator.credentials.get({
-    publicKey: pk as unknown as PublicKeyCredentialRequestOptions,
-  })) as PublicKeyCredential | null;
-  if (!cred) throw new WebAuthnCeremonyCancelledError();
+  // navigator.credentials.get THROWS a DOMException on real failure (no authenticator,
+  // cancel, timeout) and resolves null on user-cancel. Classify the throw into a reason;
+  // treat null as a user-cancel ('not-allowed'). Cast pk through unknown: the spread rebuilds
+  // a valid options shape but TypeScript cannot verify all required DOM fields
+  // (e.g. allowCredentials[].type) are present.
+  let cred: PublicKeyCredential | null;
+  try {
+    cred = (await navigator.credentials.get({
+      publicKey: pk as unknown as PublicKeyCredentialRequestOptions,
+    })) as PublicKeyCredential | null;
+  } catch (err) {
+    throw new WebAuthnCeremonyError(classifyWebAuthnError(err));
+  }
+  if (!cred) throw new WebAuthnCeremonyError('not-allowed');
   const r = cred.response as AuthenticatorAssertionResponse;
   return {
     id: cred.id,
@@ -96,14 +137,20 @@ export async function createAttestation(
       id: base64UrlToBuffer(c.id),
     })),
   };
-  // navigator.credentials.create resolves null on user cancel; null-guard here
-  // instead of letting the next line throw an opaque TypeError.
-  // Cast pk through unknown: the spread rebuilds a valid options shape but TypeScript cannot
-  // verify all required DOM fields (rp, pubKeyCredParams, etc.) are present on the spread.
-  const cred = (await navigator.credentials.create({
-    publicKey: pk as unknown as PublicKeyCredentialCreationOptions,
-  })) as PublicKeyCredential | null;
-  if (!cred) throw new WebAuthnCeremonyCancelledError();
+  // navigator.credentials.create THROWS a DOMException on real failure (no authenticator,
+  // cancel, already-registered) and resolves null on user-cancel. Classify the throw into a
+  // reason; treat null as a user-cancel ('not-allowed'). Cast pk through unknown: the spread
+  // rebuilds a valid options shape but TypeScript cannot verify all required DOM fields
+  // (rp, pubKeyCredParams, etc.) are present on the spread.
+  let cred: PublicKeyCredential | null;
+  try {
+    cred = (await navigator.credentials.create({
+      publicKey: pk as unknown as PublicKeyCredentialCreationOptions,
+    })) as PublicKeyCredential | null;
+  } catch (err) {
+    throw new WebAuthnCeremonyError(classifyWebAuthnError(err));
+  }
+  if (!cred) throw new WebAuthnCeremonyError('not-allowed');
   const r = cred.response as AuthenticatorAttestationResponse;
   return {
     id: cred.id,

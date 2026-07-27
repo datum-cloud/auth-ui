@@ -1,58 +1,8 @@
 import { checkA11y } from '../support/a11y';
-
-// Seeded password for all fake-provider test users (see app/providers/select.server.ts passwords map).
-const FAKE_PASSWORD = 'hunter2';
-
-/**
- * Extract the csrf hidden-input token from SSR HTML. React entity-escapes
- * attribute values (& → &amp; etc.), so decode before round-tripping the token —
- * otherwise tokens containing escapable chars 403 intermittently.
- */
-function extractCsrf(html: string): string {
-  const raw = /name="csrf" value="([^"]+)"/.exec(html)?.[1] ?? '';
-  return raw
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#x27;|&#39;/g, "'");
-}
-
-/**
- * Establishes a session cookie for the given loginName via cy.request (no UI).
- * Drives identifier → password steps so byLoginName finds a valid entry.
- * cy.request shares the browser cookie jar; set-cookie headers from the actions
- * apply to the subsequent cy.visit.
- */
-function loginAndGetSession(loginName: string) {
-  cy.request('/id/login').then((resp) => {
-    const csrf = extractCsrf(resp.body as string);
-    cy.request({
-      method: 'POST',
-      url: '/id/login',
-      form: true,
-      body: { csrf, loginName },
-      followRedirect: false,
-    }).then((post) => {
-      const target = String(post.headers.location ?? '');
-      if (target.includes('/login/password')) {
-        const pwPageUrl = target.startsWith('http')
-          ? target
-          : `/id${target.startsWith('/id') ? target.slice(3) : target}`;
-        cy.request(pwPageUrl).then((pwPage) => {
-          const pwCsrf = extractCsrf(pwPage.body as string) || csrf;
-          cy.request({
-            method: 'POST',
-            url: target,
-            form: true,
-            body: { csrf: pwCsrf, loginName, password: FAKE_PASSWORD },
-            followRedirect: false,
-          });
-        });
-      }
-    });
-  });
-}
+// Shared session-planting helper (posts the single-fetch `.data` endpoints). The old
+// file-local copy document-POSTed /id/login, which now 405s (no action on the layout
+// route) — every session it "planted" was silently empty.
+import { extractCsrf, loginAndGetSession } from '../support/session';
 
 // ─── Passkey enrollment (/setup/passkey) ─────────────────────────────────────
 
@@ -77,8 +27,61 @@ describe('Passkey enrollment (/setup/passkey)', () => {
       .should('not.be.disabled')
       .click();
 
+    // Name step: the ceremony ran first; the name arrives pre-filled (UA fallback under
+    // the pre-baked credential) with the scoping helptext, and Save submits credential+name.
+    cy.contains(/Name your passkey/i).should('be.visible');
+    cy.get('input[name="passkeyName"]').invoke('val').should('not.be.empty');
+    cy.contains('your password manager labels it separately').should('be.visible');
+    cy.contains("Names can't be changed later").should('be.visible');
+    checkA11y();
+    cy.contains('button', /^save$/i).click();
+
     // checkAfter=true → redirect into the matching passkey verify screen after enrollment.
     cy.location('pathname').should('eq', '/id/login/passkey');
+  });
+
+  it('threads passkeyName through enrollment and shows it on /id/passkeys', () => {
+    // Dedicated namer@acme.test fixture — enrollments here never contaminate the
+    // ordering-sensitive nofactor/mfa-skip users. The name field renders on the setup
+    // screen; the SUBMIT is driven via cy.request (the ceremony-click UI path and the
+    // client-side name pre-fill are covered by the route component spec —
+    // setup-passkey-naming.cy.tsx — because WebAuthn ceremony clicks are
+    // unreliable under the local dev-mode hydration recovery).
+    loginAndGetSession('namer@acme.test');
+
+    // The name field is on the page with its set-once helper copy.
+    cy.visit('/id/setup/passkey?loginName=namer%40acme.test&returnTo=%2Fpasskeys');
+    // Step 1 shows no name field — naming happens AFTER the ceremony. The
+    // two-step UI (pre-fill, helptext, Save) is covered by the hydrated test above
+    // and by cypress/component/routes/setup/setup-passkey-naming.cy.tsx.
+    cy.get('input[name="passkeyName"]').should('not.exist');
+
+    // Enrollment with a typed name → the exact name lands on the inventory row.
+    const setupUrl = '/id/setup/passkey?loginName=namer%40acme.test&returnTo=%2Fpasskeys';
+    cy.request(setupUrl).then((resp) => {
+      const html = resp.body as string;
+      const csrf = extractCsrf(html);
+      const passkeyId = /name="passkeyId" value="([^"]+)"/.exec(html)?.[1] ?? '';
+      cy.request({
+        method: 'POST',
+        url: '/id/setup/passkey.data?loginName=namer%40acme.test&returnTo=%2Fpasskeys',
+        form: true,
+        body: {
+          csrf,
+          loginName: 'namer@acme.test',
+          passkeyId,
+          returnTo: '/passkeys',
+          passkeyName: 'My yubikey',
+          credential: JSON.stringify({ id: 'fake-credential-id', type: 'public-key' }),
+        },
+        followRedirect: false,
+      }).then((post) => {
+        expect(String(post.body ?? '')).to.contain('"redirect","/passkeys"');
+      });
+    });
+
+    cy.visit('/id/passkeys');
+    cy.contains('ul li', 'My yubikey').should('be.visible');
   });
 });
 

@@ -6,8 +6,9 @@ import React from 'react';
 //
 // In Cypress, window.Cypress is defined, so the component takes the CYPRESS_CREDENTIAL
 // shortcut (skips navigator.credentials). By NOT wrapping in a <form>, formRef.current
-// remains null, which triggers setError('webauthn-failed') — the same error path that
-// the Vitest test exercised via publicKey=null + mocked isWebAuthnSupported=true.
+// remains null, which sets the generic ceremony failure (reason 'unknown') and renders the
+// per-mode generic copy — asserting enroll wording is distinct from sign-in wording.
+// (Reason-specific DOMException copy is covered by webauthn-button.ceremony-errors.cy.tsx.)
 function mountBtn(mode: 'assertion' | 'attestation') {
   const formRef = React.createRef<HTMLFormElement | null>();
   cy.mountRemixRoute(<WebAuthnButton publicKey={null} formRef={formRef} mode={mode} />, {

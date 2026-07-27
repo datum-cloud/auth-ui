@@ -150,4 +150,66 @@ describe('nextMfaStep', () => {
       { force: 'true', checkAfter: 'true' }
     );
   });
+
+  // ── enrolled passkey suppresses the step-6 skippable MFA-setup nudge ──────────
+  // A passkey is passwordless-primary strong auth the user already has, so the *optional*
+  // "set up MFA" nudge is confusing UX ("I have a passkey, why set up MFA?") and is suppressed.
+  // This affects ONLY the skippable step-6 nudge — a hard org policy (forced MFA) still applies.
+  // NOTE: this is a DIFFERENT nudge from the backup-method/lockout banner on the /passkeys
+  // management route (methodCount === 1). No overlap: separate file, trigger, and intent.
+
+  it('is done (step-6 nudge suppressed) when an enrolled passkey exists, password login, skip window elapsed', () => {
+    // No fresh passkey factor (password login, userVerified:false), skip window configured and
+    // never skipped → WITHOUT the passkey rule this routes to /setup/mfa?force=false.
+    expect(
+      nextMfaStep(
+        base({
+          enrolledMethods: ['passkey'],
+          settings: settings({ mfaInitSkipLifetimeMs: 1000 }),
+          mfaInitSkippedAt: null,
+        })
+      )
+    ).to.deep.equal({ kind: 'done' });
+  });
+
+  it('an enrolled passkey does NOT bypass FORCED MFA (step 5 still routes to setup, force=true)', () => {
+    expectRoute(
+      nextMfaStep(
+        base({
+          enrolledMethods: ['passkey'],
+          settings: settings({ forceMfa: true, mfaInitSkipLifetimeMs: 1000 }),
+        })
+      ),
+      '/setup/mfa',
+      { force: 'true', checkAfter: 'true' }
+    );
+  });
+
+  it('WITHOUT a passkey, no 2nd factor, not forced, skip window elapsed → skippable nudge still fires (unchanged)', () => {
+    expectRoute(
+      nextMfaStep(
+        base({
+          enrolledMethods: [],
+          settings: settings({ mfaInitSkipLifetimeMs: 1000 }),
+          mfaInitSkippedAt: null,
+        })
+      ),
+      '/setup/mfa',
+      { force: 'false', checkAfter: 'true' }
+    );
+  });
+
+  it('a fresh user-verified passwordless passkey is still done via step 1 (unchanged), even when enrolled', () => {
+    const factors: Factors = { passkey: { verifiedAt: freshDate } };
+    expect(
+      nextMfaStep(
+        base({
+          factors,
+          userVerified: true,
+          enrolledMethods: ['passkey'],
+          settings: settings({ multiFactorCheckLifetimeMs: 1000 }),
+        })
+      )
+    ).to.deep.equal({ kind: 'done' });
+  });
 });

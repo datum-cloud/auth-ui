@@ -145,6 +145,12 @@ export class ZitadelAuthProvider implements AuthProvider {
   listSessions(ids: string[]): Promise<Session[]> {
     return session.listSessions(this.ctx, ids);
   }
+  listUserSessions(userId: string): Promise<Session[]> {
+    return session.listUserSessions(this.ctx, userId);
+  }
+  deleteUserSession(sessionId: string): Promise<void> {
+    return session.deleteUserSession(this.ctx, sessionId);
+  }
 
   // passkey / u2f / totp / otp (P5)
   passkeyRegisterLink(userId: string): Promise<{ code: string }> {
@@ -160,6 +166,16 @@ export class ZitadelAuthProvider implements AuthProvider {
     passkeyName?: string
   ): Promise<void> {
     return mfa.verifyPasskey(this.ctx, userId, passkeyId, cred, passkeyName);
+  }
+  listPasskeys(
+    userId: string
+  ): Promise<
+    Array<{ id: string; state: 'active' | 'inactive'; name: string; createdAt?: string }>
+  > {
+    return mfa.listPasskeys(this.ctx, userId);
+  }
+  removePasskey(userId: string, passkeyId: string): Promise<void> {
+    return mfa.removePasskey(this.ctx, userId, passkeyId);
   }
   registerU2F(userId: string, domain: string): Promise<U2FCreationOptions> {
     return mfa.registerU2F(this.ctx, userId, domain);

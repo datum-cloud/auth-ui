@@ -68,6 +68,9 @@ export const paths = {
     index: (q?: Query) => withQuery('/logout', q),
     success: (q?: Query) => withQuery('/logout/success', q),
   },
+  // Passkey management + sudo re-auth interstitial.
+  passkeys: (q?: Query) => withQuery('/passkeys', q),
+  reauth: (q?: Query) => withQuery('/reauth', q),
   accounts: (q?: Query) => withQuery('/accounts', q),
   signedIn: (q?: Query) => withQuery('/signed-in', q),
   error: (q?: Query) => withQuery('/error', q),

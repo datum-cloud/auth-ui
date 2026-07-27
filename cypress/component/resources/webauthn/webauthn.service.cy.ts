@@ -184,6 +184,9 @@ describe('verifyPasskeyEnrollment', () => {
     callService({
       fn: 'verifyPasskeyEnrollment',
       provider: 'singleton',
+      // The sudo gate reads the ACTIVE session's factors — seed s1 live (the
+      // singleton stamps REAL factor timestamps, so the 10-min window passes).
+      liveSessions: [{ id: 's1', token: 't1' }],
       request: { url: 'http://localhost/id/setup/passkey', sessions: sessionsFor('org-1') },
       verifyEnrollInput: {
         credential: VALID_CRED,
@@ -217,6 +220,9 @@ describe('verifyPasskeyEnrollment', () => {
       fn: 'verifyPasskeyEnrollment',
       provider: 'singleton',
       failVerifyPasskey: 'INVALID_CREDENTIALS',
+      // Seed the live session so the sudo gate passes and the scenario still
+      // exercises the INVALID_CREDENTIALS mapping.
+      liveSessions: [{ id: 's1', token: 't1' }],
       request: { url: 'http://localhost/id/setup/passkey', sessions: sessionsFor() },
       verifyEnrollInput: { credential: VALID_CRED, passkeyId: 'pk-1', loginName: ALICE },
     }).then((v) => {

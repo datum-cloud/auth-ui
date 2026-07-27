@@ -12,6 +12,11 @@ msgstr ""
 "Content-Transfer-Encoding: \n"
 "Plural-Forms: \n"
 
+#. placeholder {0}: row.name
+#: app/routes/passkeys.tsx:134
+msgid "\"{0}\" will no longer work for signing in. This cannot be undone."
+msgstr "\"{0}\" will no longer work for signing in. This cannot be undone."
+
 #. placeholder {0}: attempts.count
 #: app/routes/login/password.tsx:166
 msgid "{0, plural, one {# attempt remaining.} other {# attempts remaining.}}"
@@ -48,6 +53,10 @@ msgstr "Add an extra layer of security to your account by setting up a second fa
 msgid "Add another account"
 msgstr "Add another account"
 
+#: app/routes/passkeys.tsx:296
+msgid "Add passkey"
+msgstr "Add passkey"
+
 #: app/routes/setup/email.tsx:40
 msgid "Add your email address as a second factor. We will send a one-time code each time you sign in."
 msgstr "Add your email address as a second factor. We will send a one-time code each time you sign in."
@@ -55,6 +64,11 @@ msgstr "Add your email address as a second factor. We will send a one-time code 
 #: app/routes/setup/sms.tsx:40
 msgid "Add your phone number as a second factor. We will send a one-time code via SMS each time you sign in."
 msgstr "Add your phone number as a second factor. We will send a one-time code via SMS each time you sign in."
+
+#. placeholder {0}: i18n.date(new Date(row.createdAt), { dateStyle: 'medium' })
+#: app/routes/passkeys.tsx:273
+msgid "Added {0}"
+msgstr "Added {0}"
 
 #: app/utils/errors/auth-error-messages.tsx:46
 msgid "Additional verification is required to continue."
@@ -117,6 +131,7 @@ msgid "Available accounts to link"
 msgstr "Available accounts to link"
 
 #: app/components/back-link/back-link.tsx:24
+#: app/routes/passkeys.tsx:302
 #: app/routes/sso/link.tsx:68
 #: app/routes/verify/success.tsx:36
 msgid "Back"
@@ -130,6 +145,7 @@ msgstr "Back to sign in"
 msgid "By continuing, you agree to Datum's <0>Terms of Service</0> and <1>Privacy Policy</1>, and to receive periodic emails with updates."
 msgstr "By continuing, you agree to Datum's <0>Terms of Service</0> and <1>Privacy Policy</1>, and to receive periodic emails with updates."
 
+#: app/routes/passkeys.tsx:139
 #: app/routes/sso/index.tsx:104
 msgid "Cancel"
 msgstr "Cancel"
@@ -171,6 +187,15 @@ msgstr "Choose your login method"
 #: app/routes/device/authorize.tsx:83
 msgid "Code expired"
 msgstr "Code expired"
+
+#: app/routes/reauth.tsx:223
+#: app/routes/reauth.tsx:245
+msgid "Confirm"
+msgstr "Confirm"
+
+#: app/routes/reauth.tsx:164
+msgid "Confirm it's you"
+msgstr "Confirm it's you"
 
 #: app/routes/password/new.tsx:106
 msgid "Confirm new password"
@@ -216,6 +241,11 @@ msgstr "Create a new account"
 msgid "Create account"
 msgstr "Create account"
 
+#. placeholder {0}: held.uaName
+#: app/routes/setup/passkey.tsx:144
+msgid "Created using {0}"
+msgstr "Created using {0}"
+
 #: app/routes/device/authorize.tsx:172
 #: app/routes/device/authorize.tsx:198
 msgid "Deny"
@@ -243,6 +273,10 @@ msgstr "Email"
 #: app/routes/login/verify/email.tsx:72
 msgid "Email code"
 msgstr "Email code"
+
+#: app/routes/reauth.tsx:188
+msgid "Email me a code"
+msgstr "Email me a code"
 
 #: app/routes/login/index.tsx:395
 #: app/routes/login/method.tsx:117
@@ -319,6 +353,10 @@ msgstr "Enter your SMS code"
 msgid "Finish creating your account"
 msgstr "Finish creating your account"
 
+#: app/routes/reauth.tsx:166
+msgid "For your security, verify one of your sign-in methods to continue."
+msgstr "For your security, verify one of your sign-in methods to continue."
+
 #: app/routes/login/password.tsx:197
 msgid "Forgot password?"
 msgstr "Forgot password?"
@@ -330,6 +368,10 @@ msgstr "Get started"
 #: app/layouts/split.layout.tsx:105
 msgid "If you prefer a demo, just <0>reach out</0>."
 msgstr "If you prefer a demo, just <0>reach out</0>."
+
+#: app/routes/passkeys.tsx:266
+msgid "Inactive"
+msgstr "Inactive"
 
 #: app/utils/errors/auth-error-messages.tsx:19
 msgid "Incorrect credentials. Please try again."
@@ -351,9 +393,17 @@ msgstr "Link your account"
 msgid "Linked accounts"
 msgstr "Linked accounts"
 
+#: app/routes/passkeys.tsx:227
+msgid "Logged in as"
+msgstr "Logged in as"
+
 #: app/routes/setup/authenticator.tsx:144
 msgid "Manual setup key"
 msgstr "Manual setup key"
+
+#: app/routes/setup/passkey.tsx:87
+msgid "Name your passkey"
+msgstr "Name your passkey"
 
 #: app/routes/accounts.tsx:223
 msgid "Needs re-authentication"
@@ -368,6 +418,14 @@ msgstr "New password"
 msgid "No account was found and sign-up is not available."
 msgstr "No account was found and sign-up is not available."
 
+#: app/routes/passkeys.tsx:247
+msgid "No passkeys yet."
+msgstr "No passkeys yet."
+
+#: app/routes/reauth.tsx:193
+msgid "No sign-in method is available for re-authentication."
+msgstr "No sign-in method is available for re-authentication."
+
 #: app/utils/errors/auth-error-messages.tsx:58
 msgid "No sign-in method is available for this account."
 msgstr "No sign-in method is available for this account."
@@ -376,11 +434,15 @@ msgstr "No sign-in method is available for this account."
 msgid "No signed-in accounts."
 msgstr "No signed-in accounts."
 
+#: app/routes/passkeys.tsx:185
+msgid "Not now"
+msgstr "Not now"
+
 #: app/routes/login/index.tsx:415
 msgid "Not registered?"
 msgstr "Not registered?"
 
-#: app/components/identity-badge/identity-badge.tsx:28
+#: app/components/identity-badge/identity-badge.tsx:30
 #: app/routes/signup/password.tsx:203
 msgid "Not you?"
 msgstr "Not you?"
@@ -399,11 +461,46 @@ msgstr "Or import this URI in your authenticator app"
 
 #: app/routes/login/index.tsx:340
 #: app/routes/login/method.tsx:102
+#: app/routes/reauth.tsx:174
 #: app/routes/setup/mfa.tsx:46
 msgid "Passkey"
 msgstr "Passkey"
 
+#: app/routes/setup/passkey.tsx:133
+msgid "Passkey name"
+msgstr "Passkey name"
+
+#: app/routes/passkeys.tsx:172
+msgid "Passkey removed"
+msgstr "Passkey removed"
+
+#: app/components/webauthn-button/webauthn-button.tsx:106
+msgid "Passkey setup couldn't be completed for security reasons. Please contact support if this continues."
+msgstr "Passkey setup couldn't be completed for security reasons. Please contact support if this continues."
+
+#: app/components/webauthn-button/webauthn-button.tsx:90
+msgid "Passkey setup was cancelled, or this device has no passkey support. Make sure Touch ID, Windows Hello, a security key, or a password manager is available, then try again."
+msgstr "Passkey setup was cancelled, or this device has no passkey support. Make sure Touch ID, Windows Hello, a security key, or a password manager is available, then try again."
+
+#: app/components/webauthn-button/webauthn-button.tsx:67
+msgid "Passkey sign-in couldn't be completed for security reasons. Please contact support if this continues."
+msgstr "Passkey sign-in couldn't be completed for security reasons. Please contact support if this continues."
+
+#: app/components/webauthn-button/webauthn-button.tsx:53
+msgid "Passkey sign-in was cancelled, or no passkey for this account is available on this device. Make sure you're using a device where you set up your passkey, then try again."
+msgstr "Passkey sign-in was cancelled, or no passkey for this account is available on this device. Make sure you're using a device where you set up your passkey, then try again."
+
+#: app/routes/passkeys.tsx:220
+msgid "Passkeys"
+msgstr "Passkeys"
+
+#: app/routes/passkeys.tsx:223
+msgid "Passkeys let you sign in with your fingerprint, face, or device PIN."
+msgstr "Passkeys let you sign in with your fingerprint, face, or device PIN."
+
 #: app/routes/login/method.tsx:132
+#: app/routes/reauth.tsx:181
+#: app/routes/reauth.tsx:218
 #: app/routes/signup/password.tsx:229
 #: app/routes/sso/ldap.tsx:77
 msgid "Password"
@@ -450,17 +547,25 @@ msgstr "Please check your input and try again."
 msgid "Register a hardware security key (e.g. YubiKey) as a second factor for your account."
 msgstr "Register a hardware security key (e.g. YubiKey) as a second factor for your account."
 
-#: app/routes/setup/passkey.tsx:50
+#: app/routes/setup/passkey.tsx:92
 msgid "Register a passkey using your device's biometric sensor or PIN to sign in securely without a password."
 msgstr "Register a passkey using your device's biometric sensor or PIN to sign in securely without a password."
 
-#: app/routes/setup/passkey.tsx:86
+#: app/routes/setup/passkey.tsx:177
 msgid "Register passkey"
 msgstr "Register passkey"
 
 #: app/routes/signup/index.tsx:222
 msgid "Registration is currently unavailable. Please contact your administrator."
 msgstr "Registration is currently unavailable. Please contact your administrator."
+
+#: app/routes/passkeys.tsx:146
+msgid "Remove passkey"
+msgstr "Remove passkey"
+
+#: app/routes/passkeys.tsx:132
+msgid "Remove this passkey?"
+msgstr "Remove this passkey?"
 
 #: app/routes/login/verify/email.tsx:88
 #: app/routes/login/verify/sms.tsx:85
@@ -471,6 +576,10 @@ msgstr "Resend code"
 #: app/routes/password/reset.tsx:121
 msgid "Reset your password"
 msgstr "Reset your password"
+
+#: app/routes/setup/passkey.tsx:160
+msgid "Save"
+msgstr "Save"
 
 #: app/routes/setup/authenticator.tsx:109
 msgid "Scan the QR code below with your authenticator app, then enter the 6-digit code to confirm enrollment."
@@ -522,7 +631,7 @@ msgstr "Set up email one-time code"
 msgid "Set up multi-factor authentication"
 msgstr "Set up multi-factor authentication"
 
-#: app/routes/setup/passkey.tsx:48
+#: app/routes/setup/passkey.tsx:87
 msgid "Set up passkey"
 msgstr "Set up passkey"
 
@@ -559,6 +668,8 @@ msgstr "Sign in with"
 msgid "Sign in with LDAP"
 msgstr "Sign in with LDAP"
 
+#: app/components/sign-out-button/sign-out-button.tsx:26
+#: app/components/sign-out-button/sign-out-button.tsx:30
 #: app/routes/logout/index.tsx:47
 #: app/routes/logout/index.tsx:53
 #: app/routes/signed-in.tsx:61
@@ -566,11 +677,19 @@ msgstr "Sign in with LDAP"
 msgid "Sign out"
 msgstr "Sign out"
 
+#: app/routes/passkeys.tsx:191
+msgid "Sign out other sessions"
+msgstr "Sign out other sessions"
+
 #: app/routes/login/index.tsx:405
 msgid "Sign-in is currently unavailable for this account. Please contact your administrator."
 msgstr "Sign-in is currently unavailable for this account. Please contact your administrator."
 
-#: app/components/identity-badge/identity-badge.tsx:26
+#: app/routes/passkeys.tsx:174
+msgid "Signed-in sessions on other devices can still be active. Sign out your other sessions?"
+msgstr "Signed-in sessions on other devices can still be active. Sign out your other sessions?"
+
+#: app/components/identity-badge/identity-badge.tsx:29
 msgid "Signing in as"
 msgstr "Signing in as"
 
@@ -632,7 +751,7 @@ msgstr "That identity belongs to a different account."
 msgid "That's already been done."
 msgstr "That's already been done."
 
-#: app/components/webauthn-button/webauthn-button.tsx:152
+#: app/components/webauthn-button/webauthn-button.tsx:73
 msgid "The passkey verification failed. Please try again."
 msgstr "The passkey verification failed. Please try again."
 
@@ -643,6 +762,14 @@ msgstr "The request timed out. Please try again."
 #: app/routes/sso/provider/error.tsx:12
 msgid "The sign-in link was incomplete or expired."
 msgstr "The sign-in link was incomplete or expired."
+
+#: app/components/webauthn-button/webauthn-button.tsx:99
+msgid "This device can't create a passkey. Try another device, a security key, or a password manager."
+msgstr "This device can't create a passkey. Try another device, a security key, or a password manager."
+
+#: app/components/webauthn-button/webauthn-button.tsx:60
+msgid "This device can't use a passkey to sign in. Try another device or a different sign-in method."
+msgstr "This device can't use a passkey to sign in. Try another device or a different sign-in method."
 
 #: app/routes/device/authorize.tsx:84
 msgid "This device code is invalid or has expired."
@@ -663,6 +790,10 @@ msgstr "This helps us keep our platform stable by heading off fraud and abusive 
 #: app/routes/sso/index.tsx:182
 msgid "This is your only sign-in method"
 msgstr "This is your only sign-in method"
+
+#: app/routes/setup/passkey.tsx:148
+msgid "This name is for your Datum passkey list — your password manager labels it separately. Names can't be changed later."
+msgstr "This name is for your Datum passkey list — your password manager labels it separately. Names can't be changed later."
 
 #: app/routes/sso/index.tsx:100
 msgid "This removes it as a sign-in method for your account."
@@ -695,6 +826,7 @@ msgid "Unlink {providerLabel}?"
 msgstr "Unlink {providerLabel}?"
 
 #: app/routes/device/authorize.tsx:129
+#: app/routes/passkeys.tsx:228
 msgid "Use a different account"
 msgstr "Use a different account"
 
@@ -715,6 +847,7 @@ msgstr "Use your security key to verify your identity."
 msgid "Username"
 msgstr "Username"
 
+#: app/routes/reauth.tsx:240
 #: app/routes/verify/index.tsx:159
 msgid "Verification code"
 msgstr "Verification code"
@@ -730,7 +863,7 @@ msgstr "Verify"
 msgid "Verify and enable"
 msgstr "Verify and enable"
 
-#: app/components/webauthn-button/webauthn-button.tsx:170
+#: app/components/webauthn-button/webauthn-button.tsx:273
 #: app/routes/login/passkey.tsx:74
 msgid "Verify with passkey"
 msgstr "Verify with passkey"
@@ -756,13 +889,17 @@ msgstr "We could not find an account for that identifier."
 msgid "We couldn't find what you were looking for. Please try again."
 msgstr "We couldn't find what you were looking for. Please try again."
 
-#: app/components/webauthn-button/webauthn-button.tsx:150
+#: app/components/webauthn-button/webauthn-button.tsx:112
 msgid "We couldn't set up your passkey. Please try again."
 msgstr "We couldn't set up your passkey. Please try again."
 
-#: app/routes/setup/passkey.tsx:78
+#: app/routes/setup/passkey.tsx:169
 msgid "We couldn't start passkey setup. Please try again."
 msgstr "We couldn't start passkey setup. Please try again."
+
+#: app/routes/reauth.tsx:238
+msgid "We sent a verification code to your email address."
+msgstr "We sent a verification code to your email address."
 
 #. placeholder {0}: actionData.email
 #: app/routes/password/reset.tsx:111
@@ -784,6 +921,10 @@ msgstr "Welcome"
 msgid "While Datum is currently free of charge to use, we require a valid payment method during the signup process."
 msgstr "While Datum is currently free of charge to use, we require a valid payment method during the signup process."
 
+#: app/components/webauthn-button/webauthn-button.tsx:96
+msgid "You already have a passkey for this account on this device."
+msgstr "You already have a passkey for this account on this device."
+
 #: app/routes/signed-in.tsx:42
 msgid "You are signed in"
 msgstr "You are signed in"
@@ -800,6 +941,10 @@ msgstr "You can link multiple accounts to your Datum account. {0}"
 #: app/routes/verify/success.tsx:28
 msgid "You can now sign in using <0>{loginName}</0>."
 msgstr "You can now sign in using <0>{loginName}</0>."
+
+#: app/routes/passkeys.tsx:238
+msgid "You can't remove your only sign-in method. Add another method first."
+msgstr "You can't remove your only sign-in method. Add another method first."
 
 #: app/utils/errors/auth-error-messages.tsx:50
 msgid "You don't have permission to do that."
@@ -833,7 +978,7 @@ msgstr "You've been signed out"
 msgid "Your account is temporarily locked after too many attempts."
 msgstr "Your account is temporarily locked after too many attempts."
 
-#: app/components/webauthn-button/webauthn-button.tsx:144
+#: app/components/webauthn-button/webauthn-button.tsx:253
 msgid "Your browser does not support passkeys. Please use a supported browser."
 msgstr "Your browser does not support passkeys. Please use a supported browser."
 
@@ -844,6 +989,10 @@ msgstr "Your email is already verified. You can sign in."
 #: app/routes/verify/success.tsx:26
 msgid "Your email is verified"
 msgstr "Your email is verified"
+
+#: app/routes/setup/passkey.tsx:90
+msgid "Your passkey is ready — give it a name so you can recognize it later."
+msgstr "Your passkey is ready — give it a name so you can recognize it later."
 
 #: app/utils/errors/auth-error-messages.tsx:54
 msgid "Your password has expired. Please reset it to continue."
