@@ -1,11 +1,12 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
-import { AuthFormFields } from '@/components/auth-form/auth-form-fields';
+import { IdentityBadge } from '@/components/identity-badge/identity-badge';
+import { SignOutButton } from '@/components/sign-out-button/sign-out-button';
 import { TrackOnMount, identifyUser } from '@/modules/analytics/rybbit';
 import { resolveSignedIn } from '@/resources/session';
+import { paths } from '@/routes/paths';
 import { providerForRequest } from '@/server/auth-context.server';
 import { loaderCsrf } from '@/server/csrf';
 import { env } from '@/server/infra/env.server';
-import { Button } from '@datum-cloud/datum-ui/button';
 import { Trans } from '@lingui/react/macro';
 import { useEffect } from 'react';
 import { data, redirect, useLoaderData, type LoaderFunctionArgs } from 'react-router';
@@ -42,25 +43,17 @@ export default function SignedIn() {
       title={<Trans>You are signed in</Trans>}
       description={
         loginName ? (
-          <Trans>
-            You are signed in as <strong>{loginName}</strong>
-          </Trans>
+          <IdentityBadge
+            loginName={loginName}
+            verb={<Trans>You are signed in as</Trans>}
+            linkLabel={<Trans>Use a different account</Trans>}
+            linkTarget={paths.accounts()}
+          />
         ) : null
       }>
       <TrackOnMount event="login_completed" />
       <div className="flex flex-col gap-4 text-center">
-        {/* Sign-out form posts to the logout INDEX route. Its action lives on
-            routes/logout/index, which shares /id/logout with the action-less layout, so
-            React Router needs ?index to target the index action — a native <form> won't
-            append it the way RR <Form> does; without it the POST 405s on the layout.
-            Explicit literal path because RR basename-prefixing only applies to RR <Form>.
-            A logout journey should select form[action^="/id/logout"] — keep that prefix. */}
-        <form method="post" action="/id/logout?index">
-          <AuthFormFields csrf={csrfToken} />
-          <Button type="primary" theme="solid" htmlType="submit" block>
-            <Trans>Sign out</Trans>
-          </Button>
-        </form>
+        <SignOutButton csrf={csrfToken} emphasis="primary" />
       </div>
     </AuthCard>
   );

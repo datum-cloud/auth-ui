@@ -30,6 +30,24 @@ const _handlers = createWebAuthnVerifyHandlers({
 });
 export const loader = _handlers.loader;
 
+// The in-place login ceremony (usePasskeyLoginCeremony) loads this route's loader
+// for a challenge via fetcher, then submits the assertion to this route's action.
+// RR's default post-submit revalidation would re-run the loader and mint a FRESH
+// challenge on the Zitadel session, invalidating the just-signed assertion mid-flight
+// (WEBAU-3M9si). Suppress ONLY that self-triggered revalidation — the hook tags its
+// submit with `passkeyCeremony`. A full-page visit or retry (no marker) revalidates
+// normally, so it always renders a fresh challenge.
+export function shouldRevalidate({
+  formData,
+  defaultShouldRevalidate,
+}: {
+  formData?: FormData;
+  defaultShouldRevalidate: boolean;
+}) {
+  if (formData?.get('passkeyCeremony') === '1') return false;
+  return defaultShouldRevalidate;
+}
+
 // Wrap the factory action to append the last-used-login cookie on successful
 // passkey sign-in. Two Set-Cookie headers cannot be joined into one string, so
 // we clone the redirect response and append via Headers.append().
@@ -76,7 +94,8 @@ export default function LoginPasskey() {
       error={errorMessage}
       loginName={loginName}
       requestId={requestId}
-      organization={organization}>
+      organization={organization}
+      showBackLink={false}>
       {/* Hidden form that WebAuthnButton populates and submits. */}
       <RRForm ref={formRef} method="POST" className="flex w-full flex-col gap-4">
         <AuthFormFields
@@ -88,7 +107,13 @@ export default function LoginPasskey() {
         {/* credential is populated by WebAuthnButton before submit */}
         <input type="hidden" name="credential" defaultValue="" />
 
-        <WebAuthnButton publicKey={publicKey} formRef={formRef} />
+        {/* Generic label — at sign-in the credential may live in a
+            password manager, security key, or another device, so platform branding misleads. */}
+        <WebAuthnButton
+          publicKey={publicKey}
+          formRef={formRef}
+          label={<Trans>Sign in with your passkey</Trans>}
+        />
       </RRForm>
     </AuthCeremony>
   );

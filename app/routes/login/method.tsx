@@ -1,4 +1,8 @@
+import { FormError } from '@/components/form-error/form-error';
+import { WebAuthnReasonCopy } from '@/components/webauthn-button/webauthn-button';
+import { useAuthActionError } from '@/hooks/use-auth-action-error';
 import { useLoginContext } from '@/hooks/use-login-context';
+import { usePasskeyLoginCeremony } from '@/hooks/use-passkey-login-ceremony';
 import SplitLayout from '@/layouts/split.layout';
 import { decideAfterIdentifier } from '@/resources/login/login-decision';
 import { readCeremonyParams } from '@/resources/shared/ceremony-params';
@@ -7,7 +11,7 @@ import { redirectToLogin } from '@/routes/login-bounce';
 import { paths } from '@/routes/paths';
 import { providerForRequest } from '@/server/auth-context.server';
 import { env } from '@/server/infra/env.server';
-import { LinkButton } from '@datum-cloud/datum-ui/button';
+import { Button, LinkButton } from '@datum-cloud/datum-ui/button';
 import { Icon } from '@datum-cloud/datum-ui/icons';
 import { Trans } from '@lingui/react/macro';
 import { Key, Lock, Mail, UserCircle } from 'lucide-react';
@@ -74,6 +78,10 @@ export default function LoginMethod() {
   // (loginName, then requestId, then organization — undefined values are skipped).
   const query = { loginName, requestId, organization };
 
+  const ceremony = usePasskeyLoginCeremony({ loginName, requestId, organization });
+  const serverError = useAuthActionError(ceremony.actionData);
+  const passkeyBusy = ceremony.phase !== 'idle';
+
   return (
     <SplitLayout branding={branding}>
       <div className="mb-8 flex flex-col gap-3">
@@ -81,26 +89,42 @@ export default function LoginMethod() {
           <Trans>Choose how to sign in</Trans>
         </h1>
         <p className="text-foreground/80 text-sm">
-          <Trans>Select your preferred sign-in method.</Trans>
+          <Trans>
+            Signing in as <span className="font-medium">{loginName}</span>.
+          </Trans>{' '}
+          <Link
+            to={paths.login.index({ requestId, organization })}
+            className="text-foreground underline underline-offset-4">
+            <Trans>Not you?</Trans>
+          </Link>
         </p>
+        {ceremony.reason ? (
+          <FormError>
+            <WebAuthnReasonCopy reason={ceremony.reason} />
+          </FormError>
+        ) : serverError ? (
+          <FormError>{serverError}</FormError>
+        ) : null}
       </div>
 
       <div className="flex flex-col gap-3">
-        {/* LinkButton (single styled <a>) — NOT Button asChild, which emits
-            <button><a> (nested-interactive axe violation in the prod build). */}
         {methods.includes('passkey') ? (
-          <LinkButton
+          // Button (not LinkButton) — fires the ceremony IN PLACE (lazy challenge;
+          // a password pick never spends a session) instead of navigating to
+          // /login/passkey. The list stays visible as the fallback on failure.
+          <Button
             size="large"
             className="h-13 gap-3"
             type="quaternary"
             theme="outline"
             block
-            as={Link}
-            href={paths.login.passkey(query)}
+            htmlType="button"
+            disabled={passkeyBusy}
+            onClick={() => ceremony.begin()}
             iconPosition="left"
             icon={<Icon icon={Key} />}>
             <Trans>Passkey</Trans>
-          </LinkButton>
+          </Button>
         ) : null}
 
         {methods.includes('otp_email') ? (

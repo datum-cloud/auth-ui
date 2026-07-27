@@ -1,6 +1,7 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
 import { AuthFormFields } from '@/components/auth-form/auth-form-fields';
 import { FormError } from '@/components/form-error/form-error';
+import { IdentityBadge } from '@/components/identity-badge/identity-badge';
 import { useAuthActionError } from '@/hooks/use-auth-action-error';
 import { mostRecent, readSessions } from '@/modules/auth/session/cookie';
 import {
@@ -115,20 +116,12 @@ export default function DeviceAuthorize() {
             <Trans>Device authorization requested</Trans>
           )}
           {activeLoginName ? (
-            <span className="mt-2 flex flex-wrap items-center justify-center gap-x-1.5">
-              <span>
-                <Trans>Authorizing as</Trans>{' '}
-                <span className="text-foreground font-medium">{activeLoginName}</span>
-              </span>
-              <LinkButton
-                theme="link"
-                type="quaternary"
-                className="h-auto p-0 text-sm"
-                as={Link}
-                href={paths.accounts({ user_code: userCode })}>
-                <Trans>Use a different account</Trans>
-              </LinkButton>
-            </span>
+            <IdentityBadge
+              loginName={activeLoginName}
+              verb={<Trans>Authorizing as</Trans>}
+              linkLabel={<Trans>Use a different account</Trans>}
+              linkTarget={paths.accounts({ user_code: userCode })}
+            />
           ) : (
             <span className="mt-2 block">
               <Trans>You'll be asked to sign in before authorizing.</Trans>

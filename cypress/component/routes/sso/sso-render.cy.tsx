@@ -116,6 +116,18 @@ describe('SsoIndex — unlink guard: dialog confirm + disabled sole sign-in meth
     // …and exposes an enabled submit button to complete the unlink (the "Confirm submits" path).
     cy.get('button[type="submit"]').contains('Unlink').should('exist').and('not.be.disabled');
   });
+
+  it('shows the active login name with a "Use a different account" switch link and a Sign out control', () => {
+    mountRoute(SsoIndex, 'sso-index', '/sso', '/sso', loaderData);
+    cy.contains('Logged in as').should('exist');
+    cy.contains(loaderData.loginName).should('exist');
+    cy.findByRole('link', { name: /use a different account/i }).should(
+      'have.attr',
+      'href',
+      '/accounts'
+    );
+    cy.get('form[action="/id/logout?index"]').contains('button', 'Sign out').should('exist');
+  });
 });
 
 // ── sso/provider/error ────────────────────────────────────────────────────────

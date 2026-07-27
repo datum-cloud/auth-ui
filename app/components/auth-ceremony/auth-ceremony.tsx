@@ -34,7 +34,7 @@ export interface AuthCeremonyProps {
 
 // Tokenized ceremony spacing — owned here so every ceremony screen shares one rhythm
 // (was previously repeated literally across the verify/setup/login routes).
-const CEREMONY_LAYOUT = 'flex flex-col items-baseline justify-center gap-4';
+const CEREMONY_LAYOUT = 'flex flex-col items-center justify-center gap-4';
 
 export function AuthCeremony({
   title,
@@ -49,7 +49,7 @@ export function AuthCeremony({
 }: AuthCeremonyProps) {
   return (
     <AuthCard title={title} description={description}>
-      <div className={CEREMONY_LAYOUT}>
+      <div className={CEREMONY_LAYOUT} data-testid="auth-ceremony-body">
         {/* IdentityBadge requires a loginName (it returns null without one); only mount it
             when present so requestId/organization are threaded through "Not you?". */}
         {loginName && (

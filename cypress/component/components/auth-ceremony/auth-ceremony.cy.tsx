@@ -35,6 +35,36 @@ describe('AuthCeremony shell', () => {
   });
 });
 
+describe('AuthCeremony shell — identity centering', () => {
+  it('centers the IdentityBadge row (items-center, not items-baseline)', () => {
+    cy.mount(
+      <AuthCeremony title="t" loginName="alice@acme.test">
+        <span>c</span>
+      </AuthCeremony>,
+      OPTS
+    );
+    cy.get('[data-testid="auth-ceremony-body"]')
+      .should('have.class', 'items-center')
+      .and('not.have.class', 'items-baseline');
+  });
+});
+
+describe('AuthCeremony shell — showBackLink suppression', () => {
+  it('renders no Back control when showBackLink={false}, even at a path with a real predecessor', () => {
+    // OPTS mounts at /login/password, which DOES have a predecessor in previous-step.ts
+    // (-> /login) — proving suppression here (not just at a dead-link path) is what makes
+    // Tasks 3 and 5's showBackLink={false} route changes meaningfully tested: this test
+    // proves the mechanism; those tasks prove the specific routes wire it through.
+    cy.mount(
+      <AuthCeremony title="t" showBackLink={false}>
+        <span>c</span>
+      </AuthCeremony>,
+      OPTS
+    );
+    cy.get('a').should('not.exist');
+  });
+});
+
 describe('OtpCodeField', () => {
   function mountOtpField(label = 'Email code', name = 'code') {
     cy.mount(

@@ -69,6 +69,9 @@ export default [
   route('logout/success', 'routes/logout/success.tsx'),
 
   // Flat standalone routes.
+  // Passkey management + sudo re-auth interstitial.
+  route('passkeys', 'routes/passkeys.tsx'),
+  route('reauth', 'routes/reauth.tsx'),
   route('accounts', 'routes/accounts.tsx'),
   route('signed-in', 'routes/signed-in.tsx'),
   route('error', 'routes/error.tsx'),

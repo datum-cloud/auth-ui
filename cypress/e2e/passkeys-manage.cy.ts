@@ -115,6 +115,7 @@ describe('/id/passkeys — list / remove / last-method guard / sign-out offer / 
     });
     cy.settleHydration();
     cy.location('pathname').should('eq', '/id/passkeys');
+
     // Last-method guard: refusal surfaces the inline error, the row stays.
     cy.get('button[aria-label="Remove Solo key"]').should('not.be.disabled').click();
     cy.contains('button', 'Remove passkey').click();

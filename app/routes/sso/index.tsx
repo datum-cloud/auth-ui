@@ -1,6 +1,8 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
 import { AuthFormFields } from '@/components/auth-form/auth-form-fields';
+import { IdentityBadge } from '@/components/identity-badge/identity-badge';
 import { IdpIcon } from '@/components/idp-icon/idp-icon';
+import { SignOutButton } from '@/components/sign-out-button/sign-out-button';
 import { inferIdpType } from '@/modules/auth/idp-detect';
 import { slugify } from '@/modules/auth/idp-slug';
 import type { IdProvider } from '@/modules/auth/types';
@@ -10,6 +12,7 @@ import {
   outcomeToResponse,
   type SsoActionDeps,
 } from '@/resources/sso';
+import { paths } from '@/routes/paths';
 import { providerForRequest } from '@/server/auth-context.server';
 import { getCsrfToken, assertCsrf } from '@/server/csrf';
 import { Button } from '@datum-cloud/datum-ui/button';
@@ -126,14 +129,17 @@ export default function SsoPage() {
     <AuthCard
       title={<Trans>Linked accounts</Trans>}
       description={
-        <Trans>
-          You can link multiple accounts to your Datum account.{' '}
+        <>
+          <Trans>You can link multiple accounts to your Datum account.</Trans>
           {loginName && (
-            <>
-              Logged in as <span className="font-medium">{loginName}</span>.
-            </>
+            <IdentityBadge
+              loginName={loginName}
+              verb={<Trans>Logged in as</Trans>}
+              linkLabel={<Trans>Use a different account</Trans>}
+              linkTarget={paths.accounts()}
+            />
           )}
-        </Trans>
+        </>
       }>
       <div className="flex w-full flex-col gap-4">
         {/* Linked IdPs */}
@@ -248,14 +254,7 @@ export default function SsoPage() {
           </section>
         ) : null}
 
-        {/* Sign-out link → logout INDEX action; ?index disambiguates from the
-            action-less logout/layout (native <form> won't add it like RR <Form> does). */}
-        <form method="post" action="/id/logout?index">
-          <AuthFormFields csrf={csrfToken} />
-          <Button type="secondary" theme="link" htmlType="submit" block>
-            <Trans>Sign out</Trans>
-          </Button>
-        </form>
+        <SignOutButton csrf={csrfToken} emphasis="secondary" />
       </div>
     </AuthCard>
   );

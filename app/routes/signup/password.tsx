@@ -3,6 +3,7 @@ import { AuthCeremony } from '@/components/auth-ceremony/auth-ceremony';
 import { SubmitButton } from '@/components/auth-form/auth-form';
 import { AuthFormFields } from '@/components/auth-form/auth-form-fields';
 import { PasswordRequirements } from '@/components/auth-form/password-requirements';
+import { IdentityBadge } from '@/components/identity-badge/identity-badge';
 import { useAuthActionError } from '@/hooks/use-auth-action-error';
 import { TrackOnMount } from '@/modules/analytics/rybbit';
 import { readSessions, serializeSessions } from '@/modules/auth/session/cookie';
@@ -35,7 +36,7 @@ import {
   type LoaderFunctionArgs,
   type MetaFunction,
 } from 'react-router';
-import { Form as RRForm, Link } from 'react-router';
+import { Form as RRForm } from 'react-router';
 
 export const meta: MetaFunction = () => [{ title: 'Set a password' }];
 
@@ -173,8 +174,8 @@ export default function SignupPassword() {
 
   // "Not you?" returns to the signup start (not /login — this is a signup ceremony) so a
   // different email can be entered. Mirrors IdentityBadge's requestId/organization threading,
-  // loginName intentionally dropped. AuthCeremony's shared IdentityBadge is login-only copy
-  // ("Signing in as" → /login), so the identity + link are rendered inline here instead.
+  // loginName intentionally dropped. This route uses IdentityBadge with overridden verb and
+  // linkTarget props to adapt its default login-only copy ("Signing in as" → /login) to signup.
   const notYouHref = paths.signup.index({ requestId, organization });
 
   if (actionData && 'sent' in actionData) {
@@ -197,12 +198,11 @@ export default function SignupPassword() {
       <AuthCeremony
         title={<Trans>Set a password</Trans>}
         description={
-          <>
-            <Trans>Signing up as</Trans> <strong>{loginName}</strong>.{' '}
-            <Link to={notYouHref} className="underline">
-              <Trans>Not you?</Trans>
-            </Link>
-          </>
+          <IdentityBadge
+            loginName={loginName}
+            verb={<Trans>Signing up as</Trans>}
+            linkTarget={notYouHref}
+          />
         }
         error={errorMessage}>
         <Form.Root

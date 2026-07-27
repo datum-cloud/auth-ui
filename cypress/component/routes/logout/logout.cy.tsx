@@ -36,4 +36,30 @@ describe('Logout confirm form — index-route POST disambiguation', () => {
     // action-less logout/layout (→ 405); ?index targets routes/logout/index which owns the action.
     cy.get('form').invoke('attr', 'action').should('include', '?index');
   });
+
+  it('shows "Sign out of <loginName>" when an active session exists (no switch link)', () => {
+    const router = createMemoryRouter([{ id: 'logout', path: '/logout', element: <Logout /> }], {
+      initialEntries: ['/logout'],
+      hydrationData: {
+        loaderData: { logout: { csrfToken: 'test-csrf', loginName: 'mia@acme.test' } },
+      },
+    });
+    mount(withProviders(<RouterProvider router={router} />));
+    cy.contains('Sign out of').should('be.visible');
+    cy.contains('mia@acme.test').should('be.visible');
+    // Scoped, not a blanket "no <a> on the page": BrandLogo always renders a home link.
+    // What IdentityBadge's showLink=false must suppress is its OWN "Not you?" switch-account
+    // link (which targets /login). This assertion catches if showLink={false} is accidentally removed.
+    cy.contains(/not you\?/i).should('not.exist');
+    cy.get('a[href="/login"], a[href^="/login?"]').should('not.exist');
+  });
+
+  it('falls back to the generic confirm copy when there is no active session', () => {
+    const router = createMemoryRouter([{ id: 'logout', path: '/logout', element: <Logout /> }], {
+      initialEntries: ['/logout'],
+      hydrationData: { loaderData: { logout: { csrfToken: 'test-csrf', loginName: '' } } },
+    });
+    mount(withProviders(<RouterProvider router={router} />));
+    cy.contains('Are you sure you want to sign out?').should('be.visible');
+  });
 });
