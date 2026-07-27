@@ -158,6 +158,7 @@ export async function action({ request }: ActionFunctionArgs) {
       idpId,
       origin: trustedAppOrigin(request),
       returnTo,
+      loginHint: entry.loginName,
     });
     if (!result.ok) return data({ error: result.error }, { status: 502 });
     return redirect(result.authUrl);

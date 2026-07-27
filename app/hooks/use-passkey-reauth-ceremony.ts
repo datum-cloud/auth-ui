@@ -38,8 +38,13 @@ export function usePasskeyReauthCeremony(input: PasskeyReauthCeremonyInput) {
   const submitFetcher = useFetcher();
   const [phase, setPhase] = useState<PasskeyReauthCeremonyPhase>('idle');
   const [reason, setReason] = useState<WebAuthnReason | null>(null);
-  // One ceremony per acquired challenge — survives re-renders, resets on begin().
-  const consumedChallenge = useRef<unknown>(null);
+  // One ceremony per acquired challenge — survives re-renders, resets on begin(). A sentinel
+  // (not `null`) is required: loadReauth legitimately returns a null challenge on a non-fatal
+  // mint failure, and `null === null` on the very first call would otherwise match the ref's
+  // initial value and return before setPhase('ceremony') ever runs, leaving `phase` stuck at
+  // 'loading-challenge' forever (the /reauth chooser gates every method behind it).
+  const UNSET = useRef(Symbol('unset')).current;
+  const consumedChallenge = useRef<unknown>(UNSET);
 
   const challengePath = paths.reauth({ method: 'passkey', returnTo: input.returnTo });
 
@@ -47,6 +52,13 @@ export function usePasskeyReauthCeremony(input: PasskeyReauthCeremonyInput) {
     async (csrfToken: string, publicKeyCredentialRequestOptions: unknown) => {
       if (consumedChallenge.current === publicKeyCredentialRequestOptions) return;
       consumedChallenge.current = publicKeyCredentialRequestOptions;
+      // Challenge mint failed server-side (non-fatal there) — nothing to hand the
+      // authenticator. Mirrors WebAuthnButton's own `if (!publicKey)` guard.
+      if (!publicKeyCredentialRequestOptions) {
+        setPhase('idle');
+        setReason('unknown');
+        return;
+      }
       setPhase('ceremony');
       try {
         let credential: Record<string, unknown>;
@@ -99,10 +111,10 @@ export function usePasskeyReauthCeremony(input: PasskeyReauthCeremonyInput) {
   /** Fetch a fresh challenge from this route's own loader, then run. */
   const begin = useCallback(() => {
     setReason(null);
-    consumedChallenge.current = null;
+    consumedChallenge.current = UNSET;
     setPhase('loading-challenge');
     challengeFetcher.load(challengePath);
-  }, [challengeFetcher, challengePath]);
+  }, [challengeFetcher, challengePath, UNSET]);
 
   // Challenge-load completion: when the loader data lands, run the ceremony once.
   useEffect(() => {

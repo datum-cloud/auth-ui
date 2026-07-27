@@ -247,3 +247,44 @@ export const passwordResetRateLimit: MiddlewareHandler = createRateLimit({
   match: (c, pathname) => c.req.method === 'POST' && pathname === '/id/password/reset',
   key: (_c, ip) => ip,
 });
+
+// One shared limiter for /id/reauth: 10 attempts / 5 min per ip — same class as
+// mfaVerifyLimiter/webauthnVerifyLimiter (a verification ceremony onto an EXISTING session).
+// Covers every factor (password, otp_email, passkey, idp-reauth) alike: the sudo re-verify
+// screen was previously unthrottled despite sitting beside ten throttled siblings, and
+// Zitadel's own failedAttempts lockout only partly covers the password case (none for the
+// emailed OTP code).
+// BODY-STREAM HAZARD: factor/password/code/credential are in the POST body — key is ip-only.
+const reauthLimiter = new RateLimiter({ limit: 10, windowMs: 5 * 60_000 });
+
+export const reauthRateLimit: MiddlewareHandler = createRateLimit({
+  limiter: reauthLimiter,
+  match: (c, pathname) => c.req.method === 'POST' && pathname === '/id/reauth',
+  key: (_c, ip) => ip,
+});
+
+// One shared limiter for /id/passkeys: 15 attempts / 5 min per ip — matches accountsRateLimit's
+// reasoning (session-gated, not a brute-force target, but `signout-others` is destructive and
+// cross-device, so scripted abuse from a compromised session should still be throttled).
+// BODY-STREAM HAZARD: intent/passkeyId are in the POST body — key is ip-only.
+const passkeysLimiter = new RateLimiter({ limit: 15, windowMs: 5 * 60_000 });
+
+export const passkeysRateLimit: MiddlewareHandler = createRateLimit({
+  limiter: passkeysLimiter,
+  match: (c, pathname) => c.req.method === 'POST' && pathname === '/id/passkeys',
+  key: (_c, ip) => ip,
+});
+
+// One shared limiter for /id/login/method: 10 attempts / 5 min per ip — same class as
+// mfaVerifyLimiter. This action is unauthenticated (driven by a loginName ceremony param, not
+// a session) and its three distinguishable outcomes (unknown user / known-but-unlinked idp /
+// linked idp) make it a linked-IdP identity oracle; this bounds the per-IP probing rate as a
+// backstop alongside the response-collapsing fix at the route.
+// BODY-STREAM HAZARD: idpId is in the POST body — key is ip-only.
+const loginMethodLimiter = new RateLimiter({ limit: 10, windowMs: 5 * 60_000 });
+
+export const loginMethodRateLimit: MiddlewareHandler = createRateLimit({
+  limiter: loginMethodLimiter,
+  match: (c, pathname) => c.req.method === 'POST' && pathname === '/id/login/method',
+  key: (_c, ip) => ip,
+});

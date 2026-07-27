@@ -8,6 +8,7 @@
 import type { AuthProvider } from '@/modules/auth/auth-provider';
 import type { SessionChecks } from '@/modules/auth/auth-provider';
 import { idpTypeToSlug } from '@/modules/auth/idp-slug';
+import { withLoginHint } from '@/resources/login/login.service';
 // NOTE: import the PURE helpers from session/session (not cookie.ts) — cookie.ts is
 // stubbed to no-ops in the Cypress component bundle; the pure module is browser-safe
 // and identical at runtime (cookie.ts re-exports it).
@@ -260,6 +261,15 @@ export async function performReauth(
       actor: hashActor(entry.loginName),
       factor: input.factor,
     });
+    // The stored session token may belong to a DIFFERENT browser/tab than the one hitting this
+    // route right now, and may be stale or revoked provider-side (same recovery loadReauth
+    // already applies to its own getSession/listAuthMethods calls) — this updateSession call is
+    // a THIRD site with the identical failure mode and, unlike loadReauth, previously had no
+    // isStaleSessionError guard, so a stale cross-browser token rethrew uncaught into a 500 here
+    // and at /reauth/:provider/callback's mid-OAuth return.
+    if (isStaleSessionError(err)) {
+      return { ok: false, error: 'SESSION_EXPIRED' };
+    }
     if (
       err instanceof ProviderError &&
       (err.code === 'INVALID_CREDENTIALS' ||
@@ -289,12 +299,21 @@ export async function performReauth(
   // falling back to a hardcoded /passkeys, which silently dropped the configured
   // destination (admin console / Zitadel default / env default) whenever it wasn't on
   // POST_LOGOUT_ALLOWLIST (a different allowlist, for a different purpose).
+  // Use the JUST-ROTATED token (session.token), not entry's pre-rotation one — updateSession
+  // above may have rotated it (SetSession semantics), and resolveDefaultReturnTo's
+  // isInstanceAdmin check would otherwise silently fail (.catch(() => false)) against the
+  // now-superseded token, misclassifying an admin as non-admin and landing them on the wrong
+  // default destination.
   const target =
     validateReturnTo(input.returnTo) ??
-    (await resolveDefaultReturnTo(provider, entry, {
-      consoleUrl: input.consoleUrl,
-      defaultAppUrl: input.defaultAppUrl,
-    }));
+    (await resolveDefaultReturnTo(
+      provider,
+      { ...entry, token: session.token },
+      {
+        consoleUrl: input.consoleUrl,
+        defaultAppUrl: input.defaultAppUrl,
+      }
+    ));
 
   return { ok: true, target, sessions: next };
 }
@@ -305,6 +324,14 @@ export interface StartReauthIdpInput {
   origin: string;
   /** Where to land after a successful reauth (already validated by the caller). */
   returnTo: string;
+  /**
+   * Best-effort pre-selection: the identity being re-authenticated (mirrors
+   * login.service.ts's startIdpIntent's reauthHint). On reauth, picking the wrong Google
+   * account is MORE likely than on a fresh login (the user is already signed in as someone
+   * specific) and fails loudly with FAILED_PRECONDITION — cheap UX win, never load-bearing
+   * (the callback's identity-mismatch check is the real guard).
+   */
+  loginHint?: string;
 }
 
 export type StartReauthIdpResult =
@@ -330,7 +357,7 @@ function reauthIdpReturnUrls(
  */
 export async function startReauthIdpIntent(
   provider: AuthProvider,
-  { idpId, origin, returnTo }: StartReauthIdpInput
+  { idpId, origin, returnTo, loginHint }: StartReauthIdpInput
 ): Promise<StartReauthIdpResult> {
   const slug = idpTypeToSlug(idpId) ?? idpId;
   const { success, failure } = reauthIdpReturnUrls(origin, slug, returnTo);
@@ -347,5 +374,5 @@ export async function startReauthIdpIntent(
     return { ok: false, error: 'IDP_UNAVAILABLE' };
   }
   logAuthEvent('reauth_idp_start', 'success', { idpId });
-  return { ok: true, authUrl: result.authUrl };
+  return { ok: true, authUrl: withLoginHint(result.authUrl, loginHint) };
 }

@@ -2,6 +2,17 @@
 // Verifies the returned idpIntent onto the EXISTING session via performReauth; never
 // creates a session or signs in as a different identity (that's the ordinary /sso
 // callback's job, a deliberately separate code path — see the design doc).
+//
+// No app-level state/nonce binds this GET to the request that started the round-trip
+// (reviewed and deliberately kept this way, not an oversight): the idpIntentId/idpIntentToken
+// pair is minted and validated by ZITADEL itself, opaque and unforgeable without actually
+// completing a real OAuth round-trip with the provider — an attacker cannot manufacture a
+// valid pair out-of-band the way they could forge our own state param. The actual security
+// boundary is performReauth's identity check (FAILED_PRECONDITION → 'access-denied' when the
+// intent was verified against a DIFFERENT user than the active session), which a same-origin
+// app-level nonce would not add to. /sso/:provider/callback (processIdpCallback) relies on the
+// identical Zitadel-token + identity-check pairing with no state param either — this matches
+// that established, deliberate pattern rather than diverging from it.
 import { readSessions, mostRecent, serializeSessions } from '@/modules/auth/session/cookie';
 import { performReauth } from '@/resources/reauth/reauth.service';
 import { validateReturnTo } from '@/resources/shared/return-to';

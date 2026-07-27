@@ -13,7 +13,7 @@ msgstr ""
 "Plural-Forms: \n"
 
 #. placeholder {0}: row.name
-#: app/routes/passkeys.tsx:137
+#: app/routes/passkeys.tsx:138
 msgid "\"{0}\" will no longer work for signing in. This cannot be undone."
 msgstr "\"{0}\" will no longer work for signing in. This cannot be undone."
 
@@ -53,7 +53,7 @@ msgstr "Add an extra layer of security to your account by setting up a second fa
 msgid "Add another account"
 msgstr "Add another account"
 
-#: app/routes/passkeys.tsx:299
+#: app/routes/passkeys.tsx:306
 msgid "Add passkey"
 msgstr "Add passkey"
 
@@ -66,7 +66,7 @@ msgid "Add your phone number as a second factor. We will send a one-time code vi
 msgstr "Add your phone number as a second factor. We will send a one-time code via SMS each time you sign in."
 
 #. placeholder {0}: i18n.date(new Date(row.createdAt), { dateStyle: 'medium' })
-#: app/routes/passkeys.tsx:276
+#: app/routes/passkeys.tsx:277
 msgid "Added {0}"
 msgstr "Added {0}"
 
@@ -131,7 +131,7 @@ msgid "Available accounts to link"
 msgstr "Available accounts to link"
 
 #: app/components/back-link/back-link.tsx:24
-#: app/routes/passkeys.tsx:305
+#: app/routes/passkeys.tsx:312
 #: app/routes/sso/link.tsx:68
 #: app/routes/verify/success.tsx:36
 msgid "Back"
@@ -145,7 +145,7 @@ msgstr "Back to sign in"
 msgid "By continuing, you agree to Datum's <0>Terms of Service</0> and <1>Privacy Policy</1>, and to receive periodic emails with updates."
 msgstr "By continuing, you agree to Datum's <0>Terms of Service</0> and <1>Privacy Policy</1>, and to receive periodic emails with updates."
 
-#: app/routes/passkeys.tsx:142
+#: app/routes/passkeys.tsx:143
 #: app/routes/sso/index.tsx:107
 msgid "Cancel"
 msgstr "Cancel"
@@ -172,7 +172,7 @@ msgstr "Choose a new password"
 msgid "Choose an account"
 msgstr "Choose an account"
 
-#: app/routes/login/method.tsx:179
+#: app/routes/login/method.tsx:184
 msgid "Choose how to sign in"
 msgstr "Choose how to sign in"
 
@@ -188,12 +188,12 @@ msgstr "Choose your login method"
 msgid "Code expired"
 msgstr "Code expired"
 
-#: app/routes/reauth.tsx:381
-#: app/routes/reauth.tsx:403
+#: app/routes/reauth.tsx:382
+#: app/routes/reauth.tsx:404
 msgid "Confirm"
 msgstr "Confirm"
 
-#: app/routes/reauth.tsx:271
+#: app/routes/reauth.tsx:272
 msgid "Confirm it's you"
 msgstr "Confirm it's you"
 
@@ -217,7 +217,7 @@ msgid "Continue"
 msgstr "Continue"
 
 #. placeholder {0}: idp.name ?? idp.idpId
-#: app/routes/reauth.tsx:329
+#: app/routes/reauth.tsx:330
 msgid "Continue with {0}"
 msgstr "Continue with {0}"
 
@@ -251,7 +251,7 @@ msgid "Create account"
 msgstr "Create account"
 
 #. placeholder {0}: held.uaName
-#: app/routes/setup/passkey.tsx:144
+#: app/routes/setup/passkey.tsx:154
 msgid "Created using {0}"
 msgstr "Created using {0}"
 
@@ -283,12 +283,12 @@ msgstr "Email"
 msgid "Email code"
 msgstr "Email code"
 
-#: app/routes/reauth.tsx:346
+#: app/routes/reauth.tsx:347
 msgid "Email me a code"
 msgstr "Email me a code"
 
 #: app/routes/login/index.tsx:522
-#: app/routes/login/method.tsx:233
+#: app/routes/login/method.tsx:238
 #: app/routes/signup/method.tsx:339
 msgid "Email me a sign-in link"
 msgstr "Email me a sign-in link"
@@ -362,7 +362,7 @@ msgstr "Enter your SMS code"
 msgid "Finish creating your account"
 msgstr "Finish creating your account"
 
-#: app/routes/reauth.tsx:274
+#: app/routes/reauth.tsx:275
 msgid "For your security, verify one of your sign-in methods to continue."
 msgstr "For your security, verify one of your sign-in methods to continue."
 
@@ -378,7 +378,7 @@ msgstr "Get started"
 msgid "If you prefer a demo, just <0>reach out</0>."
 msgstr "If you prefer a demo, just <0>reach out</0>."
 
-#: app/routes/passkeys.tsx:269
+#: app/routes/passkeys.tsx:270
 msgid "Inactive"
 msgstr "Inactive"
 
@@ -402,8 +402,8 @@ msgstr "Link your account"
 msgid "Linked accounts"
 msgstr "Linked accounts"
 
-#: app/routes/passkeys.tsx:230
-#: app/routes/reauth.tsx:278
+#: app/routes/passkeys.tsx:231
+#: app/routes/reauth.tsx:279
 #: app/routes/sso/index.tsx:137
 msgid "Logged in as"
 msgstr "Logged in as"
@@ -412,7 +412,7 @@ msgstr "Logged in as"
 msgid "Manual setup key"
 msgstr "Manual setup key"
 
-#: app/routes/setup/passkey.tsx:87
+#: app/routes/setup/passkey.tsx:97
 msgid "Name your passkey"
 msgstr "Name your passkey"
 
@@ -429,11 +429,11 @@ msgstr "New password"
 msgid "No account was found and sign-up is not available."
 msgstr "No account was found and sign-up is not available."
 
-#: app/routes/passkeys.tsx:250
+#: app/routes/passkeys.tsx:251
 msgid "No passkeys yet."
 msgstr "No passkeys yet."
 
-#: app/routes/reauth.tsx:351
+#: app/routes/reauth.tsx:352
 msgid "No sign-in method is available for re-authentication."
 msgstr "No sign-in method is available for re-authentication."
 
@@ -445,7 +445,7 @@ msgstr "No sign-in method is available for this account."
 msgid "No signed-in accounts."
 msgstr "No signed-in accounts."
 
-#: app/routes/passkeys.tsx:188
+#: app/routes/passkeys.tsx:189
 msgid "Not now"
 msgstr "Not now"
 
@@ -456,9 +456,9 @@ msgstr "Not registered?"
 #: app/components/identity-badge/identity-badge.tsx:30
 #: app/routes/device/authorize.tsx:122
 #: app/routes/login/index.tsx:416
-#: app/routes/login/method.tsx:188
-#: app/routes/passkeys.tsx:231
-#: app/routes/reauth.tsx:279
+#: app/routes/login/method.tsx:193
+#: app/routes/passkeys.tsx:232
+#: app/routes/reauth.tsx:280
 #: app/routes/signed-in.tsx:49
 #: app/routes/sso/index.tsx:138
 msgid "Not you?"
@@ -477,17 +477,17 @@ msgid "Or import this URI in your authenticator app"
 msgstr "Or import this URI in your authenticator app"
 
 #: app/routes/login/index.tsx:462
-#: app/routes/login/method.tsx:216
-#: app/routes/reauth.tsx:309
+#: app/routes/login/method.tsx:221
+#: app/routes/reauth.tsx:310
 #: app/routes/setup/mfa.tsx:46
 msgid "Passkey"
 msgstr "Passkey"
 
-#: app/routes/setup/passkey.tsx:133
+#: app/routes/setup/passkey.tsx:143
 msgid "Passkey name"
 msgstr "Passkey name"
 
-#: app/routes/passkeys.tsx:175
+#: app/routes/passkeys.tsx:176
 msgid "Passkey removed"
 msgstr "Passkey removed"
 
@@ -507,17 +507,17 @@ msgstr "Passkey sign-in couldn't be completed for security reasons. Please conta
 msgid "Passkey sign-in was cancelled, or no passkey for this account is available on this device. Make sure you're using a device where you set up your passkey, then try again."
 msgstr "Passkey sign-in was cancelled, or no passkey for this account is available on this device. Make sure you're using a device where you set up your passkey, then try again."
 
-#: app/routes/passkeys.tsx:223
+#: app/routes/passkeys.tsx:224
 msgid "Passkeys"
 msgstr "Passkeys"
 
-#: app/routes/passkeys.tsx:226
+#: app/routes/passkeys.tsx:227
 msgid "Passkeys let you sign in with your fingerprint, face, or device PIN."
 msgstr "Passkeys let you sign in with your fingerprint, face, or device PIN."
 
-#: app/routes/login/method.tsx:250
-#: app/routes/reauth.tsx:338
-#: app/routes/reauth.tsx:376
+#: app/routes/login/method.tsx:255
+#: app/routes/reauth.tsx:339
+#: app/routes/reauth.tsx:377
 #: app/routes/signup/password.tsx:229
 #: app/routes/sso/ldap.tsx:80
 msgid "Password"
@@ -564,11 +564,11 @@ msgstr "Please check your input and try again."
 msgid "Register a hardware security key (e.g. YubiKey) as a second factor for your account."
 msgstr "Register a hardware security key (e.g. YubiKey) as a second factor for your account."
 
-#: app/routes/setup/passkey.tsx:92
+#: app/routes/setup/passkey.tsx:102
 msgid "Register a passkey using your device's biometric sensor or PIN to sign in securely without a password."
 msgstr "Register a passkey using your device's biometric sensor or PIN to sign in securely without a password."
 
-#: app/routes/setup/passkey.tsx:177
+#: app/routes/setup/passkey.tsx:197
 msgid "Register passkey"
 msgstr "Register passkey"
 
@@ -576,11 +576,17 @@ msgstr "Register passkey"
 msgid "Registration is currently unavailable. Please contact your administrator."
 msgstr "Registration is currently unavailable. Please contact your administrator."
 
-#: app/routes/passkeys.tsx:149
+#. placeholder {0}: row.name
+#: app/routes/passkeys.tsx:129
+#: app/routes/passkeys.tsx:130
+msgid "Remove {0}"
+msgstr "Remove {0}"
+
+#: app/routes/passkeys.tsx:150
 msgid "Remove passkey"
 msgstr "Remove passkey"
 
-#: app/routes/passkeys.tsx:135
+#: app/routes/passkeys.tsx:136
 msgid "Remove this passkey?"
 msgstr "Remove this passkey?"
 
@@ -594,7 +600,7 @@ msgstr "Resend code"
 msgid "Reset your password"
 msgstr "Reset your password"
 
-#: app/routes/setup/passkey.tsx:160
+#: app/routes/setup/passkey.tsx:170
 msgid "Save"
 msgstr "Save"
 
@@ -644,7 +650,7 @@ msgstr "Set up email one-time code"
 msgid "Set up multi-factor authentication"
 msgstr "Set up multi-factor authentication"
 
-#: app/routes/setup/passkey.tsx:87
+#: app/routes/setup/passkey.tsx:97
 msgid "Set up passkey"
 msgstr "Set up passkey"
 
@@ -685,8 +691,8 @@ msgstr "Sign in with LDAP"
 msgid "Sign in with your passkey"
 msgstr "Sign in with your passkey"
 
-#: app/components/sign-out-button/sign-out-button.tsx:26
-#: app/components/sign-out-button/sign-out-button.tsx:30
+#: app/components/sign-out-button/sign-out-button.tsx:27
+#: app/components/sign-out-button/sign-out-button.tsx:31
 #: app/routes/logout/index.tsx:51
 msgid "Sign out"
 msgstr "Sign out"
@@ -695,7 +701,7 @@ msgstr "Sign out"
 msgid "Sign out of"
 msgstr "Sign out of"
 
-#: app/routes/passkeys.tsx:194
+#: app/routes/passkeys.tsx:195
 msgid "Sign out other sessions"
 msgstr "Sign out other sessions"
 
@@ -703,7 +709,7 @@ msgstr "Sign out other sessions"
 msgid "Sign-in is currently unavailable for this account. Please contact your administrator."
 msgstr "Sign-in is currently unavailable for this account. Please contact your administrator."
 
-#: app/routes/passkeys.tsx:177
+#: app/routes/passkeys.tsx:178
 msgid "Signed-in sessions on other devices can still be active. Sign out your other sessions?"
 msgstr "Signed-in sessions on other devices can still be active. Sign out your other sessions?"
 
@@ -717,7 +723,7 @@ msgstr "Signing in as"
 msgid "Signing in as <0>{0}</0>."
 msgstr "Signing in as <0>{0}</0>."
 
-#: app/routes/login/method.tsx:182
+#: app/routes/login/method.tsx:187
 msgid "Signing in as <0>{loginName}</0>."
 msgstr "Signing in as <0>{loginName}</0>."
 
@@ -823,7 +829,7 @@ msgstr "This helps us keep our platform stable by heading off fraud and abusive 
 msgid "This is your only sign-in method"
 msgstr "This is your only sign-in method"
 
-#: app/routes/setup/passkey.tsx:148
+#: app/routes/setup/passkey.tsx:158
 msgid "This name is for your Datum passkey list — your password manager labels it separately. Names can't be changed later."
 msgstr "This name is for your Datum passkey list — your password manager labels it separately. Names can't be changed later."
 
@@ -878,7 +884,7 @@ msgstr "Use your security key to verify your identity."
 msgid "Username"
 msgstr "Username"
 
-#: app/routes/reauth.tsx:398
+#: app/routes/reauth.tsx:399
 #: app/routes/verify/index.tsx:159
 msgid "Verification code"
 msgstr "Verification code"
@@ -924,11 +930,11 @@ msgstr "We couldn't find what you were looking for. Please try again."
 msgid "We couldn't set up your passkey. Please try again."
 msgstr "We couldn't set up your passkey. Please try again."
 
-#: app/routes/setup/passkey.tsx:169
+#: app/routes/setup/passkey.tsx:179
 msgid "We couldn't start passkey setup. Please try again."
 msgstr "We couldn't start passkey setup. Please try again."
 
-#: app/routes/reauth.tsx:396
+#: app/routes/reauth.tsx:397
 msgid "We sent a verification code to your email address."
 msgstr "We sent a verification code to your email address."
 
@@ -972,7 +978,7 @@ msgstr "You can link multiple accounts to your Datum account."
 msgid "You can now sign in using <0>{loginName}</0>."
 msgstr "You can now sign in using <0>{loginName}</0>."
 
-#: app/routes/passkeys.tsx:241
+#: app/routes/passkeys.tsx:242
 msgid "You can't remove your only sign-in method. Add another method first."
 msgstr "You can't remove your only sign-in method. Add another method first."
 
@@ -1016,13 +1022,17 @@ msgstr "Your email is already verified. You can sign in."
 msgid "Your email is verified"
 msgstr "Your email is verified"
 
-#: app/routes/setup/passkey.tsx:90
+#: app/routes/setup/passkey.tsx:100
 msgid "Your passkey is ready — give it a name so you can recognize it later."
 msgstr "Your passkey is ready — give it a name so you can recognize it later."
 
 #: app/utils/errors/auth-error-messages.tsx:54
 msgid "Your password has expired. Please reset it to continue."
 msgstr "Your password has expired. Please reset it to continue."
+
+#: app/routes/setup/passkey.tsx:185
+msgid "Your previous attempt may have already created a passkey on this device. Retrying will register a new one — you can remove the unused entry later from your device or password manager."
+msgstr "Your previous attempt may have already created a passkey on this device. Retrying will register a new one — you can remove the unused entry later from your device or password manager."
 
 #: app/routes/logout/success.tsx:20
 msgid "Your session has ended and you've been securely signed out of Datum. You can safely close this tab, or sign back in any time to pick up where you left off."

@@ -10,6 +10,9 @@ import {
   mfaEnrollRateLimit,
   accountsRateLimit,
   verifyEmailSendRateLimit,
+  reauthRateLimit,
+  passkeysRateLimit,
+  loginMethodRateLimit,
 } from '@/server/middleware/rate-limit';
 import { requestContext, type RequestContextEnv } from '@/server/middleware/request-context';
 import { appSecureHeaders, resolveFrameAncestors } from '@/server/middleware/secure-headers';
@@ -114,6 +117,9 @@ export default await createHonoServer<RequestContextEnv>({
     app.use('*', mfaEnrollRateLimit);
     app.use('*', accountsRateLimit);
     app.use('*', verifyEmailSendRateLimit);
+    app.use('*', reauthRateLimit);
+    app.use('*', passkeysRateLimit);
+    app.use('*', loginMethodRateLimit);
     app.get('/healthz', (c) => c.json({ status: 'ok' }));
     app.get('/readyz', (c) => c.json({ status: 'ready' }));
     app.get('/security', (c) =>
