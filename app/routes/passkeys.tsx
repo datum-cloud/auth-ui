@@ -20,6 +20,7 @@ import {
 import { paths } from '@/routes/paths';
 import { providerForRequest } from '@/server/auth-context.server';
 import { getCsrfToken, assertCsrf } from '@/server/csrf';
+import { env } from '@/server/infra/env.server';
 import { actionError } from '@/utils/errors/auth-error';
 import { Badge } from '@datum-cloud/datum-ui/badge';
 import { Button, LinkButton } from '@datum-cloud/datum-ui/button';
@@ -49,6 +50,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const result = await loadPasskeysView(provider, sessions, {
     returnTo: url.searchParams.get('returnTo'),
     nowMs: Date.now(),
+    emailDeliveryEnabled: env.AUTH_EMAIL_DELIVERY_ENABLED,
   });
   if (result.kind === 'redirect') return redirect(result.target);
 
@@ -73,6 +75,7 @@ export async function action({ request }: ActionFunctionArgs) {
       const result = await removeUserPasskey(provider, sessions, {
         passkeyId: parsed.data.passkeyId,
         nowMs: Date.now(),
+        emailDeliveryEnabled: env.AUTH_EMAIL_DELIVERY_ENABLED,
       });
       if (!result.ok) {
         // Stale sudo: bounce through /reauth and return here (server-side enforcement).

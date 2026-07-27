@@ -9,8 +9,10 @@ import type { AuthProvider } from '@/modules/auth/auth-provider';
 // in the Cypress component bundle; identical at runtime (cookie.ts re-exports it).
 import { mostRecent, type SessionEntry } from '@/modules/auth/session/session';
 import { ProviderError, isStaleSessionError } from '@/modules/auth/types';
+import { resolveOrg } from '@/resources/shared/resolve-org';
 import { validateReturnTo } from '@/resources/shared/return-to';
 import { isSudoFresh } from '@/resources/shared/sudo';
+import { usableSignInMethods } from '@/resources/shared/usable-methods';
 import { paths } from '@/routes/paths';
 import { logAuthEvent, hashActor } from '@/server/observability';
 
@@ -80,7 +82,7 @@ async function resolveActive(
 export async function loadPasskeysView(
   provider: AuthProvider,
   sessions: SessionEntry[],
-  input: { returnTo: string | null; nowMs: number }
+  input: { returnTo: string | null; nowMs: number; emailDeliveryEnabled: boolean }
 ): Promise<PasskeysViewResult> {
   const active = await resolveActive(provider, sessions);
   if (!active) return { kind: 'redirect', target: paths.login.index() };
@@ -89,17 +91,22 @@ export async function loadPasskeysView(
     return { kind: 'redirect', target: reauthTarget() };
   }
 
-  const [passkeys, methods] = await Promise.all([
+  const [passkeys, methods, settings] = await Promise.all([
     provider.listPasskeys(active.userId),
     provider.listAuthMethods(active.userId),
+    provider.getLoginSettings(await resolveOrg(provider, active.entry.organization)),
   ]);
+  // methodCount drives the backup-method banner (shown when === 1) — must reflect
+  // methods actually USABLE right now, not just enrolled (a policy-disabled method
+  // is not a real backup).
+  const usable = usableSignInMethods(methods, settings, input.emailDeliveryEnabled);
 
   return {
     kind: 'view',
     loginName: active.entry.loginName,
     userId: active.userId,
     passkeys,
-    methodCount: methods.length,
+    methodCount: usable.length,
     returnTo: validateReturnTo(input.returnTo),
   };
 }
@@ -140,7 +147,7 @@ function withUserRemovalLock<T>(userId: string, fn: () => Promise<T>): Promise<T
 export async function removeUserPasskey(
   provider: AuthProvider,
   sessions: SessionEntry[],
-  input: { passkeyId: string; nowMs: number }
+  input: { passkeyId: string; nowMs: number; emailDeliveryEnabled: boolean }
 ): Promise<RemovePasskeyResult> {
   const active = await resolveActive(provider, sessions);
   if (!active) return { ok: false, error: 'SESSION_EXPIRED' };
@@ -154,14 +161,20 @@ export async function removeUserPasskey(
   }
 
   const userId = active.userId;
+  const organization = active.entry.organization;
+  const emailDeliveryEnabled = input.emailDeliveryEnabled;
   return withUserRemovalLock(userId, async () => {
-    const [passkeys, methods] = await Promise.all([
+    const [passkeys, methods, settings] = await Promise.all([
       provider.listPasskeys(userId),
       provider.listAuthMethods(userId),
+      provider.getLoginSettings(await resolveOrg(provider, organization)),
     ]);
-    // Refuse removing the user's FINAL sign-in method: at most one passkey left AND no
-    // other method enrolled.
-    if (passkeys.length <= 1 && !methods.some((m) => m !== 'passkey')) {
+    // Refuse removing the user's FINAL USABLE sign-in method: at most one passkey left
+    // AND no other method that's both enrolled AND currently allowed by org/instance
+    // policy — an enrolled-but-policy-disabled method (e.g. password auth turned off
+    // after the user set one) is not a real backup.
+    const usable = usableSignInMethods(methods, settings, emailDeliveryEnabled);
+    if (passkeys.length <= 1 && !usable.some((m) => m !== 'passkey')) {
       logAuthEvent('passkey_remove', 'failure', {
         userId,
         reason: 'last_method',

@@ -100,6 +100,46 @@ describe('passkeys.service — /id/passkeys management', () => {
     expect(await solo.fake.listPasskeys('u1')).to.have.length(1);
   });
 
+  it('last-method guard refuses removal when the only backup method is policy-disabled', async () => {
+    // Enrolled ['passkey', 'password'] with 1 passkey — raw enrolled methods would say
+    // "password is a backup," but the org has since disabled password auth. That backup
+    // isn't usable, so removing the last passkey must still be refused (not a real lockout
+    // escape). Mirrors the same gate decideAfterIdentifier/login/method.tsx apply per-method.
+    const fake = new FakeAuthProvider({
+      users: [USER],
+      passwords: { u1: 'Password1!' },
+      authMethods: { u1: ['passkey', 'password'] },
+      passkeys: { u1: [{ id: 'pk-1', state: 'active', name: 'Seeded laptop' }] },
+      settingsByOrg: { 'org-default-fake': { allowPassword: false } },
+      realFactorTimestamps: true,
+    });
+    const s = await fake.createSession({ password: 'Password1!' }, { userId: 'u1' });
+    const sessions: SessionEntry[] = [
+      {
+        id: s.id,
+        token: s.token,
+        loginName: USER.loginName,
+        creationTs: s.changedAt,
+        expirationTs: s.expiresAt,
+        changeTs: s.changedAt,
+      },
+    ];
+    const refused = await removeUserPasskey(fake, sessions, {
+      passkeyId: 'pk-1',
+      nowMs: Date.now(),
+      emailDeliveryEnabled: true,
+    });
+    expect(refused).to.deep.equal({ ok: false, error: 'LAST_METHOD' });
+    // Same gap existed in the loader's methodCount (drives the backup-method banner).
+    const view = await loadPasskeysView(fake, sessions, {
+      returnTo: null,
+      nowMs: Date.now(),
+      emailDeliveryEnabled: true,
+    });
+    expect(view.kind).to.equal('view');
+    if (view.kind === 'view') expect(view.methodCount).to.equal(1);
+  });
+
   it('last-method guard: passkey-only user with one passkey ⇒ LAST_METHOD; password backup ⇒ ok', async () => {
     const solo = await seeded({ authMethods: ['passkey'] });
     const refused = await removeUserPasskey(solo.fake, solo.sessions, {

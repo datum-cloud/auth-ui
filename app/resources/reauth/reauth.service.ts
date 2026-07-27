@@ -64,7 +64,7 @@ export type ReauthLoadResult =
  * configured at all. Best-effort: a failed settings/admin-check read degrades to
  * the /passkeys fallback rather than failing the whole reauth load.
  */
-async function resolveDefaultReturnTo(
+export async function resolveDefaultReturnTo(
   provider: AuthProvider,
   entry: SessionEntry,
   input: Pick<ReauthLoadInput, 'consoleUrl' | 'defaultAppUrl'>

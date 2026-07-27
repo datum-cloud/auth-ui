@@ -17,6 +17,7 @@ import { isStaleSessionError } from '@/modules/auth/types';
 import {
   loadReauth,
   performReauth,
+  resolveDefaultReturnTo,
   startReauthIdpIntent,
   type ReauthLoadResult,
   type ReauthMethod,
@@ -104,12 +105,23 @@ export async function action({ request }: ActionFunctionArgs) {
 
   if (form.get('intent') === 'idp-reauth') {
     const idpId = String(form.get('idpId') ?? '');
-    const returnTo = validateReturnTo(String(form.get('returnTo') ?? '')) ?? paths.passkeys();
     if (!idpId) return data({ error: 'INVALID_INPUT' as const }, { status: 400 });
 
     const sessions = await readSessions(request);
     const entry = mostRecent(sessions);
     if (!entry) return redirect(paths.login.index());
+
+    // Never trust a client-echoed absolute returnTo (same fix as performReauth's success
+    // path) — re-resolve the configured default server-side when the submitted value
+    // doesn't validate, instead of collapsing to a hardcoded /passkeys before this
+    // round-trip even starts (which would then be baked into the callback URL with no
+    // way to recover the real destination downstream).
+    const returnTo =
+      validateReturnTo(String(form.get('returnTo') ?? '')) ??
+      (await resolveDefaultReturnTo(provider, entry, {
+        consoleUrl: `${env.ZITADEL_API_URL}/ui/console`,
+        defaultAppUrl: env.DEFAULT_APP_URL,
+      }));
 
     // Resolve the session's own user — needed to verify idpId is actually linked to
     // THEM, not just any active org provider. Same stale-session recovery loadReauth
