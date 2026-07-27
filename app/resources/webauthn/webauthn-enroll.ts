@@ -33,8 +33,13 @@ import {
   type EnrollResult,
 } from './webauthn.service';
 import type { AuthProvider } from '@/modules/auth/auth-provider';
-import { readSessions, type SessionEntry } from '@/modules/auth/session/cookie';
+import { readSessions, byLoginName, type SessionEntry } from '@/modules/auth/session/cookie';
+import type { Session } from '@/modules/auth/types';
+import { isStaleSessionError } from '@/modules/auth/types';
 import { credentialSchema, setupSkipSchema } from '@/resources/mfa/mfa.schema';
+import { validateReturnTo } from '@/resources/shared/return-to';
+import { isSudoFresh } from '@/resources/shared/sudo';
+import { paths } from '@/routes/paths';
 import { providerForRequest } from '@/server/auth-context.server';
 import { getCsrfToken, assertCsrf } from '@/server/csrf';
 import { data, redirect, type ActionFunctionArgs, type LoaderFunctionArgs } from 'react-router';
@@ -70,10 +75,15 @@ export interface WebAuthnEnrollLoaderData {
   credentialId: string | null;
   publicKey: unknown;
   challengeFailed: boolean;
+  /** Validated post-enrollment return target (e.g. /passkeys); null when absent/invalid. */
+  returnTo: string | null;
 }
 
 export type WebAuthnEnrollActionData =
-  { error: 'INVALID_INPUT' } | { error: 'SESSION_EXPIRED' } | { error: 'INVALID_CREDENTIALS' };
+  | { error: 'INVALID_INPUT' }
+  | { error: 'SESSION_EXPIRED' }
+  | { error: 'INVALID_CREDENTIALS' }
+  | { error: 'SUDO_REQUIRED' };
 
 export interface WebAuthnEnrollConfig {
   /** The hidden form field name the route posts for the credential id ('passkeyId' | 'u2fId'). */
@@ -95,8 +105,16 @@ export interface WebAuthnEnrollConfig {
       requestId?: string;
       organization?: string;
       checkAfter?: 'true' | 'false';
+      /** User-typed or AAGUID-derived passkey label (passkey config only). */
+      passkeyName?: string;
     }
   ) => Promise<EnrollResult>;
+  /**
+   * The loader mirrors the service's sudo gate as a UX check
+   * (redirect to /reauth instead of failing after the ceremony). The service check
+   * in verifyEnrollment stays the security boundary.
+   */
+  requireSudo?: boolean;
 }
 
 // Static action schema — both credential-id fields are optional here; the factory then
@@ -112,10 +130,15 @@ const enrollActionSchema = z.object({
   organization: z.string().optional(),
   force: z.enum(['true', 'false']).optional(),
   checkAfter: z.enum(['true', 'false']).optional(),
+  // Post-enrollment return target; validated server-side (validateReturnTo).
+  returnTo: z.string().optional(),
+  // Passkey label — set-once (no rename RPC); 1–200 runes Zitadel-side.
+  passkeyName: z.string().trim().max(200).optional(),
 });
 
 export const PASSKEY_ENROLL_CONFIG: WebAuthnEnrollConfig = {
   credentialField: 'passkeyId',
+  requireSudo: true, // Passkey add is sudo-gated (U2F unchanged)
   requestAttestation: requestPasskeyAttestation,
   verifyEnrollment: (provider, sessions, input) =>
     verifyPasskeyEnrollment(provider, sessions, {
@@ -125,6 +148,7 @@ export const PASSKEY_ENROLL_CONFIG: WebAuthnEnrollConfig = {
       requestId: input.requestId,
       organization: input.organization,
       checkAfter: input.checkAfter,
+      passkeyName: input.passkeyName,
     }),
 };
 
@@ -154,6 +178,42 @@ export function createWebAuthnEnrollHandlers(cfg: WebAuthnEnrollConfig) {
 
     const provider = providerForRequest(request);
     const sessions = await readSessions(request);
+    // Validated post-enrollment return target (threaded into the hidden form).
+    const returnTo = validateReturnTo(url.searchParams.get('returnTo'));
+
+    // UX mirror of the service sudo gate: bounce a stale session to
+    // /reauth BEFORE the ceremony starts (and before burning a registration link).
+    // The destination is rebuilt from loader params — never from the Referer header.
+    if (cfg.requireSudo) {
+      const entry = byLoginName(sessions, loginName, organization);
+      if (entry) {
+        // The stored session token may be stale/revoked by the time this route sees it
+        // (e.g. created in a different browser) — getSession throws a non-transient
+        // ProviderError in that case rather than returning null. Recover the same way
+        // passkeys.service.ts/reauth.service.ts do instead of crashing — this pre-check
+        // is UX only, requestAttestation re-enforces the actual sudo gate below.
+        let session: Session | null;
+        try {
+          session = await provider.getSession(entry.id, entry.token);
+        } catch (err) {
+          if (!isStaleSessionError(err)) throw err;
+          session = null;
+        }
+        if (!session || !isSudoFresh(session.factors, Date.now())) {
+          return redirect(
+            paths.reauth({
+              returnTo: paths.setup.passkey({
+                loginName,
+                requestId,
+                organization,
+                returnTo: returnTo ?? undefined,
+              }),
+            })
+          );
+        }
+      }
+      // No entry: fall through — requestAttestation issues the canonical /login bounce.
+    }
 
     const result = await cfg.requestAttestation(provider, sessions, {
       loginName,
@@ -183,6 +243,7 @@ export function createWebAuthnEnrollHandlers(cfg: WebAuthnEnrollConfig) {
         credentialId,
         publicKey,
         challengeFailed,
+        returnTo,
       },
       { headers }
     );
@@ -200,6 +261,8 @@ export function createWebAuthnEnrollHandlers(cfg: WebAuthnEnrollConfig) {
     // The required credential id is keyed per-config (passkeyId | u2fId); absence is INVALID_INPUT.
     const credentialId = parsed.data[cfg.credentialField];
     if (!credentialId) return data({ error: 'INVALID_INPUT' as const }, { status: 400 });
+    // Validate the POSTED returnTo (never the Referer header).
+    const returnTo = validateReturnTo(parsed.data.returnTo ?? null);
 
     const sessions = await readSessions(request);
     const result = await cfg.verifyEnrollment(provider, sessions, {
@@ -209,14 +272,31 @@ export function createWebAuthnEnrollHandlers(cfg: WebAuthnEnrollConfig) {
       requestId,
       organization,
       checkAfter,
+      passkeyName: parsed.data.passkeyName,
     });
 
     if (!result.ok) {
+      // Stale sudo — bounce through /reauth and return to THIS setup
+      // screen, rebuilt from the POSTED fields (deep-link safe).
+      if (result.error === 'SUDO_REQUIRED') {
+        return redirect(
+          paths.reauth({
+            returnTo: paths.setup.passkey({
+              loginName,
+              requestId,
+              organization,
+              returnTo: returnTo ?? undefined,
+            }),
+          })
+        );
+      }
       const status = result.error === 'INVALID_CREDENTIALS' ? 401 : 400;
       return data({ error: result.error }, { status });
     }
 
-    return redirect(result.target);
+    // An explicit validated returnTo wins over the derived next step
+    // (the signup checkAfter path posts no returnTo and keeps today's behavior).
+    return redirect(returnTo ?? result.target);
   }
 
   return { loader, action };

@@ -1,9 +1,10 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
-import { AuthFormFields } from '@/components/auth-form/auth-form-fields';
+import { IdentityBadge } from '@/components/identity-badge/identity-badge';
+import { SignOutButton } from '@/components/sign-out-button/sign-out-button';
+import { mostRecent, readSessions } from '@/modules/auth/session/cookie';
 import { performLogout, logoutOutcomeToResponse, completeOidcLogout } from '@/resources/session';
 import { providerForRequest } from '@/server/auth-context.server';
 import { assertCsrf, loaderCsrf } from '@/server/csrf';
-import { Button } from '@datum-cloud/datum-ui/button';
 import { Trans } from '@lingui/react/macro';
 import {
   data,
@@ -28,7 +29,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
   }
 
   const { csrfToken, headers } = await loaderCsrf(request);
-  return data({ csrfToken }, { headers });
+  // Show which account is being signed out of, mirroring password/change.tsx's pattern.
+  // Empty string (no active session) falls back to the generic confirm copy below.
+  const loginName = mostRecent(await readSessions(request))?.loginName ?? '';
+  return data({ csrfToken, loginName }, { headers });
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -41,18 +45,19 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function Logout() {
-  const { csrfToken } = useLoaderData<typeof loader>();
+  const { csrfToken, loginName } = useLoaderData<typeof loader>();
   return (
     <AuthCard
       title={<Trans>Sign out</Trans>}
-      description={<Trans>Are you sure you want to sign out?</Trans>}>
+      description={
+        loginName ? (
+          <IdentityBadge loginName={loginName} verb={<Trans>Sign out of</Trans>} showLink={false} />
+        ) : (
+          <Trans>Are you sure you want to sign out?</Trans>
+        )
+      }>
       <div className="flex flex-col gap-4 text-center">
-        <form method="post" action="?index">
-          <AuthFormFields csrf={csrfToken} />
-          <Button type="primary" theme="solid" htmlType="submit" block>
-            <Trans>Sign out</Trans>
-          </Button>
-        </form>
+        <SignOutButton csrf={csrfToken} emphasis="primary" />
       </div>
     </AuthCard>
   );

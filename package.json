@@ -59,6 +59,7 @@
     "zod": "^4.4.3"
   },
   "overrides": {
+    "axios": "^1.18.0",
     "@opentelemetry/sdk-trace-base": "2.8.0",
     "@opentelemetry/core": "2.8.0",
     "@opentelemetry/resources": "2.8.0",

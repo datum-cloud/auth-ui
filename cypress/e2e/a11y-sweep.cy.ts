@@ -135,7 +135,7 @@ describe('a11y sweep — /login/passkey (session required)', () => {
     cy.location('pathname').should('include', '/login/passkey');
     // Positive assertion: WebAuthnButton renders its "Verify with passkey" text
     // (disabled until React hydrates, but SSR-rendered DOM is present).
-    cy.contains('button', /verify with passkey/i).should('exist');
+    cy.contains('button', /sign in with .*passkey|touch id|windows hello/i).should('exist');
     checkA11y();
   });
 });

@@ -55,6 +55,8 @@ const PORT_METHODS = [
   'passkeyRegisterLink',
   'registerPasskey',
   'verifyPasskey',
+  'listPasskeys',
+  'removePasskey',
   'registerU2F',
   'verifyU2F',
   'registerTotp',

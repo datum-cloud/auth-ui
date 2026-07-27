@@ -119,7 +119,7 @@ export async function startIdpIntent(
  * returned untouched — this is a UX nicety, never load-bearing (the callback's identity check is
  * the real guard).
  */
-function withLoginHint(authUrl: string, reauthHint?: string): string {
+export function withLoginHint(authUrl: string, reauthHint?: string): string {
   if (!reauthHint) return authUrl;
   try {
     const url = new URL(authUrl);

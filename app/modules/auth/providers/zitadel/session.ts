@@ -217,3 +217,27 @@ export function listSessions(ctx: ZitadelCtx, ids: string[]): Promise<Session[]>
     return (resp.sessions ?? []).map((s) => toSession(s, ''));
   });
 }
+
+// All of the user's provider-side sessions (cross-device), via the session v2
+// userIdQuery. Read-only enrichment: token '' as in listSessions above.
+export function listUserSessions(ctx: ZitadelCtx, userId: string): Promise<Session[]> {
+  const sessions = ctx.svc(SessionService);
+  return ctx.call(async () => {
+    const req = create(ListSessionsRequestSchema, {
+      queries: [
+        create(SessionSearchQuerySchema, {
+          query: { case: 'userIdQuery', value: { id: userId } },
+        }),
+      ],
+    });
+    const resp = await sessions.listSessions(req, {});
+    return (resp.sessions ?? []).map((s) => toSession(s, ''));
+  });
+}
+
+// Privileged token-less deletion via the service PAT (session.delete permission).
+// sessionToken is OMITTED on purpose: an empty string would be sent and validated.
+export async function deleteUserSession(ctx: ZitadelCtx, sessionId: string): Promise<void> {
+  const sessions = ctx.svc(SessionService);
+  await ctx.call(() => sessions.deleteSession({ sessionId }, {}));
+}

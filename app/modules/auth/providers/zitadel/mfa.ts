@@ -1,13 +1,17 @@
 // mfa capability — passkey / u2f / totp / otp registration + verification, plus setMfaInitSkipped (P5).
 import type { ZitadelCtx } from './context';
-import { normalizeError } from './mappers';
+import { normalizeError, timestampToIso } from './mappers';
 import type { U2FCreationOptions, WebAuthnCreationOptions } from '@/modules/auth/types';
 import type { JsonObject } from '@bufbuild/protobuf';
 import { create } from '@zitadel/client';
+import { TextFilterMethod } from '@zitadel/proto/zitadel/filter/v2/filter_pb';
+import { AuthFactorState } from '@zitadel/proto/zitadel/user/v2/user_pb';
 import {
   UserService,
   CreatePasskeyRegistrationLinkRequestSchema,
+  ListPasskeysRequestSchema,
   RegisterPasskeyRequestSchema,
+  RemovePasskeyRequestSchema,
   VerifyPasskeyRegistrationRequestSchema,
   RegisterU2FRequestSchema,
   VerifyU2FRegistrationRequestSchema,
@@ -16,6 +20,9 @@ import {
   AddOTPSMSRequestSchema,
   AddOTPEmailRequestSchema,
   HumanMFAInitSkippedRequestSchema,
+  SetUserMetadataRequestSchema,
+  ListUserMetadataRequestSchema,
+  DeleteUserMetadataRequestSchema,
 } from '@zitadel/proto/zitadel/user/v2/user_service_pb';
 
 // Zitadel rejects empty webauthn credential names (PasskeyName / TokenName must be 1–200
@@ -23,6 +30,11 @@ import {
 // user-chosen label.
 const DEFAULT_PASSKEY_NAME = 'Passkey';
 const DEFAULT_SECURITY_KEY_NAME = 'Security key';
+
+// User-metadata key carrying a passkey's enroll time. Written once at verify
+// success and never rewritten, so the ENTRY's creationDate (server clock) IS the
+// enroll time — the value stores an ISO copy purely as a debugging aid.
+const passkeyCreatedKey = (passkeyId: string): string => `passkey:${passkeyId}:created`;
 
 // The proto publicKeyCredentialCreationOptions is a google.protobuf.Struct (JsonObject)
 // shaped `{ publicKey: {...} }`. Project it onto the neutral `{ publicKey: unknown }` struct so
@@ -106,6 +118,98 @@ export async function verifyPasskey(
     });
     await users.verifyPasskeyRegistration(req, {});
   });
+  // Best-effort created-at stamp — enrollment NEVER fails because of metadata
+  // (parity with the AAGUID silent-fallback rule). Own call scope, own swallow.
+  try {
+    await ctx.call(async () => {
+      const req = create(SetUserMetadataRequestSchema, {
+        userId,
+        metadata: [
+          {
+            key: passkeyCreatedKey(passkeyId),
+            value: new TextEncoder().encode(new Date().toISOString()),
+          },
+        ],
+      });
+      await users.setUserMetadata(req, {});
+    });
+  } catch {
+    // Swallowed: the passkey simply renders without a date.
+  }
+}
+
+// Passkey inventory for the /id/passkeys management page.
+// Joined with the created-at user-metadata keys; the entry's creationDate
+// (server clock) is the date source, the stored value is never read.
+export async function listPasskeys(
+  ctx: ZitadelCtx,
+  userId: string
+): Promise<Array<{ id: string; state: 'active' | 'inactive'; name: string; createdAt?: string }>> {
+  const users = ctx.svc(UserService);
+  // The metadata join runs CONCURRENTLY in its OWN call scope (own deadline) and is
+  // caught to null on ANY failure — a slow or erroring metadata backend degrades to
+  // date-less rows and can never fail or outlast the passkey list itself.
+  const metaPromise = ctx
+    .call(() =>
+      users.listUserMetadata(
+        create(ListUserMetadataRequestSchema, {
+          userId,
+          filters: [
+            {
+              filter: {
+                case: 'keyFilter',
+                value: { key: 'passkey:', method: TextFilterMethod.STARTS_WITH },
+              },
+            },
+          ],
+        }),
+        {}
+      )
+    )
+    .catch(() => null);
+  const resp = await ctx.call(() =>
+    users.listPasskeys(create(ListPasskeysRequestSchema, { userId }), {})
+  );
+  const meta = await metaPromise;
+  const createdByKey = new Map(
+    (meta?.metadata ?? []).map((m) => [m.key, timestampToIso(m.creationDate, null)])
+  );
+  // Passkey { id, state: AuthFactorState, name } — READY is the only 'active' state.
+  return (resp.result ?? []).map((p) => {
+    const createdAt = createdByKey.get(passkeyCreatedKey(p.id));
+    return {
+      id: p.id,
+      state: p.state === AuthFactorState.READY ? ('active' as const) : ('inactive' as const),
+      name: p.name,
+      ...(createdAt ? { createdAt } : {}),
+    };
+  });
+}
+
+// Errors flow through ctx.call normalization; NOT_FOUND is mapped to idempotent
+// success by the passkeys service (removal race), not here.
+export async function removePasskey(
+  ctx: ZitadelCtx,
+  userId: string,
+  passkeyId: string
+): Promise<void> {
+  const users = ctx.svc(UserService);
+  await ctx.call(async () => {
+    const req = create(RemovePasskeyRequestSchema, { userId, passkeyId });
+    await users.removePasskey(req, {});
+  });
+  // Best-effort cleanup of the created-at key — never blocks the removal result.
+  try {
+    await ctx.call(async () => {
+      const req = create(DeleteUserMetadataRequestSchema, {
+        userId,
+        keys: [passkeyCreatedKey(passkeyId)],
+      });
+      await users.deleteUserMetadata(req, {});
+    });
+  } catch {
+    // Swallowed: an orphaned key is dropped by the listPasskeys join anyway.
+  }
 }
 
 export function registerU2F(

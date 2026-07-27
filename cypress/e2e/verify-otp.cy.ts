@@ -10,7 +10,15 @@ import { checkA11y } from '../support/a11y';
  * We then navigate directly to the verify screen; the session cookie is set.
  */
 function loginAndGetSession(loginName: string) {
-  cy.visit('/id/login');
+  cy.visit('/id/login', {
+    onBeforeLoad: (win) => {
+      win.__CYPRESS_HYDRATE__ = true; // hydrate so the IdP-first "Email" reveal works (see entry.client.tsx)
+    },
+  });
+  cy.settleHydration();
+  // The email input is behind an "Email" reveal button (IdP-first UX); click it first
+  // (mirrors core-signin.cy.ts's identifier flow).
+  cy.contains('button', 'Email').click();
   cy.get('input[name="loginName"]').type(loginName);
   cy.get('input[name="loginName"]:visible').closest('form').submit();
   cy.location('pathname').should('eq', '/id/login/password');
@@ -79,6 +87,45 @@ describe('MFA verify — no session guard', () => {
     cy.visit('/id/login/verify/authenticator?loginName=nobody%40acme.test', {
       failOnStatusCode: false,
     });
+    cy.location('pathname').should('eq', '/id/login');
+  });
+});
+
+describe('MFA verify — Back navigation (regression: sole-factor loop)', () => {
+  // Motivating bug: Back from /login/verify/{channel} used to target /login/mfa.
+  // For a user with exactly one enrolled+policy-allowed second factor,
+  // /login/mfa's loader short-circuits (resolveMfaPicker's sole-factor redirect
+  // in mfa.service.ts) straight back to that same verify screen before any
+  // picker UI renders — so clicking Back silently looped back to the page the
+  // user was already on. previous-step.ts now points Back at /login directly
+  // for /login/verify/* (see previousStepFor). These tests click the real
+  // rendered "Back" control (not just the pure previousStepFor function) so a
+  // reverted map entry would fail here even though the unit tests still pass.
+
+  it('clicking Back on the email verify screen lands on /login, not looping back', () => {
+    loginAndGetSession('email-otp-user@acme.test');
+    cy.visit('/id/login/verify/email?loginName=email-otp-user%40acme.test');
+
+    cy.contains('a, button', /^back$/i).click();
+
+    cy.location('pathname').should('eq', '/id/login');
+  });
+
+  it('clicking Back on the SMS verify screen lands on /login, not looping back', () => {
+    loginAndGetSession('sms-otp-user@acme.test');
+    cy.visit('/id/login/verify/sms?loginName=sms-otp-user%40acme.test');
+
+    cy.contains('a, button', /^back$/i).click();
+
+    cy.location('pathname').should('eq', '/id/login');
+  });
+
+  it('clicking Back on the TOTP verify screen lands on /login, not looping back', () => {
+    loginAndGetSession('totp-user@acme.test');
+    cy.visit('/id/login/verify/authenticator?loginName=totp-user%40acme.test');
+
+    cy.contains('a, button', /^back$/i).click();
+
     cy.location('pathname').should('eq', '/id/login');
   });
 });

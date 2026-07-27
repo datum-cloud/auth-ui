@@ -4,6 +4,7 @@ import { AuthFormFields } from '@/components/auth-form/auth-form-fields';
 import { PasswordRequirements } from '@/components/auth-form/password-requirements';
 import { BackLink } from '@/components/back-link/back-link';
 import { FormError } from '@/components/form-error/form-error';
+import { IdentityBadge } from '@/components/identity-badge/identity-badge';
 import { useAuthActionError } from '@/hooks/use-auth-action-error';
 import { readSessions, mostRecent, byId } from '@/modules/auth/session/cookie';
 import { changePassword } from '@/resources/password';
@@ -105,7 +106,13 @@ export default function PasswordChange() {
         className="flex w-full flex-col gap-4">
         <AuthFormFields csrf={csrfToken} requestId={requestId} />
         <input type="hidden" name="sessionId" value={sessionId} />
-        {loginName ? <p className="text-foreground text-center text-sm">{loginName}</p> : null}
+        {loginName ? (
+          <IdentityBadge
+            loginName={loginName}
+            verb={<Trans>Signing in as</Trans>}
+            showLink={false}
+          />
+        ) : null}
         <Form.Field name="password" label={t`New password`} required>
           <Form.Input type="password" autoFocus autoComplete="new-password" />
         </Form.Field>

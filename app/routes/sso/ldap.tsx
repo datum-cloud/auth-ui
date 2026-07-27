@@ -59,7 +59,10 @@ export default function SsoLdap() {
   const errorMessage = useAuthActionError(actionData);
 
   return (
-    <AuthCeremony title={<Trans>Sign in with LDAP</Trans>} error={errorMessage}>
+    <AuthCeremony
+      title={<Trans>Sign in with LDAP</Trans>}
+      error={errorMessage}
+      showBackLink={false}>
       <Form.Root
         schema={ldapClientSchema}
         formComponent={RRForm}

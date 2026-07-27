@@ -145,6 +145,18 @@ export interface AuthProvider {
   // P5 — read-only enrichment: returned sessions carry token: '' (tokens live only in the session cookie)
   listSessions(ids: string[]): Promise<Session[]>; // P5
 
+  /**
+   * All of the user's provider-side sessions (cross-device). Read-only enrichment:
+   * returned sessions carry token: '' (tokens live only in the session cookie), so they
+   * cannot be used with updateSession/deleteSession; pair with deleteUserSession.
+   */
+  listUserSessions(userId: string): Promise<Session[]>;
+  /**
+   * Privileged token-less session deletion via the provider's service credential
+   * (the cross-device sign-out primitive). Callers gate this behind sudo.
+   */
+  deleteUserSession(sessionId: string): Promise<void>;
+
   // password
   sendPasswordReset(userId: string, urlTemplate: string): Promise<void>; // P2
   setPasswordWithCode(userId: string, code: string, password: string): Promise<void>; // P2
@@ -187,6 +199,14 @@ export interface AuthProvider {
     cred: unknown,
     passkeyName?: string
   ): Promise<void>; // P5
+  // Passkey inventory (management page). state maps AuthFactorState → READY='active'.
+  // createdAt (ISO) joined from Zitadel user metadata; absent when unknown
+  // (pre-existing enrollment or metadata degrade).
+  listPasskeys(
+    userId: string
+  ): Promise<Array<{ id: string; state: 'active' | 'inactive'; name: string; createdAt?: string }>>;
+  // Removing an unknown id is treated as idempotent success by callers (removal race).
+  removePasskey(userId: string, passkeyId: string): Promise<void>;
   // Tightened from Promise<unknown> — see registerPasskey (U2F analogue).
   registerU2F(userId: string, domain: string): Promise<U2FCreationOptions>; // P5
   verifyU2F(userId: string, cred: unknown): Promise<void>; // P5

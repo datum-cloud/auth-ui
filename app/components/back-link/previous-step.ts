@@ -6,8 +6,17 @@
 const PREVIOUS_STEP: Array<[match: (p: string) => boolean, target: string]> = [
   [(p) => p === '/login/password', '/login'],
   [(p) => p === '/login/mfa', '/login/password'],
-  [(p) => p.startsWith('/login/verify/'), '/login/mfa'],
+  // Verify screens AND /login/security-key are all USE_SCREEN targets of
+  // resolveMfaPicker's sole-factor short-circuit (mfa.service.ts): whenever the user has
+  // exactly one enrolled+policy-allowed second factor, /login/mfa's loader redirects
+  // straight back to that screen BEFORE any picker UI renders. A Back target of
+  // /login/mfa therefore silently loops back to the same page. Go straight to /login
+  // instead (matches "Not you?" semantics) — 2+-factor users still reach the real
+  // picker via forward navigation from /login/password, which is unaffected.
+  [(p) => p.startsWith('/login/verify/'), '/login'],
+  [(p) => p === '/login/security-key', '/login'],
   [(p) => p === '/signup/password', '/signup'],
+  [(p) => p === '/signup/method', '/signup'],
   [(p) => p === '/password/reset', '/login/password'],
   // Password-management screens previously had no Back control.
   [(p) => p === '/password/new', '/login/password'],

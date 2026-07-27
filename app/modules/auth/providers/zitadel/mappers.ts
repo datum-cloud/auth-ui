@@ -135,7 +135,7 @@ export function toAuthRequest(proto: {
 // absent/malformed proto Timestamp the caller-supplied `fallback` is returned.
 // Note: this does NOT short-circuit empty strings — callers that must treat ''/falsy
 // specially (e.g. mfaInitSkippedToIso) apply that guard before delegating here.
-function timestampToIso<F extends string | null>(val: unknown, fallback: F): string | F {
+export function timestampToIso<F extends string | null>(val: unknown, fallback: F): string | F {
   if (typeof val === 'string') return val;
   try {
     return timestampDate(val as Timestamp).toISOString();

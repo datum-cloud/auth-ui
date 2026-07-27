@@ -1,7 +1,7 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
 import { AuthCeremony } from '@/components/auth-ceremony/auth-ceremony';
 import { AuthFormFields } from '@/components/auth-form/auth-form-fields';
-import { BackLink } from '@/components/back-link/back-link';
+import { IdentityBadge } from '@/components/identity-badge/identity-badge';
 import { useAuthActionError } from '@/hooks/use-auth-action-error';
 import { readSessions, serializeSessions } from '@/modules/auth/session/cookie';
 import { MaxMindTracker, syncMaxMindTokenToRef } from '@/modules/fraud/maxmind-tracker';
@@ -14,6 +14,7 @@ import {
 } from '@/resources/signup';
 import { resolveSignupView } from '@/resources/signup/signup-view';
 import { signupMethodSchema } from '@/resources/signup/signup.schema';
+import { paths } from '@/routes/paths';
 import { providerForRequest } from '@/server/auth-context.server';
 import { loaderCsrf, assertCsrf } from '@/server/csrf';
 import { requireEmailVerification } from '@/server/env';
@@ -275,6 +276,9 @@ export default function SignupMethod() {
   // replaces the per-route toast).
   const errorMessage = useAuthActionError(actionData);
 
+  // "Not you?" returns to the signup start (mirrors signup/password.tsx one step later).
+  const notYouHref = paths.signup.index({ requestId, organization });
+
   // Enumeration-safe terminal: the email-link path (and an existing-email passkey/IdP
   // attempt) returns a generic "check your email" — render it here, otherwise the screen
   // would silently re-render with no feedback.
@@ -310,9 +314,11 @@ export default function SignupMethod() {
       <AuthCeremony
         title={<Trans>Finish creating your account</Trans>}
         description={
-          <Trans>
-            You're almost done! <span className="font-medium">{loginName}</span>
-          </Trans>
+          <IdentityBadge
+            loginName={loginName}
+            verb={<Trans>Signing up as</Trans>}
+            linkTarget={notYouHref}
+          />
         }
         error={errorMessage}>
         <div className="flex w-full flex-col gap-3">
@@ -373,8 +379,6 @@ export default function SignupMethod() {
             </RRForm>
           ) : null}
         </div>
-
-        <BackLink />
       </AuthCeremony>
     </>
   );

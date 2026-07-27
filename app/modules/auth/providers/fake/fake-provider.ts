@@ -109,6 +109,22 @@ interface Seed {
    * no MFA enrollment methods (e.g. all MFA caps false → resolveMfaSetup auto-skip path).
    */
   capabilities?: Partial<ProviderCapabilities>;
+
+  /** Pre-seeded passkey inventory (userId → rows) for /id/passkeys e2e fixtures. */
+  passkeys?: Record<
+    string,
+    Array<{ id: string; state: 'active' | 'inactive'; name: string; createdAt?: string }>
+  >;
+  /** Pre-linked IdP identities (userId → links) — a constructor-time convenience for the
+   *  same data setIdpLinks/addIdpLink set post-construction. */
+  idpLinks?: Record<string, IdpLink[]>;
+  /**
+   * Stamp factor verifiedAt with REAL Date (new Date()) instead of FIXED_NOW_DATE.
+   * Sudo freshness compares against real Date.now() at the route layer, so the e2e singleton
+   * MUST set this or every session is permanently sudo-stale (the FIXED_NOW time bomb).
+   * Component tests keep determinism by not setting it.
+   */
+  realFactorTimestamps?: boolean;
 }
 
 export class FakeAuthProvider implements AuthProvider {
@@ -140,6 +156,11 @@ export class FakeAuthProvider implements AuthProvider {
   private orgDomains: Record<string, string>; // P2 domain discovery: email domain → orgId
   private defaultOrgId: string | null; // instance Default Organization (org-first fallback)
   private enrolled = new Map<string, Set<AuthMethod>>(); // P5: dynamically enrolled methods (merged with seeded authMethods)
+  private passkeys = new Map<
+    string,
+    Array<{ id: string; state: 'active' | 'inactive'; name: string; createdAt?: string }>
+  >();
+  private realFactorTimestamps = false; // see Seed.realFactorTimestamps
   private mfaSkippedAt = new Map<string, string>(); // P5: userId → ISO timestamp of last skip
   private issuedOtpEmailCodes = new Map<string, string>(); // sessionId → returnCode issued for that session
   private deviceAuthSeeds: DeviceAuthSeed[]; // P6
@@ -184,6 +205,12 @@ export class FakeAuthProvider implements AuthProvider {
     if (seed.capabilities) {
       Object.assign(this.capabilities, seed.capabilities);
     }
+    // Passkey inventory seed + real-time factor stamps flag.
+    for (const [uid, list] of Object.entries(seed.passkeys ?? {}))
+      this.passkeys.set(uid, [...list]);
+    for (const [uid, links] of Object.entries(seed.idpLinks ?? {}))
+      this.idpLinks.set(uid, [...links]);
+    this.realFactorTimestamps = seed.realFactorTimestamps ?? false;
     this.passwordComplexity = seed.passwordComplexity ?? {
       minLength: 8,
       requiresUppercase: false,
@@ -345,6 +372,12 @@ export class FakeAuthProvider implements AuthProvider {
 
   // ─── session ─────────────────────────────────────────────────────────────────
 
+  // Factor verifiedAt stamp — real Date under realFactorTimestamps (e2e sudo
+  // freshness), frozen FIXED_NOW_DATE otherwise (component-test determinism).
+  private stamp(): Date {
+    return this.realFactorTimestamps ? new Date() : FIXED_NOW_DATE;
+  }
+
   async createSession(checks: SessionChecks, opts?: SessionOpts): Promise<Session> {
     const id = `sess-${++this.seq}`;
     this.lastCreateSessionOpts = opts;
@@ -367,8 +400,8 @@ export class FakeAuthProvider implements AuthProvider {
       // later phase starts calling createSession({ password }) as a real check.
       // P4: merge factors so a prior password factor survives an idpIntent createSession.
       factors: {
-        password: { verifiedAt: checks.password ? FIXED_NOW_DATE : null },
-        idpIntent: { verifiedAt: checks.idpIntent ? FIXED_NOW_DATE : null },
+        password: { verifiedAt: checks.password ? this.stamp() : null },
+        idpIntent: { verifiedAt: checks.idpIntent ? this.stamp() : null },
       },
       expiresAt: FAR_FUTURE, // far-future so fake sessions never trip expiry checks (MERGE RULE 1)
       changedAt: FIXED_NOW,
@@ -430,7 +463,7 @@ export class FakeAuthProvider implements AuthProvider {
         ...updated,
         factors: {
           ...updated.factors,
-          password: { verifiedAt: FIXED_NOW_DATE },
+          password: { verifiedAt: this.stamp() },
         },
       };
     }
@@ -439,7 +472,7 @@ export class FakeAuthProvider implements AuthProvider {
     if (checks.totp !== undefined) {
       updated = {
         ...updated,
-        factors: { ...updated.factors, totp: { verifiedAt: FIXED_NOW_DATE } },
+        factors: { ...updated.factors, totp: { verifiedAt: this.stamp() } },
       };
     }
 
@@ -460,7 +493,7 @@ export class FakeAuthProvider implements AuthProvider {
         }
         updated = {
           ...updated,
-          factors: { ...updated.factors, otpEmail: { verifiedAt: FIXED_NOW_DATE } },
+          factors: { ...updated.factors, otpEmail: { verifiedAt: this.stamp() } },
         };
       }
     }
@@ -471,7 +504,7 @@ export class FakeAuthProvider implements AuthProvider {
       } else {
         updated = {
           ...updated,
-          factors: { ...updated.factors, otpSms: { verifiedAt: FIXED_NOW_DATE } },
+          factors: { ...updated.factors, otpSms: { verifiedAt: this.stamp() } },
         };
       }
     }
@@ -482,8 +515,27 @@ export class FakeAuthProvider implements AuthProvider {
         ...updated,
         factors: {
           ...updated.factors,
-          passkey: { verifiedAt: FIXED_NOW_DATE, userVerified: true },
+          passkey: { verifiedAt: this.stamp(), userVerified: true },
         },
+      };
+    }
+
+    if (checks.idpIntent !== undefined) {
+      // Mirrors the password branch's fidelity note: real Zitadel checks the session's
+      // OWN user; the users[0] fallback exists for single-user seeds. Multi-user
+      // fixtures MUST pass metadata.userId (via createSession's opts.userId) or the
+      // check silently targets the first seeded user.
+      const sessionUserId = (s.user ?? this.users[0])?.id;
+      const intent = this.idpIntents[checks.idpIntent.idpIntentId];
+      if (!intent || intent.userId !== sessionUserId) {
+        // Matches real Zitadel's actual code/message for this exact case (observed in
+        // production logs) — NOT INVALID_CREDENTIALS, which performReauth's catch used to
+        // assume and therefore let this case fall through uncaught.
+        throw new ProviderError('FAILED_PRECONDITION', 'Intent meant for another user');
+      }
+      updated = {
+        ...updated,
+        factors: { ...updated.factors, idpIntent: { verifiedAt: this.stamp() } },
       };
     }
 
@@ -596,11 +648,53 @@ export class FakeAuthProvider implements AuthProvider {
 
   async verifyPasskey(
     userId: string,
-    _passkeyId: string,
+    passkeyId: string,
     _cred: unknown,
-    _passkeyName?: string
+    passkeyName?: string
   ): Promise<void> {
+    // Record the named inventory row (immutably); 'Passkey' mirrors the Zitadel
+    // adapter's non-empty default (DEFAULT_PASSKEY_NAME in providers/zitadel/mfa.ts).
+    this.passkeys.set(userId, [
+      ...(this.passkeys.get(userId) ?? []),
+      {
+        id: passkeyId,
+        state: 'active',
+        name: passkeyName?.trim() || 'Passkey',
+        // Mirrors the real adapter's created-at metadata join, surfaced here as a stamp.
+        createdAt: new Date().toISOString(),
+      },
+    ]);
     this.enroll(userId, 'passkey');
+  }
+
+  // Passkey inventory mirror (listPasskeys/removePasskey port additions).
+  async listPasskeys(
+    userId: string
+  ): Promise<
+    Array<{ id: string; state: 'active' | 'inactive'; name: string; createdAt?: string }>
+  > {
+    return [...(this.passkeys.get(userId) ?? [])];
+  }
+
+  async removePasskey(userId: string, passkeyId: string): Promise<void> {
+    // Removing an unknown id is a silent no-op (idempotent — mirrors the removal-race rule).
+    const remaining = (this.passkeys.get(userId) ?? []).filter((p) => p.id !== passkeyId);
+    this.passkeys.set(userId, remaining);
+    if (remaining.length === 0) {
+      // Un-enroll the method with the last passkey — via a NEW Set (never mutate the stored one).
+      const set = new Set(this.enrolled.get(userId) ?? []);
+      set.delete('passkey');
+      this.enrolled.set(userId, set);
+      // listAuthMethods unions this dynamic set with the SEEDED static authMethods entry —
+      // without also clearing 'passkey' there, a test seeding both authMethods: ['passkey']
+      // and a passkeys array would still report it enrolled after the last one is removed.
+      if (this.authMethods[userId]) {
+        this.authMethods = {
+          ...this.authMethods,
+          [userId]: this.authMethods[userId].filter((m) => m !== 'passkey'),
+        };
+      }
+    }
   }
 
   async registerU2F(_userId: string, _domain: string): Promise<U2FCreationOptions> {
@@ -646,6 +740,19 @@ export class FakeAuthProvider implements AuthProvider {
       .map((id) => this.sessions.get(id))
       .filter((s): s is Session => s !== undefined)
       .map((s) => ({ ...s, token: '' }));
+  }
+
+  // Cross-device mirrors: search by the session's bound user; delete without a token.
+  async listUserSessions(userId: string): Promise<Session[]> {
+    // token '' mirrors the real adapter (the search RPC never returns tokens).
+    return [...this.sessions.values()]
+      .filter((s) => s.user?.id === userId)
+      .map((s) => ({ ...s, token: '' }));
+  }
+
+  async deleteUserSession(sessionId: string): Promise<void> {
+    // Privileged token-less delete; unknown id is a silent no-op (idempotent).
+    this.sessions.delete(sessionId);
   }
 
   async setMfaInitSkipped(userId: string): Promise<void> {
@@ -696,6 +803,15 @@ export class FakeAuthProvider implements AuthProvider {
   setLoginDefaultRedirectUri(uri: string | undefined): void {
     this.loginDefaultRedirectUri = uri;
   }
+  // Override the active-IdP list getActiveIdPs returns (P4 seed default: seed.idps ?? []).
+  setActiveIdPs(list: IdProvider[]): void {
+    this.idps = list;
+  }
+  // Overwrite (not append) a user's linked-IdP rows — a deterministic seam for reauth/sso
+  // specs that need a specific link set without going through addIdpLink's upsert-by-idpId.
+  setIdpLinks(userId: string, links: IdpLink[]): void {
+    this.idpLinks.set(userId, links);
+  }
   // Override the instance Default Organization getDefaultOrg returns (null ⇒ no default org).
   setDefaultOrg(id: string | null): void {
     this.defaultOrgId = id;
@@ -726,7 +842,9 @@ export class FakeAuthProvider implements AuthProvider {
       id: entry.id,
       token: entry.token,
       user: entry.user,
-      factors: { password: { verifiedAt: FIXED_NOW_DATE } },
+      // stamp(): FIXED_NOW_DATE by default; a REAL Date under realFactorTimestamps so
+      // seeded sessions pass the sudo-freshness gate in node-harness scenarios.
+      factors: { password: { verifiedAt: this.stamp() } },
       expiresAt: FAR_FUTURE,
       changedAt: FIXED_NOW,
     });

@@ -42,6 +42,13 @@ function makeFake(): FakeAuthProvider {
       { id: 'u12', loginName: 'switch-b@acme.test', displayName: 'Switch User B' },
       // P6 Task 9 e2e seed: LDAP user (isolated from u1-u12 to avoid enrollment state contamination)
       { id: 'u13', loginName: 'ldap-bob@acme.test', displayName: 'LDAP Bob' },
+      // e2e seed: /id/passkeys management — password+passkey user with a seeded row.
+      { id: 'u20', loginName: 'mia@acme.test', displayName: 'Mia' },
+      // e2e seed: /id/passkeys management — passkey-ONLY user (last-method guard + banner).
+      { id: 'u21', loginName: 'solo@acme.test', displayName: 'Solo' },
+      // e2e seed: passkey naming journey — dedicated so enrollments never contaminate
+      // the nofactor/mfa-skip ordering-sensitive fixtures.
+      { id: 'u22', loginName: 'namer@acme.test', displayName: 'Namer' },
     ],
     // dev/e2e journey seed: without authMethods the /login action routes to /verify
     passwords: {
@@ -58,6 +65,8 @@ function makeFake(): FakeAuthProvider {
       u11: 'hunter2',
       u12: 'hunter2',
       u13: 'hunter2',
+      u20: 'hunter2', // e2e seed: /id/passkeys management (FAKE_PASSWORD helper parity)
+      u22: 'hunter2', // e2e seed: passkey naming journey
     },
     authMethods: {
       u1: ['password'],
@@ -73,6 +82,14 @@ function makeFake(): FakeAuthProvider {
       u11: ['password'],
       u12: ['password'],
       u13: ['password'],
+      u20: ['password', 'passkey'], // e2e seed: /id/passkeys management
+      u21: ['passkey'], // e2e seed: passkey-only (last-method guard + banner)
+      u22: ['password'], // e2e seed: passkey naming journey (starts passkey-less)
+    },
+    // e2e seed: /id/passkeys management — pre-seeded passkey inventory rows.
+    passkeys: {
+      u20: [{ id: 'pk-mia-1', state: 'active', name: 'Seeded laptop' }],
+      u21: [{ id: 'pk-solo-1', state: 'active', name: 'Solo key' }],
     },
     // route-test + dev seed: x has prompt=['create'] (authorize.create-prompt.test.ts);
     // cb has prompt=[] (callback journey probe: GET /id/authorize?authRequest=cb → login → callback).
@@ -136,6 +153,9 @@ function makeFake(): FakeAuthProvider {
       { id: 'sr-1', clientId: 'sp', binding: 'redirect' },
       { id: 'sr-post', clientId: 'sp', binding: 'post' },
     ],
+    // e2e sessions must carry REAL factor timestamps — sudo freshness (10-min window)
+    // compares against Date.now() at the route layer; FIXED_NOW stamps would be permanently stale.
+    realFactorTimestamps: true,
   });
   return fakeSingleton;
 }

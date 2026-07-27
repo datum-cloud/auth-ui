@@ -18,4 +18,15 @@ describe("paths.ts — typed builders return today's exact strings", () => {
     expect(paths.login.verify.sms({})).to.equal('/login/verify/sms');
     expect(paths.login.verify.authenticator({})).to.equal('/login/verify/authenticator');
   });
+
+  it('builds passkey-management and reauth paths', () => {
+    expect(paths.passkeys()).to.equal('/passkeys');
+    expect(paths.reauth()).to.equal('/reauth');
+    expect(paths.reauth({ method: 'password', returnTo: '/passkeys' })).to.equal(
+      '/reauth?method=password&returnTo=%2Fpasskeys'
+    );
+    expect(paths.passkeys({ returnTo: 'https://portal.test/settings' })).to.equal(
+      '/passkeys?returnTo=https%3A%2F%2Fportal.test%2Fsettings'
+    );
+  });
 });

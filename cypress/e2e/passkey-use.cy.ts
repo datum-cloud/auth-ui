@@ -18,7 +18,7 @@ describe('Passkey verify (/login/passkey)', () => {
 
     // The WebAuthnButton detects window.Cypress and uses the pre-baked credential.
     // Hydration gate: the button is disabled until React mounts; Cypress waits for it.
-    cy.contains('button', /verify with passkey/i)
+    cy.contains('button', /sign in with .*passkey|touch id|windows hello/i)
       .should('not.be.disabled')
       .click();
 

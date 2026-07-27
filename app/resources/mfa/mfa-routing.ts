@@ -133,6 +133,16 @@ export function nextMfaStep(input: MfaRoutingInput): MfaRoutingResult {
   if (input.suppressMfaSetupNudge) {
     return { kind: 'done' };
   }
+  // An enrolled passkey is phishing-resistant strong auth the user already has, so the *optional*
+  // nudge to add a weaker second factor is suppressed — logging in with a password when you own a
+  // passkey should not re-fire "set up MFA" ("I have a passkey, why set up MFA?" is confusing UX).
+  // This suppresses ONLY this step-6 skippable nudge. FORCED MFA (step 5 above:
+  // settings.forceMfa / forceMfaLocalOnly) is intentionally NOT bypassed — a hard org policy still
+  // routes to /setup/mfa?force=true. Passkey also stays excluded from the SECOND_FACTOR_METHODS
+  // 2FA count (steps 3/4) — that exclusion is correct; this is only about the optional nudge.
+  if (input.enrolledMethods.includes('passkey')) {
+    return { kind: 'done' };
+  }
   const skipMs = settings.mfaInitSkipLifetimeMs;
   if (skipMs) {
     const skippedAt = input.mfaInitSkippedAt ? Date.parse(input.mfaInitSkippedAt) : NaN;
