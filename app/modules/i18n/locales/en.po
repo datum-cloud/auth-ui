@@ -78,7 +78,7 @@ msgstr "Additional verification is required to continue."
 msgid "Already have an account?"
 msgstr "Already have an account?"
 
-#: app/routes/login/index.tsx:387
+#: app/routes/login/index.tsx:396
 msgid "An account with this email already exists — sign in to continue."
 msgstr "An account with this email already exists — sign in to continue."
 
@@ -180,7 +180,7 @@ msgstr "Choose how to sign in"
 msgid "Choose how you want to verify your identity."
 msgstr "Choose how you want to verify your identity."
 
-#: app/routes/login/index.tsx:383
+#: app/routes/login/index.tsx:392
 msgid "Choose your login method"
 msgstr "Choose your login method"
 
@@ -211,7 +211,7 @@ msgid "Connected accounts"
 msgstr "Connected accounts"
 
 #: app/routes/device/index.tsx:73
-#: app/routes/login/index.tsx:513
+#: app/routes/login/index.tsx:527
 #: app/routes/signup/index.tsx:291
 msgid "Continue"
 msgstr "Continue"
@@ -221,9 +221,21 @@ msgstr "Continue"
 msgid "Continue with {0}"
 msgstr "Continue with {0}"
 
-#: app/routes/login/index.tsx:428
+#: app/routes/login/index.tsx:364
+msgid "Continue with email"
+msgstr "Continue with email"
+
+#: app/routes/login/index.tsx:437
 msgid "Continue with passkey"
 msgstr "Continue with passkey"
+
+#: app/routes/login/index.tsx:366
+msgid "Continue with phone"
+msgstr "Continue with phone"
+
+#: app/routes/login/index.tsx:367
+msgid "Continue with username"
+msgstr "Continue with username"
 
 #: app/routes/login/password.tsx:114
 msgid "Could not verify password"
@@ -245,7 +257,7 @@ msgstr "Couldn't verify"
 msgid "Create a new account"
 msgstr "Create a new account"
 
-#: app/routes/login/index.tsx:545
+#: app/routes/login/index.tsx:573
 #: app/routes/signup/password.tsx:237
 msgid "Create account"
 msgstr "Create account"
@@ -273,7 +285,6 @@ msgid "Device denied"
 msgstr "Device denied"
 
 #: app/routes/login/index.tsx:350
-#: app/routes/login/index.tsx:482
 #: app/routes/signup/index.tsx:250
 #: app/routes/signup/index.tsx:275
 msgid "Email"
@@ -287,7 +298,8 @@ msgstr "Email code"
 msgid "Email me a code"
 msgstr "Email me a code"
 
-#: app/routes/login/index.tsx:522
+#: app/routes/login/index.tsx:538
+#: app/routes/login/index.tsx:548
 #: app/routes/login/method.tsx:238
 #: app/routes/signup/method.tsx:339
 msgid "Email me a sign-in link"
@@ -449,13 +461,13 @@ msgstr "No signed-in accounts."
 msgid "Not now"
 msgstr "Not now"
 
-#: app/routes/login/index.tsx:543
+#: app/routes/login/index.tsx:571
 msgid "Not registered?"
 msgstr "Not registered?"
 
 #: app/components/identity-badge/identity-badge.tsx:30
 #: app/routes/device/authorize.tsx:122
-#: app/routes/login/index.tsx:416
+#: app/routes/login/index.tsx:425
 #: app/routes/login/method.tsx:193
 #: app/routes/passkeys.tsx:232
 #: app/routes/reauth.tsx:280
@@ -476,7 +488,7 @@ msgstr "or"
 msgid "Or import this URI in your authenticator app"
 msgstr "Or import this URI in your authenticator app"
 
-#: app/routes/login/index.tsx:462
+#: app/routes/login/index.tsx:471
 #: app/routes/login/method.tsx:221
 #: app/routes/reauth.tsx:310
 #: app/routes/setup/mfa.tsx:46
@@ -705,7 +717,7 @@ msgstr "Sign out of"
 msgid "Sign out other sessions"
 msgstr "Sign out other sessions"
 
-#: app/routes/login/index.tsx:532
+#: app/routes/login/index.tsx:560
 msgid "Sign-in is currently unavailable for this account. Please contact your administrator."
 msgstr "Sign-in is currently unavailable for this account. Please contact your administrator."
 
@@ -719,7 +731,7 @@ msgid "Signing in as"
 msgstr "Signing in as"
 
 #. placeholder {0}: passkeyInline.loginName
-#: app/routes/login/index.tsx:409
+#: app/routes/login/index.tsx:418
 msgid "Signing in as <0>{0}</0>."
 msgstr "Signing in as <0>{0}</0>."
 
@@ -950,7 +962,7 @@ msgstr "We've sent a password reset link to <0>{0}</0>"
 msgid "We've sent a verification link to <0>{0}</0>"
 msgstr "We've sent a verification link to <0>{0}</0>"
 
-#: app/routes/login/index.tsx:380
+#: app/routes/login/index.tsx:389
 msgid "Welcome"
 msgstr "Welcome"
 

@@ -356,6 +356,15 @@ export default function Login() {
     : field.allowPhone
       ? '+1 555 000 0000'
       : 'username';
+  // Derived separately from identifierLabel: the field label spells out every accepted type
+  // ("Email, phone, or username"), too long for a button. Email wins the both-allowed case —
+  // it is the dominant identifier and the field states the full set once opened. Separate `t`
+  // literals so Lingui extracts each string.
+  const identifierButtonLabel = field.allowEmail
+    ? t`Continue with email`
+    : field.allowPhone
+      ? t`Continue with phone`
+      : t`Continue with username`;
   const identifierClientSchema = makeLoginIdentifierClientSchema({
     rejectPhone: field.rejectPhone,
   });
@@ -464,9 +473,9 @@ export default function Login() {
             </Button>
           ) : null}
 
-          {view.showPasswordForm && view.showIdpButtons ? <OrDivider /> : null}
+          {view.showIdentifierForm && view.showIdpButtons ? <OrDivider /> : null}
 
-          {view.showPasswordForm ? (
+          {view.showIdentifierForm ? (
             <>
               {!showEmailField ? (
                 <Button
@@ -479,7 +488,7 @@ export default function Login() {
                   iconPosition="left"
                   icon={<Icon icon={Mail} />}
                   onClick={() => setShowEmailField(true)}>
-                  <Trans>Email</Trans>
+                  {identifierButtonLabel}
                   <LastUsedBadge active={lastUsedLogin === 'email'} />
                 </Button>
               ) : (
@@ -509,18 +518,37 @@ export default function Login() {
                       className="h-9"
                     />
                   </Form.Field>
-                  <SubmitButton loading={identifierSubmitting} disabled={ceremonyBusy}>
-                    <Trans>Continue</Trans>
-                  </SubmitButton>
+                  {/* Continue hands off to decideAfterIdentifier. With neither password nor
+                      passkey that resolves to NO_SUPPORTED_METHOD, so it is hidden rather than
+                      left to dead-end. Dropping it also makes the email-link button the first
+                      submit button, so Enter in the field triggers email-link. */}
+                  {view.showContinue ? (
+                    <SubmitButton loading={identifierSubmitting} disabled={ceremonyBusy}>
+                      <Trans>Continue</Trans>
+                    </SubmitButton>
+                  ) : null}
                   {view.showEmailLink ? (
-                    <button
-                      type="submit"
-                      name="intent"
-                      value="email-link"
-                      className="text-foreground/70 hover:text-foreground mt-1 w-full text-center text-sm underline underline-offset-2 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
-                      disabled={navigation.state !== 'idle' || ceremonyBusy}>
-                      <Trans>Email me a sign-in link</Trans>
-                    </button>
+                    view.showContinue ? (
+                      <button
+                        type="submit"
+                        name="intent"
+                        value="email-link"
+                        className="text-foreground/70 hover:text-foreground mt-1 w-full text-center text-sm underline underline-offset-2 transition-colors disabled:cursor-not-allowed disabled:opacity-50"
+                        disabled={navigation.state !== 'idle' || ceremonyBusy}>
+                        <Trans>Email me a sign-in link</Trans>
+                      </button>
+                    ) : (
+                      // Sole action — render as the primary button, not a secondary link. The
+                      // intent rides on a hidden field rather than the button's name/value:
+                      // SubmitButton does not forward those, and with no Continue button this
+                      // form has exactly one submission meaning anyway.
+                      <>
+                        <input type="hidden" name="intent" value="email-link" />
+                        <SubmitButton loading={identifierSubmitting} disabled={ceremonyBusy}>
+                          <Trans>Email me a sign-in link</Trans>
+                        </SubmitButton>
+                      </>
+                    )
                   ) : null}
                 </Form.Root>
               )}
