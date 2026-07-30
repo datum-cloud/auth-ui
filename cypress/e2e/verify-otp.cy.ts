@@ -18,7 +18,7 @@ function loginAndGetSession(loginName: string) {
   cy.settleHydration();
   // The email input is behind an "Email" reveal button (IdP-first UX); click it first
   // (mirrors core-signin.cy.ts's identifier flow).
-  cy.contains('button', 'Email').click();
+  cy.contains('button', 'Continue with email').click();
   cy.get('input[name="loginName"]').type(loginName);
   cy.get('input[name="loginName"]:visible').closest('form').submit();
   cy.location('pathname').should('eq', '/id/login/password');

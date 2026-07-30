@@ -13,7 +13,7 @@ msgstr ""
 "Plural-Forms: \n"
 
 #. placeholder {0}: row.name
-#: app/routes/passkeys.tsx:138
+#: app/routes/passkeys.tsx:146
 msgid "\"{0}\" will no longer work for signing in. This cannot be undone."
 msgstr "\"{0}\" will no longer work for signing in. This cannot be undone."
 
@@ -53,7 +53,7 @@ msgstr "Add an extra layer of security to your account by setting up a second fa
 msgid "Add another account"
 msgstr "Add another account"
 
-#: app/routes/passkeys.tsx:306
+#: app/routes/passkeys.tsx:323
 msgid "Add passkey"
 msgstr "Add passkey"
 
@@ -66,7 +66,7 @@ msgid "Add your phone number as a second factor. We will send a one-time code vi
 msgstr "Add your phone number as a second factor. We will send a one-time code via SMS each time you sign in."
 
 #. placeholder {0}: i18n.date(new Date(row.createdAt), { dateStyle: 'medium' })
-#: app/routes/passkeys.tsx:277
+#: app/routes/passkeys.tsx:294
 msgid "Added {0}"
 msgstr "Added {0}"
 
@@ -131,7 +131,7 @@ msgid "Available accounts to link"
 msgstr "Available accounts to link"
 
 #: app/components/back-link/back-link.tsx:24
-#: app/routes/passkeys.tsx:312
+#: app/routes/passkeys.tsx:329
 #: app/routes/sso/link.tsx:68
 #: app/routes/verify/success.tsx:36
 msgid "Back"
@@ -145,7 +145,7 @@ msgstr "Back to sign in"
 msgid "By continuing, you agree to Datum's <0>Terms of Service</0> and <1>Privacy Policy</1>, and to receive periodic emails with updates."
 msgstr "By continuing, you agree to Datum's <0>Terms of Service</0> and <1>Privacy Policy</1>, and to receive periodic emails with updates."
 
-#: app/routes/passkeys.tsx:143
+#: app/routes/passkeys.tsx:156
 #: app/routes/sso/index.tsx:107
 msgid "Cancel"
 msgstr "Cancel"
@@ -390,7 +390,7 @@ msgstr "Get started"
 msgid "If you prefer a demo, just <0>reach out</0>."
 msgstr "If you prefer a demo, just <0>reach out</0>."
 
-#: app/routes/passkeys.tsx:270
+#: app/routes/passkeys.tsx:287
 msgid "Inactive"
 msgstr "Inactive"
 
@@ -414,7 +414,7 @@ msgstr "Link your account"
 msgid "Linked accounts"
 msgstr "Linked accounts"
 
-#: app/routes/passkeys.tsx:231
+#: app/routes/passkeys.tsx:248
 #: app/routes/reauth.tsx:279
 #: app/routes/sso/index.tsx:137
 msgid "Logged in as"
@@ -441,7 +441,7 @@ msgstr "New password"
 msgid "No account was found and sign-up is not available."
 msgstr "No account was found and sign-up is not available."
 
-#: app/routes/passkeys.tsx:251
+#: app/routes/passkeys.tsx:268
 msgid "No passkeys yet."
 msgstr "No passkeys yet."
 
@@ -457,7 +457,7 @@ msgstr "No sign-in method is available for this account."
 msgid "No signed-in accounts."
 msgstr "No signed-in accounts."
 
-#: app/routes/passkeys.tsx:189
+#: app/routes/passkeys.tsx:206
 msgid "Not now"
 msgstr "Not now"
 
@@ -469,7 +469,7 @@ msgstr "Not registered?"
 #: app/routes/device/authorize.tsx:122
 #: app/routes/login/index.tsx:425
 #: app/routes/login/method.tsx:193
-#: app/routes/passkeys.tsx:232
+#: app/routes/passkeys.tsx:249
 #: app/routes/reauth.tsx:280
 #: app/routes/signed-in.tsx:49
 #: app/routes/sso/index.tsx:138
@@ -499,7 +499,7 @@ msgstr "Passkey"
 msgid "Passkey name"
 msgstr "Passkey name"
 
-#: app/routes/passkeys.tsx:176
+#: app/routes/passkeys.tsx:192
 msgid "Passkey removed"
 msgstr "Passkey removed"
 
@@ -519,11 +519,11 @@ msgstr "Passkey sign-in couldn't be completed for security reasons. Please conta
 msgid "Passkey sign-in was cancelled, or no passkey for this account is available on this device. Make sure you're using a device where you set up your passkey, then try again."
 msgstr "Passkey sign-in was cancelled, or no passkey for this account is available on this device. Make sure you're using a device where you set up your passkey, then try again."
 
-#: app/routes/passkeys.tsx:224
+#: app/routes/passkeys.tsx:241
 msgid "Passkeys"
 msgstr "Passkeys"
 
-#: app/routes/passkeys.tsx:227
+#: app/routes/passkeys.tsx:244
 msgid "Passkeys let you sign in with your fingerprint, face, or device PIN."
 msgstr "Passkeys let you sign in with your fingerprint, face, or device PIN."
 
@@ -589,16 +589,16 @@ msgid "Registration is currently unavailable. Please contact your administrator.
 msgstr "Registration is currently unavailable. Please contact your administrator."
 
 #. placeholder {0}: row.name
-#: app/routes/passkeys.tsx:129
-#: app/routes/passkeys.tsx:130
+#: app/routes/passkeys.tsx:137
+#: app/routes/passkeys.tsx:138
 msgid "Remove {0}"
 msgstr "Remove {0}"
 
-#: app/routes/passkeys.tsx:150
+#: app/routes/passkeys.tsx:163
 msgid "Remove passkey"
 msgstr "Remove passkey"
 
-#: app/routes/passkeys.tsx:136
+#: app/routes/passkeys.tsx:144
 msgid "Remove this passkey?"
 msgstr "Remove this passkey?"
 
@@ -713,7 +713,7 @@ msgstr "Sign out"
 msgid "Sign out of"
 msgstr "Sign out of"
 
-#: app/routes/passkeys.tsx:195
+#: app/routes/passkeys.tsx:212
 msgid "Sign out other sessions"
 msgstr "Sign out other sessions"
 
@@ -721,7 +721,7 @@ msgstr "Sign out other sessions"
 msgid "Sign-in is currently unavailable for this account. Please contact your administrator."
 msgstr "Sign-in is currently unavailable for this account. Please contact your administrator."
 
-#: app/routes/passkeys.tsx:178
+#: app/routes/passkeys.tsx:194
 msgid "Signed-in sessions on other devices can still be active. Sign out your other sessions?"
 msgstr "Signed-in sessions on other devices can still be active. Sign out your other sessions?"
 
@@ -990,7 +990,7 @@ msgstr "You can link multiple accounts to your Datum account."
 msgid "You can now sign in using <0>{loginName}</0>."
 msgstr "You can now sign in using <0>{loginName}</0>."
 
-#: app/routes/passkeys.tsx:242
+#: app/routes/passkeys.tsx:259
 msgid "You can't remove your only sign-in method. Add another method first."
 msgstr "You can't remove your only sign-in method. Add another method first."
 

@@ -30,7 +30,7 @@ describe('/id/passkeys — list / remove / last-method guard / sign-out offer / 
   // passkey-use.cy.ts fails standalone on main the same way) so ceremony clicks land.
   before(() => {
     cy.visit('/id/login');
-    cy.contains('button', 'Email');
+    cy.contains('button', 'Continue with email');
     loginAndGetSession('passkey-user@acme.test');
     cy.visit('/id/login/passkey?loginName=passkey-user%40acme.test', {
       onBeforeLoad: (win) => {
