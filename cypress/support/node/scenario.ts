@@ -230,6 +230,7 @@ export type ServiceFn =
   | 'loginLoader'
   | 'loginAction'
   | 'loginPasswordAction'
+  | 'loginPasswordLoader'
   | 'securityKeyAction'
   | 'loginVerifyEmailLoader'
   | 'loginMethodLoader'
@@ -308,6 +309,9 @@ export interface Scenario {
     disableLoginWithEmail?: boolean;
     disableLoginWithPhone?: boolean;
     allowRegister?: boolean;
+    /** Password disabled by org policy (Zitadel LoginPolicy.userLogin=false) — production's
+     *  configuration. Drives the /login/password loader+action policy guard. */
+    allowPassword?: boolean;
   };
   /** deleteSession throws — exercises completeOidcLogout's best-effort tolerance. */
   failDeleteSession?: boolean;

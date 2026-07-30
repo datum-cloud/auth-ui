@@ -35,9 +35,15 @@ export const meta: MetaFunction = () => [{ title: 'Enter your password' }];
 export async function loader({ request }: LoaderFunctionArgs) {
   const url = new URL(request.url);
   const organization = url.searchParams.get('organization') ?? undefined;
+  const requestId = url.searchParams.get('requestId') ?? undefined;
   const provider = providerForRequest(request);
   // Org-first: an explicit org wins, else the default org (old app's `organization ?? getDefaultOrg()`).
   const settings = await provider.getLoginSettings(await resolveOrg(provider, organization));
+  // Org policy may forbid password entirely (Zitadel LoginPolicy.userLogin=false — production's
+  // configuration). decideAfterIdentifier already filters password out of the post-identifier
+  // routing, so nothing NAVIGATES here; but LoginPolicy governs Zitadel's own hosted UI, not
+  // auth-ui's headless Session API calls — without this a direct visit renders a working form.
+  if (!settings.allowPassword) return redirect(redirectToLogin(requestId, organization));
   const { csrfToken, headers } = await loaderCsrf(request);
   return data({ csrfToken, hidePasswordReset: settings.hidePasswordReset === true }, { headers });
 }
@@ -49,6 +55,14 @@ export async function action({ request }: ActionFunctionArgs) {
   const parsed = loginPasswordSchema.safeParse(Object.fromEntries(form));
   if (!parsed.success) return data({ error: 'INVALID_INPUT' as const }, { status: 400 });
   const { password, loginName, requestId, organization } = parsed.data;
+
+  // Same policy guard as the loader, repeated because a crafted POST never runs the loader.
+  // Not belt-and-braces: Zitadel's Session API password check does NOT consult LoginPolicy,
+  // so without this a direct POST would authenticate against a policy that forbids passwords.
+  const settings = await provider.getLoginSettings(await resolveOrg(provider, organization));
+  if (!settings.allowPassword) {
+    return data({ error: 'PASSWORD_NOT_ALLOWED' as const }, { status: 403 });
+  }
 
   const list = await readSessions(request);
   const result = await verifyLoginPassword(provider, list, {

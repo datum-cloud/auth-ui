@@ -109,7 +109,10 @@ import { loader as deviceIndexLoader } from '@/routes/device/index';
 import { loader as loginLoader, action as loginAction } from '@/routes/login/index';
 import { loader as loginMethodLoader, action as loginMethodAction } from '@/routes/login/method';
 import { action as loginMfaAction } from '@/routes/login/mfa';
-import { action as loginPasswordAction } from '@/routes/login/password';
+import {
+  action as loginPasswordAction,
+  loader as loginPasswordLoader,
+} from '@/routes/login/password';
 import { action as securityKeyAction } from '@/routes/login/security-key';
 import { loader as loginVerifyEmailLoader } from '@/routes/login/verify/email';
 import { loader as logoutLoader } from '@/routes/logout/index';
@@ -2178,6 +2181,19 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
           s.request ?? { url: 'http://localhost/id/login', csrf: true }
         );
         const result = await loginAction({ request, params: {}, context: {} as never } as never);
+        response = await serializeResponse(result);
+        break;
+      }
+
+      case 'loginPasswordLoader': {
+        const { request } = await buildHandlerRequest(
+          s.request ?? { url: 'http://localhost/id/login/password' }
+        );
+        const result = await loginPasswordLoader({
+          request,
+          params: {},
+          context: {} as never,
+        } as never);
         response = await serializeResponse(result);
         break;
       }

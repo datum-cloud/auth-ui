@@ -308,7 +308,7 @@ export default function Passkeys() {
 
         {returnTo && /^https?:\/\//.test(returnTo) ? (
           // Validated external entry point (portal round-trip) — offer the way back.
-          <LinkButton type="secondary" theme="borderless" block href={returnTo}>
+          <LinkButton theme="link" type="quaternary" block href={returnTo}>
             <Trans>Back</Trans>
           </LinkButton>
         ) : null}
