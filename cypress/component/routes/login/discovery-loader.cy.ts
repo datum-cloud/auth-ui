@@ -1,10 +1,11 @@
 // cypress/component/routes/login/discovery-loader.cy.ts
 //
 // The /login loader's identity-discovery arming + suppression list, at the HTTP
-// boundary. Discovery
-// arms ONLY for the hintless population — and a discovery arm must be free:
-// self-minted options, NO Zitadel session, NO Set-Cookie. Sibling of
-// conditional-passkey-loader.cy.ts (the hinted path).
+// boundary. Discovery is the SECOND arm of the loader's cascade (armLoginPasskey): it
+// catches every decline of the hint-bound first arm — hintless, ?add=1, a live session,
+// all of them — as long as the AUTH_PASSKEY_DISCOVERY_ENABLED kill switch is on. A
+// discovery arm must be free: self-minted options, NO Zitadel session, NO Set-Cookie.
+// Sibling of conditional-passkey-loader.cy.ts (the hinted path).
 import { callService } from '../../../support/node/call-service';
 
 const PK_USER = 'passkey-user@acme.test'; // u5, authMethods ['password','passkey']
@@ -37,17 +38,21 @@ describe('/login loader — identity-discovery arming', () => {
     );
   });
 
-  it('?add=1 suppresses discovery (explicit intent)', () => {
+  it('?add=1 arms discovery — an explicit "different identity" is what discovery serves', () => {
     callService({
       fn: 'loginLoader',
       provider: 'singleton',
       request: { url: `${URL_BASE}&add=1` },
     }).then((v) => {
-      expect((v.response?.dataBody as LoaderBody).identityDiscovery).to.equal(null);
+      const body = v.response?.dataBody as LoaderBody;
+      expect(body.identityDiscovery?.publicKeyCredentialRequestOptions, 'discovery armed').to.exist;
+      // The HINT arm stays suppressed under ?add=1 — arming it would sign the user
+      // back into the account they already hold.
+      expect(body.conditionalPasskey).to.equal(null);
     });
   });
 
-  it('ANY live session suppresses discovery', () => {
+  it('a live session no longer suppresses discovery (the add-account population)', () => {
     callService({
       fn: 'loginLoader',
       provider: 'singleton',
@@ -57,7 +62,8 @@ describe('/login loader — identity-discovery arming', () => {
         sessions: [{ id: 's5', token: 't5', loginName: PK_USER }],
       },
     }).then((v) => {
-      expect((v.response?.dataBody as LoaderBody).identityDiscovery).to.equal(null);
+      const body = v.response?.dataBody as LoaderBody;
+      expect(body.identityDiscovery?.publicKeyCredentialRequestOptions, 'discovery armed').to.exist;
     });
   });
 

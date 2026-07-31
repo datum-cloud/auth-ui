@@ -55,8 +55,9 @@ function mountLogin(opts?: {
   // Loader-resolved usernameless hint (Task 7's conditionalPasskey field). Null/undefined
   // mirrors a cold visit with no hint.
   conditionalPasskey?: { loginName: string; publicKeyCredentialRequestOptions: unknown } | null;
-  // Loader-armed identity discovery (fresh browser, no hint). Null/undefined mirrors a
-  // loader-SUPPRESSED visit (?add=1 / live session) where the button must fall back.
+  // Loader-armed identity discovery. Null/undefined mirrors the ONLY remaining unarmed
+  // state: the discovery kill switch (AUTH_PASSKEY_DISCOVERY_ENABLED=false). ?add=1 and
+  // live-session visits now arm discovery via the loader cascade.
   identityDiscovery?: { publicKeyCredentialRequestOptions: unknown } | null;
 }) {
   const loginContext = { ...LOGIN_CONTEXT, loginName: opts?.loginName ?? LOGIN_CONTEXT.loginName };
@@ -122,8 +123,8 @@ describe('/login Passkey button — visibility and identity binding', () => {
       .and('not.be.disabled');
   });
 
-  it('cold click with discovery UNARMED (loader-suppressed) falls back to the identifier field', () => {
-    // identityDiscovery null = the loader suppressed arming (?add=1 / live session).
+  it('cold click with discovery UNARMED (kill switch off) falls back to the identifier field', () => {
+    // identityDiscovery null = discovery kill switch is off (the only unarmed state left).
     // beginDiscovery has no options to run over → the identifier step is the fallback.
     mountLogin();
     cy.contains('button', /passkey/i).click();
@@ -188,5 +189,60 @@ describe('/login Passkey button — visibility and identity binding', () => {
         expect($cold.text()).to.equal(hintedText);
       });
     });
+  });
+
+  it('a 409 with a malformed body (no loginName) surfaces error copy instead of a silent dead end', () => {
+    // NOTE: ordered BEFORE the successful-routing 409 test below. That test's
+    // window.location.assign() is a REAL navigation in this Cypress/Electron
+    // component runner (not a jsdom no-op), and it leaves the AUT on Cypress's
+    // "URL navigation disabled in component testing" page for any test that runs
+    // after it in the same spec — there's no per-`it()` page reset for component
+    // tests. Keeping the navigating test last avoids contaminating this one.
+    cy.intercept('POST', '**/id/login/passkey-discover', {
+      statusCode: 409,
+      body: { error: 'ALREADY_SIGNED_IN' }, // no loginName — contract violation
+    }).as('discover');
+    mountLogin({
+      identityDiscovery: {
+        publicKeyCredentialRequestOptions: { publicKey: { challenge: 'identity-x' } },
+      },
+    });
+    cy.contains('button', /passkey/i).click();
+    cy.wait('@discover');
+    // No verify POST — the branch must not fall through to submit either.
+    cy.then(() => expect(capturedPosts).to.have.length(0));
+    // The explicit click must not be left with zero visible outcome — falls back to
+    // the same 'unknown' copy the 200-path shape-validation branch uses.
+    cy.get('[role="alert"]').should('exist');
+  });
+
+  it('a 409 ALREADY_SIGNED_IN routes to the accounts picker instead of reporting a failure', () => {
+    // NOTE: this environment (Cypress 15 component runner on Electron) cannot stub
+    // window.location.assign — both `cy.stub(win.location, 'assign')` and replacing
+    // `win.location` wholesale via Object.defineProperty throw "Cannot redefine
+    // property" (window.location is non-configurable here). So this test cannot
+    // assert the full-page navigation (to /accounts, carrying requestId/organization —
+    // NOT /signed-in, which would resolve mostRecent(sessions) rather than the tapped
+    // account) directly; it instead proves the negative that matters at this layer —
+    // the 409 branch must NOT fall through to the verify POST — and leaves the
+    // navigation assertion itself to the e2e coverage in cypress/e2e/passkey-conditional.cy.ts.
+    // ALSO: keep this test LAST in the file — see the note on the malformed-body
+    // test above (this one's assign() call really navigates the AUT).
+    cy.intercept('POST', '**/id/login/passkey-discover', {
+      statusCode: 409,
+      body: { error: 'ALREADY_SIGNED_IN', loginName: 'mia@acme.test' },
+    }).as('discover');
+    mountLogin({
+      identityDiscovery: {
+        publicKeyCredentialRequestOptions: { publicKey: { challenge: 'identity-x' } },
+      },
+    });
+    cy.contains('button', /passkey/i).click();
+    cy.wait('@discover');
+    // No verify POST — there is nothing to verify, the session already exists.
+    cy.then(() => expect(capturedPosts).to.have.length(0));
+    // Nor should the ceremony-failure copy render — a 409 must not be swallowed by
+    // the opaque-400 `!res.ok` branch into a misleading "not-allowed" FormError.
+    cy.get('[role="alert"]').should('not.exist');
   });
 });

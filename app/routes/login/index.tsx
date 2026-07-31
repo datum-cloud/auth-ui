@@ -14,7 +14,7 @@ import { idpTypeToSlug } from '@/modules/auth/idp-slug';
 // ADAPTATION (plan-drift fix): readSessions + serializeSessions live in @/modules/auth/session/cookie.
 // The locked plan block incorrectly listed them as coming from @/modules/auth/session/session
 // (that module only has pure helpers, no cookie I/O).
-import { readSessions, serializeSessions, listSessions } from '@/modules/auth/session/cookie';
+import { readSessions, serializeSessions } from '@/modules/auth/session/cookie';
 import { readLastUsedLogin } from '@/modules/auth/session/last-used-login';
 import { readPasskeyHint, clearPasskeyHint } from '@/modules/auth/session/passkey-hint';
 import { readReauthIntent } from '@/modules/auth/session/reauth-intent';
@@ -28,8 +28,7 @@ import {
 } from '@/resources/login/login.schema';
 import { resolveOrg } from '@/resources/shared/resolve-org';
 import { getActiveIdPs } from '@/resources/sso/idp-providers';
-import { mintIdentityChallenge } from '@/resources/webauthn/identity-challenge';
-import { armUserBoundChallenge } from '@/resources/webauthn/webauthn.service';
+import { armLoginPasskey } from '@/resources/webauthn/arm-login-passkey';
 import { paths } from '@/routes/paths';
 import { providerForRequest } from '@/server/auth-context.server';
 import { loaderCsrf, assertCsrf } from '@/server/csrf';
@@ -86,76 +85,27 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const notice = url.searchParams.get('notice') ?? undefined;
 
   // ── Usernameless fast path: arm a conditional-mediation passkey ceremony ────
-  // A hint is an inference; arm ONLY when nothing more specific is known. Explicit
-  // suppression list: ?add=1 (user asked for a different
-  // account), hinted user already live (nothing to log in), unresolvable user (clear the
-  // stale hint), no passkey method. Every suppression — and every mint failure — renders
-  // the ordinary page; arming is invisible either way.
+  // Two arms tried as a CASCADE (armLoginPasskey), not mutually-exclusive alternatives.
+  // The first arm binds a pre-minted, user-bound challenge to the passkey hint — but only
+  // when nothing more specific is known: it declines under ?add=1 (user asked for a
+  // different account), a hinted user already live (nothing to log in), an unresolvable
+  // user (the hint is cleared), or no passkey method. Every decline of the first arm falls
+  // through to the second: usernameless identity discovery, which serves ?add=1 and a live
+  // session just as well as a cold browser (gated only by the AUTH_PASSKEY_DISCOVERY_ENABLED
+  // kill switch). Every failure of both arms — and every mint failure — renders the
+  // ordinary page; arming is invisible either way.
   const responseHeaders = new Headers(headers);
-  let conditionalPasskey: {
-    loginName: string;
-    publicKeyCredentialRequestOptions: unknown;
-  } | null = null;
-  let identityDiscovery: { publicKeyCredentialRequestOptions: unknown } | null = null;
   const hint = await readPasskeyHint(request);
-  const isAddAccount = url.searchParams.get('add') === '1';
-  if (hint && !isAddAccount) {
-    const sessions = await readSessions(request);
-    // LIVE session, not just any cookie entry: raw readSessions() output can carry stale
-    // (expired) entries, and a stale entry must not suppress the fast path — the
-    // suppression criterion is a LIVE session. listSessions is the codebase's expiry-aware
-    // filter (same usage as session.service.ts); unknown expiry counts as live.
-    const hasLiveSession = listSessions(sessions, Date.now()).some(
-      (s) => s.loginName.toLowerCase() === hint.toLowerCase()
-    );
-    if (!hasLiveSession) {
-      const user = await provider.findUser(hint);
-      if (!user) {
-        // Deleted/renamed user — the hint can never fire; drop it so we stop re-checking.
-        responseHeaders.append('set-cookie', await clearPasskeyHint());
-      } else if ((await provider.listAuthMethods(user.id)).includes('passkey')) {
-        try {
-          // Mirror resolveIdentifier's known-user session mint, then persist the entry so
-          // the /login/passkey verify action can resolve it by loginName. The loader-side
-          // Set-Cookie is the accepted side effect.
-          // `hasLiveSession` above satisfies armUserBoundChallenge's caller contract
-          // (its same-loginName supersede is only safe against dead entries).
-          const armed = await armUserBoundChallenge(
-            provider,
-            request,
-            sessions,
-            user,
-            url.hostname
-          );
-          if (armed) {
-            for (const cookie of armed.setCookies) responseHeaders.append('set-cookie', cookie);
-            conditionalPasskey = {
-              loginName: armed.loginName,
-              publicKeyCredentialRequestOptions: armed.publicKeyCredentialRequestOptions,
-            };
-          }
-        } catch {
-          // Session creation failed (deactivated user, provider hiccup) —
-          // clear the hint, render normally.
-          responseHeaders.append('set-cookie', await clearPasskeyHint());
-        }
-      }
-    }
-  } else if (!hint && !isAddAccount) {
-    // ── Discovery arm ─────────────────────────────────────────────────────────
-    // Hintless visitors get a SELF-MINTED challenge: no Zitadel call, nothing
-    // persisted — the identity tap posts to /login/passkey-discover, which mints
-    // the real user-bound challenge only after a passkey was actually tapped.
-    // Suppressed when ANY live session exists (arming is inference; a logged-in
-    // visitor is better served by the ordinary page) and
-    // by the operational kill switch (env, default ON — incident mitigation).
-    const sessions = await readSessions(request);
-    if (env.AUTH_PASSKEY_DISCOVERY_ENABLED && listSessions(sessions, Date.now()).length === 0) {
-      identityDiscovery = {
-        publicKeyCredentialRequestOptions: mintIdentityChallenge(url.hostname),
-      };
-    }
-  }
+  const arming = await armLoginPasskey(provider, request, {
+    hint,
+    isAddAccount: url.searchParams.get('add') === '1',
+    sessions: await readSessions(request),
+    hostname: url.hostname,
+    discoveryEnabled: env.AUTH_PASSKEY_DISCOVERY_ENABLED,
+  });
+  for (const cookie of arming.setCookies) responseHeaders.append('set-cookie', cookie);
+  if (arming.clearHint) responseHeaders.append('set-cookie', await clearPasskeyHint());
+  const { conditionalPasskey, identityDiscovery } = arming;
 
   return data(
     {
@@ -521,8 +471,10 @@ export default function Login() {
             onClick={() => {
               // No resolvable identity — run the discovery ceremony MODALLY: the browser's native picker over the loader's
               // self-minted challenge, then the discover → verify pipeline. Fall back to
-              // the identifier step only when discovery can't start (not armed — e.g.
-              // ?add=1 or a live session — or WebAuthn unsupported).
+              // the identifier step only when discovery can't start — the
+              // AUTH_PASSKEY_DISCOVERY_ENABLED kill switch is off, or WebAuthn is
+              // unsupported (?add=1 and a live session no longer suppress discovery; the
+              // loader's cascade arms it for both).
               if (!passkeyIdentity) {
                 if (!conditional.beginDiscovery()) setShowEmailField(true);
                 return;
