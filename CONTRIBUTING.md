@@ -72,5 +72,4 @@ See [Testing](docs/development/testing.md) for the full test strategy.
 
 ## License
 
-By contributing, you agree that your contributions will be licensed under the
-[Apache License 2.0](LICENSE).
+By contributing, you agree that your contributions will be licensed under the MIT License, the same as this project.

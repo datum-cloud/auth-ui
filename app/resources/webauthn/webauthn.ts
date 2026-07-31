@@ -77,9 +77,12 @@ export function isWebAuthnSupported(): boolean {
   return typeof window !== 'undefined' && typeof window.PublicKeyCredential !== 'undefined';
 }
 
-/** USE: marshal a server assertion challenge through navigator.credentials.get. Returns plain JSON for the provider. */
+/** USE: marshal a server assertion challenge through navigator.credentials.get. Returns plain
+ *  JSON for the provider. `opts` (conditional-mediation fast path) forwards mediation + an
+ *  AbortSignal to credentials.get — omitted for every pre-existing caller (modal behavior). */
 export async function marshalAssertion(
-  publicKey: WebAuthnChallengeInput
+  publicKey: WebAuthnChallengeInput,
+  opts?: { mediation?: CredentialMediationRequirement; signal?: AbortSignal }
 ): Promise<Record<string, unknown>> {
   if (!isWebAuthnSupported()) throw new WebAuthnUnsupportedError();
   const pk = {
@@ -101,6 +104,8 @@ export async function marshalAssertion(
   try {
     cred = (await navigator.credentials.get({
       publicKey: pk as unknown as PublicKeyCredentialRequestOptions,
+      mediation: opts?.mediation,
+      signal: opts?.signal,
     })) as PublicKeyCredential | null;
   } catch (err) {
     throw new WebAuthnCeremonyError(classifyWebAuthnError(err));

@@ -20,6 +20,7 @@ export const paths = {
     password: (q?: Query) => withQuery('/login/password', q),
     mfa: (q?: Query) => withQuery('/login/mfa', q),
     passkey: (q?: Query) => withQuery('/login/passkey', q),
+    passkeyDiscover: (q?: Query) => withQuery('/login/passkey-discover', q),
     securityKey: (q?: Query) => withQuery('/login/security-key', q),
     verify: {
       email: (q?: Query) => withQuery('/login/verify/email', q),

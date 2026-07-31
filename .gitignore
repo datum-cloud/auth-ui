@@ -10,6 +10,8 @@ node_modules
 /cypress/videos
 /cypress/screenshots
 .claude/settings.local.json
+.claude/settings.json
+.superpowers/
 app/modules/i18n/locales/*.ts
 app/modules/i18n/locales/*.js
 /.lighthouseci

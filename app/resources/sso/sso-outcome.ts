@@ -17,6 +17,8 @@ export type SsoOutcome =
       location: string;
       setCookie?: string;
       lastUsedCookie?: string;
+      /** Writes the passkey-hint (usernameless fast path) for the just-signed-in loginName. */
+      passkeyHintCookie?: string;
       // fingerprintId Set-Cookie minted for a browser that lacked it (null/absent on reuse).
       fingerprintCookie?: string;
       // Clears the `reauth-intent` marker once a re-auth flow resolves (match or mismatch).
@@ -36,12 +38,14 @@ export function outcomeToResponse(outcome: SsoOutcome): Response | ReturnType<ty
       if (
         outcome.setCookie ||
         outcome.lastUsedCookie ||
+        outcome.passkeyHintCookie ||
         outcome.fingerprintCookie ||
         outcome.reauthClearCookie
       ) {
         const h = new Headers();
         if (outcome.setCookie) h.append('set-cookie', outcome.setCookie);
         if (outcome.lastUsedCookie) h.append('set-cookie', outcome.lastUsedCookie);
+        if (outcome.passkeyHintCookie) h.append('set-cookie', outcome.passkeyHintCookie);
         if (outcome.fingerprintCookie) h.append('set-cookie', outcome.fingerprintCookie);
         if (outcome.reauthClearCookie) h.append('set-cookie', outcome.reauthClearCookie);
         return redirect(outcome.location, { headers: h });

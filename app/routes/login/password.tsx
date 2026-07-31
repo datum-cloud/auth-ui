@@ -7,6 +7,7 @@ import { useLoginContext } from '@/hooks/use-login-context';
 // (which re-exports them from session.ts) — the canonical one-stop import for route-layer session I/O.
 import { readSessions, serializeSessions } from '@/modules/auth/session/cookie';
 import { serializeLastUsedLogin } from '@/modules/auth/session/last-used-login';
+import { serializePasskeyHint } from '@/modules/auth/session/passkey-hint';
 import { checkReauthIntent } from '@/modules/auth/session/reauth-intent';
 import { verifyLoginPassword } from '@/resources/login';
 import { attemptsRemaining } from '@/resources/login/login-view';
@@ -96,6 +97,7 @@ export async function action({ request }: ActionFunctionArgs) {
   const headers = new Headers();
   headers.append('set-cookie', await serializeSessions(result.sessions));
   headers.append('set-cookie', await serializeLastUsedLogin('email'));
+  headers.append('set-cookie', await serializePasskeyHint(loginName));
 
   // RE-AUTH identity guard (password path) — shared checkReauthIntent so all factors agree. When
   // this login is re-authenticating a specific account, verify the identity that authenticated

@@ -26,6 +26,7 @@ import {
   byId,
   type SessionEntry,
 } from '@/modules/auth/session/cookie';
+import { serializePasskeyHint } from '@/modules/auth/session/passkey-hint';
 import { serializeReauthIntent } from '@/modules/auth/session/reauth-intent';
 import type { Session, AuthMethod, LoginSettings, ProviderErrorCode } from '@/modules/auth/types';
 import { ProviderError } from '@/modules/auth/types';
@@ -535,7 +536,15 @@ export async function switchAccount(
   // /device/authorize consent screen for review + Authorize. Standalone/OIDC switches keep the
   // normal resolved destination.
   const location = userCode ? paths.device.authorize({ user_code: userCode }) : nextPath;
-  return { kind: 'redirect', location, setCookie: await serializeSessions(updated) };
+  return {
+    kind: 'redirect',
+    location,
+    setCookie: await serializeSessions(updated),
+    // The switched-to account is now this browser's active identity — refresh the hint
+    // (spec: hint-maintenance matrix). reauthRedirect (dead session) intentionally does
+    // NOT rewrite it: identity is not re-established until re-auth actually succeeds.
+    cookies: [await serializePasskeyHint(entry.loginName)],
+  };
 }
 
 /**

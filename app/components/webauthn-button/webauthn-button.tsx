@@ -25,7 +25,10 @@ export const CYPRESS_CREDENTIAL = {
     authenticatorData: 'ZmFrZS1hdXRoZW50aWNhdG9yLWRhdGE',
     clientDataJSON: 'ZmFrZS1jbGllbnQtZGF0YS1qc29u',
     signature: 'ZmFrZS1zaWduYXR1cmU',
-    userHandle: null,
+    // base64url('u5') — the fake singleton's passkey user. The verify path ignores
+    // userHandle; the /login/passkey-discover action reads it to resolve identity,
+    // so the pre-baked credential must claim a real seeded passkey user.
+    userHandle: 'dTU',
   },
 };
 

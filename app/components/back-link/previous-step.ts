@@ -14,6 +14,7 @@ const PREVIOUS_STEP: Array<[match: (p: string) => boolean, target: string]> = [
   // instead (matches "Not you?" semantics) — 2+-factor users still reach the real
   // picker via forward navigation from /login/password, which is unaffected.
   [(p) => p.startsWith('/login/verify/'), '/login'],
+  [(p) => p === '/login/passkey', '/login'],
   [(p) => p === '/login/security-key', '/login'],
   [(p) => p === '/signup/password', '/signup'],
   [(p) => p === '/signup/method', '/signup'],

@@ -187,7 +187,10 @@ const webauthnVerifyLimiter = new RateLimiter({ limit: 10, windowMs: 5 * 60_000 
 // Self-guards on POST + exact normalized paths to avoid double-limiting:
 //   - loginPasswordRateLimit already covers /id/login/password
 //   - mfaVerifyRateLimit already covers /id/login/verify/*
-// This middleware only counts its three exact paths, so no overlap occurs.
+// This middleware only counts its four exact paths, so no overlap occurs.
+// /id/login/passkey-discover shares this budget deliberately: it is the same
+// endpoint class (assertion-adjacent POST, enumeration-parity 400s) and a real
+// discovery login costs 1 discover + 1 verify — well inside 10/5min.
 // BODY-STREAM HAZARD: assertion payloads are in the POST body — key is ip-only.
 // mfaVerifyRateLimit keying decision (2026-06-12): ip-only stays. Body-stream hazard
 // prevents reading loginName without consuming the stream; the per-account lockout
@@ -197,6 +200,7 @@ export const webauthnVerifyRateLimit: MiddlewareHandler = createRateLimit({
   match: (c, pathname) =>
     c.req.method === 'POST' &&
     (pathname === '/id/login/passkey' ||
+      pathname === '/id/login/passkey-discover' ||
       pathname === '/id/login/security-key' ||
       pathname === '/id/login/mfa'),
   key: (_c, ip) => ip,

@@ -17,6 +17,7 @@ export default [
     route('password', 'routes/login/password.tsx'),
     route('mfa', 'routes/login/mfa.tsx'),
     route('passkey', 'routes/login/passkey.tsx'),
+    route('passkey-discover', 'routes/login/passkey-discover.tsx'),
     route('security-key', 'routes/login/security-key.tsx'),
     route('verify/email', 'routes/login/verify/email.tsx'),
     route('verify/sms', 'routes/login/verify/sms.tsx'),

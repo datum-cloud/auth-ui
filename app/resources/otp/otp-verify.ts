@@ -29,6 +29,7 @@ import {
   serializeSessions,
 } from '@/modules/auth/session/cookie';
 import { serializeLastUsedLogin } from '@/modules/auth/session/last-used-login';
+import { serializePasskeyHint } from '@/modules/auth/session/passkey-hint';
 import {
   dispatchEmailChallenge,
   dispatchSmsChallenge,
@@ -166,6 +167,7 @@ export function createOtpVerifyHandlers(cfg: OtpVerifyConfig) {
     headers.append('set-cookie', await serializeSessions(updatedSessions));
     if (cfg.writeLastUsedLogin) {
       headers.append('set-cookie', await serializeLastUsedLogin(cfg.writeLastUsedLogin));
+      headers.append('set-cookie', await serializePasskeyHint(loginName));
     }
 
     // email only: continue passkey enrollment when requested.
