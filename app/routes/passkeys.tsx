@@ -34,6 +34,7 @@ import {
   redirect,
   useActionData,
   useLoaderData,
+  useNavigation,
   type ActionFunctionArgs,
   type LoaderFunctionArgs,
   type MetaFunction,
@@ -111,7 +112,14 @@ export async function action({ request }: ActionFunctionArgs) {
 function RemoveConfirmDialog({ row, csrfToken }: { row: PasskeyRow; csrfToken: string }) {
   const [open, setOpen] = useState(false);
   const actionData = useActionData();
+  const navigation = useNavigation();
   const { t } = useLingui();
+  // Scoped to THIS row: useNavigation is global, and every passkey row renders its own
+  // dialog — matching on passkeyId keeps one row's removal from spinning all of them.
+  const removing =
+    navigation.state !== 'idle' &&
+    navigation.formData?.get('intent') === 'remove' &&
+    navigation.formData?.get('passkeyId') === row.id;
   // Close when any action result lands: on success the row unmounts anyway, but on a
   // refusal (LAST_METHOD) the inline error must not hide behind the modal overlay.
   useEffect(() => {
@@ -139,14 +147,19 @@ function RemoveConfirmDialog({ row, csrfToken }: { row: PasskeyRow; csrfToken: s
           }
         />
         <Dialog.Footer>
-          <Button type="secondary" theme="outline" htmlType="button" onClick={() => setOpen(false)}>
+          <Button
+            type="secondary"
+            theme="outline"
+            htmlType="button"
+            disabled={removing}
+            onClick={() => setOpen(false)}>
             <Trans>Cancel</Trans>
           </Button>
           <RRForm method="post">
             <AuthFormFields csrf={csrfToken} />
             <input type="hidden" name="intent" value="remove" />
             <input type="hidden" name="passkeyId" value={row.id} />
-            <Button type="danger" theme="solid" htmlType="submit">
+            <Button type="danger" theme="solid" htmlType="submit" loading={removing}>
               <Trans>Remove passkey</Trans>
             </Button>
           </RRForm>
@@ -169,6 +182,9 @@ function SignOutOthersDialog({
   onOpenChange: (open: boolean) => void;
   csrfToken: string;
 }) {
+  const navigation = useNavigation();
+  const signingOut =
+    navigation.state !== 'idle' && navigation.formData?.get('intent') === 'signout-others';
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <Dialog.Content>
@@ -185,13 +201,14 @@ function SignOutOthersDialog({
             type="secondary"
             theme="outline"
             htmlType="button"
+            disabled={signingOut}
             onClick={() => onOpenChange(false)}>
             <Trans>Not now</Trans>
           </Button>
           <RRForm method="post">
             <AuthFormFields csrf={csrfToken} />
             <input type="hidden" name="intent" value="signout-others" />
-            <Button type="danger" theme="solid" htmlType="submit">
+            <Button type="danger" theme="solid" htmlType="submit" loading={signingOut}>
               <Trans>Sign out other sessions</Trans>
             </Button>
           </RRForm>
@@ -308,7 +325,7 @@ export default function Passkeys() {
 
         {returnTo && /^https?:\/\//.test(returnTo) ? (
           // Validated external entry point (portal round-trip) — offer the way back.
-          <LinkButton type="secondary" theme="borderless" block href={returnTo}>
+          <LinkButton theme="link" type="quaternary" block href={returnTo}>
             <Trans>Back</Trans>
           </LinkButton>
         ) : null}

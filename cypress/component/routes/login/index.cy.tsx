@@ -14,7 +14,7 @@ import { createMemoryRouter, RouterProvider } from 'react-router';
 
 const LOGIN_CONTEXT = { loginName: '', requestId: undefined, organization: undefined };
 
-// Settings shaped so the ordinary identifier form (the "Email" button) renders by
+// Settings shaped so the ordinary identifier form (the "Continue with email" button) renders by
 // default — the baseline the inline ceremony state must replace/restore around.
 const INDEX_LOADER_DATA = {
   csrfToken: 'tok-0',
@@ -55,8 +55,18 @@ function mountLogin(opts?: {
   // Overrides the /login/passkey stub's action — used to simulate a ceremony failure
   // (Finding 1 coverage). Defaults to capturing the POST into capturedPosts.
   passkeyAction?: (args: { request: Request }) => unknown | Promise<unknown>;
+  // Org-policy overrides — used to cover configurations where password is disabled.
+  settings?: Partial<(typeof INDEX_LOADER_DATA)['settings']>;
+  emailDeliveryEnabled?: boolean;
 }) {
   const loginContext = { ...LOGIN_CONTEXT, loginName: opts?.loginName ?? LOGIN_CONTEXT.loginName };
+  // Must feed BOTH the loader and the router's hydrationData below — with hydrationData
+  // present the loaders do not run on initial render, so patching only the loader is a no-op.
+  const indexData = {
+    ...INDEX_LOADER_DATA,
+    settings: { ...INDEX_LOADER_DATA.settings, ...opts?.settings },
+    emailDeliveryEnabled: opts?.emailDeliveryEnabled ?? INDEX_LOADER_DATA.emailDeliveryEnabled,
+  };
   const router = createMemoryRouter(
     [
       {
@@ -68,7 +78,7 @@ function mountLogin(opts?: {
             id: 'index',
             index: true,
             element: <Login />,
-            loader: async () => INDEX_LOADER_DATA,
+            loader: async () => indexData,
             action: opts?.indexAction ?? (async () => null),
           },
           // Stub /login/passkey — same route the shared ceremony hook lazily loads
@@ -102,7 +112,7 @@ function mountLogin(opts?: {
     {
       initialEntries: ['/login'],
       hydrationData: {
-        loaderData: { login: loginContext, index: INDEX_LOADER_DATA },
+        loaderData: { login: loginContext, index: indexData },
         ...(opts?.actionData !== undefined ? { actionData: { index: opts.actionData } } : {}),
       },
     }
@@ -134,7 +144,37 @@ describe('/login — sole-passkey inline ceremony', () => {
       expect(capturedPosts[0].loginName).to.equal('solo@acme.test');
     });
     // Identifier form is gone while the ceremony state shows.
-    cy.contains('button', 'Email').should('not.exist');
+    cy.contains('button', 'Continue with email').should('not.exist');
+  });
+
+  // REGRESSION: with allowPassword=false the identifier form used to be hidden entirely,
+  // while signInUnavailable stayed false (suppressed by showPasskeyPrompt) — so a fresh
+  // visitor at a passkey-only org got an EMPTY card: no sign-in path and no error.
+  // Passkey needs a known user (zitadel/zitadel#8899), so the identifier IS the entry point.
+  it('a passkey-only org still offers the identifier form, not an empty card', () => {
+    mountLogin({
+      settings: { allowPassword: false, passkeysType: 'allowed' },
+      emailDeliveryEnabled: false,
+    });
+    cy.contains('button', 'Continue with email').should('be.visible');
+    cy.contains('Sign-in is currently unavailable').should('not.exist');
+  });
+
+  // When email-link is the ONLY path, "Continue" would hand off to decideAfterIdentifier
+  // and resolve to NO_SUPPORTED_METHOD — so it must not render. The email-link submit
+  // takes over as the form's primary (and only) action.
+  it('an email-link-only org shows the form without a dead-end Continue button', () => {
+    mountLogin({
+      settings: { allowPassword: false, passkeysType: 'not_allowed' },
+      emailDeliveryEnabled: true,
+    });
+    cy.contains('button', 'Continue with email').should('be.visible').click();
+    cy.contains('button', 'Email me a sign-in link').should('be.visible');
+    // Exactly one submit action — no "Continue" alongside it.
+    cy.get('form button[type="submit"]').should('have.length', 1);
+    cy.contains('form button', 'Continue').should('not.exist');
+    // The intent rides on a hidden field, so implicit submission still means email-link.
+    cy.get('form input[name="intent"]').should('have.value', 'email-link');
   });
 
   it('inline state offers the manual button and Not you? returns to the identifier form', () => {
@@ -149,7 +189,7 @@ describe('/login — sole-passkey inline ceremony', () => {
     });
     cy.contains('button', 'Continue with passkey').should('be.visible');
     cy.contains('Not you?').click();
-    cy.contains('button', 'Email').should('be.visible');
+    cy.contains('button', 'Continue with email').should('be.visible');
   });
 
   // Finding 1: the gated Passkey SHORTCUT drives the same `ceremony` as the inline
@@ -198,7 +238,7 @@ describe('/login — sole-passkey inline ceremony', () => {
     cy.wrap(null).should(() => expect(capturedPosts).to.have.length(1));
 
     cy.contains('Not you?').click();
-    cy.contains('button', 'Email').should('be.visible').click();
+    cy.contains('button', 'Continue with email').should('be.visible').click();
     cy.contains('button', 'Continue').click();
 
     // The fresh challenge (different identity, different publicKeyCredentialRequestOptions
