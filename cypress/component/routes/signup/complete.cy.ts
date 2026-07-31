@@ -27,6 +27,7 @@ describe('signup/complete — success path', () => {
       expect(url.pathname).to.equal('/setup/passkey');
       expect(url.searchParams.get('loginName')).to.equal('alice@acme.test');
       expect(url.searchParams.get('userId')).to.be.ok;
+      expect(v.response?.passkeyHint).to.equal('alice@acme.test');
     });
   });
 });

@@ -11,6 +11,7 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
 import { readSessions, serializeSessions } from '@/modules/auth/session/cookie';
 import { serializeLastUsedLogin } from '@/modules/auth/session/last-used-login';
+import { serializePasskeyHint } from '@/modules/auth/session/passkey-hint';
 import { ProviderError } from '@/modules/auth/types';
 import { completeEmailLinkSignup } from '@/resources/signup';
 import { paths } from '@/routes/paths';
@@ -76,6 +77,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     const headers = new Headers();
     headers.append('set-cookie', await serializeSessions(result.sessions));
     headers.append('set-cookie', await serializeLastUsedLogin('email'));
+    headers.append('set-cookie', await serializePasskeyHint(user.loginName));
     if (fpCookie) headers.append('set-cookie', fpCookie);
     return redirect(result.target, { headers });
   } catch (err) {

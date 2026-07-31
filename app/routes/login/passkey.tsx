@@ -3,6 +3,7 @@ import { AuthFormFields } from '@/components/auth-form/auth-form-fields';
 import { WebAuthnButton } from '@/components/webauthn-button/webauthn-button';
 import { useAuthActionError } from '@/hooks/use-auth-action-error';
 import { serializeLastUsedLogin } from '@/modules/auth/session/last-used-login';
+import { serializePasskeyHint } from '@/modules/auth/session/passkey-hint';
 import {
   createWebAuthnVerifyHandlers,
   type WebAuthnVerifyActionData,
@@ -48,10 +49,13 @@ export function shouldRevalidate({
   return defaultShouldRevalidate;
 }
 
-// Wrap the factory action to append the last-used-login cookie on successful
-// passkey sign-in. Two Set-Cookie headers cannot be joined into one string, so
-// we clone the redirect response and append via Headers.append().
+// Wrap the factory action to append the last-used-login + passkey-hint cookies on
+// successful passkey sign-in. Two Set-Cookie headers cannot be joined into one string,
+// so we clone the redirect response and append via Headers.append(). loginName is read
+// from a CLONE of the request BEFORE the factory action consumes the body.
 export async function action(args: ActionFunctionArgs) {
+  const form = await args.request.clone().formData();
+  const loginName = String(form.get('loginName') ?? '');
   const result = await _handlers.action(args);
   // Only decorate successful redirects (3xx with a Location header).
   if (!(result instanceof Response) || !result.headers.get('location')) {
@@ -59,6 +63,7 @@ export async function action(args: ActionFunctionArgs) {
   }
   const headers = new Headers(result.headers);
   headers.append('set-cookie', await serializeLastUsedLogin('passkey'));
+  if (loginName) headers.append('set-cookie', await serializePasskeyHint(loginName));
   return new Response(result.body, {
     status: result.status,
     statusText: result.statusText,
@@ -95,7 +100,7 @@ export default function LoginPasskey() {
       loginName={loginName}
       requestId={requestId}
       organization={organization}
-      showBackLink={false}>
+      showBackLink={true}>
       {/* Hidden form that WebAuthnButton populates and submits. */}
       <RRForm ref={formRef} method="POST" className="flex w-full flex-col gap-4">
         <AuthFormFields

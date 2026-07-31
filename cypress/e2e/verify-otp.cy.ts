@@ -18,7 +18,7 @@ function loginAndGetSession(loginName: string) {
   cy.settleHydration();
   // The email input is behind an "Email" reveal button (IdP-first UX); click it first
   // (mirrors core-signin.cy.ts's identifier flow).
-  cy.contains('button', 'Continue with email').click();
+  cy.contains('button', 'Email').click();
   cy.get('input[name="loginName"]').type(loginName);
   cy.get('input[name="loginName"]:visible').closest('form').submit();
   cy.location('pathname').should('eq', '/id/login/password');
@@ -63,6 +63,9 @@ describe('MFA verify — Email OTP (/login/verify/email)', () => {
     cy.contains('button', /verify/i).click();
 
     cy.location('pathname').should('eq', '/id/signed-in');
+
+    // The OTP-email login completion writes the passkey-hint (mirrors last-used-login).
+    cy.getCookie('passkey-hint').should('exist');
   });
 });
 

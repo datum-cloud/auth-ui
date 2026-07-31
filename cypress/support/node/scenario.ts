@@ -97,6 +97,9 @@ export interface RequestSpec {
   /** Signed last-used-login cookie value (e.g. 'email', 'passkey', 'idp:google'). Merged into the
    *  Cookie header so loginLoader's readLastUsedLogin returns the value on the spec. */
   lastUsedLogin?: string;
+  /** A loginName signed into a REAL `passkey-hint` cookie (readPasskeyHint reads it).
+   *  Merged into the Cookie header alongside `sessions`. */
+  passkeyHint?: string;
 }
 
 /** A serializable IdP intent, injected via the SSO callback's `retrieveIdpIntent` DI seam.
@@ -209,6 +212,7 @@ export type ServiceFn =
   | 'cookieGuardCheck'
   | 'cookieRoundTripCheck'
   | 'lastUsedLoginCheck'
+  | 'passkeyHintCheck'
   | 'reauthIntentCheck'
   // select.server is stubbed in the browser bundle (a fake-only registry), so the REAL
   // provider-selection binding point (fake↔zitadel) is exercised node-side.
@@ -230,6 +234,10 @@ export type ServiceFn =
   | 'loginLoader'
   | 'loginAction'
   | 'loginPasswordAction'
+  | 'loginPasskeyAction'
+  // /login/passkey-discover action: identity-resolution step of the usernameless
+  // discovery path — userHandle → user-bound challenge (opaque 400s on failure).
+  | 'passkeyDiscoverAction'
   | 'loginPasswordLoader'
   | 'securityKeyAction'
   | 'loginVerifyEmailLoader'
@@ -261,6 +269,7 @@ export type ServiceFn =
   | 'accountsLoader'
   | 'accountsAction'
   | 'logoutLoader'
+  | 'logoutAction'
   | 'passwordNewLoader'
   | 'passwordNewAction'
   | 'passwordChangeLoader'
@@ -632,6 +641,10 @@ export interface Scenario {
   /** serializeLastUsedLogin → parse round-trips + path scoping. outcome: { parsed } | { setCookie }. */
   lastUsedOp?: 'roundTripIdp' | 'absent' | 'roundTripEmail' | 'roundTripPasskey' | 'scopedToId';
 
+  // ── passkey-hint cookie (fn: 'passkeyHintCheck') ───────────────────────────
+  /** serializePasskeyHint → parse round-trips, clear, attribute pinning. outcome: { parsed } | { setCookie }. */
+  passkeyHintOp?: 'roundTrip' | 'absent' | 'clear' | 'attrs';
+
   // ── reauth-intent cookie + shared identity guard (fn: 'reauthIntentCheck') ─
   /** serialize/read/clear/check. outcome: { value } | { cleared } | ReauthCheck. */
   reauthOp?:
@@ -671,11 +684,17 @@ export interface SerializedResponse {
   setCookies?: string[];
   /** Parsed `last-used-login` token (e.g. `idp:<idpId>`), or null when absent. */
   lastUsedLogin?: string | null;
+  /** Parsed value of a `passkey-hint` Set-Cookie on the response: the written loginName,
+   *  '' when the response CLEARS the hint (empty value + Max-Age=0), null/absent when untouched. */
+  passkeyHint?: string | null;
   /** Raw `fingerprintId` cookie value, or null when no fingerprintId Set-Cookie was emitted. */
   fingerprintId?: string | null;
   /** react-router data() object shape (non-Response path). */
   dataStatus?: number;
   dataBody?: unknown;
+  /** Set-Cookie strings from a data() object's init.headers (loaders that both return data
+   *  AND set cookies — e.g. /login's ceremony-session persist + hint clear). */
+  dataSetCookies?: string[];
 }
 
 export interface Verdict {

@@ -47,6 +47,8 @@ export interface SignupRedirectResult {
   kind: 'redirect';
   target: string;
   sessions: SessionEntry[];
+  /** The created/authenticated account's loginName — write-site key for the passkey-hint. */
+  loginName?: string;
 }
 
 /**
@@ -151,7 +153,7 @@ export async function registerAndLinkIdp(
   // a brand-new IdP user completing a prompt=select_account / prompt=login ceremony loops straight
   // back to /accounts (or /login). Mirrors the password path's hand-back.
   const target = authorizeHandbackTarget(requestId, session.id);
-  return { kind: 'redirect', target, sessions };
+  return { kind: 'redirect', target, sessions, loginName: user.loginName };
 }
 
 // ── password-first hand-off (allowPassword) ────────────────────────────────────

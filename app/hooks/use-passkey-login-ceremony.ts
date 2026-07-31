@@ -21,7 +21,7 @@ export interface PasskeyLoginCeremonyInput {
 }
 
 /** Extract the inner publicKey the marshaller expects (mirrors login/passkey.tsx). */
-function unwrapPublicKey(options: unknown): unknown {
+export function unwrapPublicKey(options: unknown): unknown {
   return options !== null && typeof options === 'object' && 'publicKey' in (options as object)
     ? (options as { publicKey: unknown }).publicKey
     : options;

@@ -72,7 +72,7 @@ describe('accounts loader', () => {
       request: { url: `${BASE}?authRequest=abc` },
     }).then((v) => {
       expect(v.response!.isResponse).to.be.true;
-      expect(v.response!.location).to.equal('/login?requestId=oidc_abc');
+      expect(v.response!.location).to.equal('/login?requestId=oidc_abc&add=1');
     });
   });
 
@@ -82,7 +82,7 @@ describe('accounts loader', () => {
       request: { url: `${BASE}?samlRequest=xyz` },
     }).then((v) => {
       expect(v.response!.isResponse).to.be.true;
-      expect(v.response!.location).to.equal('/login?requestId=saml_xyz');
+      expect(v.response!.location).to.equal('/login?requestId=saml_xyz&add=1');
     });
   });
 
@@ -91,7 +91,7 @@ describe('accounts loader', () => {
       fn: 'accountsLoader',
       request: { url: `${BASE}?requestId=oidc_threaded&authRequest=raw` },
     }).then((v) => {
-      expect(v.response!.location).to.equal('/login?requestId=oidc_threaded');
+      expect(v.response!.location).to.equal('/login?requestId=oidc_threaded&add=1');
     });
   });
 
@@ -102,7 +102,7 @@ describe('accounts loader', () => {
     }).then((v) => {
       expect(v.response!.isResponse).to.be.true;
       expect(v.response!.status).to.equal(302);
-      expect(v.response!.location).to.equal('/login?requestId=oidc_abc&organization=org-1');
+      expect(v.response!.location).to.equal('/login?requestId=oidc_abc&organization=org-1&add=1');
     });
   });
 
@@ -112,7 +112,7 @@ describe('accounts loader', () => {
       request: { url: `${BASE}?user_code=WDJB-MJHT` },
     }).then((v) => {
       expect(v.response!.isResponse).to.be.true;
-      expect(v.response!.location).to.equal('/login?requestId=device_WDJB-MJHT');
+      expect(v.response!.location).to.equal('/login?requestId=device_WDJB-MJHT&add=1');
     });
   });
 
@@ -139,6 +139,17 @@ describe('accounts loader', () => {
       request: { url: `${BASE}?requestId=evil_payload` },
     }).then((v) => {
       expect(v.response!.isResponse).to.be.false;
+    });
+  });
+
+  it('empty-picker mid-ceremony redirect carries the add=1 suppression marker', () => {
+    callService({
+      fn: 'accountsLoader',
+      request: { url: 'http://localhost/id/accounts?requestId=oidc_x' },
+    }).then((v) => {
+      expect(v.response?.status).to.equal(302);
+      expect(v.response?.location ?? '').to.include('add=1');
+      expect(v.response?.location ?? '').to.include('requestId=oidc_x');
     });
   });
 });

@@ -33,6 +33,11 @@ import {
   serializeLastUsedLogin,
 } from '@/modules/auth/session/last-used-login';
 import {
+  passkeyHintCookie,
+  serializePasskeyHint,
+  clearPasskeyHint,
+} from '@/modules/auth/session/passkey-hint';
+import {
   serializeReauthIntent,
   readReauthIntent,
   clearReauthIntent,
@@ -109,13 +114,15 @@ import { loader as deviceIndexLoader } from '@/routes/device/index';
 import { loader as loginLoader, action as loginAction } from '@/routes/login/index';
 import { loader as loginMethodLoader, action as loginMethodAction } from '@/routes/login/method';
 import { action as loginMfaAction } from '@/routes/login/mfa';
+import { action as loginPasskeyAction } from '@/routes/login/passkey';
+import { action as passkeyDiscoverAction } from '@/routes/login/passkey-discover';
 import {
   action as loginPasswordAction,
   loader as loginPasswordLoader,
 } from '@/routes/login/password';
 import { action as securityKeyAction } from '@/routes/login/security-key';
 import { loader as loginVerifyEmailLoader } from '@/routes/login/verify/email';
-import { loader as logoutLoader } from '@/routes/logout/index';
+import { loader as logoutLoader, action as logoutAction } from '@/routes/logout/index';
 import {
   loader as passwordChangeLoader,
   action as passwordChangeAction,
@@ -206,6 +213,7 @@ async function buildCookieHeader(req: RequestSpec): Promise<string | undefined> 
   if (req.reauthIntent) parts.push((await serializeReauthIntent(req.reauthIntent)).split(';')[0]);
   if (req.lastUsedLogin)
     parts.push((await serializeLastUsedLogin(req.lastUsedLogin)).split(';')[0]);
+  if (req.passkeyHint) parts.push((await serializePasskeyHint(req.passkeyHint)).split(';')[0]);
   return parts.length > 0 ? parts.join('; ') : undefined;
 }
 
@@ -273,6 +281,11 @@ async function buildHandlerRequest(
   const request = new Request(req.url, { method });
   Object.defineProperty(request, 'headers', { value: headers, configurable: true });
   Object.defineProperty(request, 'formData', { value: async () => form, configurable: true });
+  // login/passkey's action wrapper reads loginName via request.clone().formData() BEFORE
+  // delegating to the factory action (which consumes the body). A clone of this synthetic
+  // body-less Request would NOT inherit the formData override, so hand back the same
+  // object — the override is repeatable (async () => form).
+  Object.defineProperty(request, 'clone', { value: () => request, configurable: true });
   return { request, form };
 }
 
@@ -467,11 +480,35 @@ async function serializeResponse(res: unknown): Promise<SerializedResponse> {
       }
     }
 
+    // passkey-hint loginName — signed, so parse via the real cookie module. A CLEARING
+    // Set-Cookie (empty signed value + Max-Age=0) parses to '' — distinct from null (untouched).
+    let passkeyHint: string | null = null;
+    const hintStr = setCookies.find((c) => c.startsWith('passkey-hint='));
+    if (hintStr) {
+      try {
+        const parsed = await passkeyHintCookie.parse(hintStr.split(';')[0]);
+        passkeyHint = typeof parsed === 'string' ? parsed : (parsed ?? null);
+      } catch {
+        passkeyHint = null;
+      }
+    }
+
     // fingerprintId is a BARE (unsigned) cookie value — decode it directly.
     let fingerprintId: string | null = null;
     const fpStr = setCookies.find((c) => c.startsWith('fingerprintId='));
     if (fpStr) {
       fingerprintId = decodeURIComponent(fpStr.split(';')[0].slice('fingerprintId='.length));
+    }
+
+    // Plain-JSON responses (Response.json from direct-fetch API actions like
+    // /login/passkey-discover) — capture the body so specs can assert on it.
+    let dataBody: unknown;
+    if ((res.headers.get('content-type') ?? '').includes('application/json')) {
+      try {
+        dataBody = await res.clone().json();
+      } catch {
+        dataBody = undefined;
+      }
     }
 
     return {
@@ -482,12 +519,22 @@ async function serializeResponse(res: unknown): Promise<SerializedResponse> {
       cookieEntries,
       setCookies,
       lastUsedLogin,
+      passkeyHint,
       fingerprintId,
+      dataBody,
     };
   }
-  // react-router data() object: { data, init: { status } }
-  const d = res as { data?: unknown; init?: { status?: number } };
-  return { isResponse: false, dataStatus: d?.init?.status, dataBody: d?.data };
+  // react-router data() object: { data, init: { status, headers } }
+  const d = res as { data?: unknown; init?: { status?: number; headers?: HeadersInit } };
+  const initHeaders = d?.init?.headers ? new Headers(d.init.headers) : null;
+  const getInitSetCookie = initHeaders
+    ? (initHeaders as Headers & { getSetCookie?: () => string[] }).getSetCookie
+    : undefined;
+  const dataSetCookies =
+    initHeaders && typeof getInitSetCookie === 'function'
+      ? getInitSetCookie.call(initHeaders)
+      : undefined;
+  return { isResponse: false, dataStatus: d?.init?.status, dataBody: d?.data, dataSetCookies };
 }
 
 /** Parse a captured audit JSON line into a structured event (or null if it isn't one). */
@@ -1220,6 +1267,21 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
             op === 'roundTripIdp' ? 'idp:g' : op === 'roundTripEmail' ? 'email' : 'passkey';
           const sc = await serializeLastUsedLogin(token);
           outcome = { parsed: await lastUsedLoginCookie.parse(toHeader(sc)) };
+        }
+        break;
+      }
+      case 'passkeyHintCheck': {
+        const op = s.passkeyHintOp;
+        if (!op) throw new Error('passkeyHintCheck requires passkeyHintOp');
+        if (op === 'absent') {
+          outcome = { parsed: await passkeyHintCookie.parse(null) };
+        } else if (op === 'clear') {
+          outcome = { setCookie: await clearPasskeyHint() };
+        } else if (op === 'attrs') {
+          outcome = { setCookie: await serializePasskeyHint('alice@acme.test') };
+        } else {
+          const sc = await serializePasskeyHint('alice@acme.test');
+          outcome = { parsed: await passkeyHintCookie.parse(sc.split(';')[0].trim()) };
         }
         break;
       }
@@ -2224,6 +2286,32 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
         break;
       }
 
+      case 'passkeyDiscoverAction': {
+        const { request } = await buildHandlerRequest(
+          s.request ?? { url: 'http://localhost/id/login/passkey-discover', csrf: true }
+        );
+        const result = await passkeyDiscoverAction({
+          request,
+          params: {},
+          context: {} as never,
+        } as never);
+        response = await serializeResponse(result);
+        break;
+      }
+
+      case 'loginPasskeyAction': {
+        const { request } = await buildHandlerRequest(
+          s.request ?? { url: 'http://localhost/id/login/passkey', csrf: true }
+        );
+        const result = await loginPasskeyAction({
+          request,
+          params: {},
+          context: {} as never,
+        } as never);
+        response = await serializeResponse(result);
+        break;
+      }
+
       case 'loginVerifyEmailLoader': {
         const { request } = await buildHandlerRequest(
           s.request ?? { url: 'http://localhost/id/login/verify/email' }
@@ -2592,6 +2680,15 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
           params: {},
           context: {} as never,
         } as never);
+        response = await serializeResponse(result);
+        break;
+      }
+
+      case 'logoutAction': {
+        const { request } = await buildHandlerRequest(
+          s.request ?? { url: 'http://localhost/id/logout', csrf: true }
+        );
+        const result = await logoutAction({ request, params: {}, context: {} as never } as never);
         response = await serializeResponse(result);
         break;
       }

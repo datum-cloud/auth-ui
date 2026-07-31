@@ -353,3 +353,32 @@ describe('processIdpCallback — fresh-identity link ceremony (Req 2)', () => {
     });
   });
 });
+
+describe('processIdpCallback — passkey-hint write', () => {
+  it('auto-link sign-in writes passkey-hint = the IdP-vouched loginName', () => {
+    callService({
+      fn: 'processIdpCallback',
+      slug: 'google',
+      env: { ALLOW_IDP_AUTO_LINK: 'true' },
+      seed: { users: [{ id: 'u1', loginName: 'you@gmail.com', displayName: 'You User' }] },
+      idpIntent: REGISTER_INTENT_VERIFIED,
+      request: { url: CB() },
+    }).then((v) => {
+      expect(v.response?.status).to.equal(302);
+      expect(v.response?.passkeyHint).to.equal('you@gmail.com');
+    });
+  });
+
+  it('auto-create writes passkey-hint = the freshly created loginName', () => {
+    callService({
+      fn: 'processIdpCallback',
+      slug: 'google',
+      seed: { users: [] }, // no existing account → auto-create path
+      idpIntent: REGISTER_INTENT_VERIFIED,
+      request: { url: CB() },
+    }).then((v) => {
+      expect(v.response?.status).to.equal(302);
+      expect(v.response?.passkeyHint).to.equal('you@gmail.com');
+    });
+  });
+});

@@ -1,10 +1,13 @@
 // cypress/component/routes/login/index.cy.tsx
 //
-// UI contract for /login (A-P10): the sole-passkey action-data variant fires the
-// shared ceremony INLINE ("Signing in as <email>." + auto-fire via beginWith), with
-// a manual "Continue with passkey" fallback (begin(), a FRESH challenge) and a
-// "Not you?" dismissal back to the ordinary identifier form. Mirrors method.cy.tsx's
-// stub /login/passkey route + capturedPosts convention (Task 2).
+// UI contract for /login: the chooser
+// renders unconditionally. There is no identity-bound inline passkey ceremony state on
+// this route anymore — a sole-passkey identifier now REDIRECTS to /login/passkey (see
+// the node-bound action test below) instead of the action returning inline challenge
+// data. The gated Passkey SHORTCUT still drives the shared ceremony in place
+// on this page, and its own failure surface is still covered here. Mirrors
+// method.cy.tsx's stub /login/passkey route + capturedPosts convention (Task 2).
+import { callService } from '../../../support/node/call-service';
 import Login from '@/routes/login/index';
 import { ConformAdapter } from '@datum-cloud/datum-ui/form/adapters/conform';
 import { setupI18n } from '@lingui/core';
@@ -14,8 +17,8 @@ import { createMemoryRouter, RouterProvider } from 'react-router';
 
 const LOGIN_CONTEXT = { loginName: '', requestId: undefined, organization: undefined };
 
-// Settings shaped so the ordinary identifier form (the "Continue with email" button) renders by
-// default — the baseline the inline ceremony state must replace/restore around.
+// Settings shaped so the ordinary identifier form (the "Email" button) renders by
+// default — the baseline the chooser must always render, regardless of actionData.
 const INDEX_LOADER_DATA = {
   csrfToken: 'tok-0',
   idps: [],
@@ -49,13 +52,10 @@ function mountLogin(opts?: {
   actionData?: unknown;
   // Known loginName gates the Passkey SHORTCUT visible (view.showPasskeyPrompt && loginName).
   loginName?: string;
-  // Overrides the /login (index) route's own action — used to simulate a REAL identifier
-  // resubmit that resolves to a fresh sole-passkey challenge (Finding 2 coverage).
-  indexAction?: (args: { request: Request }) => unknown | Promise<unknown>;
   // Overrides the /login/passkey stub's action — used to simulate a ceremony failure
-  // (Finding 1 coverage). Defaults to capturing the POST into capturedPosts.
+  // Defaults to capturing the POST into capturedPosts.
   passkeyAction?: (args: { request: Request }) => unknown | Promise<unknown>;
-  // Org-policy overrides — used to cover configurations where password is disabled.
+  // Org-policy overrides — cover configurations where password is disabled.
   settings?: Partial<(typeof INDEX_LOADER_DATA)['settings']>;
   emailDeliveryEnabled?: boolean;
 }) {
@@ -79,7 +79,7 @@ function mountLogin(opts?: {
             index: true,
             element: <Login />,
             loader: async () => indexData,
-            action: opts?.indexAction ?? (async () => null),
+            action: async () => null,
           },
           // Stub /login/passkey — same route the shared ceremony hook lazily loads
           // (challenge) then posts to (credential). Mirrors method.cy.tsx's convention:
@@ -120,12 +120,14 @@ function mountLogin(opts?: {
   return mount(withI18n(<RouterProvider router={router} />));
 }
 
-describe('/login — sole-passkey inline ceremony', () => {
+describe('/login — chooser (no inline ceremony)', () => {
   beforeEach(() => {
     capturedPosts.length = 0;
   });
 
-  it('sole-passkey action data swaps to the inline ceremony state and auto-fires', () => {
+  it('never renders an identity-bound inline block — the chooser always stays on screen', () => {
+    // Mount with the action having returned what USED to trigger the inline block.
+    // The chooser must render regardless; no identity, no "Not you?", no inline CTA.
     mountLogin({
       actionData: {
         passkeyInline: {
@@ -135,65 +137,14 @@ describe('/login — sole-passkey inline ceremony', () => {
         },
       },
     });
-    cy.contains('Signing in as').should('be.visible');
-    cy.contains('solo@acme.test').should('be.visible');
-    cy.contains('Not you?').should('be.visible');
-    // Auto-fire: the pre-baked credential reaches the stub action without a click.
-    cy.wrap(null).should(() => {
-      expect(capturedPosts).to.have.length(1);
-      expect(capturedPosts[0].loginName).to.equal('solo@acme.test');
-    });
-    // Identifier form is gone while the ceremony state shows.
-    cy.contains('button', 'Continue with email').should('not.exist');
+    cy.contains(/signing in as/i).should('not.exist');
+    cy.contains(/not you\?/i).should('not.exist');
+    cy.contains('button', /continue with passkey/i).should('not.exist');
+    cy.get('input[name="loginName"], button').should('exist'); // chooser is intact
   });
 
-  // REGRESSION: with allowPassword=false the identifier form used to be hidden entirely,
-  // while signInUnavailable stayed false (suppressed by showPasskeyPrompt) — so a fresh
-  // visitor at a passkey-only org got an EMPTY card: no sign-in path and no error.
-  // Passkey needs a known user (zitadel/zitadel#8899), so the identifier IS the entry point.
-  it('a passkey-only org still offers the identifier form, not an empty card', () => {
-    mountLogin({
-      settings: { allowPassword: false, passkeysType: 'allowed' },
-      emailDeliveryEnabled: false,
-    });
-    cy.contains('button', 'Continue with email').should('be.visible');
-    cy.contains('Sign-in is currently unavailable').should('not.exist');
-  });
-
-  // When email-link is the ONLY path, "Continue" would hand off to decideAfterIdentifier
-  // and resolve to NO_SUPPORTED_METHOD — so it must not render. The email-link submit
-  // takes over as the form's primary (and only) action.
-  it('an email-link-only org shows the form without a dead-end Continue button', () => {
-    mountLogin({
-      settings: { allowPassword: false, passkeysType: 'not_allowed' },
-      emailDeliveryEnabled: true,
-    });
-    cy.contains('button', 'Continue with email').should('be.visible').click();
-    cy.contains('button', 'Email me a sign-in link').should('be.visible');
-    // Exactly one submit action — no "Continue" alongside it.
-    cy.get('form button[type="submit"]').should('have.length', 1);
-    cy.contains('form button', 'Continue').should('not.exist');
-    // The intent rides on a hidden field, so implicit submission still means email-link.
-    cy.get('form input[name="intent"]').should('have.value', 'email-link');
-  });
-
-  it('inline state offers the manual button and Not you? returns to the identifier form', () => {
-    mountLogin({
-      actionData: {
-        passkeyInline: {
-          loginName: 'solo@acme.test',
-          csrfToken: 'tok-1',
-          publicKeyCredentialRequestOptions: { publicKey: { challenge: 'x' } },
-        },
-      },
-    });
-    cy.contains('button', 'Continue with passkey').should('be.visible');
-    cy.contains('Not you?').click();
-    cy.contains('button', 'Continue with email').should('be.visible');
-  });
-
-  // Finding 1: the gated Passkey SHORTCUT drives the same `ceremony` as the inline
-  // state but never sets passkeyInline — a failure there must still surface visibly.
+  // The gated Passkey SHORTCUT drives the shared `ceremony` in place on this
+  // page — a failure there must still surface visibly.
   it('the gated Passkey shortcut surfaces a ceremony failure through the shared error region', () => {
     mountLogin({
       loginName: 'solo@acme.test',
@@ -207,46 +158,58 @@ describe('/login — sole-passkey inline ceremony', () => {
     // The shortcut re-enables once the ceremony drops back to idle (not stuck busy).
     cy.contains('button', 'Passkey').should('not.be.disabled');
   });
+});
 
-  // Finding 2: dismissal is keyed to the SPECIFIC challenge, not a component-lifetime
-  // boolean — a later, unrelated sole-passkey resolution must still auto-fire. Driven via
-  // a REAL identifier resubmit (not a remount, which would reset all component state and
-  // prove nothing about the dismiss→re-arm transition on the same mounted instance).
-  it('a fresh sole-passkey challenge after "Not you?" auto-fires again (re-arm, not stuck)', () => {
-    const CHALLENGE_B = { publicKey: { challenge: 'chal-b' } };
-    mountLogin({
-      loginName: 'solo@acme.test',
-      actionData: {
-        passkeyInline: {
-          loginName: 'solo@acme.test',
-          csrfToken: 'tok-1',
-          publicKeyCredentialRequestOptions: { publicKey: { challenge: 'chal-a' } },
-        },
+describe('/login action — sole-passkey identifier', () => {
+  it('a sole-passkey identifier now REDIRECTS to /login/passkey instead of returning inline data', () => {
+    callService({
+      fn: 'loginAction',
+      provider: 'singleton',
+      request: {
+        url: 'http://localhost/id/login',
+        form: { loginName: 'solo@acme.test' }, // u21 — the seeded passkey-ONLY fixture
+        csrf: true,
       },
-      // Simulates the /login action resolving a DIFFERENT identifier to a fresh
-      // sole-passkey challenge — a real resubmit, not the same dismissed challenge.
-      indexAction: async () => ({
-        passkeyInline: {
-          loginName: 'other@acme.test',
-          csrfToken: 'tok-2',
-          publicKeyCredentialRequestOptions: CHALLENGE_B,
-        },
-      }),
+    }).then((v) => {
+      expect(v.response?.isResponse).to.equal(true);
+      expect(v.response?.status).to.equal(302);
+      expect(v.response?.location ?? '').to.contain('/login/passkey');
+      expect(v.response?.location ?? '').to.contain('loginName=');
     });
+  });
+});
 
-    // Auto-fire #1 (challenge A) reaches the stub /login/passkey action.
-    cy.wrap(null).should(() => expect(capturedPosts).to.have.length(1));
-
-    cy.contains('Not you?').click();
-    cy.contains('button', 'Continue with email').should('be.visible').click();
-    cy.contains('button', 'Continue').click();
-
-    // The fresh challenge (different identity, different publicKeyCredentialRequestOptions
-    // object) shows the inline state again and auto-fires a SECOND time.
-    cy.contains('other@acme.test').should('be.visible');
-    cy.wrap(null).should(() => {
-      expect(capturedPosts).to.have.length(2);
-      expect(capturedPosts[1].loginName).to.equal('other@acme.test');
+// ── Identifier-form view logic ───────────────────────────────────────────────
+// Sole-passkey identifiers REDIRECT to /login/passkey (asserted above); these two
+// cover the identifier-form visibility logic under restricted org policies.
+describe('/login — identifier-form view logic', () => {
+  // REGRESSION: with allowPassword=false the identifier form used to be hidden entirely,
+  // while signInUnavailable stayed false (suppressed by showPasskeyPrompt) — so a fresh
+  // visitor at a passkey-only org got an EMPTY card: no sign-in path and no error.
+  // Passkey needs a known user, so the identifier IS the entry point.
+  it('a passkey-only org still offers the identifier form, not an empty card', () => {
+    mountLogin({
+      settings: { allowPassword: false, passkeysType: 'allowed' },
+      emailDeliveryEnabled: false,
     });
+    cy.contains('button', 'Email').should('be.visible');
+    cy.contains('Sign-in is currently unavailable').should('not.exist');
+  });
+
+  // When email-link is the ONLY path, "Continue" would hand off to decideAfterIdentifier
+  // and resolve to NO_SUPPORTED_METHOD — so it must not render. The email-link submit
+  // takes over as the form's primary (and only) action.
+  it('an email-link-only org shows the form without a dead-end Continue button', () => {
+    mountLogin({
+      settings: { allowPassword: false, passkeysType: 'not_allowed' },
+      emailDeliveryEnabled: true,
+    });
+    cy.contains('button', 'Email').should('be.visible').click();
+    cy.contains('button', 'Email me a sign-in link').should('be.visible');
+    // Exactly one submit action — no "Continue" alongside it.
+    cy.get('form button[type="submit"]').should('have.length', 1);
+    cy.contains('form button', 'Continue').should('not.exist');
+    // The intent rides on a hidden field, so implicit submission still means email-link.
+    cy.get('form input[name="intent"]').should('have.value', 'email-link');
   });
 });

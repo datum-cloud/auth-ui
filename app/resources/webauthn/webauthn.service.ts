@@ -16,8 +16,14 @@
 // folder during Pass 1; the barrel (index.ts) re-exports them and the verify
 // factory so callers/tests reach the whole domain through one specifier.
 import type { AuthProvider } from '@/modules/auth/auth-provider';
-import { byLoginName, addSession, type SessionEntry } from '@/modules/auth/session/cookie';
-import type { Session } from '@/modules/auth/types';
+import {
+  byLoginName,
+  addSession,
+  sessionEntryFromSession,
+  serializeSessions,
+  type SessionEntry,
+} from '@/modules/auth/session/cookie';
+import type { Session, User } from '@/modules/auth/types';
 import { ProviderError, isStaleSessionError } from '@/modules/auth/types';
 import {
   nextStepFromSession as sharedNextStepFromSession,
@@ -27,6 +33,7 @@ import {
 import { resolveOrg } from '@/resources/shared/resolve-org';
 import { isSudoFresh } from '@/resources/shared/sudo';
 import { logAuthEvent, hashActor } from '@/server/observability';
+import { getOrCreateFingerprintId, userAgentFromRequest } from '@/server/user-agent';
 
 // ── shared: derive the post-ceremony next step from a session ─────────────────
 
@@ -137,6 +144,84 @@ export async function requestWebAuthnChallenge(
   }
 
   return { kind: 'challenge', publicKeyCredentialRequestOptions };
+}
+
+// ── USER-BOUND CHALLENGE ARM (usernameless entry points) ──────────────────────
+
+export interface ArmedUserBoundChallenge {
+  loginName: string;
+  publicKeyCredentialRequestOptions: unknown;
+  /** Set-Cookie values the caller must append: the updated sessions list, plus
+   *  the fingerprint cookie when one was newly minted. */
+  setCookies: string[];
+}
+
+/**
+ * Mint a Zitadel session bound to `user`, then request a WebAuthn assertion
+ * challenge on it — the sequence Zitadel's "a challenge requires a bound user"
+ * constraint forces on every usernameless entry point.
+ * Two callers: the /login loader (passkey-hint fast path) and the
+ * /login/passkey-discover action (identity-discovery path).
+ *
+ * CALLER CONTRACT: call only after verifying no LIVE session exists for
+ * user.loginName. The same-loginName supersede below is safe precisely because
+ * that guard ran — see the comment on the filter. Failure split: a
+ * session-creation failure THROWS (each caller owns the response: clear the
+ * hint / opaque 400); a challenge-request failure returns null (non-fatal —
+ * the ordinary page renders, nothing armed, no cookies to set).
+ */
+export async function armUserBoundChallenge(
+  provider: AuthProvider,
+  request: Request,
+  sessions: SessionEntry[],
+  user: User,
+  domain: string
+): Promise<ArmedUserBoundChallenge | null> {
+  const [fingerprintId, fpCookie] = getOrCreateFingerprintId(request);
+  const session = await provider.createSession(
+    {},
+    { userId: user.id, userAgent: userAgentFromRequest(request, fingerprintId) }
+  );
+  // Supersede any PRIOR entry for the same loginName before persisting — same motivating
+  // bug as resolveIdentifier's known-user supersede (login.service.ts:317): a stale,
+  // cookie-resident duplicate can shadow the fresh ceremony entry in byLoginName's
+  // mostRecent tie-break, sending the challenge request to a session the provider has
+  // never heard of. The SCOPE here is narrower than that precedent, deliberately:
+  // resolveIdentifier keys its supersede on (loginName, organization) because it mints
+  // one org-tagged entry per call; this function's `user` arrives from an instance-wide,
+  // org-unscoped lookup (findUser on a bare hint / getUser on a userHandle) and the mint
+  // below never sets `organization` on the new entry, so there is no org value to key a
+  // filter by. Scoping this loginName-only rather than by identity tuple is safe because
+  // the blast radius is bounded to DEAD data: the caller contract requires a live-session
+  // scan across every organization for this loginName before calling, so every
+  // same-loginName entry still in `sessions` here — under any organization — is already
+  // expired. Clearing them can only ever drop stale cookie residue, never a live session.
+  // Cross-org regression coverage: conditional-passkey-loader.cy.ts ("stale
+  // cross-organization session entry").
+  const priorCleared = sessions.filter((s) => s.loginName !== user.loginName);
+  const withCeremony = addSession(
+    priorCleared,
+    sessionEntryFromSession(session, { loginName: user.loginName })
+  );
+  const challenge = await requestWebAuthnChallenge(
+    provider,
+    withCeremony,
+    {
+      userVerificationRequirement: 'required',
+      challengeAuditEvent: 'mfa_passkey_challenge',
+    },
+    { loginName: user.loginName, domain }
+  );
+  if (challenge.kind !== 'challenge' || !challenge.publicKeyCredentialRequestOptions) {
+    return null;
+  }
+  const setCookies = [await serializeSessions(withCeremony)];
+  if (fpCookie) setCookies.push(fpCookie);
+  return {
+    loginName: user.loginName,
+    publicKeyCredentialRequestOptions: challenge.publicKeyCredentialRequestOptions,
+    setCookies,
+  };
 }
 
 // ── VERIFY (assertion) action ─────────────────────────────────────────────────

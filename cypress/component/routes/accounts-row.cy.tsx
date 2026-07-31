@@ -91,7 +91,7 @@ describe('accounts row — switch form structure', () => {
     cy.contains('a', 'Add another account').should(
       'have.attr',
       'href',
-      '/login?requestId=oidc_V2_123&organization=org-1'
+      '/login?requestId=oidc_V2_123&organization=org-1&add=1'
     );
   });
 });
@@ -100,18 +100,18 @@ describe('addAccountHref', () => {
   it('carries an OIDC ceremony requestId and organization', () => {
     expect(
       addAccountHref({ requestId: 'oidc_abc', organization: 'org-1', userCode: null })
-    ).to.equal('/login?requestId=oidc_abc&organization=org-1');
+    ).to.equal('/login?requestId=oidc_abc&organization=org-1&add=1');
   });
 
   it('prefers the device user_code, rewriting it as a device_ requestId', () => {
     expect(
       addAccountHref({ requestId: 'oidc_abc', organization: undefined, userCode: 'WDJB-MJHT' })
-    ).to.equal('/login?requestId=device_WDJB-MJHT');
+    ).to.equal('/login?requestId=device_WDJB-MJHT&add=1');
   });
 
   it('omits absent values rather than emitting empty params', () => {
     expect(addAccountHref({ requestId: null, organization: undefined, userCode: null })).to.equal(
-      '/login'
+      '/login?add=1'
     );
   });
 });

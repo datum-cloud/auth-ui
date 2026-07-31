@@ -13,6 +13,7 @@ import {
   serializeSessions,
 } from '@/modules/auth/session/cookie';
 import { serializeLastUsedLogin } from '@/modules/auth/session/last-used-login';
+import { serializePasskeyHint } from '@/modules/auth/session/passkey-hint';
 import { clearReauthIntent, readReauthIntent } from '@/modules/auth/session/reauth-intent';
 import { ProviderError } from '@/modules/auth/types';
 import type { IdpIntentResult } from '@/modules/auth/types';
@@ -291,11 +292,13 @@ export async function processIdpCallback(
         requestId,
       });
       const lastUsedCookie = await serializeLastUsedLogin(`idp:${intent.information.idpId}`);
+      const passkeyHintCookie = await serializePasskeyHint(intent.information.idpUserName);
       return {
         kind: 'redirect',
         location: target,
         setCookie,
         lastUsedCookie,
+        passkeyHintCookie,
         fingerprintCookie: fingerprintCookie ?? undefined,
         reauthClearCookie,
       };
@@ -353,11 +356,13 @@ export async function processIdpCallback(
         // straight back to /accounts (or /login). Mirrors the password path's hand-back.
         const target = authorizeHandbackTarget(requestId, session.id);
         const lastUsedCookie = await serializeLastUsedLogin(`idp:${decision.link.idpId}`);
+        const passkeyHintCookie = await serializePasskeyHint(loginName);
         return {
           kind: 'redirect',
           location: target,
           setCookie: await serializeSessions(next),
           lastUsedCookie,
+          passkeyHintCookie,
           fingerprintCookie: fingerprintCookie ?? undefined,
           reauthClearCookie: reauthClear,
         };
@@ -436,11 +441,15 @@ export async function processIdpCallback(
           deviceTrackingToken,
         });
         const lastUsedCookie = await serializeLastUsedLogin(`idp:${decision.link.idpId}`);
+        const passkeyHintCookie = result.loginName
+          ? await serializePasskeyHint(result.loginName)
+          : undefined;
         return {
           kind: 'redirect',
           location: result.target,
           setCookie: await serializeSessions(result.sessions),
           lastUsedCookie,
+          passkeyHintCookie,
           fingerprintCookie: fingerprintCookie ?? undefined,
           reauthClearCookie: reauthClear,
         };

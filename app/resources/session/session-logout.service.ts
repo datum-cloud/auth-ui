@@ -12,6 +12,7 @@ import {
   removeSession,
   serializeSessions,
 } from '@/modules/auth/session/cookie';
+import { readPasskeyHint, clearPasskeyHint } from '@/modules/auth/session/passkey-hint';
 import { env } from '@/server/infra/env.server';
 import { logAuthEvent, hashActor } from '@/server/observability';
 import { redirect } from 'react-router';
@@ -23,6 +24,8 @@ import { redirect } from 'react-router';
 export interface LogoutOutcome {
   location: string;
   setCookie: string;
+  /** Clears the passkey-hint — set only when the signing-out identity owns it (or on sign-out-of-all). */
+  clearHintCookie?: string;
 }
 
 /** Parse the comma-separated POST_LOGOUT_ALLOWLIST env into a list of origins. */
@@ -113,12 +116,23 @@ export async function performLogout(
   const hasResidualSessions = next.length > 0;
   const target = explicitTarget ?? (hasResidualSessions ? '/accounts' : '/logout/success');
 
-  return { location: target, setCookie: await serializeSessions(next) };
+  // Owner-scoped hint clearing: "logout clears everything" from the perspective of WHOEVER
+  // signed out. Alice signing out must not erase Bob's fast path.
+  const hint = await readPasskeyHint(request);
+  const clearHintCookie =
+    active && hint && hint.toLowerCase() === active.loginName.toLowerCase()
+      ? await clearPasskeyHint()
+      : undefined;
+
+  return { location: target, setCookie: await serializeSessions(next), clearHintCookie };
 }
 
 /** Turn a LogoutOutcome into the Response the /logout route returns. */
 export function logoutOutcomeToResponse(outcome: LogoutOutcome) {
-  return redirect(outcome.location, { headers: { 'set-cookie': outcome.setCookie } });
+  const headers = new Headers();
+  headers.append('set-cookie', outcome.setCookie);
+  if (outcome.clearHintCookie) headers.append('set-cookie', outcome.clearHintCookie);
+  return redirect(outcome.location, { headers });
 }
 
 /**
@@ -157,5 +171,10 @@ export async function completeOidcLogout(
   );
 
   const target = validatePostLogoutRedirect(request) ?? '/logout/success';
-  return { location: target, setCookie: await serializeSessions([]) };
+  return {
+    location: target,
+    setCookie: await serializeSessions([]),
+    // Sign-out-of-all: no session survives, so no identity keeps a claim on the hint.
+    clearHintCookie: await clearPasskeyHint(),
+  };
 }
