@@ -7,7 +7,7 @@ describe('core sign-in (fake provider)', () => {
   // visit hydrated. We wait for the SSR'd "Email" button so the cold reload has fully settled.
   before(() => {
     cy.visit('/id/login');
-    cy.contains('button', 'Continue with email');
+    cy.contains('button', 'Email');
   });
 
   it('identifier → password → signed-in', () => {
@@ -20,7 +20,7 @@ describe('core sign-in (fake provider)', () => {
     checkA11y(); // /login renders
 
     // The email input is behind an "Email" reveal button (IdP-first UX); click it first.
-    cy.contains('button', 'Continue with email').click();
+    cy.contains('button', 'Email').click();
     cy.get('input[name="loginName"]').type('alice@acme.test');
     cy.get('input[name="loginName"]:visible').closest('form').submit();
 
@@ -42,7 +42,7 @@ describe('core sign-in (fake provider)', () => {
       },
     });
     cy.settleHydration();
-    cy.contains('button', 'Continue with email').click();
+    cy.contains('button', 'Email').click();
     cy.get('input[name="loginName"]').type('alice@acme.test');
     cy.get('input[name="loginName"]:visible').closest('form').submit();
     cy.get('input[name="password"]').type('wrong-password');

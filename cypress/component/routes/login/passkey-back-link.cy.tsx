@@ -1,8 +1,8 @@
 // cypress/component/routes/login/passkey-back-link.cy.tsx
 //
-// /login/passkey is now a fallback/deep-link-only screen (2026-07-22 passkey rework) —
-// no mainstream forward navigation lands here, so it has no meaningful "previous step".
-// Pins that Back is explicitly suppressed rather than silently rendering null.
+// /login/passkey is once again the mainstream destination for a sole-passkey login
+// (the inline ceremony on /login was removed), so a failed or wrong-account ceremony must
+// have a way back. Mirrors /login/security-key, which has always had this target.
 import LoginPasskey from '@/routes/login/passkey';
 import { ConformAdapter } from '@datum-cloud/datum-ui/form/adapters/conform';
 import { setupI18n } from '@lingui/core';
@@ -40,10 +40,35 @@ function mountPasskey() {
   return mount(withI18n(<RouterProvider router={router} />));
 }
 
-describe('/login/passkey — Back link explicitly suppressed', () => {
-  it('renders the identity header but no Back control', () => {
+describe('/login/passkey — Back link', () => {
+  it('renders Back with href to /login', () => {
     mountPasskey();
     cy.contains('a', 'Not you?').should('exist');
-    cy.contains('a', 'Back').should('not.exist');
+    cy.contains('a', 'Back').should('exist').and('have.attr', 'href').and('include', '/login');
+  });
+
+  it('preserves the ceremony query string on the Back target', () => {
+    // mount at /login/passkey?loginName=mia%40acme.test
+    const router = createMemoryRouter(
+      [
+        {
+          id: 'passkey',
+          path: '/login/passkey',
+          element: <LoginPasskey />,
+          loader: async () => ({
+            csrfToken: 'tok-1',
+            loginName: 'mia@acme.test',
+            requestId: undefined,
+            organization: undefined,
+            publicKeyCredentialRequestOptions: { publicKey: { challenge: 'x' } },
+          }),
+        },
+      ],
+      { initialEntries: ['/login/passkey?loginName=mia%40acme.test'] }
+    );
+    mount(
+      withI18n(<RouterProvider router={router} />)
+    );
+    cy.contains('a', 'Back').should('have.attr', 'href').and('include', 'loginName=mia%40acme.test');
   });
 });

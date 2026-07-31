@@ -46,7 +46,7 @@ describe('login form submits when hydrated (RHF-adapter regression)', () => {
     // entry.client.tsx + routes/login/index.tsx). Click it first to mount the loginName input —
     // mirrors core-signin.cy.ts. (Pre-IdP-first this field was visible on load; the reveal is the
     // current behavior.) The hydration regression this spec guards is unaffected by the reveal.
-    cy.contains('button', 'Continue with email').click();
+    cy.contains('button', 'Email').click();
 
     // Type into the (now React-controlled) identifier field and click the real
     // Continue button — the exact interaction the RHF adapter used to swallow.

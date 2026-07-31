@@ -21,7 +21,6 @@ describe('previousStepFor', () => {
     // Terminal/headless steps have no predecessor.
     expect(previousStepFor('/login')).to.be.null;
     expect(previousStepFor('/signed-in')).to.be.null;
-    expect(previousStepFor('/login/passkey')).to.be.null;
   });
 
   it('verify/* and security-key Back goes straight to /login, not /login/mfa (fixes the sole-factor loop, 2026-07-22)', () => {
@@ -32,6 +31,7 @@ describe('previousStepFor', () => {
     expect(previousStepFor('/login/verify/email')).to.equal('/login');
     expect(previousStepFor('/login/verify/sms')).to.equal('/login');
     expect(previousStepFor('/login/verify/authenticator')).to.equal('/login');
+    expect(previousStepFor('/login/passkey')).to.equal('/login');
     expect(previousStepFor('/login/security-key')).to.equal('/login');
   });
 
