@@ -1,7 +1,7 @@
 // app/resources/webauthn/identity-challenge.ts
 //
-// Self-minted discovery challenge for the usernameless identity-resolution path
-// (spec: 2026-07-31-usernameless-passkey-discovery-design.md). NOT a Zitadel
+// Self-minted discovery challenge for the usernameless identity-resolution path.
+// NOT a Zitadel
 // challenge and NEVER verified: the assertion it produces is an identity CLAIM
 // (userHandle read only) at the trust level of the passkey-hint cookie. Because
 // nothing checks the signature, nothing is persisted server-side either — the

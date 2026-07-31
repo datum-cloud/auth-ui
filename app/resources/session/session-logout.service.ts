@@ -117,7 +117,7 @@ export async function performLogout(
   const target = explicitTarget ?? (hasResidualSessions ? '/accounts' : '/logout/success');
 
   // Owner-scoped hint clearing: "logout clears everything" from the perspective of WHOEVER
-  // signed out. Alice signing out must not erase Bob's fast path (spec: hint-maintenance matrix).
+  // signed out. Alice signing out must not erase Bob's fast path.
   const hint = await readPasskeyHint(request);
   const clearHintCookie =
     active && hint && hint.toLowerCase() === active.loginName.toLowerCase()

@@ -541,7 +541,7 @@ export async function switchAccount(
     location,
     setCookie: await serializeSessions(updated),
     // The switched-to account is now this browser's active identity — refresh the hint
-    // (spec: hint-maintenance matrix). reauthRedirect (dead session) intentionally does
+    // reauthRedirect (dead session) intentionally does
     // NOT rewrite it: identity is not re-established until re-auth actually succeeds.
     cookies: [await serializePasskeyHint(entry.loginName)],
   };

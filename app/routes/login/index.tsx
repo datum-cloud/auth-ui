@@ -87,7 +87,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
   // ── Usernameless fast path: arm a conditional-mediation passkey ceremony ────
   // A hint is an inference; arm ONLY when nothing more specific is known. Explicit
-  // suppression list (spec, /accounts interaction §): ?add=1 (user asked for a different
+  // suppression list: ?add=1 (user asked for a different
   // account), hinted user already live (nothing to log in), unresolvable user (clear the
   // stale hint), no passkey method. Every suppression — and every mint failure — renders
   // the ordinary page; arming is invisible either way.
@@ -102,7 +102,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   if (hint && !isAddAccount) {
     const sessions = await readSessions(request);
     // LIVE session, not just any cookie entry: raw readSessions() output can carry stale
-    // (expired) entries, and a stale entry must not suppress the fast path — the spec's
+    // (expired) entries, and a stale entry must not suppress the fast path — the
     // suppression criterion is a LIVE session. listSessions is the codebase's expiry-aware
     // filter (same usage as session.service.ts); unknown expiry counts as live.
     const hasLiveSession = listSessions(sessions, Date.now()).some(
@@ -117,7 +117,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
         try {
           // Mirror resolveIdentifier's known-user session mint, then persist the entry so
           // the /login/passkey verify action can resolve it by loginName. The loader-side
-          // Set-Cookie is the accepted side effect (spec, verified-before-building §2).
+          // Set-Cookie is the accepted side effect.
           // `hasLiveSession` above satisfies armUserBoundChallenge's caller contract
           // (its same-loginName supersede is only safe against dead entries).
           const armed = await armUserBoundChallenge(
@@ -135,19 +135,19 @@ export async function loader({ request }: LoaderFunctionArgs) {
             };
           }
         } catch {
-          // Session creation failed (deactivated user, provider hiccup) — spec error
-          // matrix: clear the hint, render normally.
+          // Session creation failed (deactivated user, provider hiccup) —
+          // clear the hint, render normally.
           responseHeaders.append('set-cookie', await clearPasskeyHint());
         }
       }
     }
   } else if (!hint && !isAddAccount) {
-    // ── Discovery arm (spec: usernameless discovery design) ──────────────────
+    // ── Discovery arm ─────────────────────────────────────────────────────────
     // Hintless visitors get a SELF-MINTED challenge: no Zitadel call, nothing
     // persisted — the identity tap posts to /login/passkey-discover, which mints
     // the real user-bound challenge only after a passkey was actually tapped.
     // Suppressed when ANY live session exists (arming is inference; a logged-in
-    // visitor is better served by the ordinary page — spec, open decision §2) and
+    // visitor is better served by the ordinary page) and
     // by the operational kill switch (env, default ON — incident mitigation).
     const sessions = await readSessions(request);
     if (env.AUTH_PASSKEY_DISCOVERY_ENABLED && listSessions(sessions, Date.now()).length === 0) {
@@ -317,7 +317,7 @@ export async function action({ request }: ActionFunctionArgs) {
     return redirect(idpResult.authUrl, { headers });
   }
   // Sole-passkey: redirect to /login/passkey like every other post-identifier path
-  // (password, OTP). Pre-A-P10 behavior, reinstated by product ruling (Task 12) —
+  // (password, OTP) —
   // /login renders the chooser and nothing else; no route inlines an identity-bound,
   // single-method screen except /login/method and /reauth, which are out of scope here.
   return redirect(`${result.target}?${result.params}`, { headers });
@@ -379,11 +379,11 @@ export default function Login() {
   // Usernameless fast path — armed by the loader for a hinted returning user (hinted
   // mode) or for a hintless fresh browser (discovery mode: identity tap → discover
   // round-trip → modal ceremony). Retired by the user's OWN form submission below
-  // (spec interaction §2's single-flight concern no longer applies: the sole-passkey
-  // path redirects to /login/passkey — Task 12 — so there is no competing in-place
+  // (no competing single-flight concern: the sole-passkey
+  // path redirects to /login/passkey, so there is no competing in-place
   // ceremony on this page to race against).
   const conditional = useConditionalPasskey({
-    // AMBIENT arming is hinted-only (spec, decision §4): a fresh-browser auto-prompt
+    // AMBIENT arming is hinted-only: a fresh-browser auto-prompt
     // is intrusive — password managers (1Password) escalate the quiet conditional
     // request into a full picker on page load. Discovery stays BUTTON-initiated
     // (beginDiscovery below); the loader-armed identityDiscovery options feed it.
@@ -400,7 +400,7 @@ export default function Login() {
   });
   const conditionalAbort = conditional.abort;
   // ANY form submission (identifier, email-link, IdP button) is the user stating explicit
-  // intent — retire the armed conditional ceremony (spec error matrix: "user types and
+  // intent — retire the armed conditional ceremony ("user types and
   // submits → abort()").
   useEffect(() => {
     if (navigation.state === 'submitting') conditionalAbort();
@@ -436,7 +436,7 @@ export default function Login() {
   // Derived separately from identifierLabel: the field label spells out every accepted type
   // ("Email, phone, or username"), too long for a button. Email wins the both-allowed case —
   // it is the dominant identifier and the field states the full set once opened. Short noun
-  // labels (rebranding ruling, 2026-07-31): the chooser reads as a method list — "Passkey",
+  // labels: the chooser reads as a method list — "Passkey",
   // "Google", "Email" — not as instructions. Separate `t` literals so Lingui extracts each.
   const identifierButtonLabel = field.allowEmail
     ? t`Email`
@@ -519,8 +519,7 @@ export default function Login() {
             htmlType="button"
             loading={ceremonyBusy}
             onClick={() => {
-              // No resolvable identity — run the discovery ceremony MODALLY (spec, open
-              // decision §3 as built): the browser's native picker over the loader's
+              // No resolvable identity — run the discovery ceremony MODALLY: the browser's native picker over the loader's
               // self-minted challenge, then the discover → verify pipeline. Fall back to
               // the identifier step only when discovery can't start (not armed — e.g.
               // ?add=1 or a live session — or WebAuthn unsupported).

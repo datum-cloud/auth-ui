@@ -1,7 +1,7 @@
 // cypress/component/routes/login/passkey-discover.cy.ts
 //
 // /login/passkey-discover action — the identity-resolution step of the usernameless
-// discovery path (spec: 2026-07-31-usernameless-passkey-discovery-design.md).
+// discovery path.
 // The posted assertion is an UNTRUSTED identity claim: only response.userHandle is
 // read (== Zitadel userId). Every user-dependent failure must collapse into ONE
 // opaque 400 (enumeration parity with the identifier form). The action returns
@@ -58,7 +58,7 @@ describe('/login/passkey-discover action', () => {
         'ceremony session entry persisted'
       ).to.equal(true);
       // Hint invariant: "last successfully AUTHENTICATED user" — the verify action
-      // writes it on success; discover must NOT (spec, design decisions).
+      // writes it on success; discover must NOT.
       expect(
         cookies.some((c) => c.startsWith('passkey-hint=')),
         'no hint write on discover'

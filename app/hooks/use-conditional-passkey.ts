@@ -16,7 +16,7 @@ import { useFetcher } from 'react-router';
 
 export type ConditionalPasskeyPhase = 'idle' | 'armed' | 'submitting' | 'done';
 
-// CAPACITY WATERMARK (review #108): two modes + explicit begin + staged dispatch is
+// NOTE: two modes + explicit begin + staged dispatch is
 // this hook's ceiling — the NEXT mode or feature added here should split the
 // hinted/discovery halves instead of growing the shared latch matrix further.
 
@@ -31,7 +31,7 @@ export interface ConditionalPasskeyInput {
    *  assertion submits straight to the verify action. 'discovery': the loader minted
    *  a SELF-issued identity challenge; the first assertion is an identity claim that
    *  posts to /login/passkey-discover, whose response carries the real challenge for
-   *  a modal second ceremony (spec: usernameless discovery design). */
+   *  a modal second ceremony. */
   mode?: 'hinted' | 'discovery';
   /** The hinted user the pre-minted challenge belongs to (loader-resolved loginName).
    *  Empty in discovery mode — the discover response resolves it. */
@@ -89,7 +89,7 @@ export function useConditionalPasskey(input: ConditionalPasskeyInput) {
   } | null>(null);
   const [phase, setPhase] = useState<ConditionalPasskeyPhase>('idle');
   // Failure copy for EXPLICIT (button-initiated) discovery only — the ambient
-  // conditional flow keeps every failure a silent non-event (spec error matrix).
+  // conditional flow keeps every failure a silent non-event.
   const [reason, setReason] = useState<WebAuthnReason | null>(null);
   const armedRef = useRef(false); // one-shot arming (also latched by abort())
   const retriedRef = useRef(false); // expired-challenge re-arm, once (hinted only)
@@ -181,7 +181,7 @@ export function useConditionalPasskey(input: ConditionalPasskeyInput) {
           // Opaque 400 (unknown user, no passkey, mint failure). Ambient flow: designed
           // non-event. Explicit (button) flow: the user acted, so say something — the
           // 'not-allowed' copy ("cancelled, or no passkey for this account is available")
-          // is the truthful fit (spec, open decision §3).
+          // is the truthful fit.
           if (explicitRef.current) setReason('not-allowed');
           setPhase('done');
           return;
@@ -210,7 +210,7 @@ export function useConditionalPasskey(input: ConditionalPasskeyInput) {
   );
 
   /**
-   * EXPLICIT discovery (spec, open decision §3 as built): the Passkey button runs the
+   * EXPLICIT discovery: the Passkey button runs the
    * same discovery pipeline MODALLY — credentials.get over the loader's self-minted
    * options WITHOUT conditional mediation, so the browser opens its native picker
    * (including cross-device QR). Retires the ambient ceremony first (explicit intent

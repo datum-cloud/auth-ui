@@ -1,7 +1,6 @@
 // cypress/e2e/passkey-discovery.cy.ts
 //
-// The usernameless DISCOVERY path end-to-end against the fake provider (spec:
-// 2026-07-31-usernameless-passkey-discovery-design.md): a FRESH browser — no
+// The usernameless DISCOVERY path end-to-end against the fake provider: a FRESH browser — no
 // passkey-hint, no session, nothing — signs in with zero typing. The identity tap
 // (auto-resolved via the Cypress seam; CYPRESS_CREDENTIAL carries userHandle
 // base64url('u5')) posts to /login/passkey-discover, which resolves u5 and mints
@@ -49,7 +48,7 @@ describe('usernameless passkey discovery (fresh browser)', () => {
     // passkey-conditional.cy.ts also clears specific cookies only).
     cy.clearCookie('passkey-hint');
     cy.clearCookie('sessions');
-    // Ambient arming is hinted-only (spec, decision §4): a hintless load stays quiet
+    // Ambient arming is hinted-only: a hintless load stays quiet
     // even with auto-resolve armed; the Passkey BUTTON is the discovery entry
     // (beginDiscovery — under Cypress the pre-baked credential IS the picked passkey).
     visitLoginArmed();

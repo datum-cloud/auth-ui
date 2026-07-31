@@ -74,8 +74,8 @@ describe('usernameless passkey fast path', () => {
     cy.location('pathname').should('eq', '/id/logout/success');
     cy.getCookie('passkey-hint').should('not.exist');
 
-    // 5. No hint → the page stays QUIET even with auto-resolve armed (spec, decision
-    // §4: ambient arming is hinted-only — no fresh-load auto-prompt). Discovery is
+    // 5. No hint → the page stays QUIET even with auto-resolve armed (ambient arming is
+    // hinted-only — no fresh-load auto-prompt). Discovery is
     // BUTTON-initiated: the Passkey button signs in via userHandle resolution, and
     // the verify success re-writes the hint (browser self-upgrade).
     visitLoginArmed();
@@ -96,7 +96,7 @@ describe('usernameless passkey fast path', () => {
 
   it('an armed (un-resolved) ceremony never blocks the ordinary identifier flow', () => {
     // Hint present but NO auto-resolve: the ceremony parks; typing + submitting must win
-    // (the page aborts the armed ceremony on submit — spec: "user types and submits").
+    // (the page aborts the armed ceremony on submit).
     signInWithPassword(USER);
     cy.clearCookie('sessions');
     cy.visit('/id/login', {

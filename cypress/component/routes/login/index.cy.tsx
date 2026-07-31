@@ -1,10 +1,10 @@
 // cypress/component/routes/login/index.cy.tsx
 //
-// UI contract for /login (post-A-P10-reversal, Task 12 — product ruling): the chooser
+// UI contract for /login: the chooser
 // renders unconditionally. There is no identity-bound inline passkey ceremony state on
 // this route anymore — a sole-passkey identifier now REDIRECTS to /login/passkey (see
 // the node-bound action test below) instead of the action returning inline challenge
-// data. The gated Passkey SHORTCUT (Task 11) still drives the shared ceremony in place
+// data. The gated Passkey SHORTCUT still drives the shared ceremony in place
 // on this page, and its own failure surface is still covered here. Mirrors
 // method.cy.tsx's stub /login/passkey route + capturedPosts convention (Task 2).
 import { callService } from '../../../support/node/call-service';
@@ -53,10 +53,9 @@ function mountLogin(opts?: {
   // Known loginName gates the Passkey SHORTCUT visible (view.showPasskeyPrompt && loginName).
   loginName?: string;
   // Overrides the /login/passkey stub's action — used to simulate a ceremony failure
-  // (Finding 1 coverage). Defaults to capturing the POST into capturedPosts.
+  // Defaults to capturing the POST into capturedPosts.
   passkeyAction?: (args: { request: Request }) => unknown | Promise<unknown>;
-  // Org-policy overrides — cover configurations where password is disabled (#107's
-  // showIdentifierForm/showContinue view logic, grafted from main's spec version).
+  // Org-policy overrides — cover configurations where password is disabled.
   settings?: Partial<(typeof INDEX_LOADER_DATA)['settings']>;
   emailDeliveryEnabled?: boolean;
 }) {
@@ -144,7 +143,7 @@ describe('/login — chooser (no inline ceremony)', () => {
     cy.get('input[name="loginName"], button').should('exist'); // chooser is intact
   });
 
-  // Finding 1: the gated Passkey SHORTCUT drives the shared `ceremony` in place on this
+  // The gated Passkey SHORTCUT drives the shared `ceremony` in place on this
   // page — a failure there must still surface visibly.
   it('the gated Passkey shortcut surfaces a ceremony failure through the shared error region', () => {
     mountLogin({
@@ -180,15 +179,14 @@ describe('/login action — sole-passkey identifier', () => {
   });
 });
 
-// ── #107 view logic (grafted from main's spec version at the merge) ──────────────
-// The inline-ceremony tests main carried were dropped — the merged runtime keeps the
-// Task-12 product ruling (sole-passkey REDIRECTS to /login/passkey, asserted above) —
-// but these two cover showIdentifierForm/showContinue, which survive unchanged.
-describe('/login — identifier-form view logic (#107)', () => {
+// ── Identifier-form view logic ───────────────────────────────────────────────
+// Sole-passkey identifiers REDIRECT to /login/passkey (asserted above); these two
+// cover the identifier-form visibility logic under restricted org policies.
+describe('/login — identifier-form view logic', () => {
   // REGRESSION: with allowPassword=false the identifier form used to be hidden entirely,
   // while signInUnavailable stayed false (suppressed by showPasskeyPrompt) — so a fresh
   // visitor at a passkey-only org got an EMPTY card: no sign-in path and no error.
-  // Passkey needs a known user (zitadel/zitadel#8899), so the identifier IS the entry point.
+  // Passkey needs a known user, so the identifier IS the entry point.
   it('a passkey-only org still offers the identifier form, not an empty card', () => {
     mountLogin({
       settings: { allowPassword: false, passkeysType: 'allowed' },

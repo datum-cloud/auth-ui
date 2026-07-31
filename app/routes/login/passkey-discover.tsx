@@ -1,9 +1,9 @@
 // app/routes/login/passkey-discover.tsx
 //
 // Resource route (action only): the identity-resolution step of the usernameless
-// discovery path (spec: 2026-07-31-usernameless-passkey-discovery-design.md).
+// discovery path.
 // The posted assertion is an UNTRUSTED identity claim — its signature is never
-// checked; only response.userHandle (== Zitadel userId, probe-verified) is read.
+// checked; only response.userHandle (the Zitadel user ID) is read.
 // Every user-dependent failure collapses into ONE opaque 400 so this endpoint
 // leaks exactly what the identifier form leaks (enumeration parity) — the AUDIT
 // event carries the real reason instead. The authenticating ceremony is the
@@ -119,7 +119,7 @@ export async function action({ request }: ActionFunctionArgs) {
   if (csrfSetCookie) headers.append('set-cookie', csrfSetCookie);
   // Deliberately NO passkey-hint write: the hint means "last successfully
   // AUTHENTICATED user", and the /login/passkey verify action writes it on
-  // success — discovery only identifies (spec, design decisions).
+  // success — discovery only identifies.
   const payload: PasskeyDiscoverData = {
     loginName: armed.loginName,
     csrfToken,

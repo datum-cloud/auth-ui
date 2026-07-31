@@ -124,8 +124,7 @@ describe('/login Passkey button — visibility and identity binding', () => {
 
   it('cold click with discovery UNARMED (loader-suppressed) falls back to the identifier field', () => {
     // identityDiscovery null = the loader suppressed arming (?add=1 / live session).
-    // beginDiscovery has no options to run over → the identifier step is the fallback
-    // (spec, open decision §3 as built).
+    // beginDiscovery has no options to run over → the identifier step is the fallback.
     mountLogin();
     cy.contains('button', /passkey/i).click();
     cy.get('input[name="loginName"]').should('be.visible');

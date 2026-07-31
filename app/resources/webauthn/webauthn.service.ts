@@ -159,7 +159,7 @@ export interface ArmedUserBoundChallenge {
 /**
  * Mint a Zitadel session bound to `user`, then request a WebAuthn assertion
  * challenge on it — the sequence Zitadel's "a challenge requires a bound user"
- * constraint (zitadel/zitadel#8899) forces on every usernameless entry point.
+ * constraint forces on every usernameless entry point.
  * Two callers: the /login loader (passkey-hint fast path) and the
  * /login/passkey-discover action (identity-discovery path).
  *

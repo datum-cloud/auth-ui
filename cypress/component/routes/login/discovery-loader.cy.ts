@@ -1,7 +1,7 @@
 // cypress/component/routes/login/discovery-loader.cy.ts
 //
 // The /login loader's identity-discovery arming + suppression list, at the HTTP
-// boundary (spec: 2026-07-31-usernameless-passkey-discovery-design.md). Discovery
+// boundary. Discovery
 // arms ONLY for the hintless population — and a discovery arm must be free:
 // self-minted options, NO Zitadel session, NO Set-Cookie. Sibling of
 // conditional-passkey-loader.cy.ts (the hinted path).

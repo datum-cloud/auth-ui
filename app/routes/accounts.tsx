@@ -125,7 +125,7 @@ export function addAccountHref({
 }): string {
   // add=1 marks an EXPLICIT "different account" intent: the /login loader suppresses the
   // usernameless fast path so the previously remembered user's passkey is never offered
-  // to someone who asked to add another account (spec: required change, /accounts §).
+  // to someone who asked to add another account.
   return userCode
     ? paths.login.index({ requestId: `device_${userCode}`, organization, add: '1' })
     : paths.login.index({ requestId: requestId ?? undefined, organization, add: '1' });

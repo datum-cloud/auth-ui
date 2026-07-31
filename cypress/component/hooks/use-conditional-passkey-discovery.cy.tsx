@@ -1,7 +1,6 @@
 // cypress/component/hooks/use-conditional-passkey-discovery.cy.tsx
 //
-// The DISCOVERY mode of the conditional ceremony driver (spec:
-// 2026-07-31-usernameless-passkey-discovery-design.md): assertion #1 (identity
+// The DISCOVERY mode of the conditional ceremony driver: assertion #1 (identity
 // claim) posts to /login/passkey-discover via PLAIN fetch (not an RR fetcher —
 // see submitDiscover's comment); the response carries the REAL user-bound
 // challenge + resolved loginName + fresh csrf, over which the modal ceremony runs
@@ -149,7 +148,7 @@ describe('useConditionalPasskey — discovery mode', () => {
     });
   });
 
-  // ── beginDiscovery: the EXPLICIT (Passkey-button) modal flow — spec, decision §3 ──
+  // ── beginDiscovery: the EXPLICIT (Passkey-button) modal flow ─────────────
 
   it('beginDiscovery runs the modal flow: discover → verify → redirect (no auto-resolve needed)', () => {
     const { discoverPosts, verifyPosts } = mountHarness({});

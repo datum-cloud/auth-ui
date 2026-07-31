@@ -211,7 +211,7 @@ msgid "Connected accounts"
 msgstr "Connected accounts"
 
 #: app/routes/device/index.tsx:73
-#: app/routes/login/index.tsx:595
+#: app/routes/login/index.tsx:594
 #: app/routes/signup/index.tsx:291
 msgid "Continue"
 msgstr "Continue"
@@ -241,7 +241,7 @@ msgstr "Couldn't verify"
 msgid "Create a new account"
 msgstr "Create a new account"
 
-#: app/routes/login/index.tsx:640
+#: app/routes/login/index.tsx:639
 #: app/routes/signup/password.tsx:237
 msgid "Create account"
 msgstr "Create account"
@@ -283,8 +283,8 @@ msgstr "Email code"
 msgid "Email me a code"
 msgstr "Email me a code"
 
-#: app/routes/login/index.tsx:606
-#: app/routes/login/index.tsx:616
+#: app/routes/login/index.tsx:605
+#: app/routes/login/index.tsx:615
 #: app/routes/login/method.tsx:238
 #: app/routes/signup/method.tsx:339
 msgid "Email me a sign-in link"
@@ -446,7 +446,7 @@ msgstr "No signed-in accounts."
 msgid "Not now"
 msgstr "Not now"
 
-#: app/routes/login/index.tsx:638
+#: app/routes/login/index.tsx:637
 msgid "Not registered?"
 msgstr "Not registered?"
 
@@ -472,7 +472,7 @@ msgstr "or"
 msgid "Or import this URI in your authenticator app"
 msgstr "Or import this URI in your authenticator app"
 
-#: app/routes/login/index.tsx:536
+#: app/routes/login/index.tsx:535
 #: app/routes/login/method.tsx:221
 #: app/routes/reauth.tsx:310
 #: app/routes/setup/mfa.tsx:46
@@ -702,7 +702,7 @@ msgstr "Sign out of"
 msgid "Sign out other sessions"
 msgstr "Sign out other sessions"
 
-#: app/routes/login/index.tsx:628
+#: app/routes/login/index.tsx:627
 msgid "Sign-in is currently unavailable for this account. Please contact your administrator."
 msgstr "Sign-in is currently unavailable for this account. Please contact your administrator."
 
