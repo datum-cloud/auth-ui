@@ -109,13 +109,20 @@ export function createWebAuthnVerifyHandlers(cfg: WebAuthnVerifyConfig) {
         userVerificationRequirement: cfg.userVerificationRequirement,
         challengeAuditEvent: cfg.challengeAuditEvent,
       },
-      { loginName, requestId, organization, domain: url.hostname }
+      { loginName, requestId, organization, domain: url.hostname },
+      // Opt in to the stale-session self-heal: a `sessions` cookie can outlive the session it
+      // names (OIDC logout, admin revoke, another browser), and without this the screen renders
+      // a null challenge that only surfaces as "verification failed" on click.
+      { request }
     );
     if (result.kind === 'redirect') return redirect(result.target);
 
     const [csrfToken, setCookie] = await getCsrfToken(request);
-    const headers: Record<string, string> = {};
-    if (setCookie !== null) headers['set-cookie'] = setCookie;
+    // Headers, not a plain record: a self-heal emits its own sessions/fingerprint cookies
+    // alongside the CSRF one, and multiple Set-Cookie values cannot be joined into one string.
+    const headers = new Headers();
+    if (setCookie !== null) headers.append('set-cookie', setCookie);
+    for (const cookie of result.setCookies ?? []) headers.append('set-cookie', cookie);
 
     return data<WebAuthnVerifyLoaderData>(
       {

@@ -114,7 +114,7 @@ import { loader as deviceIndexLoader } from '@/routes/device/index';
 import { loader as loginLoader, action as loginAction } from '@/routes/login/index';
 import { loader as loginMethodLoader, action as loginMethodAction } from '@/routes/login/method';
 import { action as loginMfaAction } from '@/routes/login/mfa';
-import { action as loginPasskeyAction } from '@/routes/login/passkey';
+import { action as loginPasskeyAction, loader as loginPasskeyLoader } from '@/routes/login/passkey';
 import { action as passkeyDiscoverAction } from '@/routes/login/passkey-discover';
 import {
   action as loginPasswordAction,
@@ -123,6 +123,7 @@ import {
 import { action as securityKeyAction } from '@/routes/login/security-key';
 import { loader as loginVerifyEmailLoader } from '@/routes/login/verify/email';
 import { loader as logoutLoader, action as logoutAction } from '@/routes/logout/index';
+import { loader as logoutSuccessLoader } from '@/routes/logout/success';
 import {
   loader as passwordChangeLoader,
   action as passwordChangeAction,
@@ -807,13 +808,17 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
       case 'requestWebAuthnChallenge': {
         if (!s.attestationInput)
           throw new Error('requestWebAuthnChallenge requires attestationInput');
-        // cfg is unused on the no-session guard-fail path exercised by the threading test; a valid
-        // passkey config keeps the type honest.
+        // Mirror the real verify loader, which always opts into the stale-session self-heal.
+        // Recovery re-mints a session, so it needs a Request for the fingerprint + user-agent.
+        const { request } = await buildHandlerRequest(
+          s.request ?? { url: 'http://localhost/id/login/passkey' }
+        );
         outcome = await requestWebAuthnChallenge(
           provider,
           buildSessionEntries(sr.sessions),
           { userVerificationRequirement: 'required', challengeAuditEvent: 'mfa_passkey_challenge' },
-          s.attestationInput
+          s.attestationInput,
+          { request }
         );
         break;
       }
@@ -2312,6 +2317,19 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
         break;
       }
 
+      case 'loginPasskeyLoader': {
+        const { request } = await buildHandlerRequest(
+          s.request ?? { url: 'http://localhost/id/login/passkey' }
+        );
+        const result = await loginPasskeyLoader({
+          request,
+          params: {},
+          context: {} as never,
+        } as never);
+        response = await serializeResponse(result);
+        break;
+      }
+
       case 'loginVerifyEmailLoader': {
         const { request } = await buildHandlerRequest(
           s.request ?? { url: 'http://localhost/id/login/verify/email' }
@@ -2676,6 +2694,19 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
           s.request ?? { url: 'http://localhost/id/logout' }
         );
         const result = await logoutLoader({
+          request,
+          params: {},
+          context: {} as never,
+        } as never);
+        response = await serializeResponse(result);
+        break;
+      }
+
+      case 'logoutSuccessLoader': {
+        const { request } = await buildHandlerRequest(
+          s.request ?? { url: 'http://localhost/id/logout/success' }
+        );
+        const result = await logoutSuccessLoader({
           request,
           params: {},
           context: {} as never,

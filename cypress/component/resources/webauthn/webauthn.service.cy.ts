@@ -179,6 +179,66 @@ describe('requestWebAuthnChallenge — guard-fail bounce target threading', () =
   });
 });
 
+// Singleton seed: u5 passkey-user@acme.test carries a passkey (same constant as
+// routes/login/conditional-passkey-loader.cy.ts).
+const PK_USER = 'passkey-user@acme.test';
+
+describe('requestWebAuthnChallenge — stale provider-side session self-heal', () => {
+  // Staging bug: after an OIDC logout the signed `sessions` cookie survived with a
+  // still-future expirationTs while Zitadel had already terminated the session. byLoginName
+  // therefore handed a DEAD entry to updateSession, which threw NOT_FOUND/PERMISSION_DENIED.
+  // The bare `catch {}` swallowed it and returned a null challenge, so the screen rendered
+  // normally and WebAuthnButton's `!publicKey` guard fired on click — surfacing
+  // "The passkey verification failed. Please try again." without ever calling
+  // navigator.credentials.get(). Nothing was verified; the advice to retry could never work.
+  it('re-mints a user-bound session and arms a fresh challenge when the cookie entry is dead provider-side', () => {
+    callService({
+      fn: 'requestWebAuthnChallenge',
+      provider: 'singleton',
+      request: {
+        url: 'http://localhost/id/login/passkey',
+        // Names a REAL seeded passkey user, but an id/token the provider has never issued —
+        // the fake throws ProviderError('NOT_FOUND') exactly as staging Zitadel does.
+        sessions: [{ id: 'dead-session', token: 'dead-token', loginName: PK_USER }],
+      },
+      attestationInput: { loginName: PK_USER, domain: 'localhost' },
+    }).then((v) => {
+      const o = v.outcome as {
+        kind: string;
+        publicKeyCredentialRequestOptions?: unknown;
+        setCookies?: string[];
+      };
+      expect(o.kind).to.equal('challenge');
+      expect(o.publicKeyCredentialRequestOptions, 'a fresh challenge is armed').to.exist;
+      // The dead entry must be superseded so the cookie stops advertising it as live.
+      expect(
+        (o.setCookies ?? []).some((c) => c.startsWith('sessions=')),
+        'sessions Set-Cookie'
+      ).to.be.true;
+    });
+  });
+
+  it('bounces to /login when the session is dead AND the user no longer resolves', () => {
+    callService({
+      fn: 'requestWebAuthnChallenge',
+      provider: 'singleton',
+      request: {
+        url: 'http://localhost/id/login/passkey',
+        sessions: [{ id: 'dead-session', token: 'dead-token', loginName: 'ghost@acme.test' }],
+      },
+      attestationInput: {
+        loginName: 'ghost@acme.test',
+        domain: 'localhost',
+        requestId: 'oidc_V2_1',
+      },
+    }).then((v) => {
+      const o = v.outcome as { kind: string; target?: string };
+      expect(o.kind).to.equal('redirect');
+      expect(o.target).to.equal('/login?requestId=oidc_V2_1');
+    });
+  });
+});
+
 describe('verifyPasskeyEnrollment', () => {
   it('threads checkAfter routing params, rejects malformed/invalid credentials, and expires with no session', () => {
     callService({

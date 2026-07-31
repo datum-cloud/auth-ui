@@ -11,6 +11,9 @@ node_modules
 /cypress/screenshots
 .claude/settings.local.json
 .claude/settings.json
+# Local-only Claude Code state (generated skills, worktree checkouts)
+.claude/skills/
+.claude/worktrees/
 .superpowers/
 app/modules/i18n/locales/*.ts
 app/modules/i18n/locales/*.js

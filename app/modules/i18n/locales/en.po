@@ -667,7 +667,7 @@ msgid "Sign in"
 msgstr "Sign in"
 
 #: app/routes/login/password.tsx:195
-#: app/routes/logout/success.tsx:27
+#: app/routes/logout/success.tsx:57
 #: app/utils/errors/auth-error-recovery.tsx:47
 msgid "Sign in again"
 msgstr "Sign in again"
@@ -995,7 +995,7 @@ msgstr "You signed in as a different account than the one you were re-authentica
 msgid "You'll be asked to sign in before authorizing."
 msgstr "You'll be asked to sign in before authorizing."
 
-#: app/routes/logout/success.tsx:18
+#: app/routes/logout/success.tsx:48
 msgid "You've been signed out"
 msgstr "You've been signed out"
 
@@ -1027,7 +1027,7 @@ msgstr "Your password has expired. Please reset it to continue."
 msgid "Your previous attempt may have already created a passkey on this device. Retrying will register a new one — you can remove the unused entry later from your device or password manager."
 msgstr "Your previous attempt may have already created a passkey on this device. Retrying will register a new one — you can remove the unused entry later from your device or password manager."
 
-#: app/routes/logout/success.tsx:20
+#: app/routes/logout/success.tsx:50
 msgid "Your session has ended and you've been securely signed out of Datum. You can safely close this tab, or sign back in any time to pick up where you left off."
 msgstr "Your session has ended and you've been securely signed out of Datum. You can safely close this tab, or sign back in any time to pick up where you left off."
 
