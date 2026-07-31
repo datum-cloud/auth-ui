@@ -177,6 +177,38 @@ export function useConditionalPasskey(input: ConditionalPasskeyInput) {
           body: new URLSearchParams({ csrf: csrfToken, credential: JSON.stringify(credential) }),
         });
         if (abortedRef.current) return;
+        // 409 = the tapped credential belongs to an account this browser is ALREADY
+        // signed into. Not a failure: send the user there rather than showing ceremony
+        // error copy for a session that already exists. Full navigation, not RR
+        // routing — the destination resolves the session server-side.
+        if (res.status === 409) {
+          const body = (await res.json().catch(() => null)) as { loginName?: string } | null;
+          if (abortedRef.current) return;
+          setPhase('done');
+          if (typeof body?.loginName === 'string' && body.loginName.length > 0) {
+            // Land on the ACCOUNTS PICKER, not /signed-in. /signed-in resolves
+            // mostRecent(sessions) — the most-recently-active account, not necessarily the
+            // one whose passkey was just tapped — so with two live sessions this could sign
+            // the user into the WRONG one. The picker's switchAccount (session.service.ts)
+            // validates the tapped session provider-side, resolves the continuation via
+            // resolveNextPath(..., { requestId }), and promotes it to most-recent — the
+            // existing, correct idiom for "continue as a specific already-live account".
+            // Threading requestId/organization (rather than dropping them, as /signed-in
+            // would) keeps a mid-ceremony ?add=1 arrival able to hand back to the
+            // OIDC/SAML/device callback the picker resolves; with none, it resolves the
+            // same default destination /signed-in would have.
+            window.location.assign(
+              `${APP_BASENAME}${paths.accounts({
+                requestId: input.requestId,
+                organization: input.organization,
+              })}`
+            );
+            return;
+          }
+          // Contract violation — never leave an explicit click with no outcome.
+          if (explicitRef.current) setReason('unknown');
+          return;
+        }
         if (!res.ok) {
           // Opaque 400 (unknown user, no passkey, mint failure). Ambient flow: designed
           // non-event. Explicit (button) flow: the user acted, so say something — the

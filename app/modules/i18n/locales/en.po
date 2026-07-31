@@ -78,7 +78,7 @@ msgstr "Additional verification is required to continue."
 msgid "Already have an account?"
 msgstr "Already have an account?"
 
-#: app/routes/login/index.tsx:474
+#: app/routes/login/index.tsx:424
 msgid "An account with this email already exists — sign in to continue."
 msgstr "An account with this email already exists — sign in to continue."
 
@@ -180,7 +180,7 @@ msgstr "Choose how to sign in"
 msgid "Choose how you want to verify your identity."
 msgstr "Choose how you want to verify your identity."
 
-#: app/routes/login/index.tsx:470
+#: app/routes/login/index.tsx:420
 msgid "Choose your login method"
 msgstr "Choose your login method"
 
@@ -211,7 +211,7 @@ msgid "Connected accounts"
 msgstr "Connected accounts"
 
 #: app/routes/device/index.tsx:73
-#: app/routes/login/index.tsx:594
+#: app/routes/login/index.tsx:546
 #: app/routes/signup/index.tsx:291
 msgid "Continue"
 msgstr "Continue"
@@ -241,7 +241,7 @@ msgstr "Couldn't verify"
 msgid "Create a new account"
 msgstr "Create a new account"
 
-#: app/routes/login/index.tsx:639
+#: app/routes/login/index.tsx:591
 #: app/routes/signup/password.tsx:237
 msgid "Create account"
 msgstr "Create account"
@@ -268,8 +268,8 @@ msgstr "Device code"
 msgid "Device denied"
 msgstr "Device denied"
 
-#: app/routes/login/index.tsx:427
-#: app/routes/login/index.tsx:442
+#: app/routes/login/index.tsx:377
+#: app/routes/login/index.tsx:392
 #: app/routes/signup/index.tsx:250
 #: app/routes/signup/index.tsx:275
 msgid "Email"
@@ -283,8 +283,8 @@ msgstr "Email code"
 msgid "Email me a code"
 msgstr "Email me a code"
 
-#: app/routes/login/index.tsx:605
-#: app/routes/login/index.tsx:615
+#: app/routes/login/index.tsx:557
+#: app/routes/login/index.tsx:567
 #: app/routes/login/method.tsx:238
 #: app/routes/signup/method.tsx:339
 msgid "Email me a sign-in link"
@@ -306,7 +306,7 @@ msgstr "Email OTP"
 msgid "Email sign-in isn't available — use your username."
 msgstr "Email sign-in isn't available — use your username."
 
-#: app/routes/login/index.tsx:426
+#: app/routes/login/index.tsx:376
 msgid "Email, phone, or username"
 msgstr "Email, phone, or username"
 
@@ -446,7 +446,7 @@ msgstr "No signed-in accounts."
 msgid "Not now"
 msgstr "Not now"
 
-#: app/routes/login/index.tsx:637
+#: app/routes/login/index.tsx:589
 msgid "Not registered?"
 msgstr "Not registered?"
 
@@ -472,7 +472,7 @@ msgstr "or"
 msgid "Or import this URI in your authenticator app"
 msgstr "Or import this URI in your authenticator app"
 
-#: app/routes/login/index.tsx:535
+#: app/routes/login/index.tsx:487
 #: app/routes/login/method.tsx:221
 #: app/routes/reauth.tsx:310
 #: app/routes/setup/mfa.tsx:46
@@ -543,8 +543,8 @@ msgstr "Password must contain an uppercase letter."
 msgid "Password sign-in isn't available for this account."
 msgstr "Password sign-in isn't available for this account."
 
-#: app/routes/login/index.tsx:429
-#: app/routes/login/index.tsx:444
+#: app/routes/login/index.tsx:379
+#: app/routes/login/index.tsx:394
 msgid "Phone"
 msgstr "Phone"
 
@@ -702,7 +702,7 @@ msgstr "Sign out of"
 msgid "Sign out other sessions"
 msgstr "Sign out other sessions"
 
-#: app/routes/login/index.tsx:627
+#: app/routes/login/index.tsx:579
 msgid "Sign-in is currently unavailable for this account. Please contact your administrator."
 msgstr "Sign-in is currently unavailable for this account. Please contact your administrator."
 
@@ -871,8 +871,8 @@ msgstr "Use your passkey to verify your identity."
 msgid "Use your security key to verify your identity."
 msgstr "Use your security key to verify your identity."
 
-#: app/routes/login/index.tsx:430
-#: app/routes/login/index.tsx:445
+#: app/routes/login/index.tsx:380
+#: app/routes/login/index.tsx:395
 #: app/routes/sso/ldap.tsx:76
 msgid "Username"
 msgstr "Username"
@@ -943,7 +943,7 @@ msgstr "We've sent a password reset link to <0>{0}</0>"
 msgid "We've sent a verification link to <0>{0}</0>"
 msgstr "We've sent a verification link to <0>{0}</0>"
 
-#: app/routes/login/index.tsx:467
+#: app/routes/login/index.tsx:417
 msgid "Welcome"
 msgstr "Welcome"
 

@@ -86,12 +86,41 @@ describe('usernameless passkey fast path', () => {
     cy.getCookie('passkey-hint').should('exist');
   });
 
-  it('add-another-account arrival suppresses the fast path', () => {
+  it('add-another-account arrival keeps the hint dark but discovery still arms', () => {
     signInWithPassword(USER);
     cy.clearCookie('sessions');
     visitLoginArmed('/id/login?add=1');
     cy.settleHydration();
+    // ?add=1 suppresses only the HINT arm — no zero-typing auto sign-in.
     cy.location('pathname').should('eq', '/id/login');
+    // Discovery arms regardless of ?add=1 (the cascade) — the Passkey button still
+    // resolves the tapped credential's identity and signs in.
+    cy.contains('button', /passkey/i).click();
+    cy.location('pathname').should('eq', '/id/signed-in');
+    cy.contains(USER);
+  });
+
+  it("add-another-account with a LIVE session: tapping the signed-in account's own passkey routes to the accounts picker", () => {
+    // Distinct from the test above: THAT test clears the `sessions` cookie before
+    // visiting ?add=1, so it never reaches a live session and never reaches the 409 branch
+    // this covers. "Add another account" implies a session already exists — THIS test keeps
+    // it live. CYPRESS_CREDENTIAL's userHandle (base64url('u5')) resolves to USER, so tapping
+    // it while USER's own session is live is the reported bug's exact repro: the discover
+    // action's ALREADY_SIGNED_IN 409 branch must fire, and the client must land on the
+    // accounts picker (not /signed-in, which would resolve mostRecent() rather than the
+    // tapped account, and not the opaque-failure copy — the session already exists).
+    signInWithPassword(USER);
+    visitLoginArmed('/id/login?add=1');
+    cy.settleHydration();
+    cy.location('pathname').should('eq', '/id/login');
+    cy.contains('button', /passkey/i).click();
+    cy.location('pathname').should('eq', '/id/accounts');
+    // The picker renders the seeded fake-provider displayName ("Passkey User"), not the
+    // raw loginName — same convention as accounts.tsx (`account.displayName ??
+    // account.loginName`). "Session active" confirms it landed on USER's own live row,
+    // not an empty picker or a different account.
+    cy.contains('Passkey User');
+    cy.contains('Session active');
   });
 
   it('an armed (un-resolved) ceremony never blocks the ordinary identifier flow', () => {

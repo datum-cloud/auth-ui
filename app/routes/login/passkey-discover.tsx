@@ -83,15 +83,30 @@ export async function action({ request }: ActionFunctionArgs) {
   const user = await provider.getUser(userHandle);
   if (!user) return opaque('unresolved_user');
 
-  // Cheap LOCAL guard before the second provider round-trip: armUserBoundChallenge's
-  // caller contract + crafted-POST protection. The loader suppresses discovery
-  // whenever a live session exists, so a live entry here means the POST bypassed
-  // the page. Refuse rather than let the arm supersede a LIVE cookie entry.
+  // Per-user guard. This endpoint decides what is ALLOWED independently of what the
+  // /login loader chose to OFFER, so it stays correct against a crafted POST — and the
+  // loader now arms discovery while a session is live, so a live entry here is ordinary
+  // rather than evidence the page was bypassed.
+  //
+  // armUserBoundChallenge's caller contract forbids superseding a LIVE cookie entry, so
+  // this case cannot proceed. It is NOT a failure though: the user tapped the passkey of
+  // an account they already hold, so say so and let the client route there. Not an
+  // enumeration leak — reaching this branch requires passing assertCsrf AND holding a
+  // live signed sessions cookie for this exact user, which reveals nothing /accounts
+  // does not already show. (The assertion signature is never verified here, so a forged
+  // userHandle is assumed; the guard keys on THIS browser's sessions, which a forger
+  // cannot influence.)
   const sessions = await readSessions(request);
   const hasLiveSession = listSessions(sessions, Date.now()).some(
     (s) => s.loginName.toLowerCase() === user.loginName.toLowerCase()
   );
-  if (hasLiveSession) return opaque('live_session');
+  if (hasLiveSession) {
+    logAuthEvent('passkey_discover', 'failure', { reason: 'already_signed_in' });
+    return Response.json(
+      { error: 'ALREADY_SIGNED_IN', loginName: user.loginName },
+      { status: 409 }
+    );
+  }
 
   if (!(await provider.listAuthMethods(user.id)).includes('passkey')) {
     return opaque('no_passkey_method');

@@ -136,25 +136,6 @@ describe('/login/passkey-discover action', () => {
     });
   });
 
-  it('live session for the resolved user → opaque 400 (crafted-POST supersede guard)', () => {
-    // The loader suppresses discovery when a live session exists; a crafted POST must
-    // not bypass that and supersede a LIVE cookie entry via armUserBoundChallenge.
-    callService({
-      fn: 'passkeyDiscoverAction',
-      provider: 'singleton',
-      liveSessions: [{ id: 's5', token: 't5', user: { id: 'u5', loginName: PK_USER } }],
-      request: {
-        url: URL,
-        sessions: [{ id: 's5', token: 't5', loginName: PK_USER }],
-        form: { credential: assertionWith(B64_U5) },
-        csrf: true,
-      },
-    }).then((v) => {
-      expect(v.response?.status).to.equal(400);
-      expect((v.response?.dataBody as { error?: string }).error).to.equal('DISCOVERY_FAILED');
-    });
-  });
-
   it('malformed credential JSON → opaque DISCOVERY_FAILED 400 (shape violations are non-events)', () => {
     callService({
       fn: 'passkeyDiscoverAction',
@@ -174,6 +155,30 @@ describe('/login/passkey-discover action', () => {
     }).then((v) => {
       expect(v.response?.status).to.equal(400);
       expect((v.response?.dataBody as { error?: string }).error).to.equal('INVALID_INPUT');
+    });
+  });
+});
+
+describe('passkey-discover — already signed in as the tapped account', () => {
+  // Reachable only since the loader cascade began arming discovery while a session is
+  // live. Previously an opaque 400, which read as "something went wrong" when the user
+  // had simply tapped the account they were already in.
+  it('returns 409 ALREADY_SIGNED_IN with the loginName, not the opaque 400', () => {
+    callService({
+      fn: 'passkeyDiscoverAction',
+      provider: 'singleton',
+      liveSessions: [{ id: 's5', token: 't5', user: { id: 'u5', loginName: PK_USER } }],
+      request: {
+        url: URL,
+        sessions: [{ id: 's5', token: 't5', loginName: PK_USER }],
+        form: { credential: assertionWith(B64_U5) },
+        csrf: true,
+      },
+    }).then((v) => {
+      expect(v.response?.status).to.equal(409);
+      const body = v.response?.dataBody as { error?: string; loginName?: string };
+      expect(body.error).to.equal('ALREADY_SIGNED_IN');
+      expect(body.loginName).to.equal(PK_USER);
     });
   });
 });

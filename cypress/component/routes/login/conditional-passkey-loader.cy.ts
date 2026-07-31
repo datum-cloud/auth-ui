@@ -10,10 +10,11 @@ const PK_USER = 'passkey-user@acme.test';
 const URL_BASE = 'http://localhost/id/login?organization=org1';
 type LoaderBody = {
   conditionalPasskey?: { loginName?: string; publicKeyCredentialRequestOptions?: unknown } | null;
+  identityDiscovery?: { publicKeyCredentialRequestOptions?: unknown } | null;
 };
 
 describe('/login loader — conditional passkey arming', () => {
-  it('no hint → arms nothing', () => {
+  it('no hint → the HINT arm stays inert (discovery arming is covered in discovery-loader.cy.ts)', () => {
     callService({ fn: 'loginLoader', provider: 'singleton', request: { url: URL_BASE } }).then(
       (v) => {
         expect((v.response?.dataBody as LoaderBody).conditionalPasskey).to.equal(null);
@@ -36,30 +37,41 @@ describe('/login loader — conditional passkey arming', () => {
     });
   });
 
-  it('?add=1 (add-another-account arrival) suppresses arming', () => {
+  it('?add=1 suppresses the HINT arm but falls through to discovery', () => {
     callService({
       fn: 'loginLoader',
       provider: 'singleton',
       request: { url: `${URL_BASE}&add=1`, passkeyHint: PK_USER },
     }).then((v) => {
-      expect((v.response?.dataBody as LoaderBody).conditionalPasskey).to.equal(null);
+      const body = v.response?.dataBody as LoaderBody;
+      expect(body.conditionalPasskey).to.equal(null);
+      expect(body.identityDiscovery?.publicKeyCredentialRequestOptions, 'discovery armed').to.exist;
+      // Discovery is free — self-minted options, no Zitadel session, so still no cookie.
       expect(
         (v.response?.dataSetCookies ?? []).some((c: string) => c.startsWith('sessions='))
       ).to.equal(false);
     });
   });
 
-  it('hinted user already has a live session → suppresses arming', () => {
+  it('hinted user WITH a live session falls through to discovery instead of dead-ending', () => {
     callService({
       fn: 'loginLoader',
       provider: 'singleton',
+      liveSessions: [{ id: 's5', token: 't5', user: { id: 'u5', loginName: PK_USER } }],
       request: {
         url: URL_BASE,
         passkeyHint: PK_USER,
         sessions: [{ id: 's5', token: 't5', loginName: PK_USER }],
       },
     }).then((v) => {
-      expect((v.response?.dataBody as LoaderBody).conditionalPasskey).to.equal(null);
+      const body = v.response?.dataBody as LoaderBody;
+      // Hint arm still declines — armUserBoundChallenge must not supersede a LIVE entry.
+      expect(body.conditionalPasskey).to.equal(null);
+      // ...but discovery now catches the decline. This is the bug being fixed.
+      expect(
+        body.identityDiscovery?.publicKeyCredentialRequestOptions,
+        'discovery caught the declined hint arm'
+      ).to.exist;
     });
   });
 
@@ -110,7 +122,10 @@ describe('/login loader — conditional passkey arming', () => {
       provider: 'singleton',
       request: { url: URL_BASE, passkeyHint: 'ghost@acme.test' },
     }).then((v) => {
-      expect((v.response?.dataBody as LoaderBody).conditionalPasskey).to.equal(null);
+      const body = v.response?.dataBody as LoaderBody;
+      expect(body.conditionalPasskey).to.equal(null);
+      // The hint arm's decline falls through to the cascade's second arm.
+      expect(body.identityDiscovery?.publicKeyCredentialRequestOptions).to.exist;
       const cleared = (v.response?.dataSetCookies ?? []).find((c: string) =>
         c.startsWith('passkey-hint=')
       );
@@ -124,7 +139,10 @@ describe('/login loader — conditional passkey arming', () => {
       provider: 'singleton',
       request: { url: URL_BASE, passkeyHint: 'alice@acme.test' },
     }).then((v) => {
-      expect((v.response?.dataBody as LoaderBody).conditionalPasskey).to.equal(null);
+      const body = v.response?.dataBody as LoaderBody;
+      expect(body.conditionalPasskey).to.equal(null);
+      // The hint arm's decline falls through to the cascade's second arm.
+      expect(body.identityDiscovery?.publicKeyCredentialRequestOptions).to.exist;
       expect(
         (v.response?.dataSetCookies ?? []).some((c: string) => c.startsWith('passkey-hint='))
       ).to.equal(false);
