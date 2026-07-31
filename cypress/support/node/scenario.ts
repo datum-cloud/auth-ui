@@ -235,6 +235,10 @@ export type ServiceFn =
   | 'loginAction'
   | 'loginPasswordAction'
   | 'loginPasskeyAction'
+  // /login/passkey loader: the challenge-arming half of the verify ceremony. Covers the
+  // stale-session self-heal end-to-end — the re-minted session must reach the browser as a
+  // Set-Cookie or the assertion that follows verifies against the wrong session.
+  | 'loginPasskeyLoader'
   // /login/passkey-discover action: identity-resolution step of the usernameless
   // discovery path — userHandle → user-bound challenge (opaque 400s on failure).
   | 'passkeyDiscoverAction'
@@ -269,6 +273,7 @@ export type ServiceFn =
   | 'accountsLoader'
   | 'accountsAction'
   | 'logoutLoader'
+  | 'logoutSuccessLoader'
   | 'logoutAction'
   | 'passwordNewLoader'
   | 'passwordNewAction'

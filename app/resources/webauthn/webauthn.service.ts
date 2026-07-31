@@ -101,6 +101,22 @@ export interface WebAuthnChallengeRedirect {
 export interface WebAuthnChallengeData {
   kind: 'challenge';
   publicKeyCredentialRequestOptions: unknown;
+  /**
+   * Set-Cookie values the caller MUST append. Only populated by the stale-session
+   * self-heal below, which supersedes the dead entry with a freshly minted one — the
+   * challenge is armed on the new session, so dropping these cookies would leave the
+   * browser pointing at the dead entry and the assertion would fail to verify.
+   */
+  setCookies?: string[];
+}
+
+/**
+ * Opt-in recovery for a session that is dead PROVIDER-SIDE but still present (and
+ * apparently unexpired) in the signed `sessions` cookie — see requestWebAuthnChallenge.
+ * Carries the Request because re-minting needs the fingerprint + user-agent.
+ */
+export interface StaleSessionRecovery {
+  request: Request;
 }
 
 export type WebAuthnChallengeResult = WebAuthnChallengeRedirect | WebAuthnChallengeData;
@@ -121,7 +137,8 @@ export async function requestWebAuthnChallenge(
   provider: AuthProvider,
   sessions: SessionEntry[],
   cfg: WebAuthnChallengeConfig,
-  { loginName, requestId, organization, domain }: WebAuthnChallengeInput
+  { loginName, requestId, organization, domain }: WebAuthnChallengeInput,
+  recovery?: StaleSessionRecovery
 ): Promise<WebAuthnChallengeResult> {
   const entry = byLoginName(sessions, loginName, organization);
   if (!entry) return { kind: 'redirect', target: loginBounceTarget(requestId, organization) };
@@ -138,12 +155,75 @@ export async function requestWebAuthnChallenge(
     });
     publicKeyCredentialRequestOptions =
       session.challenges?.webAuthN?.publicKeyCredentialRequestOptions ?? null;
-  } catch {
+  } catch (err) {
     logAuthEvent(cfg.challengeAuditEvent, 'failure', { loginName });
-    // Challenge failure is not fatal — the browser will show an error when the button is clicked.
+    // A STALE session is not the same failure as an unreachable backend, and conflating them
+    // is what produced the staging bug: the cookie entry above passed byLoginName (its
+    // expirationTs is cookie-local, so a provider-side termination is invisible to it), the
+    // challenge request threw NOT_FOUND/PERMISSION_DENIED, and the null options below reached
+    // WebAuthnButton's `!publicKey` guard — which tells the user "The passkey verification
+    // failed. Please try again." No verification was attempted and no retry could ever succeed,
+    // because every retry re-reads the same dead entry. Re-mint instead (below).
+    if (recovery && isStaleSessionError(err)) {
+      return recoverStaleChallenge(provider, recovery.request, sessions, {
+        loginName,
+        requestId,
+        organization,
+        domain,
+      });
+    }
+    // Any OTHER failure stays non-fatal — a transient backend fault is genuinely retryable,
+    // so render the screen and let the button surface the error on click.
   }
 
   return { kind: 'challenge', publicKeyCredentialRequestOptions };
+}
+
+/**
+ * Recover from a session that the provider has already terminated: mint a fresh user-bound
+ * session and arm the challenge on THAT, so the click that follows opens a real passkey
+ * dialog instead of a dead end.
+ *
+ * Only ever reached from requestWebAuthnChallenge's catch, and only when the caller opted in
+ * by passing `recovery` — armUserBoundChallenge calls requestWebAuthnChallenge itself, so
+ * unconditional recovery would let a stale error recurse back into it. Omitting the parameter
+ * on that internal call makes the cycle structurally impossible rather than merely unlikely
+ * (types.ts also warns the stale classifier is "NOT appropriate for a session just created
+ * earlier in the SAME request").
+ *
+ * Not an authentication bypass: reaching here requires an entry in the HMAC-signed `sessions`
+ * cookie naming this loginName, so the loginName cannot be forged through the URL param, and
+ * the minted session carries no verified factors until the assertion below it succeeds.
+ *
+ * CONTRACT NOTE: armUserBoundChallenge supersedes EVERY same-loginName entry, while we have
+ * only proven the one byLoginName selected is dead. byLoginName returns the most recent, so
+ * older duplicates are all but certainly dead too — and the blast radius is bounded either
+ * way, since dropping a session reference can only force a re-authentication, never grant one.
+ */
+async function recoverStaleChallenge(
+  provider: AuthProvider,
+  request: Request,
+  sessions: SessionEntry[],
+  { loginName, requestId, organization, domain }: WebAuthnChallengeInput
+): Promise<WebAuthnChallengeResult> {
+  const bounce: WebAuthnChallengeRedirect = {
+    kind: 'redirect',
+    target: loginBounceTarget(requestId, organization),
+  };
+
+  const user = await provider.findUser(loginName, organization);
+  if (!user) return bounce;
+
+  const armed = await armUserBoundChallenge(provider, request, sessions, user, domain);
+  // Re-mint failed (no passkey, provider refused the challenge) — resolve away from a verify
+  // screen that cannot work rather than rendering it with nothing armed.
+  if (!armed) return bounce;
+
+  return {
+    kind: 'challenge',
+    publicKeyCredentialRequestOptions: armed.publicKeyCredentialRequestOptions,
+    setCookies: armed.setCookies,
+  };
 }
 
 // ── USER-BOUND CHALLENGE ARM (usernameless entry points) ──────────────────────
