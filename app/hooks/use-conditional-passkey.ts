@@ -1,6 +1,7 @@
 import { CYPRESS_CREDENTIAL } from '@/components/webauthn-button/webauthn-button';
 import { unwrapPublicKey } from '@/hooks/use-passkey-login-ceremony';
 import { APP_BASENAME } from '@/resources/shared/app-basename';
+import type { PasskeyDiscoverData } from '@/resources/webauthn/passkey-discover.types';
 import {
   marshalAssertion,
   isWebAuthnSupported,
@@ -15,13 +16,13 @@ import { useFetcher } from 'react-router';
 
 export type ConditionalPasskeyPhase = 'idle' | 'armed' | 'submitting' | 'done';
 
-/** The discover action's success payload (declared locally — importing the route
- *  module would drag its server-only imports into the client graph). */
-interface DiscoverResponse {
-  loginName: string;
-  csrfToken: string;
-  publicKeyCredentialRequestOptions: unknown;
-}
+// CAPACITY WATERMARK (review #108): two modes + explicit begin + staged dispatch is
+// this hook's ceiling — the NEXT mode or feature added here should split the
+// hinted/discovery halves instead of growing the shared latch matrix further.
+
+/** The discover action's success payload (shared types-only module — the route
+ *  module itself carries server-only imports the client graph must not see). */
+type DiscoverResponse = PasskeyDiscoverData;
 
 export interface ConditionalPasskeyInput {
   /** Master switch — false keeps the hook fully inert (no detection, no arming). */

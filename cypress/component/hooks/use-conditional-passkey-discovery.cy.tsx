@@ -49,22 +49,26 @@ function mountHarness({
   enabled = true,
   options = IDENTITY_OPTIONS as unknown,
   discoverReply = undefined as { statusCode: number; body: unknown } | undefined,
+  // Holds the discover reply open so a test can act WHILE phase === 'submitting'
+  // (the fake path otherwise completes the whole flow synchronously).
+  discoverDelayMs = 0,
   verifyResult = undefined as unknown, // undefined → redirect('/signed-in')
 } = {}) {
   const discoverPosts: string[] = [];
   const verifyPosts: Array<Record<string, unknown>> = [];
   cy.intercept('POST', '**/id/login/passkey-discover', (req) => {
     discoverPosts.push(String(req.body));
-    req.reply(
-      discoverReply ?? {
+    req.reply({
+      ...(discoverReply ?? {
         statusCode: 200,
         body: {
           loginName: RESOLVED,
           csrfToken: 'tok-discover',
           publicKeyCredentialRequestOptions: REAL_OPTIONS,
         },
-      }
-    );
+      }),
+      ...(discoverDelayMs ? { delay: discoverDelayMs } : {}),
+    });
   }).as('discover');
   const router = createMemoryRouter(
     [
@@ -166,6 +170,15 @@ describe('useConditionalPasskey — discovery mode', () => {
     cy.get('[data-testid="begin"]').click();
     cy.get('[data-testid="signed-in"]').should('exist');
     cy.then(() => expect(verifyPosts).to.have.length(1));
+  });
+
+  it('beginDiscovery is single-flight — a second click while submitting is a no-op', () => {
+    const { discoverPosts } = mountHarness({ discoverDelayMs: 300 });
+    cy.get('[data-testid="begin"]').click();
+    cy.get('[data-testid="phase"]').should('have.text', 'submitting');
+    cy.get('[data-testid="begin"]').click(); // phase 'submitting' → beginDiscovery() === false
+    cy.get('[data-testid="signed-in"]').should('exist');
+    cy.then(() => expect(discoverPosts).to.have.length(1));
   });
 
   it('opaque 400 during beginDiscovery surfaces a reason (message, not silence)', () => {

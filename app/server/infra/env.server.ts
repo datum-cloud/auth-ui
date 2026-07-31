@@ -84,6 +84,15 @@ const schema = z
       .string()
       .optional()
       .transform((v) => v === 'true' || v === '1'),
+    // Operational kill switch for the usernameless discovery entry points (the /login
+    // loader's identity-challenge arm and the /login/passkey-discover action). Default ON
+    // — unset keeps the feature live; ONLY the explicit strings 'false'/'0' disable it.
+    // Inverse polarity from the fail-safe-off flags above on purpose: this exists so an
+    // incident can be mitigated by config instead of a revert deploy, not to gate rollout.
+    AUTH_PASSKEY_DISCOVERY_ENABLED: z
+      .string()
+      .optional()
+      .transform((v) => v !== 'false' && v !== '0'),
     // Whether identity-provider UNLINK is permitted in this environment. Defaults to false
     // (fail-closed): only the exact string 'true' enables it. Was an unvalidated raw
     // process.env read in sso.service.ts.

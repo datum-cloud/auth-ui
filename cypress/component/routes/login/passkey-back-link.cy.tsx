@@ -66,9 +66,9 @@ describe('/login/passkey — Back link', () => {
       ],
       { initialEntries: ['/login/passkey?loginName=mia%40acme.test'] }
     );
-    mount(
-      withI18n(<RouterProvider router={router} />)
-    );
-    cy.contains('a', 'Back').should('have.attr', 'href').and('include', 'loginName=mia%40acme.test');
+    mount(withI18n(<RouterProvider router={router} />));
+    cy.contains('a', 'Back')
+      .should('have.attr', 'href')
+      .and('include', 'loginName=mia%40acme.test');
   });
 });

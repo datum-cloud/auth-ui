@@ -12,12 +12,21 @@
 /** 2 minutes — generous for an autofill tap; browsers may ignore it under conditional mediation. */
 const IDENTITY_CHALLENGE_TIMEOUT_MS = 120_000;
 
+/** Web-safe base64url (no Buffer): keeps this module portable if it ever lands in
+ *  the client graph — today it is loader-only, but nothing enforces that. */
+function toBase64Url(bytes: Uint8Array): string {
+  return btoa(String.fromCharCode(...bytes))
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+}
+
 export function mintIdentityChallenge(rpId: string): { publicKey: Record<string, unknown> } {
   const bytes = new Uint8Array(32);
   crypto.getRandomValues(bytes);
   return {
     publicKey: {
-      challenge: Buffer.from(bytes).toString('base64url'),
+      challenge: toBase64Url(bytes),
       rpId,
       // Empty on purpose — the browser offers EVERY resident key for this RP.
       allowCredentials: [],

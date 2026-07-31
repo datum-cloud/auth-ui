@@ -147,9 +147,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
     // persisted — the identity tap posts to /login/passkey-discover, which mints
     // the real user-bound challenge only after a passkey was actually tapped.
     // Suppressed when ANY live session exists (arming is inference; a logged-in
-    // visitor is better served by the ordinary page — spec, open decision §2).
+    // visitor is better served by the ordinary page — spec, open decision §2) and
+    // by the operational kill switch (env, default ON — incident mitigation).
     const sessions = await readSessions(request);
-    if (listSessions(sessions, Date.now()).length === 0) {
+    if (env.AUTH_PASSKEY_DISCOVERY_ENABLED && listSessions(sessions, Date.now()).length === 0) {
       identityDiscovery = {
         publicKeyCredentialRequestOptions: mintIdentityChallenge(url.hostname),
       };

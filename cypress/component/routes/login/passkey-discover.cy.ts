@@ -63,6 +63,33 @@ describe('/login/passkey-discover action', () => {
         cookies.some((c) => c.startsWith('passkey-hint=')),
         'no hint write on discover'
       ).to.equal(false);
+      // Observability: success emits the audit event with a HASHED actor.
+      const success = v.audit?.find(
+        (a) => a.event === 'passkey_discover' && a.outcome === 'success'
+      ) as { actor?: string } | undefined;
+      expect(success, 'passkey_discover success audit').to.exist;
+      expect(success?.actor).to.be.a('string').and.not.contain('@');
+    });
+  });
+
+  it('kill switch (AUTH_PASSKEY_DISCOVERY_ENABLED=false) → the SAME opaque 400', () => {
+    callService({
+      fn: 'passkeyDiscoverAction',
+      provider: 'singleton',
+      env: { AUTH_PASSKEY_DISCOVERY_ENABLED: 'false' },
+      request: { url: URL, form: { credential: assertionWith(B64_U5) }, csrf: true },
+    }).then((v) => {
+      expect(v.response?.status).to.equal(400);
+      expect((v.response?.dataBody as { error?: string }).error).to.equal('DISCOVERY_FAILED');
+      expect(
+        v.audit?.some(
+          (a) =>
+            a.event === 'passkey_discover' &&
+            a.outcome === 'failure' &&
+            (a as { reason?: string }).reason === 'disabled'
+        ),
+        'audited as disabled'
+      ).to.equal(true);
     });
   });
 
@@ -77,7 +104,7 @@ describe('/login/passkey-discover action', () => {
     });
   });
 
-  it('unknown userHandle → the SAME opaque DISCOVERY_FAILED 400', () => {
+  it('unknown userHandle → the SAME opaque DISCOVERY_FAILED 400, real reason in the audit', () => {
     callService({
       fn: 'passkeyDiscoverAction',
       provider: 'singleton',
@@ -85,6 +112,16 @@ describe('/login/passkey-discover action', () => {
     }).then((v) => {
       expect(v.response?.status).to.equal(400);
       expect((v.response?.dataBody as { error?: string }).error).to.equal('DISCOVERY_FAILED');
+      // Enumeration parity is CALLER-facing only — operators get the specific reason.
+      expect(
+        v.audit?.some(
+          (a) =>
+            a.event === 'passkey_discover' &&
+            a.outcome === 'failure' &&
+            (a as { reason?: string }).reason === 'unresolved_user'
+        ),
+        'audited as unresolved_user'
+      ).to.equal(true);
     });
   });
 

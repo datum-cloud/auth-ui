@@ -82,6 +82,17 @@ describe('/login loader — identity-discovery arming', () => {
     });
   });
 
+  it('kill switch (AUTH_PASSKEY_DISCOVERY_ENABLED=false) suppresses discovery arming', () => {
+    callService({
+      fn: 'loginLoader',
+      provider: 'singleton',
+      env: { AUTH_PASSKEY_DISCOVERY_ENABLED: 'false' },
+      request: { url: URL_BASE },
+    }).then((v) => {
+      expect((v.response?.dataBody as LoaderBody).identityDiscovery).to.equal(null);
+    });
+  });
+
   it('hint present → hinted path arms, discovery stays dark', () => {
     callService({
       fn: 'loginLoader',
