@@ -310,6 +310,150 @@ describe('processIdpCallback — default-org resolution for IdP auto-create (bar
   });
 });
 
+describe('processIdpCallback — ?policyOrg gates the allowRegister/auto-create org', () => {
+  // The START side (login/method.tsx's sole-linked-IdP auto-start, and its chooser action) picks
+  // an IdP out of a list resolved for the FOUND USER's org while the ceremony `organization` is
+  // still absent. `policyOrg` carries that deciding org across the round-trip so the callback
+  // gates allowRegister — and auto-creates — under the SAME policy that offered the provider,
+  // instead of falling back to the default org.
+  it('reads allowRegister from policyOrg and registers into it, ignoring the default-org fallback', () => {
+    callService({
+      fn: 'processIdpCallback',
+      slug: 'google',
+      seed: {},
+      idpIntent: REGISTER_INTENT_VERIFIED,
+      // signPolicyOrg mints the value + signature through the REAL idpReturnUrls, i.e. exactly
+      // what a legitimate start emits. Only that pair is honoured (see the forgery specs below).
+      request: { url: CB('google', 'id=intent-1&token=tok-1'), signPolicyOrg: 'org-mia' },
+      recordCalls: ['getLoginSettings', 'register'],
+    }).then((v) => {
+      const settingsCalls = (v.calls?.['getLoginSettings'] ?? []) as Array<[string | undefined]>;
+      expect(settingsCalls[0]?.[0], 'allowRegister is read from the deciding org').to.equal(
+        'org-mia'
+      );
+      const registerCalls = (v.calls?.['register'] ?? []) as Array<[Record<string, unknown>]>;
+      expect(registerCalls[0]?.[0]?.orgId, 'auto-create lands in the deciding org').to.equal(
+        'org-mia'
+      );
+    });
+  });
+
+  it('does NOT org-scope the same-email findUser — that lookup stays instance-wide', () => {
+    // The whole reason policyOrg is its own param: widening `organization` instead would have
+    // silently narrowed these findUser lookups (see the note at sso-callback.ts's callbackOrg),
+    // so an existing account outside the named org would stop being found and the flow would
+    // register a duplicate. The seeded account has NO orgId, so an org-scoped lookup misses it.
+    callService({
+      fn: 'processIdpCallback',
+      slug: 'google',
+      env: { ALLOW_IDP_AUTO_LINK: 'true' },
+      seed: { users: [{ id: 'u1', loginName: 'you@gmail.com', displayName: 'You User' }] },
+      idpIntent: REGISTER_INTENT_VERIFIED,
+      request: { url: CB('google', 'id=intent-1&token=tok-1'), signPolicyOrg: 'org-mia' },
+      recordCalls: ['findUser', 'register'],
+    }).then((v) => {
+      const findUserCalls = (v.calls?.['findUser'] ?? []) as Array<[string, string | undefined]>;
+      expect(findUserCalls.length, 'the same-email pre-check ran').to.be.greaterThan(0);
+      // `undefined` crosses the cy.task JSON boundary as null — either way it is NOT 'org-mia'.
+      expect(
+        findUserCalls[0][1] ?? null,
+        'findUser stays instance-wide (org arg untouched)'
+      ).to.equal(null);
+      // …and the existing account was actually found: it auto-linked instead of registering.
+      expect(v.calls?.['register'] ?? []).to.have.length(0);
+    });
+  });
+});
+
+describe('processIdpCallback — an unsigned/forged ?policyOrg is ignored', () => {
+  // The callback URL is handed to the IdP broker and then to the browser, so `?policyOrg=` is
+  // fully attacker-writable. It is also the ONE param on that URL coupled to nothing else:
+  // `organization` drags the same-email findUser scope, createSession's orgId and
+  // signInWithIdpIntent along with it, so naming a foreign org there fails closed. policyOrg feeds
+  // `callbackOrg` alone — which gates allowRegister and picks the auto-create org — so a crafted
+  // one borrows a registration-open org's policy WHILE the same-email lookup stays instance-wide.
+  // With ALLOW_IDP_AUTO_LINK on that is a path into a victim's account in any org. A `.max(64)`
+  // cannot help: decoupling those two orgs is the param's entire purpose, so only provenance can.
+  const FORGED = 'org-attacker-registration-open';
+
+  it('a hand-written policyOrg with NO signature falls back to `organization`', () => {
+    callService({
+      fn: 'processIdpCallback',
+      slug: 'google',
+      seed: {},
+      idpIntent: REGISTER_INTENT_VERIFIED,
+      request: { url: CB('google', `id=intent-1&token=tok-1&policyOrg=${FORGED}`) },
+      recordCalls: ['getLoginSettings', 'register'],
+    }).then((v) => {
+      const settingsCalls = (v.calls?.['getLoginSettings'] ?? []) as Array<[string | undefined]>;
+      expect(settingsCalls[0]?.[0], 'allowRegister must NOT come from the forged org').to.equal(
+        'org-default-fake'
+      );
+      const registerCalls = (v.calls?.['register'] ?? []) as Array<[Record<string, unknown>]>;
+      expect(registerCalls[0]?.[0]?.orgId, 'auto-create must NOT land in the forged org').to.equal(
+        'org-default-fake'
+      );
+    });
+  });
+
+  it('a MIS-signed policyOrg (valid signature, swapped value) is ignored too', () => {
+    // The realistic forgery is not a random digest — it is a signature lifted from a legitimate
+    // start and pasted next to a different org. Domain separation + signing the VALUE is what
+    // makes that fail; a signature is a claim about one exact string, not a bearer token.
+    callService({
+      fn: 'processIdpCallback',
+      slug: 'google',
+      seed: {},
+      idpIntent: REGISTER_INTENT_VERIFIED,
+      // Mint a real pair for 'org-mia', then overwrite the VALUE while keeping the signature.
+      request: {
+        url: CB('google', 'id=intent-1&token=tok-1'),
+        signPolicyOrg: 'org-mia',
+        tamperPolicyOrg: FORGED,
+      },
+      recordCalls: ['getLoginSettings'],
+    }).then((v) => {
+      const settingsCalls = (v.calls?.['getLoginSettings'] ?? []) as Array<[string | undefined]>;
+      expect(settingsCalls[0]?.[0], 'a mismatched value voids the signature').to.equal(
+        'org-default-fake'
+      );
+    });
+  });
+
+  it('logs the rejection so tampering (or a mid-flight secret rotation) is visible', () => {
+    callService({
+      fn: 'processIdpCallback',
+      slug: 'google',
+      seed: {},
+      idpIntent: REGISTER_INTENT_VERIFIED,
+      request: { url: CB('google', `id=intent-1&token=tok-1&policyOrg=${FORGED}`) },
+    }).then((v) => {
+      const line = v.audit.find((e) => e.event === 'idp_policy_org');
+      expect(line, 'an audit line names the rejected param').to.not.equal(undefined);
+      expect(line?.outcome).to.equal('failure');
+      expect((line as { reason?: string } | undefined)?.reason).to.equal('invalid_signature');
+    });
+  });
+
+  it('no policyOrg at all still resolves the default org (unchanged baseline)', () => {
+    callService({
+      fn: 'processIdpCallback',
+      slug: 'google',
+      seed: {},
+      idpIntent: REGISTER_INTENT_VERIFIED,
+      request: { url: CB('google', 'id=intent-1&token=tok-1') },
+      recordCalls: ['getLoginSettings'],
+    }).then((v) => {
+      const settingsCalls = (v.calls?.['getLoginSettings'] ?? []) as Array<[string | undefined]>;
+      expect(settingsCalls[0]?.[0]).to.equal('org-default-fake');
+      expect(
+        v.audit.some((e) => e.event === 'idp_policy_org'),
+        'nothing to reject, nothing logged'
+      ).to.equal(false);
+    });
+  });
+});
+
 describe('processIdpCallback — fresh-identity link ceremony (Req 2)', () => {
   // A FRESH external identity (intent.userId == null) attached to the ACTIVE session user via
   // ?link=true — the Req-2 wiring (sso-callback.ts:144-153) that the existing already-MAPPED link

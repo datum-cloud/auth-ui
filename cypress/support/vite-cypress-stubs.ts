@@ -73,6 +73,17 @@ export function stubServerModulesForCypress(root: string): Plugin {
       export function logHono() { return (_c, next) => next(); }
       export const httpRequestDuration = { startTimer: () => () => {}, observe: () => {} };
     `,
+    // signed-param.ts binds node:crypto (HMAC-SHA256 over SESSION_SECRET), which Vite externalizes
+    // to a browser shim with no named exports — importing it crashes any spec that reaches
+    // idp-return-urls.ts. Browser specs only assert the URL SHAPE, so a deterministic,
+    // purpose-bound placeholder is enough and keeps sign/verify a matched pair in-browser too.
+    // The REAL HMAC round-trip (and the forged-signature rejection) runs in Bun via cy.task —
+    // see the ?policyOrg specs in cypress/component/resources/sso/sso-callback.cy.ts.
+    [resolve(root, './app/server/signed-param.ts')]: `
+      const stub = (purpose, value) => 'stub-sig.' + purpose + '.' + value;
+      export function signParam(purpose, value) { return stub(purpose, value); }
+      export function verifyParam(purpose, value, signature) { return signature === stub(purpose, value); }
+    `,
     // Task 8d: webauthn-verify.ts exports schema + factory handlers. For component specs testing
     // just the schema (no service calls), stub the file to export only the Zod schema.
     [resolve(root, './app/resources/webauthn/webauthn-verify.ts')]: `

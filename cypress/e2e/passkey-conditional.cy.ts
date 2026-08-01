@@ -9,11 +9,11 @@ import { extractCsrf, loginAndGetSession } from '../support/session';
 
 const USER = 'passkey-user@acme.test';
 
-// USER has TWO primary methods (password + passkey), so the identifier step routes to
-// the /login/method chooser — loginAndGetSession leaves the session at the bare identifier
-// check (never signed in), same gap passkeys-manage.cy.ts's signInMiaWithPassword documents
-// for mia@acme.test. Complete the password factor via cy.request (deterministic; the
-// password UI journey is core-signin.cy.ts's subject) so the action's passkey-hint write fires.
+// USER has TWO primary methods (password + passkey), so the identifier step routes to the
+// /login/method chooser. What this spec needs is a COMPLETED password login (that action is
+// what writes the passkey hint), so drive the factor explicitly via cy.request — deterministic,
+// and independent of which factor the shared session helper happens to satisfy while planting
+// the cookie. The password UI journey itself is core-signin.cy.ts's subject.
 function signInWithPassword(loginName: string) {
   loginAndGetSession(loginName);
   cy.request(`/id/login/password?loginName=${encodeURIComponent(loginName)}`).then((resp) => {
@@ -138,6 +138,9 @@ describe('usernameless passkey fast path', () => {
     cy.get('input[name="loginName"]').should('have.attr', 'autocomplete', 'username webauthn');
     cy.get('input[name="loginName"]').type('alice@acme.test');
     cy.get('input[name="loginName"]:visible').closest('form').submit();
-    cy.location('pathname').should('eq', '/id/login/password');
+    // The identifier step's destination for any account with >= 1 usable method is the
+    // /login/method chooser. What this test pins is that the ordinary submit WON — the URL
+    // advanced off /id/login instead of the parked ceremony swallowing it.
+    cy.location('pathname').should('eq', '/id/login/method');
   });
 });

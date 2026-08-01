@@ -15,6 +15,7 @@ import { idpTypeToSlug } from '@/modules/auth/idp-slug';
 // The locked plan block incorrectly listed them as coming from @/modules/auth/session/session
 // (that module only has pure helpers, no cookie I/O).
 import { readSessions, serializeSessions } from '@/modules/auth/session/cookie';
+import { clearIdpAutostart } from '@/modules/auth/session/idp-autostart';
 import { readLastUsedLogin } from '@/modules/auth/session/last-used-login';
 import { readPasskeyHint, clearPasskeyHint } from '@/modules/auth/session/passkey-hint';
 import { readReauthIntent } from '@/modules/auth/session/reauth-intent';
@@ -253,6 +254,13 @@ export async function action({ request }: ActionFunctionArgs) {
   const headers = new Headers();
   headers.append('set-cookie', await serializeSessions(result.sessions));
   if (fpCookie) headers.append('set-cookie', fpCookie);
+  // A fresh ceremony starts here, so retire any one-shot IdP auto-start marker the previous one
+  // left behind — otherwise a sign-out/sign-in inside its 10-minute window suppressed the very
+  // auto-start the marker exists to protect. Unconditional, and identical on both the known and
+  // ghost branches: expiring an already-absent cookie is a no-op for the browser, and branching
+  // on its presence would both cost a read and make the two branches' headers differ. See
+  // clearIdpAutostart.
+  headers.append('set-cookie', await clearIdpAutostart());
   // Domain-discovery single-IdP org: start the IdP intent directly. A plain redirect to /sso
   // (the old behavior) dead-ends session-less users in a /login ↔ /sso bounce loop.
   if ('startIdp' in result) {
@@ -266,10 +274,12 @@ export async function action({ request }: ActionFunctionArgs) {
     if (!idpResult.ok) return data({ error: idpResult.error }, { status: 502 });
     return redirect(idpResult.authUrl, { headers });
   }
-  // Sole-passkey: redirect to /login/passkey like every other post-identifier path
-  // (password, OTP) —
-  // /login renders the chooser and nothing else; no route inlines an identity-bound,
-  // single-method screen except /login/method and /reauth, which are out of scope here.
+  // Every account with >= 1 usable method now resolves to the same target — /login/method —
+  // which renders exactly what that account has and auto-starts what needs no form (a sole
+  // linked IdP server-side in its loader, a sole passkey client-side on mount). This route
+  // deliberately picks no per-method screen: it is pure over method KINDS, so it has no idpId
+  // and could only ever name a static path (that is what sent sole-IdP users to a bare /sso).
+  // The zero-method legs (/verify, /error) are unchanged.
   return redirect(`${result.target}?${result.params}`, { headers });
 }
 

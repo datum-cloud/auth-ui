@@ -115,8 +115,11 @@ describe('MFA setup picker (/setup/mfa)', () => {
     // mfa-skip-user@acme.test is a dedicated skip-only user seeded with authMethods=['password']
     // and never touched by other enrollment tests (which share the fake singleton). This avoids
     // the test-ordering hazard where nofactor-user accumulates enrolled factors (e.g. passkey)
-    // across the suite, causing decideAfterIdentifier to route to /login/passkey instead of
-    // /login/password, breaking the loginAndGetSession helper's password step.
+    // across the suite. decideAfterIdentifier no longer names a per-method target — every
+    // account with >= 1 usable method routes to /login/method — but the hazard is unchanged in
+    // substance: loginAndGetSession completes the password factor only when password is the
+    // account's ONLY method (see the CHOOSER HOP note in support/session.ts), so a contaminated
+    // fixture silently stops getting its password step planted.
     loginAndGetSession('mfa-skip-user@acme.test');
 
     // No hydration opt-in needed: links + native form POST don't require JS.

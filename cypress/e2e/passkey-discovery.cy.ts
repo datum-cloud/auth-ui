@@ -82,6 +82,9 @@ describe('usernameless passkey discovery (fresh browser)', () => {
     cy.contains('button', /email/i).click();
     cy.get('input[name="loginName"]').type('alice@acme.test');
     cy.get('input[name="loginName"]:visible').closest('form').submit();
-    cy.location('pathname').should('eq', '/id/login/password');
+    // The identifier step's destination for any account with >= 1 usable method is the
+    // /login/method chooser. What this test pins is that the ordinary submit WON — the URL
+    // advanced off /id/login instead of the parked discovery ceremony swallowing it.
+    cy.location('pathname').should('eq', '/id/login/method');
   });
 });

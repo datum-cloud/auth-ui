@@ -23,10 +23,12 @@ import { registerAndLinkIdp } from '@/resources/signup';
 import { MAXMIND_TRACKING_TOKEN_METADATA_KEY } from '@/resources/signup/signup.service';
 import { deriveIdpProfileName } from '@/resources/sso/derive-idp-name';
 import { decideIdpCallback } from '@/resources/sso/idp-callback';
+import { POLICY_ORG_PURPOSE } from '@/resources/sso/idp-return-urls';
 import { signInWithIdpIntent, requestScopedProviderReads } from '@/resources/sso/idp-session';
 import type { SsoOutcome } from '@/resources/sso/sso-outcome';
 import { env } from '@/server/infra/env.server';
 import { logAuthEvent } from '@/server/observability';
+import { verifyParam } from '@/server/signed-param';
 import { getOrCreateFingerprintId, userAgentFromRequest } from '@/server/user-agent';
 import { providerErrorCode } from '@/utils/errors/auth-error';
 import { z } from 'zod';
@@ -48,6 +50,19 @@ export const CallbackQuery = z.object({
   // Attacker-controllable from the callback URL; POSTURE B2 is fail-closed against a wrong org, but
   // cap the length as defense-in-depth (Zitadel org ids are short numeric strings).
   organization: z.string().max(64).optional(),
+  // The POLICY org the START side decided this intent under (idp-return-urls.ts). Feeds
+  // `callbackOrg` ONLY — never the findUser lookups below, which stay on raw `organization`.
+  //
+  // That asymmetry is exactly why it must be AUTHENTICATED and not merely capped. `organization`
+  // is attacker-controllable too, but naming a foreign org there also narrows the same-email
+  // lookup and poisons createSession's orgId — it fails closed. `policyOrg` is coupled to none of
+  // that: it decides `allowRegister` and the auto-create org and nothing else, so an unsigned one
+  // is a way to borrow a registration-open org's policy while keeping the lookup instance-wide.
+  // Verified against `policyOrgSig` below; anything that fails falls back to `organization`.
+  policyOrg: z.string().max(64).optional(),
+  // Detached HMAC over `policyOrg`, minted by idpReturnUrls with SESSION_SECRET. base64url
+  // SHA-256 is 43 chars; the cap is slack, not a check — verifyParam is the check.
+  policyOrgSig: z.string().max(128).optional(),
   // MaxMind device-fingerprint token captured client-side and threaded through the OAuth
   // round-trip (see idp-return-urls.ts) so it can be attached to the resulting session's metadata.
   deviceTrackingToken: z.string().optional(),
@@ -94,7 +109,28 @@ export async function processIdpCallback(
     };
   }
 
-  const { id, token, link, requestId, organization, deviceTrackingToken } = parsed.data;
+  const { id, token, link, requestId, organization, policyOrg, policyOrgSig, deviceTrackingToken } =
+    parsed.data;
+
+  // AUTHENTICATE the policy org before it is allowed to influence anything. An unsigned or
+  // mis-signed value is treated as absent — the callback falls back to `organization`, i.e. to
+  // exactly the behavior it had before the param existed. Logged (org ids are not PII) because a
+  // signature failure here is either tampering or a SESSION_SECRET rotation mid-flight, and both
+  // are worth seeing.
+  let verifiedPolicyOrg: string | undefined;
+  if (policyOrg) {
+    if (verifyParam(POLICY_ORG_PURPOSE, policyOrg, policyOrgSig)) {
+      verifiedPolicyOrg = policyOrg;
+    } else {
+      // snake_case per the P5+ naming convention, and the same `invalid_signature` reason the
+      // `sessions` cookie's tamper signal uses — one vocabulary for "we did not mint this".
+      logAuthEvent('idp_policy_org', 'failure', {
+        reason: 'invalid_signature',
+        requestId,
+        policyOrg,
+      });
+    }
+  }
 
   // Ensure the fingerprintId cookie exists for this browser. The SAME minted id feeds
   // every createSession userAgent below (no first-session gap); fingerprintCookie is
@@ -115,14 +151,22 @@ export async function processIdpCallback(
   let intent: IdpIntentResult;
   let entries: Awaited<ReturnType<typeof readSessions>>;
   let decision: ReturnType<typeof decideIdpCallback>;
-  // Resolve the effective org for this callback ceremony — org-first (URL ?organization=),
-  // then ZITADEL_DEFAULT_ORG_ID env pin, then the provider's instance Default Organization.
+  // Resolve the effective org for this callback ceremony — policy-org-first (the org the START
+  // side decided the intent under, see idp-return-urls.ts), then the URL `?organization=`, then
+  // the ZITADEL_DEFAULT_ORG_ID env pin, then the provider's instance Default Organization.
   // Hoisted before the try block so both the decision try and the auto-create switch case
   // can reference it. This resolved org feeds the allowRegister gate (getLoginSettings) and
   // the auto-create register call so a bare (no ?organization=) flow always has a concrete
   // org, preventing Zitadel's FAILED_PRECONDITION on addHumanUser with no org.
-  // NOTE: findUser calls below deliberately stay on raw `organization` (instance-wide lookup).
-  const callbackOrg = await resolveOrg(provider, organization);
+  //
+  // `policyOrg` participates HERE and nowhere else. Without it, a start that resolved its IdP
+  // list under the found user's own org (e.g. /login/method's sole-linked-IdP auto-start) landed
+  // here with `organization` still undefined and had allowRegister decided by the DEFAULT org —
+  // a different policy from the one that offered the provider in the first place.
+  // NOTE: findUser calls below deliberately stay on raw `organization` (instance-wide lookup),
+  // which is exactly why the policy org rides in its OWN param instead of widening this one —
+  // and why only the SIGNATURE-VERIFIED value may be used here.
+  const callbackOrg = await resolveOrg(provider, verifiedPolicyOrg ?? organization);
 
   try {
     intent = await doRetrieveIdpIntent(id, token);

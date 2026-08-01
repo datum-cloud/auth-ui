@@ -2,11 +2,15 @@
 //
 // UI contract for /login: the chooser
 // renders unconditionally. There is no identity-bound inline passkey ceremony state on
-// this route anymore — a sole-passkey identifier now REDIRECTS to /login/passkey (see
-// the node-bound action test below) instead of the action returning inline challenge
-// data. The gated Passkey SHORTCUT still drives the shared ceremony in place
-// on this page, and its own failure surface is still covered here. Mirrors
-// method.cy.tsx's stub /login/passkey route + capturedPosts convention (Task 2).
+// this route anymore — every identifier with >= 1 usable method (sole-passkey included)
+// now REDIRECTS to /login/method, the method chooser, instead of the action returning
+// inline challenge data or redirecting straight to a per-method target (see the
+// node-bound action test below). /login/method itself now owns auto-starting a sole
+// passkey client-side (Task 3) and a sole linked IdP server-side (Task 2) — this route's
+// own action no longer picks a per-method destination. The gated Passkey SHORTCUT still
+// drives the shared ceremony in place on this page, and its own failure surface is still
+// covered here. Mirrors method.cy.tsx's stub /login/passkey route + capturedPosts
+// convention (Task 2).
 import { callService } from '../../../support/node/call-service';
 import Login from '@/routes/login/index';
 import { ConformAdapter } from '@datum-cloud/datum-ui/form/adapters/conform';
@@ -161,7 +165,12 @@ describe('/login — chooser (no inline ceremony)', () => {
 });
 
 describe('/login action — sole-passkey identifier', () => {
-  it('a sole-passkey identifier now REDIRECTS to /login/passkey instead of returning inline data', () => {
+  it('a sole-passkey identifier REDIRECTS to /login/method (the chooser), not a per-method target', () => {
+    // Task 1 collapsed decideAfterIdentifier's per-method single-target branch: every
+    // account with >= 1 usable method — sole-passkey included — now redirects to the
+    // chooser. /login/method itself auto-begins a sole passkey ceremony client-side
+    // (Task 3), so the user still sees no intermediate chooser screen; this route's own
+    // action just hands off to /login/method rather than picking /login/passkey directly.
     callService({
       fn: 'loginAction',
       provider: 'singleton',
@@ -173,15 +182,18 @@ describe('/login action — sole-passkey identifier', () => {
     }).then((v) => {
       expect(v.response?.isResponse).to.equal(true);
       expect(v.response?.status).to.equal(302);
-      expect(v.response?.location ?? '').to.contain('/login/passkey');
+      expect(v.response?.location ?? '').to.contain('/login/method');
+      // Regression guard: must NOT fall back to the old per-method redirect target.
+      expect(v.response?.location ?? '').to.not.contain('/login/passkey');
       expect(v.response?.location ?? '').to.contain('loginName=');
     });
   });
 });
 
 // ── Identifier-form view logic ───────────────────────────────────────────────
-// Sole-passkey identifiers REDIRECT to /login/passkey (asserted above); these two
-// cover the identifier-form visibility logic under restricted org policies.
+// Sole-passkey (and every other >= 1-usable-method) identifier REDIRECTS to /login/method
+// (asserted above); these two cover the identifier-form visibility logic under restricted
+// org policies.
 describe('/login — identifier-form view logic', () => {
   // REGRESSION: with allowPassword=false the identifier form used to be hidden entirely,
   // while signInUnavailable stayed false (suppressed by showPasskeyPrompt) — so a fresh

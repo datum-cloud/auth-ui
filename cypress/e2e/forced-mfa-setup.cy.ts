@@ -1,4 +1,5 @@
 import { checkA11y } from '../support/a11y';
+import { chooseMethodPassword } from '../support/session';
 
 /**
  * P5 Task 14 — forced MFA setup journey
@@ -23,6 +24,8 @@ describe('forced MFA setup → enroll authenticator → signed-in', () => {
     cy.visit('/id/login?organization=force-org');
     cy.get('input[name="loginName"]').type('forced-user@acme.test');
     cy.get('input[name="loginName"]:visible').closest('form').submit();
+
+    chooseMethodPassword();
 
     cy.location('pathname').should('eq', '/id/login/password');
     cy.get('input[name="password"]').type('hunter2');

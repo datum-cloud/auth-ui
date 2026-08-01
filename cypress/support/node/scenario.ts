@@ -31,6 +31,13 @@ export interface ScenarioSeed {
     { id: string; clientId?: string; scopes: string[]; prompt: string[]; loginHint?: string }
   >;
   settingsByOrg?: Record<string, Record<string, unknown>>;
+  /**
+   * Email domain → orgId (fake-provider.ts's `orgDomains`), what findOrgByDomain answers from.
+   * Needed by any spec exercising domain-derived org resolution — both the allowDomainDiscovery
+   * routing path and the GHOST policy read (resolveGhostPolicyOrg), which uses it to judge an
+   * unknown identifier under the org that claims its domain.
+   */
+  orgDomains?: Record<string, string>;
   /** Instance Default Organization getDefaultOrg returns (org-first fallback). Default
    *  'org-default-fake' in the fake; pass `null` for the "no default org" last-resort branch. */
   defaultOrgId?: string | null;
@@ -100,6 +107,26 @@ export interface RequestSpec {
   /** A loginName signed into a REAL `passkey-hint` cookie (readPasskeyHint reads it).
    *  Merged into the Cookie header alongside `sessions`. */
   passkeyHint?: string;
+  /** A loginName signed into a REAL `idp-autostart` cookie — the one-shot marker
+   *  /login/method's loader writes when it auto-starts a sole linked IdP. Present ⇒ this
+   *  browser is on its SECOND arrival for that account and must get the chooser, not a
+   *  freshly minted intent. */
+  idpAutostart?: string;
+  /**
+   * Append the `policyOrg` + `policyOrgSig` pair the START side would have minted for this org,
+   * produced by the REAL `idpReturnUrls` signer.
+   *
+   * A spec that hand-wrote the signature would only prove the verifier agrees with itself; going
+   * through the producer proves the round-trip that actually ships. Leave it off (and write a
+   * bare `?policyOrg=` into the url) to exercise the FORGED case.
+   */
+  signPolicyOrg?: string;
+  /**
+   * Applied AFTER `signPolicyOrg`: replace the `policyOrg` value while keeping the signature
+   * minted for the original one. Models the realistic forgery — a signature lifted from a
+   * legitimate start and pasted next to a different org — rather than a random digest.
+   */
+  tamperPolicyOrg?: string;
 }
 
 /** A serializable IdP intent, injected via the SSO callback's `retrieveIdpIntent` DI seam.
@@ -329,6 +356,10 @@ export interface Scenario {
   };
   /** deleteSession throws — exercises completeOidcLogout's best-effort tolerance. */
   failDeleteSession?: boolean;
+  /** startIdpIntent returns no authUrl — startIdpIntent() maps that to IDP_UNAVAILABLE, which
+   *  /login/method's sole-IdP auto-start must FALL THROUGH from (render the button) rather than
+   *  dead-ending the user on a screen with no way forward. */
+  failStartIdpIntent?: boolean;
   /** getSession returns a session with a CONTROLLABLE password.verifiedAt (freshness gate). */
   freshness?: { sessionId: string; token: string; verifiedAtMs: number };
   /** Override getPasswordComplexity on the built provider (the cy.task equivalent of an org policy
@@ -597,6 +628,14 @@ export interface Scenario {
     | 'accountsGetNoConsume' // GETs don't count
     | 'accountsIsolatedIps' // different IPs → separate buckets
     | 'verifyEmailBlocked' // 10 ?send=true then 429
+    | 'loginMethodIntentBlocked' // 10 identified GETs for ONE loginName then 429 (tight tier)
+    | 'loginMethodIntentPerLoginName' // a 2nd loginName from the same ip keeps its own budget
+    | 'loginMethodIntentIpCeiling' // 120 GETs spread across loginNames then 429 (loose tier)
+    | 'loginMethodIntentHtml429' // a top-level GET navigation 429s with HTML, not JSON
+    | 'loginMethodIntentDataJson429' // the .data variant keeps the JSON body
+    | 'loginMethodBareGetNoConsume' // GET without (or with an empty) ?loginName never counts
+    | 'loginIdentifierBlocked' // 120 identifier POSTs then 429; .data shares it, GET does not
+    | 'serverMountsChooserLimiters' // app/server.ts imports + mounts BOTH chooser GET tiers
     | 'verifyEmailNoSendNoConsume' // no ?send=true → no count
     | 'verifyEmailPostNoConsume'; // POST → not counted
 

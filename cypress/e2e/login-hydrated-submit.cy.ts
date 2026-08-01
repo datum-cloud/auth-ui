@@ -15,10 +15,10 @@ import { checkA11y } from '../support/a11y';
  * asserts the form ACTUALLY submits when a hydrated user clicks Continue:
  *   1. a POST to /id/login is observed and the action redirects (302/303 —
  *      cy.intercept yields the redirect response itself without following it), AND
- *   2. the URL advances off /id/login to the password screen.
+ *   2. the URL advances off /id/login to the method chooser.
  *
  * Runs in the FAST suite (fake provider) and reuses the exact seeded user the
- * core-signin spec uses (alice@acme.test → /id/login/password). No live Zitadel.
+ * core-signin spec uses (alice@acme.test → /id/login/method). No live Zitadel.
  *
  * If the RHF-style "swallow the submit" regression returns, the POST interception
  * never fires and the location assertion stays on /id/login — both fail.
@@ -60,7 +60,8 @@ describe('login form submits when hydrated (RHF-adapter regression)', () => {
     //    and that the ceremony advances (asserted below). 202/302/303, never a non-redirect 200.
     cy.wait('@identifierPost').its('response.statusCode').should('be.oneOf', [202, 302, 303]);
 
-    // 2) And the ceremony must advance — alice resolves to the password screen.
-    cy.location('pathname').should('eq', '/id/login/password');
+    // 2) And the ceremony must advance — alice resolves to the /login/method chooser, the
+    //    single post-identifier destination for every account with >= 1 usable method.
+    cy.location('pathname').should('eq', '/id/login/method');
   });
 });

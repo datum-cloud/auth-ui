@@ -8,13 +8,6 @@ export type Decision =
   | { kind: 'redirect'; path: string; params?: Record<string, string> }
   | { kind: 'error'; error: string };
 
-const SINGLE_TARGET: Record<string, string> = {
-  passkey: '/login/passkey',
-  idp: '/sso',
-  password: '/login/password',
-  otp_email: '/login/verify/email',
-};
-
 export function decideAfterIdentifier({
   methods,
   settings,
@@ -41,9 +34,11 @@ export function decideAfterIdentifier({
   if (methods.includes('password') && settings.allowPassword) available.push('password');
   if (methods.includes('otp_email') && emailDeliveryEnabled) available.push('otp_email');
 
-  if (available.length >= 2) return { kind: 'redirect', path: '/login/method' };
-
-  if (available.length === 1) return { kind: 'redirect', path: SINGLE_TARGET[available[0]] };
+  // Every account with at least one usable method goes to the chooser, which renders
+  // exactly the methods it has (and auto-starts the ones that need no form). Routing
+  // per-method from here is what sent sole-IdP users to a bare /sso page: this function
+  // is pure over method KINDS, so it has no idpId and could only name a static path.
+  if (available.length >= 1) return { kind: 'redirect', path: '/login/method' };
 
   // available.length === 0: surface the most actionable error.
   if (methods.includes('password') && !settings.allowPassword) {

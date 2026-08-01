@@ -6,9 +6,10 @@ import { extractCsrf, loginAndGetSession } from '../support/session';
 // seeded row, (d) adds a fresh one.
 
 // mia has TWO primary methods (password + passkey), so the identifier step routes to the
-// /login/method chooser — loginAndGetSession leaves the session at the bare user check
-// (never sudo-fresh). Complete the password factor via cy.request (deterministic; the
-// password UI journey is core-signin.cy.ts's subject) so verifiedAt is stamped.
+// /login/method chooser and this spec needs a SUDO-FRESH session on top of it. Complete the
+// password factor explicitly via cy.request (deterministic; the password UI journey is
+// core-signin.cy.ts's subject) so verifiedAt is stamped no matter which factor the shared
+// helper happens to satisfy while planting the cookie.
 function signInMiaWithPassword() {
   loginAndGetSession('mia@acme.test');
   cy.request('/id/login/password?loginName=mia%40acme.test').then((resp) => {

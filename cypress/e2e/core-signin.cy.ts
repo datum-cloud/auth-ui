@@ -1,4 +1,5 @@
 import { checkA11y } from '../support/a11y';
+import { chooseMethodPassword } from '../support/session';
 
 describe('core sign-in (fake provider)', () => {
   // Warm Vite's dep optimization once. The first cold route load triggers a hard reload
@@ -24,6 +25,12 @@ describe('core sign-in (fake provider)', () => {
     cy.get('input[name="loginName"]').type('alice@acme.test');
     cy.get('input[name="loginName"]:visible').closest('form').submit();
 
+    // alice@acme.test has one usable method (password), and every account with at least one
+    // now lands on the /login/method chooser first — the deliberate extra click documented as
+    // the "Known trade-off" in the single-method-routing design. Traverse it: its Password
+    // entry is an <a>, so the hop needs no hydration.
+    chooseMethodPassword();
+
     cy.location('pathname').should('eq', '/id/login/password');
     checkA11y(); // /login/password renders
     cy.get('input[name="password"]').type('hunter2');
@@ -45,6 +52,7 @@ describe('core sign-in (fake provider)', () => {
     cy.contains('button', 'Email').click();
     cy.get('input[name="loginName"]').type('alice@acme.test');
     cy.get('input[name="loginName"]:visible').closest('form').submit();
+    chooseMethodPassword();
     cy.get('input[name="password"]').type('wrong-password');
     cy.get('input[name="password"]:visible').closest('form').submit();
     cy.location('pathname').should('eq', '/id/login/password');

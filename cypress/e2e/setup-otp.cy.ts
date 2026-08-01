@@ -1,58 +1,10 @@
 import { checkA11y } from '../support/a11y';
+import { loginAndGetSession } from '../support/session';
 
-// Seeded password for all fake-provider test users (see app/providers/select.server.ts passwords map).
-const FAKE_PASSWORD = 'hunter2';
-
-/**
- * Extract the csrf hidden-input token from SSR HTML. React entity-escapes
- * attribute values (& → &amp; etc.), so decode before round-tripping the token —
- * otherwise tokens containing escapable chars 403 intermittently.
- */
-function extractCsrf(html: string): string {
-  const raw = /name="csrf" value="([^"]+)"/.exec(html)?.[1] ?? '';
-  return raw
-    .replace(/&amp;/g, '&')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#x27;|&#39;/g, "'");
-}
-
-/**
- * Establishes a session cookie for the given loginName via cy.request (no UI).
- * Drives identifier → password steps so byLoginName finds a valid entry.
- * cy.request shares the browser cookie jar; set-cookie headers from the actions
- * apply to the subsequent cy.visit.
- */
-function loginAndGetSession(loginName: string) {
-  cy.request('/id/login').then((resp) => {
-    const csrf = extractCsrf(resp.body as string);
-    cy.request({
-      method: 'POST',
-      url: '/id/login',
-      form: true,
-      body: { csrf, loginName },
-      followRedirect: false,
-    }).then((post) => {
-      const target = String(post.headers.location ?? '');
-      if (target.includes('/login/password')) {
-        const pwPageUrl = target.startsWith('http')
-          ? target
-          : `/id${target.startsWith('/id') ? target.slice(3) : target}`;
-        cy.request(pwPageUrl).then((pwPage) => {
-          const pwCsrf = extractCsrf(pwPage.body as string) || csrf;
-          cy.request({
-            method: 'POST',
-            url: target,
-            form: true,
-            body: { csrf: pwCsrf, loginName, password: FAKE_PASSWORD },
-            followRedirect: false,
-          });
-        });
-      }
-    });
-  });
-}
+// Session planting is the SHARED helper's job (cypress/support/session.ts). This spec used to
+// carry a private copy of it, which silently rotted the moment the identifier step stopped
+// redirecting to /login/password and started routing every account through the /login/method
+// chooser — two copies of one branch, only one of them updated. There is now a single copy.
 
 // ─── TOTP enrollment (/setup/authenticator) ───────────────────────────────────
 

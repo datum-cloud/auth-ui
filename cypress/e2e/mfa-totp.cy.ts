@@ -1,3 +1,5 @@
+import { chooseMethodPassword } from '../support/session';
+
 /**
  * P5 Task 14 — password → TOTP → signed-in
  *
@@ -15,6 +17,8 @@ describe('password → TOTP → signed-in', () => {
     cy.visit('/id/login');
     cy.get('input[name="loginName"]').type('totp-user@acme.test');
     cy.get('input[name="loginName"]:visible').closest('form').submit();
+
+    chooseMethodPassword();
 
     cy.location('pathname').should('eq', '/id/login/password');
     cy.get('input[name="password"]').type('hunter2');

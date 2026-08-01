@@ -17,6 +17,10 @@
  *   /login/password     — no session guard; ?loginName seeds the field so the
  *                         real form renders (otherwise an empty field still
  *                         renders the same markup — included for completeness)
+ *   /login/method       — SESSION guard (the loader is state-changing) → requires
+ *                         loginAndGetSession first; use mia@acme.test, whose two
+ *                         methods (password + passkey) render the real chooser
+ *                         with no sole-method auto-start short-circuit
  *   /signup             — no guard, plain visit
  *   /signup/password    — no session guard; ?loginName seeds it (same as above)
  *   /password/reset     — no guard, plain visit
@@ -136,6 +140,22 @@ describe('a11y sweep — /login/passkey (session required)', () => {
     // Positive assertion: WebAuthnButton renders its "Verify with passkey" text
     // (disabled until React hydrates, but SSR-rendered DOM is present).
     cy.contains('button', /sign in with .*passkey|touch id|windows hello/i).should('exist');
+    checkA11y();
+  });
+});
+
+describe('a11y sweep — /login/method (session required, multi-method user)', () => {
+  it('passes axe (WCAG 2.2 AA)', () => {
+    // mia@acme.test has password + passkey, so the chooser RENDERS: a sole-method account
+    // would be short-circuited (a lone linked IdP redirects from the loader; a lone passkey
+    // auto-begins its ceremony on mount) and there would be no screen to sweep.
+    loginAndGetSession('mia@acme.test');
+
+    cy.visit('/id/login/method?loginName=mia%40acme.test');
+    cy.location('pathname').should('eq', '/id/login/method');
+    // Positive assertion: both method entries render as real links (the no-JS contract).
+    cy.contains('a', 'Passkey').should('exist');
+    cy.contains('a', 'Password').should('exist');
     checkA11y();
   });
 });
