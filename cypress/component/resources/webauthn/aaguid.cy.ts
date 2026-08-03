@@ -10,36 +10,50 @@ import { aaguidFromAttestationObject, defaultPasskeyName } from '@/resources/web
 const MAC_CHROME_UA =
   'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36';
 
+const APPLE_AAGUID = 'fbfc3007-154e-4ecc-8c0b-6e020557d7bd';
+const ZERO_AAGUID = '00000000-0000-0000-0000-000000000000';
+
+// Extraction: every input shape, valid and malformed. A null result must never throw —
+// AAGUID failure must not block enrollment.
+const EXTRACTION: [label: string, input: string, expected: string | null][] = [
+  // fbfc3007-... is Apple's authenticator.
+  [
+    'known AAGUID',
+    attestationObject(authDataWith(0x45, 'fbfc3007154e4ecc8c0b6e020557d7bd')),
+    APPLE_AAGUID,
+  ],
+  [
+    'zeroed AAGUID',
+    attestationObject(authDataWith(0x45, '00000000000000000000000000000000')),
+    ZERO_AAGUID,
+  ],
+  // UP only, no AT flag → no attested credential data at all.
+  ['AT flag absent', attestationObject(authDataWith(0x01)), null],
+  ['garbage', '!!!', null],
+  ['empty string', '', null],
+  // truncated CBOR: a map header promising entries that never arrive
+  ['truncated CBOR', 'owFj', null],
+];
+
+// Naming: catalog hit, catalog miss → UA, no AAGUID → UA, and no UA either → generic.
+const NAMING: [label: string, aaguid: string | null, ua: string, expected: string][] = [
+  // 'Apple Passwords' in the vendored catalog snapshot, upstream 9e867bf.
+  ['catalog hit', APPLE_AAGUID, MAC_CHROME_UA, 'Apple Passwords'],
+  ['zeroed AAGUID falls back to UA', ZERO_AAGUID, MAC_CHROME_UA, 'Chrome on macOS'],
+  ['null AAGUID falls back to UA', null, MAC_CHROME_UA, 'Chrome on macOS'],
+  ['no AAGUID and no UA', null, '', 'This device'],
+];
+
 describe('aaguidFromAttestationObject / defaultPasskeyName — default naming', () => {
-  it('decodes a known AAGUID and maps it to the vendored catalog name', () => {
-    // fbfc3007-154e-4ecc-8c0b-6e020557d7bd — Apple's authenticator (named
-    // 'Apple Passwords' in the vendored catalog snapshot, upstream 9e867bf).
-    const att = attestationObject(authDataWith(0x45, 'fbfc3007154e4ecc8c0b6e020557d7bd'));
-    expect(aaguidFromAttestationObject(att)).to.equal('fbfc3007-154e-4ecc-8c0b-6e020557d7bd');
-    expect(defaultPasskeyName('fbfc3007-154e-4ecc-8c0b-6e020557d7bd', MAC_CHROME_UA)).to.equal(
-      'Apple Passwords'
-    );
+  it('extracts the AAGUID from a valid attestation, returning null for malformed input', () => {
+    for (const [label, input, expected] of EXTRACTION) {
+      expect(aaguidFromAttestationObject(input), label).to.equal(expected);
+    }
   });
 
-  it('returns the zero UUID for a zeroed AAGUID and falls back to the UA name', () => {
-    const att = attestationObject(authDataWith(0x45, '00000000000000000000000000000000'));
-    expect(aaguidFromAttestationObject(att)).to.equal('00000000-0000-0000-0000-000000000000');
-    expect(defaultPasskeyName('00000000-0000-0000-0000-000000000000', MAC_CHROME_UA)).to.equal(
-      'Chrome on macOS'
-    );
-  });
-
-  it('never throws on garbage input — returns null and the UA fallback (AAGUID failure never blocks enrollment)', () => {
-    expect(aaguidFromAttestationObject('!!!')).to.equal(null);
-    expect(aaguidFromAttestationObject('')).to.equal(null);
-    // truncated CBOR: a map header promising entries that never arrive
-    expect(aaguidFromAttestationObject('owFj')).to.equal(null);
-    expect(defaultPasskeyName(null, MAC_CHROME_UA)).to.equal('Chrome on macOS');
-    expect(defaultPasskeyName(null, '')).to.equal('This device');
-  });
-
-  it('returns null when the AT flag is absent (no attested credential data)', () => {
-    const att = attestationObject(authDataWith(0x01)); // UP only, no AT, no AAGUID bytes
-    expect(aaguidFromAttestationObject(att)).to.equal(null);
+  it('resolves the default passkey name from the vendored catalog, falling back to the UA and then to a generic label', () => {
+    for (const [label, aaguid, ua, expected] of NAMING) {
+      expect(defaultPasskeyName(aaguid, ua), label).to.equal(expected);
+    }
   });
 });

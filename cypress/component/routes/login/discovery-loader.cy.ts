@@ -6,7 +6,7 @@
 // all of them — as long as the AUTH_PASSKEY_DISCOVERY_ENABLED kill switch is on. A
 // discovery arm must be free: self-minted options, NO Zitadel session, NO Set-Cookie.
 // Sibling of conditional-passkey-loader.cy.ts (the hinted path).
-import { callService } from '../../../support/node/call-service';
+import { callService, type Scenario } from '../../../support/node/call-service';
 
 const PK_USER = 'passkey-user@acme.test'; // u5, authMethods ['password','passkey']
 const URL_BASE = 'http://localhost/id/login?organization=org1';
@@ -52,39 +52,48 @@ describe('/login loader — identity-discovery arming', () => {
     });
   });
 
-  it('a live session no longer suppresses discovery (the add-account population)', () => {
-    callService({
-      fn: 'loginLoader',
-      provider: 'singleton',
-      liveSessions: [{ id: 's5', token: 't5', user: { id: 'u5', loginName: PK_USER } }],
-      request: {
-        url: URL_BASE,
-        sessions: [{ id: 's5', token: 't5', loginName: PK_USER }],
-      },
-    }).then((v) => {
-      const body = v.response?.dataBody as LoaderBody;
-      expect(body.identityDiscovery?.publicKeyCredentialRequestOptions, 'discovery armed').to.exist;
-    });
-  });
-
-  it('a STALE (expired) session entry does NOT suppress discovery', () => {
-    callService({
-      fn: 'loginLoader',
-      provider: 'singleton',
-      request: {
-        url: URL_BASE,
-        sessions: [
-          {
-            id: 's-old',
-            token: 't-old',
-            loginName: PK_USER,
-            expirationTs: '2020-01-01T00:00:00.000Z',
+  it('session entries do not suppress discovery arming', () => {
+    const rows: Array<{ label: string; scenario: Scenario }> = [
+      {
+        label: 'live session (the add-account population)',
+        scenario: {
+          fn: 'loginLoader',
+          provider: 'singleton',
+          liveSessions: [{ id: 's5', token: 't5', user: { id: 'u5', loginName: PK_USER } }],
+          request: {
+            url: URL_BASE,
+            sessions: [{ id: 's5', token: 't5', loginName: PK_USER }],
           },
-        ],
+        },
       },
-    }).then((v) => {
-      const body = v.response?.dataBody as LoaderBody;
-      expect(body.identityDiscovery?.publicKeyCredentialRequestOptions).to.exist;
+      {
+        label: 'STALE (expired) session entry',
+        scenario: {
+          fn: 'loginLoader',
+          provider: 'singleton',
+          request: {
+            url: URL_BASE,
+            sessions: [
+              {
+                id: 's-old',
+                token: 't-old',
+                loginName: PK_USER,
+                expirationTs: '2020-01-01T00:00:00.000Z',
+              },
+            ],
+          },
+        },
+      },
+    ];
+
+    rows.forEach(({ label, scenario }) => {
+      callService(scenario).then((v) => {
+        const body = v.response?.dataBody as LoaderBody;
+        expect(
+          body.identityDiscovery?.publicKeyCredentialRequestOptions,
+          `${label}: discovery armed`
+        ).to.exist;
+      });
     });
   });
 

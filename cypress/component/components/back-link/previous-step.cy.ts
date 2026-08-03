@@ -2,25 +2,27 @@ import { previousStepFor } from '@/components/back-link/previous-step';
 
 describe('previousStepFor', () => {
   it('maps each ceremony step to its predecessor, including /setup/* enrollment screens, the MFA chooser, password-management screens, and terminal/headless steps (spec §5)', () => {
-    expect(previousStepFor('/login/password')).to.equal('/login');
-    expect(previousStepFor('/login/mfa')).to.equal('/login/password');
-    expect(previousStepFor('/signup/password')).to.equal('/signup');
-    expect(previousStepFor('/password/reset')).to.equal('/login/password');
+    expect(previousStepFor('/login/password'), '/login/password').to.equal('/login');
+    expect(previousStepFor('/login/mfa'), '/login/mfa').to.equal('/login/password');
+    expect(previousStepFor('/signup/password'), '/signup/password').to.equal('/signup');
+    // /signup/method mirrors /signup/password: both return to /signup.
+    expect(previousStepFor('/signup/method'), '/signup/method').to.equal('/signup');
+    expect(previousStepFor('/password/reset'), '/password/reset').to.equal('/login/password');
 
     // The /setup/* leaf enrollment screens are reached FROM the /setup/mfa
     // chooser, so Back returns there.
-    expect(previousStepFor('/setup/passkey')).to.equal('/setup/mfa');
-    expect(previousStepFor('/setup/email')).to.equal('/setup/mfa');
+    expect(previousStepFor('/setup/passkey'), '/setup/passkey').to.equal('/setup/mfa');
+    expect(previousStepFor('/setup/email'), '/setup/email').to.equal('/setup/mfa');
 
     // The chooser itself returns to /login/password (mirrors /login/mfa → /login/password).
-    expect(previousStepFor('/setup/mfa')).to.equal('/login/password');
+    expect(previousStepFor('/setup/mfa'), '/setup/mfa').to.equal('/login/password');
 
     // Password-management screens return to /login/password.
-    expect(previousStepFor('/password/new')).to.equal('/login/password');
+    expect(previousStepFor('/password/new'), '/password/new').to.equal('/login/password');
 
     // Terminal/headless steps have no predecessor.
-    expect(previousStepFor('/login')).to.be.null;
-    expect(previousStepFor('/signed-in')).to.be.null;
+    expect(previousStepFor('/login'), '/login').to.be.null;
+    expect(previousStepFor('/signed-in'), '/signed-in').to.be.null;
   });
 
   it('verify/* and security-key Back goes straight to /login, not /login/mfa (fixes the sole-factor loop, 2026-07-22)', () => {
@@ -33,9 +35,5 @@ describe('previousStepFor', () => {
     expect(previousStepFor('/login/verify/authenticator')).to.equal('/login');
     expect(previousStepFor('/login/passkey')).to.equal('/login');
     expect(previousStepFor('/login/security-key')).to.equal('/login');
-  });
-
-  it('signup/method returns to /signup (mirrors signup/password)', () => {
-    expect(previousStepFor('/signup/method')).to.equal('/signup');
   });
 });

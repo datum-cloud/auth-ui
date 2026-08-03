@@ -22,32 +22,69 @@ describe('setupSkipSchema — graceful tampered force/checkAfter params (otp-enr
   });
 });
 
-describe('otp-enroll loader guard-fail — threads requestId/organization (regression: dead-end mid-ceremony)', () => {
-  it('redirects to a bare /login when no session matches and no ceremony context is present', () => {
-    callService({
+// Both OTP loaders enforce the IDENTICAL guard-fail bounce contract, and otp-verify.cy.ts
+// (now deleted) asserted exactly this shape against otpVerifyLoader. Merged here as one
+// 4-row table: {enroll, verify} × {no ceremony context, mid-ceremony}.
+const CEREMONY_QUERY = '&requestId=oidc_V2_123&organization=org-1';
+
+const BOUNCES: Array<{
+  label: string;
+  scenario: Parameters<typeof callService>[0];
+  expectedLocation: string;
+}> = [
+  {
+    label: 'enroll, no ceremony context',
+    scenario: {
       fn: 'otpEnrollLoader',
       provider: 'singleton',
       otpEnrollConfig: { verifyPath: '/login/verify/email' },
       request: { url: 'http://localhost/id/setup/email?loginName=ghost@nowhere.test' },
-    }).then((v) => {
-      expect(v.response?.status).to.equal(302);
-      expect(v.response?.location).to.equal('/login');
-    });
-  });
-
-  it('threads requestId/organization onto the /login bounce when the ceremony is in flight', () => {
-    callService({
+    },
+    expectedLocation: '/login',
+  },
+  {
+    label: 'enroll, ceremony in flight',
+    scenario: {
       fn: 'otpEnrollLoader',
       provider: 'singleton',
       otpEnrollConfig: { verifyPath: '/login/verify/email' },
       request: {
-        url:
-          'http://localhost/id/setup/email?loginName=ghost@nowhere.test' +
-          '&requestId=oidc_V2_123&organization=org-1',
+        url: `http://localhost/id/setup/email?loginName=ghost@nowhere.test${CEREMONY_QUERY}`,
       },
-    }).then((v) => {
-      expect(v.response?.status).to.equal(302);
-      expect(v.response?.location).to.equal('/login?requestId=oidc_V2_123&organization=org-1');
-    });
+    },
+    expectedLocation: '/login?requestId=oidc_V2_123&organization=org-1',
+  },
+  {
+    label: 'verify, no ceremony context',
+    scenario: {
+      fn: 'otpVerifyLoader',
+      provider: 'singleton',
+      otpVerifyConfig: { channel: 'email', verifyPath: '/login/verify/email' },
+      request: { url: 'http://localhost/id/login/verify/email?loginName=ghost@nowhere.test' },
+    },
+    expectedLocation: '/login',
+  },
+  {
+    label: 'verify, ceremony in flight',
+    scenario: {
+      fn: 'otpVerifyLoader',
+      provider: 'singleton',
+      otpVerifyConfig: { channel: 'email', verifyPath: '/login/verify/email' },
+      request: {
+        url: `http://localhost/id/login/verify/email?loginName=ghost@nowhere.test${CEREMONY_QUERY}`,
+      },
+    },
+    expectedLocation: '/login?requestId=oidc_V2_123&organization=org-1',
+  },
+];
+
+describe('otp enroll/verify loader guard-fail — threads requestId/organization (regression: dead-end mid-ceremony)', () => {
+  it('bounces both loaders to /login, threading requestId/organization mid-ceremony', () => {
+    for (const { label, scenario, expectedLocation } of BOUNCES) {
+      callService(scenario).then((v) => {
+        expect(v.response?.status, `${label}: status`).to.equal(302);
+        expect(v.response?.location, `${label}: location`).to.equal(expectedLocation);
+      });
+    }
   });
 });

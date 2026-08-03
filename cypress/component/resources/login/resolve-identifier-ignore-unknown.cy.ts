@@ -4,16 +4,10 @@
 import { FakeAuthProvider } from '@/modules/auth/providers/fake/fake-provider';
 import { resolveIdentifier } from '@/resources/login';
 
+// The OFF (default) branch lives in resolve-identifier-defaults.cy.ts, alongside the other
+// default-off policy flags — same seed, same USER_NOT_FOUND assertion. Only the ON branch,
+// which has no equivalent there, is kept here.
 describe('resolveIdentifier — ignoreUnknownUsernames', () => {
-  it('OFF (default): unknown identifier returns USER_NOT_FOUND (unchanged)', async () => {
-    const p = new FakeAuthProvider({ users: [{ id: 'u1', loginName: 'alice@acme.test' }] });
-    const r = await resolveIdentifier(p, [], {
-      loginName: 'ghost@acme.test',
-      emailDeliveryEnabled: true,
-    });
-    expect(r).to.deep.equal({ ok: false, error: 'USER_NOT_FOUND' });
-  });
-
   it('ON: the ghost target is whatever a real PASSWORD-ONLY account resolves to', () => {
     // Pinned as a comparison, never as a literal. The ghost has no destination of its own — its
     // only job is to collide with the password-only account's, and a literal '/login/method' here

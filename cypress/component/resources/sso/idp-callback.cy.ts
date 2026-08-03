@@ -32,37 +32,55 @@ const base = {
 const linkBase = { allowAutoLink: false, allowLinkAnyEmail: false } as const;
 const LINK = { idpId: 'idp-g', idpUserId: 'g-1', idpUserName: 'you@gmail.com' };
 
-describe('decideIdpCallback — existing-account handling', () => {
-  it('auto-links when email is IdP-verified and the account has no password', () => {
-    const d = decideIdpCallback({
+// The four plain routing decisions on the link=false path. Only these are table-driven —
+// every ownership / POSTURE-B2 guard below stays standalone so an identity-takeover
+// regression fails in isolation and is immediately diagnosable.
+//
+// `full` means the whole decision object is pinned; `kind` means only the discriminant was
+// ever asserted (the auto-create case), preserved exactly rather than tightened.
+const ROUTING: Array<{
+  label: string;
+  input: Parameters<typeof decideIdpCallback>[0];
+  full?: ReturnType<typeof decideIdpCallback>;
+  kind?: string;
+}> = [
+  {
+    label: 'email IdP-verified, existing account has no password → auto-link',
+    input: {
       ...base,
       intent: intentOf({ emailVerified: true }),
       existingAccount: { userId: 'u1', hasPassword: false },
-    });
-    expect(d).to.deep.equal({ kind: 'auto-link', userId: 'u1', link: LINK });
-  });
-
-  it('requires sign-in when the existing account has a password', () => {
-    const d = decideIdpCallback({
+    },
+    full: { kind: 'auto-link', userId: 'u1', link: LINK },
+  },
+  {
+    label: 'existing account has a password → link-needs-auth',
+    input: {
       ...base,
       intent: intentOf({ emailVerified: true }),
       existingAccount: { userId: 'u1', hasPassword: true },
-    });
-    expect(d).to.deep.equal({ kind: 'link-needs-auth', email: 'you@gmail.com' });
-  });
+    },
+    full: { kind: 'link-needs-auth', email: 'you@gmail.com' },
+  },
+  {
+    label: 'no existing account matches → auto-create',
+    input: { ...base, intent: intentOf(), existingAccount: null },
+    kind: 'auto-create',
+  },
+  {
+    label: 'IdP identity already linked → sign-in',
+    input: { ...base, intent: intentOf({ userId: 'u9' }), existingAccount: null },
+    full: { kind: 'sign-in', userId: 'u9' },
+  },
+];
 
-  it('auto-creates when no existing account matches', () => {
-    const d = decideIdpCallback({ ...base, intent: intentOf(), existingAccount: null });
-    expect(d.kind).to.equal('auto-create');
-  });
-
-  it('still signs in when the IdP identity is already linked', () => {
-    const d = decideIdpCallback({
-      ...base,
-      intent: intentOf({ userId: 'u9' }),
-      existingAccount: null,
-    });
-    expect(d).to.deep.equal({ kind: 'sign-in', userId: 'u9' });
+describe('decideIdpCallback — existing-account handling', () => {
+  it('routes each existing-account shape to the right decision (auto-link / link-needs-auth / auto-create / sign-in)', () => {
+    for (const { label, input, full, kind } of ROUTING) {
+      const d = decideIdpCallback(input);
+      if (full) expect(d, label).to.deep.equal(full);
+      else expect(d.kind, label).to.equal(kind);
+    }
   });
 });
 

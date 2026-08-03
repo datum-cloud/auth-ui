@@ -25,26 +25,47 @@ function RecoveryHarness({
 }
 
 describe('useAuthActionRecovery', () => {
-  it('resolves message + recovery for a recoverable code (inline-only surface, no toast)', () => {
-    cy.mount(<RecoveryHarness actionData={{ error: 'SESSION_EXPIRED' }} />);
-    cy.get('[data-testid="message"]').should('have.text', 'Your session has expired.');
-    cy.get('[data-testid="recovery-to"]').should('have.text', '/login');
-    cy.get('[data-testid="recovery-label"]').should('have.text', 'Sign in again');
-  });
+  // Table: actionData varies (no ctx); every row asserts all three always-rendered
+  // testids. The SESSION_EXPIRED row also carries the former standalone
+  // "bare /login when no ctx is forwarded" test — identical mount, identical
+  // recovery-to === '/login' assertion.
+  const RESOLUTION_ROWS = [
+    {
+      label: 'recoverable SESSION_EXPIRED (no ctx → bare /login)',
+      actionData: { error: 'SESSION_EXPIRED' },
+      message: 'Your session has expired.',
+      to: '/login',
+      labelText: 'Sign in again',
+    },
+    {
+      label: 'non-recoverable INVALID_CREDENTIALS (message only, no recovery)',
+      actionData: { error: 'INVALID_CREDENTIALS' },
+      message: 'Incorrect credentials. Please try again.',
+      to: '__none__',
+      labelText: '__none__',
+    },
+    {
+      label: 'actionData without error (undefined message + recovery)',
+      actionData: undefined,
+      message: '__undefined__',
+      to: '__none__',
+      labelText: '__none__',
+    },
+  ] as const;
 
-  it('resolves message but no recovery for a non-recoverable code', () => {
-    cy.mount(<RecoveryHarness actionData={{ error: 'INVALID_CREDENTIALS' }} />);
-    cy.get('[data-testid="message"]').should(
-      'have.text',
-      'Incorrect credentials. Please try again.'
-    );
-    cy.get('[data-testid="recovery-to"]').should('have.text', '__none__');
-  });
-
-  it('returns undefined message + recovery when actionData has no error', () => {
-    cy.mount(<RecoveryHarness actionData={undefined} />);
-    cy.get('[data-testid="message"]').should('have.text', '__undefined__');
-    cy.get('[data-testid="recovery-to"]').should('have.text', '__none__');
+  it('resolves message + recovery from actionData.error (inline-only surface, no toast)', () => {
+    RESOLUTION_ROWS.forEach(({ label, actionData, message, to, labelText }) => {
+      cy.mount(<RecoveryHarness actionData={actionData} />);
+      cy.get('[data-testid="message"]').should(($el) => {
+        expect($el.text(), `${label} → message`).to.equal(message);
+      });
+      cy.get('[data-testid="recovery-to"]').should(($el) => {
+        expect($el.text(), `${label} → recovery.to`).to.equal(to);
+      });
+      cy.get('[data-testid="recovery-label"]').should(($el) => {
+        expect($el.text(), `${label} → recovery.label`).to.equal(labelText);
+      });
+    });
   });
 
   // OIDC ceremony preservation: the hook forwards the in-scope ceremony ctx
@@ -61,10 +82,5 @@ describe('useAuthActionRecovery', () => {
       'have.text',
       '/login?requestId=rq1&organization=acme'
     );
-  });
-
-  it('yields a bare /login recovery when no ctx is forwarded', () => {
-    cy.mount(<RecoveryHarness actionData={{ error: 'SESSION_EXPIRED' }} />);
-    cy.get('[data-testid="recovery-to"]').should('have.text', '/login');
   });
 });

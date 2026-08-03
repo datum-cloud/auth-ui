@@ -4,6 +4,8 @@
 // ?organization=org1 is threaded so the loader RENDERS (same note as
 // last-used-login-loader.cy.ts). Singleton seed: u5 passkey-user@acme.test has
 // authMethods ['password','passkey']; u1 alice@acme.test is password-only.
+// The hintless baseline (no hint → conditionalPasskey === null) lives in
+// discovery-loader.cy.ts (its first test makes the identical call and assertion).
 import { callService } from '../../../support/node/call-service';
 
 const PK_USER = 'passkey-user@acme.test';
@@ -14,14 +16,6 @@ type LoaderBody = {
 };
 
 describe('/login loader — conditional passkey arming', () => {
-  it('no hint → the HINT arm stays inert (discovery arming is covered in discovery-loader.cy.ts)', () => {
-    callService({ fn: 'loginLoader', provider: 'singleton', request: { url: URL_BASE } }).then(
-      (v) => {
-        expect((v.response?.dataBody as LoaderBody).conditionalPasskey).to.equal(null);
-      }
-    );
-  });
-
   it('hinted passkey user → arms: challenge returned, ceremony session persisted', () => {
     callService({
       fn: 'loginLoader',

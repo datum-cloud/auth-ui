@@ -31,27 +31,28 @@ describe('startReauthIdpIntent', () => {
     expect(capturedUrls?.failure).to.include('returnTo=%2Fpasskeys');
   });
 
-  it('maps a ProviderError from provider.startIdpIntent to IDP_UNAVAILABLE', async () => {
-    const fake = new FakeAuthProvider({ users: [{ id: 'u1', loginName: 'mia@acme.test' }] });
-    fake.startIdpIntent = async () => {
-      throw new ProviderError('UNAVAILABLE', 'idp down');
-    };
-    const result = await startReauthIdpIntent(fake, {
-      idpId: 'idp-google',
-      origin: 'http://localhost:3000',
-      returnTo: '/passkeys',
-    });
-    expect(result).to.deep.equal({ ok: false, error: 'IDP_UNAVAILABLE' });
-  });
+  // Both failure modes collapse to the SAME deep.equal, differing only in how the provider
+  // fails: it throws, or it returns a response with no authUrl.
+  const FAILURES: [label: string, startIdpIntent: () => Promise<unknown>][] = [
+    [
+      'provider throws a ProviderError',
+      async () => {
+        throw new ProviderError('UNAVAILABLE', 'idp down');
+      },
+    ],
+    ['provider returns no authUrl', async () => ({})],
+  ];
 
-  it('maps a missing authUrl to IDP_UNAVAILABLE', async () => {
-    const fake = new FakeAuthProvider({ users: [{ id: 'u1', loginName: 'mia@acme.test' }] });
-    fake.startIdpIntent = async () => ({});
-    const result = await startReauthIdpIntent(fake, {
-      idpId: 'idp-google',
-      origin: 'http://localhost:3000',
-      returnTo: '/passkeys',
-    });
-    expect(result).to.deep.equal({ ok: false, error: 'IDP_UNAVAILABLE' });
+  it('maps every startIdpIntent failure mode (a thrown ProviderError, a missing authUrl) to IDP_UNAVAILABLE', async () => {
+    for (const [label, startIdpIntent] of FAILURES) {
+      const fake = new FakeAuthProvider({ users: [{ id: 'u1', loginName: 'mia@acme.test' }] });
+      fake.startIdpIntent = startIdpIntent as typeof fake.startIdpIntent;
+      const result = await startReauthIdpIntent(fake, {
+        idpId: 'idp-google',
+        origin: 'http://localhost:3000',
+        returnTo: '/passkeys',
+      });
+      expect(result, label).to.deep.equal({ ok: false, error: 'IDP_UNAVAILABLE' });
+    }
   });
 });

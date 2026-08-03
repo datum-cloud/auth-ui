@@ -42,12 +42,12 @@ describe('resolveRybbitSiteId', () => {
 });
 
 describe('RybbitAnalytics', () => {
-  it('renders nothing when siteId is falsy', () => {
+  it('renders no script tag when siteId is falsy, and renders the Rybbit script with siteId, tag and nonce when it is set', () => {
+    // Asserted FIRST on purpose: `should('not.exist')` on `script[data-site-id]` is a
+    // whole-DOM negative, so it is only meaningful before any mount has injected a script.
     cy.mount(<RybbitAnalytics />);
     cy.get('script[data-site-id]').should('not.exist');
-  });
 
-  it('renders the Rybbit script tag with siteId, tag and nonce', () => {
     cy.mount(<RybbitAnalytics siteId="997f89789d8f" tag="staging" nonce="abc123" />);
     cy.get('script[data-site-id="997f89789d8f"]').should(($el) => {
       const el = $el.get(0) as HTMLScriptElement;
@@ -72,20 +72,19 @@ describe('TrackOnMount + identifyUser', () => {
     });
   });
 
-  it('identifyUser calls window.rybbit.identify with the given user id', () => {
+  it('identifies the user with optional traits, and clears the identified user', () => {
+    // Indexed off `filter`, NOT `find` — both calls land in the same recorder here, and
+    // `find` would return call #0 again for the second assertion, silently never checking
+    // the traits payload.
     identifyUser('user-42');
-    expect(rybbitCalls().find((c) => c.fn === 'identify')?.args).to.deep.equal(['user-42']);
-  });
+    expect(rybbitCalls().filter((c) => c.fn === 'identify')[0]?.args).to.deep.equal(['user-42']);
 
-  it('identifyUser passes traits through when given', () => {
     identifyUser('user-42', { email: 'user@example.com' });
-    expect(rybbitCalls().find((c) => c.fn === 'identify')?.args).to.deep.equal([
+    expect(rybbitCalls().filter((c) => c.fn === 'identify')[1]?.args).to.deep.equal([
       'user-42',
       { email: 'user@example.com' },
     ]);
-  });
 
-  it('clearIdentifiedUser calls window.rybbit.clearUserId', () => {
     clearIdentifiedUser();
     expect(rybbitCalls().filter((c) => c.fn === 'clearUserId')).to.have.length(1);
   });

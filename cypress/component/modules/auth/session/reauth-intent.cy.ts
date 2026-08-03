@@ -16,29 +16,32 @@ interface ReauthCheck {
 }
 
 describe('checkReauthIntent (shared identity guard)', () => {
-  it('matching identity → no mismatch, intent echoed, clear cookie present', () => {
-    callService({
-      fn: 'reauthIntentCheck',
-      reauthOp: 'checkMatch',
-      request: { url: 'http://localhost/id' },
-    }).then((v) => {
-      const r = v.outcome as ReauthCheck;
-      expect(r.intent).to.equal('alice@acme.test');
-      expect(r.mismatch).to.equal(false);
-      expect(r.clearCookie).to.include('reauth-intent=');
-    });
-  });
-
-  it('different identity → mismatch true, clear cookie still present', () => {
+  // The match/mismatch pair chains in one test, matching the established cy.task pattern. Each
+  // callService spawns a fresh Bun process, so the two decisions stay fully independent. The
+  // MISMATCH case runs first: it is the one that actually denies a re-auth against the wrong
+  // identity, so it must never be masked by a failure in the permissive case.
+  it('echoes the intent and clears the cookie, flagging mismatch only on a different identity', () => {
     callService({
       fn: 'reauthIntentCheck',
       reauthOp: 'checkMismatch',
       request: { url: 'http://localhost/id' },
-    }).then((v) => {
-      const r = v.outcome as ReauthCheck;
-      expect(r.intent).to.equal('alice@acme.test');
-      expect(r.mismatch).to.equal(true);
-      expect(r.clearCookie).to.include('reauth-intent=');
-    });
+    })
+      .then((v) => {
+        const r = v.outcome as ReauthCheck;
+        expect(r.intent, 'mismatch: intent echoed').to.equal('alice@acme.test');
+        expect(r.mismatch, 'mismatch: flagged').to.equal(true);
+        expect(r.clearCookie, 'mismatch: clear cookie present').to.include('reauth-intent=');
+        return callService({
+          fn: 'reauthIntentCheck',
+          reauthOp: 'checkMatch',
+          request: { url: 'http://localhost/id' },
+        });
+      })
+      .then((v) => {
+        const r = v.outcome as ReauthCheck;
+        expect(r.intent, 'match: intent echoed').to.equal('alice@acme.test');
+        expect(r.mismatch, 'match: not flagged').to.equal(false);
+        expect(r.clearCookie, 'match: clear cookie present').to.include('reauth-intent=');
+      });
   });
 });

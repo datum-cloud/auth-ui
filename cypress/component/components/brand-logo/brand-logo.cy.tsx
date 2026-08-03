@@ -7,24 +7,30 @@
 import { BrandLogo } from '@/components/brand-logo/brand-logo';
 
 describe('BrandLogo — preserves the ceremony on its home link', () => {
-  it('carries requestId + organization from the current URL onto the home link', () => {
-    cy.mount(<BrandLogo />, {
-      path: '/login',
-      initialEntries: ['/login?requestId=oidc_V2_123&organization=org-1'],
-    });
-    cy.get('a').should('have.attr', 'href', '/?requestId=oidc_V2_123&organization=org-1');
-  });
+  it('carries ceremony params from the current URL onto the home link', () => {
+    const rows = [
+      {
+        label: 'requestId + organization carried onto the home link',
+        entry: '/login?requestId=oidc_V2_123&organization=org-1',
+        expectedHref: '/?requestId=oidc_V2_123&organization=org-1',
+      },
+      {
+        label: 'requestId alone (organization omitted) without a stray param',
+        entry: '/login?requestId=saml_abc',
+        expectedHref: '/?requestId=saml_abc',
+      },
+      {
+        label: 'no ceremony params (bare /login) degrades to a bare "/"',
+        entry: '/login',
+        expectedHref: '/',
+      },
+    ] as const;
 
-  it('carries requestId alone (organization omitted) without a stray param', () => {
-    cy.mount(<BrandLogo />, {
-      path: '/login',
-      initialEntries: ['/login?requestId=saml_abc'],
+    rows.forEach((row) => {
+      cy.mount(<BrandLogo />, { path: '/login', initialEntries: [row.entry] });
+      cy.get('a').should(($a) => {
+        expect($a.attr('href'), row.label).to.equal(row.expectedHref);
+      });
     });
-    cy.get('a').should('have.attr', 'href', '/?requestId=saml_abc');
-  });
-
-  it('degrades to a bare "/" on a page with no ceremony params (e.g. bare /login)', () => {
-    cy.mount(<BrandLogo />, { path: '/login', initialEntries: ['/login'] });
-    cy.get('a').should('have.attr', 'href', '/');
   });
 });

@@ -40,27 +40,34 @@ describe('CSP style-src policy', () => {
 });
 
 describe('resolveFrameAncestors', () => {
-  it('parses a space- or comma-separated allowlist of origins', () => {
-    expect(resolveFrameAncestors('https://a.example.com https://b.example.com')).to.deep.equal([
-      'https://a.example.com',
-      'https://b.example.com',
-    ]);
-    expect(resolveFrameAncestors('https://a.example.com, https://b.example.com')).to.deep.equal([
-      'https://a.example.com',
-      'https://b.example.com',
-    ]);
+  // Parsing and token-validation of an OPERATOR-set allowlist (deploy config, not
+  // attacker input). Same call, same deep.equal shape, differing only by input string.
+  const PARSING: [label: string, input: string, expected: string[]][] = [
+    [
+      'space-separated allowlist',
+      'https://a.example.com https://b.example.com',
+      ['https://a.example.com', 'https://b.example.com'],
+    ],
+    [
+      'comma-separated allowlist',
+      'https://a.example.com, https://b.example.com',
+      ['https://a.example.com', 'https://b.example.com'],
+    ],
+    ['unparseable token', 'not-a-url', ["'none'"]],
+    ['non-http(s) scheme', 'ftp://x.example.com', ["'none'"]],
+    ['path stripped to origin', 'https://a.example.com/embed', ['https://a.example.com']],
+  ];
+
+  it("parses space- or comma-separated origins and drops unparseable / non-http(s) tokens, falling back to 'none' if nothing valid remains", () => {
+    for (const [label, input, expected] of PARSING) {
+      expect(resolveFrameAncestors(input), label).to.deep.equal(expected);
+    }
   });
 
+  // Kept standalone: this is the clickjacking footgun, not a parsing case. A wildcard
+  // that survived would expose every page to framing, so it must fail on its own.
   it("rejects a bare wildcard and falls back to 'none' (clickjacking footgun)", () => {
     expect(resolveFrameAncestors('*')).to.deep.equal(["'none'"]);
     expect(resolveFrameAncestors('https://a.example.com *')).to.deep.equal(["'none'"]);
-  });
-
-  it("drops unparseable / non-http(s) tokens, falling back to 'none' if nothing valid remains", () => {
-    expect(resolveFrameAncestors('not-a-url')).to.deep.equal(["'none'"]);
-    expect(resolveFrameAncestors('ftp://x.example.com')).to.deep.equal(["'none'"]);
-    expect(resolveFrameAncestors('https://a.example.com/embed')).to.deep.equal([
-      'https://a.example.com',
-    ]);
   });
 });

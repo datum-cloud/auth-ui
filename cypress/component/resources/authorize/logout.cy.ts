@@ -9,7 +9,7 @@
 // Regression coverage for the post-logout stale-cookie bug (validate-before-reuse): dead →
 // /login + session_stale (self-heal); transient → /error (NOT a silent re-login — the crux of
 // the fix is not conflating a transient lookup failure with a genuinely dead session).
-import { callService, type AuditEvent } from '../../../support/node/call-service';
+import { callService, type AuditEvent, type Scenario } from '../../../support/node/call-service';
 
 const RAW_ID = 'cb'; // singleton seed: requestId `cb` has prompt:[] → OIDC callback path
 
@@ -75,71 +75,64 @@ describe('/authorize — stale-cookie self-heal (validate before reuse)', () => 
 describe('/authorize — read-after-write retry on a freshly-created session (NOT_FOUND)', () => {
   const NOW_MS = Date.parse('2026-06-24T12:00:00.000Z');
 
-  it('FRESH session (creationTs within the retry window): NOT_FOUND once then alive on retry → finalizes the callback (no self-heal)', () => {
-    callService({
-      fn: 'resolveAuthorize',
-      provider: 'singleton',
-      // Consumed by the FIRST getSession call; the retry then falls through to this seeded
-      // live session, simulating "the write landed, the first read just raced a lagging replica".
-      liveSessions: [{ id: 'fresh-race-1', token: 'tok-fresh-race-1' }],
-      sessionResults: { 'fresh-race-1': { mode: 'throw-once', code: 'NOT_FOUND' } },
-      nowMs: NOW_MS,
-      request: {
-        url: `http://localhost/id/authorize?requestId=oidc_${RAW_ID}&sessionId=fresh-race-1`,
-        sessions: [
-          {
-            id: 'fresh-race-1',
-            token: 'tok-fresh-race-1',
-            loginName: 'alice@acme.test',
-            // 2s old — well inside the retry window (this is the "just redirected back from
-            // register" case).
-            creationTs: new Date(NOW_MS - 2000).toISOString(),
-          },
-        ],
+  it('FRESH session (creationTs within the retry window): NOT_FOUND then alive → the bounded backoff keeps polling until the replica catches up and finalizes the callback (no self-heal)', () => {
+    // Each row scripts N failing getSession reads before falling through to the seeded live
+    // session — "the write landed, the read(s) just raced a lagging replica". Distinct session
+    // ids per row keep the singleton provider's scripted results independent.
+    const ROWS: ReadonlyArray<{
+      label: string;
+      id: string;
+      script: NonNullable<Scenario['sessionResults']>[string];
+    }> = [
+      {
+        // Consumed by the FIRST getSession call; the retry then finds the live session (this is
+        // the "just redirected back from register" case).
+        label: 'replica lags one read cycle',
+        id: 'fresh-race-1',
+        script: { mode: 'throw-once', code: 'NOT_FOUND' },
       },
-    }).then((v) => {
-      expect(v.response?.status).to.equal(302);
-      const loc = v.response?.location ?? '';
-      expect(loc).to.include('client.acme.test/callback');
-      expect(loc).to.include(`code=fake_${RAW_ID}_fresh-race-1`);
-      expect(loc).to.not.include('/login');
-      // No self-heal fired — the retry recovered the session, so it must NOT look like the
-      // stale-cookie case above.
-      expect(v.audit.some((e) => e.event === 'session_stale')).to.equal(false);
-    });
-  });
+      {
+        // Throws NOT_FOUND for the first TWO getSession calls (the initial probe + the first
+        // retry), then falls through on the third — a replica that lags past a single retry.
+        // Proves healIfSessionDead's loop keeps going instead of giving up after one attempt.
+        label: 'replica lags two read cycles',
+        id: 'fresh-race-2',
+        script: { mode: 'throw-times', code: 'NOT_FOUND', times: 2 },
+      },
+    ];
 
-  it('FRESH session lagging MORE than one read cycle: NOT_FOUND twice then alive → the bounded backoff loop keeps polling and finalizes (no self-heal)', () => {
-    callService({
-      fn: 'resolveAuthorize',
-      provider: 'singleton',
-      // Throws NOT_FOUND for the first TWO getSession calls (the initial probe + the first retry),
-      // then falls through to this live session on the third — a replica that lags past a single
-      // retry. Proves healIfSessionDead's loop keeps going instead of giving up after one attempt.
-      liveSessions: [{ id: 'fresh-race-2', token: 'tok-fresh-race-2' }],
-      sessionResults: {
-        'fresh-race-2': { mode: 'throw-times', code: 'NOT_FOUND', times: 2 },
-      },
-      nowMs: NOW_MS,
-      request: {
-        url: `http://localhost/id/authorize?requestId=oidc_${RAW_ID}&sessionId=fresh-race-2`,
-        sessions: [
-          {
-            id: 'fresh-race-2',
-            token: 'tok-fresh-race-2',
-            loginName: 'alice@acme.test',
-            // 2s old — inside the retry window.
-            creationTs: new Date(NOW_MS - 2000).toISOString(),
-          },
-        ],
-      },
-    }).then((v) => {
-      expect(v.response?.status).to.equal(302);
-      const loc = v.response?.location ?? '';
-      expect(loc).to.include('client.acme.test/callback');
-      expect(loc).to.include(`code=fake_${RAW_ID}_fresh-race-2`);
-      expect(loc).to.not.include('/login');
-      expect(v.audit.some((e) => e.event === 'session_stale')).to.equal(false);
+    ROWS.forEach(({ label, id, script }) => {
+      callService({
+        fn: 'resolveAuthorize',
+        provider: 'singleton',
+        liveSessions: [{ id, token: `tok-${id}` }],
+        sessionResults: { [id]: script },
+        nowMs: NOW_MS,
+        request: {
+          url: `http://localhost/id/authorize?requestId=oidc_${RAW_ID}&sessionId=${id}`,
+          sessions: [
+            {
+              id,
+              token: `tok-${id}`,
+              loginName: 'alice@acme.test',
+              // 2s old — well inside the retry window.
+              creationTs: new Date(NOW_MS - 2000).toISOString(),
+            },
+          ],
+        },
+      }).then((v) => {
+        expect(v.response?.status, `${label}: 302`).to.equal(302);
+        const loc = v.response?.location ?? '';
+        expect(loc, `${label}: callback host`).to.include('client.acme.test/callback');
+        expect(loc, `${label}: minted code`).to.include(`code=fake_${RAW_ID}_${id}`);
+        expect(loc, `${label}: no /login re-prompt`).to.not.include('/login');
+        // No self-heal fired — the retry recovered the session, so it must NOT look like the
+        // stale-cookie case above.
+        expect(
+          v.audit.some((e) => e.event === 'session_stale'),
+          `${label}: no session_stale`
+        ).to.equal(false);
+      });
     });
   });
 

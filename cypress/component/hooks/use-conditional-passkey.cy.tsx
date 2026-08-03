@@ -89,18 +89,19 @@ describe('useConditionalPasskey', () => {
     cy.then(() => expect(posts).to.have.length(0));
   });
 
-  it('enabled=false stays fully inert', () => {
+  it('inert gates: enabled=false and null options stay fully inert', () => {
     (window as W).__conditionalPasskeyAutoResolve = true;
-    const posts = mountHarness({ enabled: false });
-    cy.get('[data-testid="phase"]').should('have.text', 'idle');
-    cy.then(() => expect(posts).to.have.length(0));
-  });
-
-  it('null options stay fully inert', () => {
-    (window as W).__conditionalPasskeyAutoResolve = true;
-    const posts = mountHarness({ options: null });
-    cy.get('[data-testid="phase"]').should('have.text', 'idle');
-    cy.then(() => expect(posts).to.have.length(0));
+    const ROWS: Array<{ label: string; props: { enabled?: boolean; options?: unknown } }> = [
+      { label: 'enabled=false', props: { enabled: false } },
+      { label: 'null options', props: { options: null } },
+    ];
+    for (const row of ROWS) {
+      const posts = mountHarness(row.props);
+      cy.get('[data-testid="phase"]').should(($phase) => {
+        expect($phase, `${row.label}: phase`).to.have.text('idle');
+      });
+      cy.then(() => expect(posts, `${row.label}: no POSTs`).to.have.length(0));
+    }
   });
 
   it('abort() retires the ceremony permanently', () => {

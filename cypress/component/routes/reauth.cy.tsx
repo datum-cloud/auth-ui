@@ -90,22 +90,16 @@ describe('/reauth — in-place passkey ceremony', () => {
     releaseChallenge = null;
   });
 
-  it('shows the active identity with a "Not you?" link to /accounts', () => {
+  it('shows the identity and method chooser, and fires the Passkey ceremony in place', () => {
     mountReauth();
+    // Identity row and chooser entries (folded in — all three shared one mountReauth()).
     cy.contains('Logged in as').should('be.visible');
     cy.contains(CHOOSER_VIEW.loginName).should('be.visible');
     cy.contains('a', 'Not you?').should('have.attr', 'href', '/accounts');
-  });
-
-  it('lists Passkey and Password as chooser entries', () => {
-    mountReauth();
     cy.contains("Confirm it's you").should('be.visible');
     cy.contains('button', 'Passkey').should('be.visible');
     cy.contains('a', 'Password').should('be.visible');
-  });
 
-  it('Passkey fires the ceremony in place and submits the pre-baked credential', () => {
-    mountReauth();
     cy.contains('button', 'Passkey').click();
     // Lazy challenge (fetcher.load ?method=passkey) → pre-baked credential → POST.
     cy.wrap(null).should(() => {

@@ -47,29 +47,27 @@ describe('readMaxMindTrackingToken', () => {
 describe('syncMaxMindTokenToRef', () => {
   beforeEach(() => window.sessionStorage.clear());
 
-  it('writes a freshly-captured token into the ref input, simulating a submit that races the periodic sync', () => {
-    // Nothing mirrored into sessionStorage yet when the ref is created (mirrors the real
-    // scenario: the periodic interval hasn't ticked, or device.js hasn't captured the cookie
-    // at mount time) — then the token lands and the user clicks submit immediately after.
-    const input = document.createElement('input');
-    input.value = '';
-    window.sessionStorage.setItem(MAXMIND_TOKEN_STORAGE_KEY, 'tok-submit-time');
+  it('syncs a captured token into the ref, leaves it untouched when absent, tolerates a null ref', () => {
+    for (const [stored, initial, expected] of [
+      // Nothing mirrored into sessionStorage yet when the ref is created (mirrors the real
+      // scenario: the periodic interval hasn't ticked, or device.js hasn't captured the
+      // cookie at mount time) — then the token lands and the user submits immediately after.
+      ['tok-submit-time', '', 'tok-submit-time'],
+      // No token captured at all — the server-round-tripped value must survive untouched.
+      [undefined, 'server-round-tripped-value', 'server-round-tripped-value'],
+    ] as const) {
+      window.sessionStorage.clear();
+      if (stored) window.sessionStorage.setItem(MAXMIND_TOKEN_STORAGE_KEY, stored);
+      const input = document.createElement('input');
+      input.value = initial;
 
-    syncMaxMindTokenToRef({ current: input });
+      syncMaxMindTokenToRef({ current: input });
 
-    expect(input.value).to.equal('tok-submit-time');
-  });
+      expect(input.value, `stored=${String(stored)}`).to.equal(expected);
+    }
 
-  it('leaves the ref input untouched when no token has been captured yet', () => {
-    const input = document.createElement('input');
-    input.value = 'server-round-tripped-value';
-
-    syncMaxMindTokenToRef({ current: input });
-
-    expect(input.value).to.equal('server-round-tripped-value');
-  });
-
-  it('is a no-op (does not throw) when ref.current is null', () => {
+    // A null ref must not throw even when a token IS available to write.
+    window.sessionStorage.clear();
     window.sessionStorage.setItem(MAXMIND_TOKEN_STORAGE_KEY, 'tok-ignored');
     expect(() => syncMaxMindTokenToRef({ current: null })).to.not.throw();
   });

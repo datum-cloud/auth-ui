@@ -138,5 +138,14 @@ describe('toPasswordComplexity / toChallengeRequest', () => {
     expect(
       toChallengeRequest({ otpEmail: { kind: 'send-template', urlTemplate: tmpl } }).otpEmail
     ).to.deep.equal({ deliveryType: { case: 'sendCode', value: { urlTemplate: tmpl } } });
+
+    // return-code kind (folded in from mappers.otpemail.cy.ts) — completes the delivery-kind
+    // enum here, including the "no other delivery oneofs are populated" property.
+    const returnCode = toChallengeRequest({ otpEmail: { kind: 'return-code' } });
+    expect(returnCode.otpEmail).to.deep.equal({
+      deliveryType: { case: 'returnCode', value: {} },
+    });
+    expect(returnCode.webAuthN).to.be.undefined;
+    expect(returnCode.otpSms).to.be.undefined;
   });
 });

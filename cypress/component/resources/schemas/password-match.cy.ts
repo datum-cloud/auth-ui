@@ -10,23 +10,27 @@ const schema = withPasswordMatch(z.object({ password: z.string(), confirmPasswor
 });
 
 describe('withPasswordMatch', () => {
-  it('fails when passwords differ, error on confirmPassword path', () => {
-    const r = schema.safeParse({ password: 'a', confirmPassword: 'b' });
-    expect(r.success).to.equal(false);
-    if (!r.success) {
-      expect(r.error.issues[0].path).to.include('confirmPassword');
+  it('reports a password mismatch on the confirm path, for an explicit and the default field', () => {
+    // Explicit confirmField override.
+    const explicit = schema.safeParse({ password: 'a', confirmPassword: 'b' });
+    expect(explicit.success, 'explicit confirmField: mismatch rejected').to.equal(false);
+    if (!explicit.success) {
+      expect(explicit.error.issues[0].path, 'explicit confirmField: error path').to.include(
+        'confirmPassword'
+      );
     }
-  });
 
-  it('defaults to the real confirm field name used by the live schemas', () => {
+    // Default confirm field name.
     const real = withPasswordMatch(z.object({ password: z.string(), confirm: z.string() }));
     const ok = real.safeParse({ password: 'a', confirm: 'a' });
-    expect(ok.success).to.equal(true);
+    expect(ok.success, 'default confirm: match accepted').to.equal(true);
     const bad = real.safeParse({ password: 'a', confirm: 'b' });
-    expect(bad.success).to.equal(false);
+    expect(bad.success, 'default confirm: mismatch rejected').to.equal(false);
     if (!bad.success) {
-      expect(bad.error.issues[0].path).to.include('confirm');
-      expect(bad.error.issues[0].message).to.equal('Passwords must match');
+      expect(bad.error.issues[0].path, 'default confirm: error path').to.include('confirm');
+      expect(bad.error.issues[0].message, 'default confirm: message').to.equal(
+        'Passwords must match'
+      );
     }
   });
 });

@@ -7,23 +7,23 @@ import {
   decideSignupIdpIntent,
 } from '@/resources/signup/signup-decision';
 
-describe('decideSignupIdpIntent', () => {
-  it('redirects to the provider authUrl on success and surfaces the error code on failure', () => {
+describe('decideSignupIdpIntent / decideAfterSignupIdentifier', () => {
+  it('resolves the IdP-intent outcome and the post-identifier signup route', () => {
     expect(
-      decideSignupIdpIntent({ ok: true, authUrl: 'https://idp.example/start?x=1' })
+      decideSignupIdpIntent({ ok: true, authUrl: 'https://idp.example/start?x=1' }),
+      'idp intent: success'
     ).to.deep.equal({
       kind: 'redirect',
       path: 'https://idp.example/start?x=1',
     });
-    expect(decideSignupIdpIntent({ ok: false, error: 'IDP_START_FAILED' })).to.deep.equal({
+    expect(
+      decideSignupIdpIntent({ ok: false, error: 'IDP_START_FAILED' }),
+      'idp intent: failure'
+    ).to.deep.equal({
       kind: 'error',
       error: 'IDP_START_FAILED',
     });
-  });
-});
 
-describe('decideAfterSignupIdentifier', () => {
-  it('routes to /signup/method with the duplicated placeholder name, threads optional org/requestId, and omits absent keys', () => {
     const withContext = decideAfterSignupIdentifier({
       email: 'alice.smith@example.com',
       organization: 'acme',

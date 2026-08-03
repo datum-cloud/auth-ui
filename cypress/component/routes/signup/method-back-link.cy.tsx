@@ -47,20 +47,16 @@ function mountSignupMethod() {
   return mount(withI18n(<RouterProvider router={router} />));
 }
 
-describe('/signup/method — exactly one Back control, targeting /signup', () => {
-  it('renders a single Back link (no duplicate)', () => {
+describe('/signup/method — exactly one Back control + identity, both targeting /signup', () => {
+  it('renders a single Back link (no duplicate) and shows "Signing up as <loginName>. Not you?" linking back to /signup', () => {
     mountSignupMethod();
     cy.get('a')
       .filter(':contains("Back")')
       .should('have.length', 1)
       .and('have.attr', 'href')
       .and('match', /^\/signup(\?|$)/);
-  });
-});
 
-describe('/signup/method — identity + Not you? (new, mirrors signup/password)', () => {
-  it('shows "Signing up as <loginName>. Not you?" linking back to /signup', () => {
-    mountSignupMethod();
+    // Identity + "Not you?" (mirrors signup/password) — same mountSignupMethod() fixture.
     cy.contains('Signing up as').should('be.visible');
     cy.contains(LOADER_DATA.loginName).should('be.visible');
     cy.findByRole('link', { name: /not you/i })

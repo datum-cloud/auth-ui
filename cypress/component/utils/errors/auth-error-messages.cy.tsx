@@ -43,17 +43,22 @@ describe('useAuthErrorMessage — device-code lookup codes (lowercase)', () => {
   });
 });
 
+// Baseline lookup: same mount, same have.text assertion, differing only by code and
+// expected message. The harness always renders the msg node, so no whole-DOM negative
+// is involved and mount order is not load-bearing.
+const BASELINE: [label: string, code: string | undefined, expected: string][] = [
+  ['no code (empty error surface)', undefined, '__undefined__'],
+  ['known code', 'INVALID_CREDENTIALS', 'Incorrect credentials. Please try again.'],
+  ['unknown code falls back to generic', 'SOME_UNKNOWN_CODE', GENERIC],
+];
+
 describe('useAuthErrorMessage — baseline behavior', () => {
-  it('returns undefined for no code (empty error surface)', () => {
-    cy.mount(<MessageHarness code={undefined} />);
-    cy.get('[data-testid="msg"]').should('have.text', '__undefined__');
-  });
-
-  it('resolves a known code to its specific message, and falls back to the generic message for an unknown code', () => {
-    cy.mount(<MessageHarness code="INVALID_CREDENTIALS" />);
-    cy.get('[data-testid="msg"]').should('have.text', 'Incorrect credentials. Please try again.');
-
-    cy.mount(<MessageHarness code="SOME_UNKNOWN_CODE" />);
-    cy.get('[data-testid="msg"]').should('have.text', GENERIC);
+  it('returns undefined for no code, resolves a known code to its message, and falls back to the generic message for an unknown one', () => {
+    for (const [label, code, expected] of BASELINE) {
+      cy.mount(<MessageHarness code={code} />);
+      cy.get('[data-testid="msg"]').should(($el) => {
+        expect($el.text(), label).to.equal(expected);
+      });
+    }
   });
 });

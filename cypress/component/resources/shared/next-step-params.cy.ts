@@ -32,43 +32,53 @@ describe('nextStepWithParams requestId validation', () => {
 });
 
 describe('ssoErrorRedirect — threads requestId/organization (regression: dropped on SSO error redirects)', () => {
-  it('builds the bare reason-only URL when no ceremony context is given', () => {
-    const url = ssoErrorRedirect('google', 'context-missing');
-    expect(url).to.equal('/sso/google/error?reason=context-missing');
-  });
+  const CASES: [label: string, args: Parameters<typeof ssoErrorRedirect>, expected: string][] = [
+    [
+      'bare reason-only when no ceremony context',
+      ['google', 'context-missing'],
+      '/sso/google/error?reason=context-missing',
+    ],
+    [
+      'requestId + organization both threaded',
+      ['google', 'signin_failed', 'oidc_V2_123', 'org-1'],
+      '/sso/google/error?reason=signin_failed&requestId=oidc_V2_123&organization=org-1',
+    ],
+    [
+      'requestId alone, no stray organization param',
+      ['google', 'signin_failed', 'oidc_V2_123'],
+      '/sso/google/error?reason=signin_failed&requestId=oidc_V2_123',
+    ],
+    [
+      'slug and reason are URL-encoded',
+      ['my provider', 'some/reason'],
+      '/sso/my%20provider/error?reason=some%2Freason',
+    ],
+  ];
 
-  it('threads requestId and organization onto the error redirect when present', () => {
-    const url = ssoErrorRedirect('google', 'signin_failed', 'oidc_V2_123', 'org-1');
-    expect(url).to.equal(
-      '/sso/google/error?reason=signin_failed&requestId=oidc_V2_123&organization=org-1'
-    );
-  });
-
-  it('threads requestId alone (organization omitted) without a stray param', () => {
-    const url = ssoErrorRedirect('google', 'signin_failed', 'oidc_V2_123');
-    expect(url).to.equal('/sso/google/error?reason=signin_failed&requestId=oidc_V2_123');
-  });
-
-  it('URL-encodes the slug and reason', () => {
-    const url = ssoErrorRedirect('my provider', 'some/reason');
-    expect(url).to.equal('/sso/my%20provider/error?reason=some%2Freason');
+  it('builds the error redirect for every ceremony-context combination, URL-encoding slug and reason', () => {
+    for (const [label, args, expected] of CASES) {
+      expect(ssoErrorRedirect(...args), label).to.equal(expected);
+    }
   });
 });
 
 describe('loginBounceTarget — resource-layer /login guard-fail bounce (mirrors routes/login-bounce.ts)', () => {
-  it('bounces to a bare /login when no requestId is present', () => {
-    expect(loginBounceTarget()).to.equal('/login');
-    expect(loginBounceTarget(undefined, 'org-1')).to.equal('/login'); // org never leaks alone
-  });
+  const CASES: [label: string, args: Parameters<typeof loginBounceTarget>, expected: string][] = [
+    ['no context', [], '/login'],
+    // An organization must never leak onto the bounce without a requestId to scope it.
+    ['organization alone never leaks', [undefined, 'org-1'], '/login'],
+    [
+      'requestId + organization',
+      ['oidc_V2_123', 'org-1'],
+      '/login?requestId=oidc_V2_123&organization=org-1',
+    ],
+    ['requestId alone', ['oidc_V2_123'], '/login?requestId=oidc_V2_123'],
+  ];
 
-  it('threads requestId + organization when a requestId is present', () => {
-    expect(loginBounceTarget('oidc_V2_123', 'org-1')).to.equal(
-      '/login?requestId=oidc_V2_123&organization=org-1'
-    );
-  });
-
-  it('threads requestId alone when organization is absent', () => {
-    expect(loginBounceTarget('oidc_V2_123')).to.equal('/login?requestId=oidc_V2_123');
+  it('bounces to a bare /login without a requestId and threads requestId (+organization) when present', () => {
+    for (const [label, args, expected] of CASES) {
+      expect(loginBounceTarget(...args), label).to.equal(expected);
+    }
   });
 });
 

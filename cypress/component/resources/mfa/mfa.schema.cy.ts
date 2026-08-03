@@ -6,16 +6,20 @@
 // exercised by any e2e flow.)
 import { otpCodeSchema } from '@/resources/mfa/mfa.schema';
 
-describe('mfa schemas', () => {
-  it('accepts a 6-digit OTP code and rejects others', () => {
-    expect(otpCodeSchema.safeParse({ code: '123456' }).success).to.equal(true);
-    expect(otpCodeSchema.safeParse({ code: 'abc' }).success).to.equal(false);
-    expect(otpCodeSchema.safeParse({ code: '12' }).success).to.equal(false);
-  });
+// TOTP/authenticator codes MUST stay exactly 6 digits — both too-short and too-long inputs
+// are rejected. Widening this schema in either direction would weaken TOTP.
+const CASES: [code: string, accepted: boolean][] = [
+  ['123456', true],
+  ['abc', false],
+  ['12', false],
+  ['1234567', false],
+  ['86230120', false],
+];
 
-  it('keeps otpCodeSchema strictly 6 digits — rejects 8-digit codes (TOTP regression guard)', () => {
-    // TOTP/authenticator codes MUST stay exactly 6 digits; widening here would weaken TOTP.
-    expect(otpCodeSchema.safeParse({ code: '86230120' }).success).to.equal(false);
-    expect(otpCodeSchema.safeParse({ code: '1234567' }).success).to.equal(false);
+describe('mfa schemas', () => {
+  it('accepts exactly a 6-digit OTP code and rejects non-numeric, short, and 7/8-digit codes (TOTP regression guard)', () => {
+    for (const [code, accepted] of CASES) {
+      expect(otpCodeSchema.safeParse({ code }).success, `code=${code}`).to.equal(accepted);
+    }
   });
 });

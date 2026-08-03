@@ -55,43 +55,62 @@ const FOCUSABLE_SEL = [
  *   - landmark-one-main : mounted fragment has no <main> landmark
  *   - page-has-heading-one : mounted fragment may have no <h1>
  */
+const AXE_COMPONENT_RULES = {
+  rules: {
+    'color-contrast': { enabled: false },
+    'document-title': { enabled: false },
+    'html-has-lang': { enabled: false },
+    'landmark-one-main': { enabled: false },
+    'page-has-heading-one': { enabled: false },
+  },
+};
+
 function checkComponentA11y() {
   cy.injectAxe();
-  cy.checkA11y('[data-cy-root]', {
-    rules: {
-      'color-contrast': { enabled: false },
-      'document-title': { enabled: false },
-      'html-has-lang': { enabled: false },
-      'landmark-one-main': { enabled: false },
-      'page-has-heading-one': { enabled: false },
-    },
-  });
+  cy.checkA11y('[data-cy-root]', AXE_COMPONENT_RULES);
 }
 
 describe('a11y guard — axe structural/aria (0 violations)', () => {
-  it('AuthCeremony with a full verify body has no axe violations', () => {
-    cy.mount(
-      <AuthCeremony title="Enter your code" description="We sent a code to your email">
-        <CeremonyBody />
-      </AuthCeremony>,
-      OPTS
-    );
-    checkComponentA11y();
-  });
+  it('AuthCeremony verify body and AuthFormFields cluster have no axe violations', () => {
+    const surfaces = [
+      {
+        label: 'AuthCeremony with a full verify body',
+        node: (
+          <AuthCeremony title="Enter your code" description="We sent a code to your email">
+            <CeremonyBody />
+          </AuthCeremony>
+        ),
+        opts: OPTS,
+      },
+      {
+        label: 'AuthFormFields (hidden-input cluster)',
+        node: (
+          <form>
+            <AuthFormFields
+              csrf="csrf-token"
+              loginName="alice@acme.test"
+              requestId="rq1"
+              organization="acme"
+              next="/dashboard"
+            />
+          </form>
+        ),
+        opts: undefined,
+      },
+    ];
 
-  it('AuthFormFields (hidden-input cluster) has no axe violations', () => {
-    cy.mount(
-      <form>
-        <AuthFormFields
-          csrf="csrf-token"
-          loginName="alice@acme.test"
-          requestId="rq1"
-          organization="acme"
-          next="/dashboard"
-        />
-      </form>
-    );
-    checkComponentA11y();
+    surfaces.forEach((surface, i) => {
+      // cy.log names the surface in the command log — checkA11y reports the
+      // violation itself but not which row mounted the offending tree.
+      cy.log(surface.label);
+      cy.mount(surface.node, surface.opts);
+      if (i === 0) {
+        // axe persists on the AUT window across mounts within a test — inject
+        // once after the first mount instead of re-evaluating the bundle per row.
+        cy.injectAxe();
+      }
+      cy.checkA11y('[data-cy-root]', AXE_COMPONENT_RULES);
+    });
   });
 
   it('inline error banner (FormError, role="alert") has no axe violations', () => {

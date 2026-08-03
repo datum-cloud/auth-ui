@@ -4,30 +4,37 @@
 // deriveIdpProfileName is pure (string fallback chain) → runs browser-side with Chai.
 import { deriveIdpProfileName } from '@/resources/sso/derive-idp-name';
 
+type Draft = Parameters<typeof deriveIdpProfileName>[0];
+
+const CASES: [label: string, draft: Draft, expected: { firstName: string; lastName: string }][] = [
+  [
+    'both names present — displayName/idpUserName ignored',
+    {
+      firstName: 'Ada',
+      lastName: 'Lovelace',
+      displayName: 'Should Be Ignored',
+      idpUserName: 'ada',
+    },
+    { firstName: 'Ada', lastName: 'Lovelace' },
+  ],
+  [
+    // GitHub sends no name at all — idpUserName fills BOTH fields.
+    'no name at all → idpUserName in both fields',
+    { idpUserName: 'anindia0703' },
+    { firstName: 'anindia0703', lastName: 'anindia0703' },
+  ],
+  ['empty draft → "user"', {}, { firstName: 'user', lastName: 'user' }],
+  [
+    'whitespace-only idpUserName → "user"',
+    { idpUserName: '   ' },
+    { firstName: 'user', lastName: 'user' },
+  ],
+];
+
 describe('deriveIdpProfileName', () => {
-  it('passes through given/family names unchanged when both are present', () => {
-    expect(
-      deriveIdpProfileName({
-        firstName: 'Ada',
-        lastName: 'Lovelace',
-        displayName: 'Should Be Ignored',
-        idpUserName: 'ada',
-      })
-    ).to.deep.equal({ firstName: 'Ada', lastName: 'Lovelace' });
-  });
-
-  it('falls back to idpUserName for BOTH names when the draft has no name at all (GitHub)', () => {
-    expect(deriveIdpProfileName({ idpUserName: 'anindia0703' })).to.deep.equal({
-      firstName: 'anindia0703',
-      lastName: 'anindia0703',
-    });
-  });
-
-  it('falls back to "user" when no name and no idpUserName are available', () => {
-    expect(deriveIdpProfileName({})).to.deep.equal({ firstName: 'user', lastName: 'user' });
-    expect(deriveIdpProfileName({ idpUserName: '   ' })).to.deep.equal({
-      firstName: 'user',
-      lastName: 'user',
-    });
+  it('passes through given/family names when present, falls back to idpUserName for BOTH names, then to "user"', () => {
+    for (const [label, draft, expected] of CASES) {
+      expect(deriveIdpProfileName(draft), label).to.deep.equal(expected);
+    }
   });
 });

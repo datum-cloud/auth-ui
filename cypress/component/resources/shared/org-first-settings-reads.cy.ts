@@ -15,39 +15,37 @@ import { callService } from '../../../support/node/call-service';
 const ALICE = 'alice@acme.test';
 
 describe('login/method loader — org-first getLoginSettings + getBranding', () => {
-  it('NO ?organization → both reads get the resolved default org; provider default consulted once', () => {
-    callService({
-      fn: 'loginMethodLoader',
-      provider: 'singleton',
-      request: {
-        url: `http://localhost/id/login/method?loginName=${ALICE}`,
-        // The chooser loader is session-gated: it only identifies a user the ceremony has
-        // already planted a LIVE session for (the identifier step writes it on the same
-        // response that redirects here).
-        sessions: [{ id: 's1', token: 'tok-s1', loginName: ALICE }],
-      },
-      recordCalls: ['getDefaultOrg', 'getLoginSettings', 'getBranding'],
-    }).then((v) => {
-      expect(v.calls?.getDefaultOrg).to.have.length(1);
-      expect(v.calls?.getLoginSettings?.[0]?.[0]).to.equal('org-default-fake');
-      expect(v.calls?.getBranding?.[0]?.[0]).to.equal('org-default-fake');
-    });
-  });
+  // One contract exercised twice — raw org EMPTY vs PRESENT. Same call, same three
+  // assertions; only the URL and the expected org / default-lookup count vary. Each row is
+  // its own cy.task (fresh Bun process), so the recorded-call arrays cannot couple.
+  const CASES: [label: string, query: string, expectedOrg: string, defaultOrgCalls: number][] = [
+    ['NO ?organization', '', 'org-default-fake', 1],
+    ['explicit ?organization', '&organization=org-explicit', 'org-explicit', 0],
+  ];
 
-  it('explicit ?organization → both reads get it; provider default never consulted', () => {
-    callService({
-      fn: 'loginMethodLoader',
-      provider: 'singleton',
-      request: {
-        url: `http://localhost/id/login/method?loginName=${ALICE}&organization=org-explicit`,
-        sessions: [{ id: 's1', token: 'tok-s1', loginName: ALICE }],
-      },
-      recordCalls: ['getDefaultOrg', 'getLoginSettings', 'getBranding'],
-    }).then((v) => {
-      expect(v.calls?.getDefaultOrg).to.have.length(0);
-      expect(v.calls?.getLoginSettings?.[0]?.[0]).to.equal('org-explicit');
-      expect(v.calls?.getBranding?.[0]?.[0]).to.equal('org-explicit');
-    });
+  it('resolves the org org-first for both reads: an explicit ?organization wins and skips the provider default, an empty one falls back to it', () => {
+    for (const [label, query, expectedOrg, defaultOrgCalls] of CASES) {
+      callService({
+        fn: 'loginMethodLoader',
+        provider: 'singleton',
+        request: {
+          url: `http://localhost/id/login/method?loginName=${ALICE}${query}`,
+          // The chooser loader is session-gated: it only identifies a user the ceremony has
+          // already planted a LIVE session for (the identifier step writes it on the same
+          // response that redirects here).
+          sessions: [{ id: 's1', token: 'tok-s1', loginName: ALICE }],
+        },
+        recordCalls: ['getDefaultOrg', 'getLoginSettings', 'getBranding'],
+      }).then((v) => {
+        expect(v.calls?.getDefaultOrg, `${label}: getDefaultOrg lookups`).to.have.length(
+          defaultOrgCalls
+        );
+        expect(v.calls?.getLoginSettings?.[0]?.[0], `${label}: getLoginSettings org`).to.equal(
+          expectedOrg
+        );
+        expect(v.calls?.getBranding?.[0]?.[0], `${label}: getBranding org`).to.equal(expectedOrg);
+      });
+    }
   });
 });
 

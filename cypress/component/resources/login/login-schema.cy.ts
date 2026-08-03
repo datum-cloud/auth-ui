@@ -4,19 +4,19 @@
 // Pure Zod schema utilities → browser-side Chai only.
 import { isEmailLike, isPhoneLike } from '@/resources/login/login.schema';
 
-describe('isPhoneLike', () => {
-  it('true for phone-shaped input with no @', () => {
-    expect(isPhoneLike('+15550000000')).to.equal(true);
-    expect(isPhoneLike('0612345678')).to.equal(true);
-    expect(isPhoneLike('+1 555 000 0000')).to.equal(true);
-  });
-});
+describe('isPhoneLike / isEmailLike', () => {
+  it('classifies phone-shaped and email-shaped identifiers', () => {
+    for (const phone of ['+15550000000', '0612345678', '+1 555 000 0000']) {
+      expect(isPhoneLike(phone), `isPhoneLike(${phone})`).to.equal(true);
+    }
 
-describe('isEmailLike', () => {
-  it('matches email-shaped identifiers (incl. domain-suffixed usernames)', () => {
-    expect(isEmailLike('a@b.com')).to.equal(true);
-    expect(isEmailLike('alice@acme.test')).to.equal(true);
-    expect(isEmailLike('alice@acme.zitadel.cloud')).to.equal(true);
-    expect(isEmailLike('  alice@acme.test  ')).to.equal(true);
+    for (const email of [
+      'a@b.com',
+      'alice@acme.test',
+      'alice@acme.zitadel.cloud',
+      '  alice@acme.test  ',
+    ]) {
+      expect(isEmailLike(email), `isEmailLike(${JSON.stringify(email)})`).to.equal(true);
+    }
   });
 });

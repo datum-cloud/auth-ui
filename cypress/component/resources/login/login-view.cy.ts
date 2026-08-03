@@ -26,21 +26,87 @@ const settings = (
 
 const IDP = [{ id: 'i', name: 'G', type: 'oidc' } as never];
 
+type View = ReturnType<typeof resolveLoginView>;
+type Args = Parameters<typeof resolveLoginView>;
+
 describe('resolveLoginView', () => {
-  // The identifier field is a prerequisite for password, passkey (usernameless is
-  // unsupported upstream — zitadel/zitadel#8899) AND email-link, so it must not be
-  // gated on allowPassword alone.
-  it('shows the identifier form for password, passkey, or email-link independently', () => {
-    expect(
-      resolveLoginView(settings({ allowPassword: true }), [], false).showIdentifierForm
-    ).to.equal(true);
-    expect(
-      resolveLoginView(settings({ passkeysAllowed: true }), [], false).showIdentifierForm
-    ).to.equal(true);
+  // Consolidated from three one-shape tests (identifier-form gating, email-link-only
+  // Continue suppression, signInUnavailable matrix) into one labeled partial table —
+  // the same [label, Args, Partial<View>] pattern as signup-view.cy.ts. Every original
+  // assertion is preserved as a row/field; a failure names '<row> → <field>'.
+  const CASES: [string, Args, Partial<View>][] = [
+    // ── showIdentifierForm ────────────────────────────────────────────────────────────
+    // The identifier field is a prerequisite for password, passkey (usernameless is
+    // unsupported upstream — zitadel/zitadel#8899) AND email-link, so it must not be
+    // gated on allowPassword alone.
+    [
+      'password alone shows the identifier form',
+      [settings({ allowPassword: true }), [], false],
+      { showIdentifierForm: true },
+    ],
+    [
+      'passkey alone shows the identifier form',
+      [settings({ passkeysAllowed: true }), [], false],
+      { showIdentifierForm: true },
+    ],
     // email-link alone: delivery on, org has not disabled email login.
-    expect(resolveLoginView(settings({}), [], true).showIdentifierForm).to.equal(true);
-    // nothing at all → no form.
-    expect(resolveLoginView(settings({}), [], false).showIdentifierForm).to.equal(false);
+    [
+      'email-link alone shows the identifier form',
+      [settings({}), [], true],
+      { showIdentifierForm: true },
+    ],
+    ['nothing at all → no form', [settings({}), [], false], { showIdentifierForm: false }],
+    // ── email-link only: form without Continue ────────────────────────────────────────
+    // "Continue" routes through decideAfterIdentifier; with neither password nor passkey
+    // that resolves to NO_SUPPORTED_METHOD, so the button must not render.
+    [
+      'email-link only hides Continue but keeps the form',
+      [settings({}), [], true],
+      {
+        showContinue: false,
+        showEmailLink: true,
+        showIdentifierForm: true,
+        signInUnavailable: false,
+      },
+    ],
+    // ── signInUnavailable: only when neither an identifier nor an IdP path exists ─────
+    [
+      'no password, no passkey, no IdP, delivery off → genuinely unavailable',
+      [settings({}), [], false],
+      { signInUnavailable: true },
+    ],
+    [
+      'password alone clears unavailable',
+      [settings({ allowPassword: true }), [], false],
+      { signInUnavailable: false },
+    ],
+    // An IdP alone clears it even with no identifier path.
+    [
+      'an IdP alone clears unavailable',
+      [settings({ allowExternalIdp: true }), IDP, false],
+      { signInUnavailable: false },
+    ],
+    // Email delivery on is itself a path (reverses the 2026-07-06 assumption).
+    [
+      'email delivery on clears unavailable',
+      [settings({}), [], true],
+      { signInUnavailable: false },
+    ],
+    // …but not when the org disabled email login.
+    [
+      'delivery on but org disabled email login → unavailable',
+      [settings({ disableLoginWithEmail: true }), [], true],
+      { signInUnavailable: true },
+    ],
+  ];
+
+  it('resolves identifier form, Continue, and unavailability across the policy matrix', () => {
+    for (const [label, args, expected] of CASES) {
+      const view = resolveLoginView(...args);
+      for (const [field, value] of Object.entries(expected)) {
+        expect(view[field as keyof View], `${label} → ${field}`).to.equal(value);
+      }
+    }
   });
 
   // REGRESSION: a passkey-only org with no loginName used to render an EMPTY card — the
@@ -51,34 +117,6 @@ describe('resolveLoginView', () => {
     expect(view.showIdentifierForm).to.equal(true);
     expect(view.showContinue).to.equal(true);
     expect(view.signInUnavailable).to.equal(false);
-  });
-
-  // "Continue" routes through decideAfterIdentifier; with neither password nor passkey
-  // that resolves to NO_SUPPORTED_METHOD, so the button must not render.
-  it('hides Continue when only email-link is available, but keeps the form', () => {
-    const view = resolveLoginView(settings({}), [], true);
-    expect(view.showContinue).to.equal(false);
-    expect(view.showEmailLink).to.equal(true);
-    expect(view.showIdentifierForm).to.equal(true);
-    expect(view.signInUnavailable).to.equal(false);
-  });
-
-  it('flags sign-in unavailable only when neither an identifier nor an IdP path exists', () => {
-    // No password, no passkey, no IdP, email delivery OFF → genuinely unavailable.
-    expect(resolveLoginView(settings({}), [], false).signInUnavailable).to.equal(true);
-    expect(
-      resolveLoginView(settings({ allowPassword: true }), [], false).signInUnavailable
-    ).to.equal(false);
-    // An IdP alone clears it even with no identifier path.
-    expect(
-      resolveLoginView(settings({ allowExternalIdp: true }), IDP, false).signInUnavailable
-    ).to.equal(false);
-    // Email delivery on is itself a path (reverses the 2026-07-06 assumption).
-    expect(resolveLoginView(settings({}), [], true).signInUnavailable).to.equal(false);
-    // …but not when the org disabled email login.
-    expect(
-      resolveLoginView(settings({ disableLoginWithEmail: true }), [], true).signInUnavailable
-    ).to.equal(true);
   });
 });
 

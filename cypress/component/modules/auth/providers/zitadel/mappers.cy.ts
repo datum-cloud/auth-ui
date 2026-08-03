@@ -52,6 +52,25 @@ describe('normalizeError (ConnectError → ProviderError)', () => {
       message: '[failed_precondition] Session already terminated (COMMAND-Hewfq)',
     });
     expect(deadSession.code).to.equal('ALREADY_DONE');
+
+    // Complementary branch (folded in from verify.adapter.cy.ts): an unrelated code-9 message
+    // must NOT be swept into ALREADY_DONE — it stays FAILED_PRECONDITION.
+    const unrelated = normalizeError(ce(9, 'precondition failed'));
+    expect(unrelated).to.be.instanceOf(ProviderError);
+    expect(unrelated.code).to.equal('FAILED_PRECONDITION');
+
+    // Phase 2 extensions (folded in from mappers.p2.cy.ts): code 3 + /complexity/i and code 6.
+    const complexity = normalizeError(ce(3, 'Password does not meet complexity requirements'));
+    expect(complexity).to.be.instanceOf(ProviderError);
+    expect(complexity.code).to.equal('PASSWORD_COMPLEXITY');
+    expect(normalizeError(ce(6, 'user already exists')).code).to.equal('ALREADY_EXISTS');
+
+    // P1 regression guard: failedAttempts wins over message discrimination. Distinct from the
+    // failedAttempts case above — here the MESSAGE says "complexity", so a mapper that checked
+    // the message before the detail would wrongly return PASSWORD_COMPLEXITY.
+    const p1 = normalizeError(ce(3, 'complexity check', [{ failedAttempts: 1 }]));
+    expect(p1.code).to.equal('INVALID_CREDENTIALS');
+    expect(p1.detail?.failedAttempts).to.equal(1);
   });
 });
 

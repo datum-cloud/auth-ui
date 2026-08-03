@@ -45,21 +45,35 @@ describe('reauth.service — verify one factor onto the EXISTING session', () =>
     }
   });
 
-  it('loadReauth falls back to the Zitadel-configured default destination when returnTo is absent', async () => {
+  it('falls back to the configured default returnTo, then to /passkeys', async () => {
     // Mirrors /signed-in's own fallback priority (admin console → Zitadel default →
     // env default → /passkeys) — reauth is reached from multiple flows (passkeys,
     // sso, ...), so a caller-less visit shouldn't blindly land on /passkeys.
-    const { fake, sessions } = await seeded();
-    fake.setLoginDefaultRedirectUri('https://app.acme.test/dashboard');
-    const v = await loadReauth(fake, sessions, {
-      returnTo: null,
-      method: null,
-      domain: 'localhost',
-      emailDeliveryEnabled: false,
-      consoleUrl: 'https://console.acme.test',
-    });
-    expect(v.kind).to.equal('view');
-    if (v.kind === 'view') expect(v.returnTo).to.equal('https://app.acme.test/dashboard');
+    const load = async (configuredDefault?: string) => {
+      const { fake, sessions } = await seeded();
+      if (configuredDefault) fake.setLoginDefaultRedirectUri(configuredDefault);
+      return loadReauth(fake, sessions, {
+        returnTo: null,
+        method: null,
+        domain: 'localhost',
+        emailDeliveryEnabled: false,
+        consoleUrl: 'https://console.acme.test',
+      });
+    };
+
+    const configured = await load('https://app.acme.test/dashboard');
+    expect(configured.kind, 'configured default: kind').to.equal('view');
+    if (configured.kind === 'view') {
+      expect(configured.returnTo, 'configured default wins').to.equal(
+        'https://app.acme.test/dashboard'
+      );
+    }
+
+    const bare = await load();
+    expect(bare.kind, 'nothing configured: kind').to.equal('view');
+    if (bare.kind === 'view') {
+      expect(bare.returnTo, 'falls through to /passkeys').to.equal('/passkeys');
+    }
   });
 
   it('performReauth preserves the Zitadel-configured default returnTo across the full round-trip', async () => {
@@ -89,19 +103,6 @@ describe('reauth.service — verify one factor onto the EXISTING session', () =>
     });
     expect(r.ok).to.equal(true);
     if (r.ok) expect(r.target).to.equal('https://app.acme.test/dashboard');
-  });
-
-  it('loadReauth falls back to /passkeys when returnTo is absent AND nothing is configured', async () => {
-    const { fake, sessions } = await seeded();
-    const v = await loadReauth(fake, sessions, {
-      returnTo: null,
-      method: null,
-      domain: 'localhost',
-      emailDeliveryEnabled: false,
-      consoleUrl: 'https://console.acme.test',
-    });
-    expect(v.kind).to.equal('view');
-    if (v.kind === 'view') expect(v.returnTo).to.equal('/passkeys');
   });
 
   it('performReauth(password) updates the SAME session id, rotates the token, and targets returnTo', async () => {
@@ -227,38 +228,22 @@ describe('reauth.service — verify one factor onto the EXISTING session', () =>
     expect(threw).to.exist;
   });
 
-  it('loadReauth lists idp as a method and populates linkedIdps for a Google-linked user', async () => {
-    const fake = new FakeAuthProvider({
-      users: [USER],
-      authMethods: { u1: ['idp'] },
-      capabilities: { externalIdp: true },
-    });
-    fake.setActiveIdPs?.([{ id: 'idp-google', name: 'Google', type: 'GOOGLE' }]);
-    fake.setIdpLinks?.('u1', [
-      { idpId: 'idp-google', idpUserId: 'g-1', idpUserName: 'mia@gmail.com' },
-    ]);
-    const s = await fake.createSession({}, { userId: 'u1' });
-    const sessions: SessionEntry[] = [
-      {
-        id: s.id,
-        token: s.token,
-        loginName: USER.loginName,
-        creationTs: s.changedAt,
-        expirationTs: s.expiresAt,
-        changeTs: s.changedAt,
-      },
-    ];
-    const v = await loadReauth(fake, sessions, {
-      returnTo: '/passkeys',
-      method: null,
-      domain: 'localhost',
-      emailDeliveryEnabled: false,
-      consoleUrl: 'https://console.acme.test',
-    });
-    expect(v.kind).to.equal('view');
-    if (v.kind === 'view') {
-      expect(v.methods).to.include('idp');
-      expect(v.linkedIdps).to.deep.equal([
+  // Same setup, same assertion shape — only the linked provider's type differs, and with it
+  // whether idp is offerable at all. LDAP is a directory bind, not a browser-redirect IdP, so
+  // it must never surface as a re-auth method.
+  const LINKED_IDPS: Array<{
+    label: string;
+    idp: { id: string; name: string; type: string };
+    link: { idpId: string; idpUserId: string; idpUserName: string };
+    offersIdp: boolean;
+    expectedLinked: Record<string, string>[];
+  }> = [
+    {
+      label: 'Google-linked user',
+      idp: { id: 'idp-google', name: 'Google', type: 'GOOGLE' },
+      link: { idpId: 'idp-google', idpUserId: 'g-1', idpUserName: 'mia@gmail.com' },
+      offersIdp: true,
+      expectedLinked: [
         {
           idpId: 'idp-google',
           idpUserId: 'g-1',
@@ -266,40 +251,49 @@ describe('reauth.service — verify one factor onto the EXISTING session', () =>
           name: 'Google',
           type: 'GOOGLE',
         },
-      ]);
-    }
-  });
+      ],
+    },
+    {
+      label: 'LDAP-only user',
+      idp: { id: 'idp-ldap', name: 'Corporate LDAP', type: 'LDAP' },
+      link: { idpId: 'idp-ldap', idpUserId: 'ldap-1', idpUserName: 'mia' },
+      offersIdp: false,
+      expectedLinked: [],
+    },
+  ];
 
-  it('loadReauth omits idp when the only linked provider is LDAP', async () => {
-    const fake = new FakeAuthProvider({
-      users: [USER],
-      authMethods: { u1: ['idp'] },
-      capabilities: { externalIdp: true },
-    });
-    fake.setActiveIdPs?.([{ id: 'idp-ldap', name: 'Corporate LDAP', type: 'LDAP' }]);
-    fake.setIdpLinks?.('u1', [{ idpId: 'idp-ldap', idpUserId: 'ldap-1', idpUserName: 'mia' }]);
-    const s = await fake.createSession({}, { userId: 'u1' });
-    const sessions: SessionEntry[] = [
-      {
-        id: s.id,
-        token: s.token,
-        loginName: USER.loginName,
-        creationTs: s.changedAt,
-        expirationTs: s.expiresAt,
-        changeTs: s.changedAt,
-      },
-    ];
-    const v = await loadReauth(fake, sessions, {
-      returnTo: '/passkeys',
-      method: null,
-      domain: 'localhost',
-      emailDeliveryEnabled: false,
-      consoleUrl: 'https://console.acme.test',
-    });
-    expect(v.kind).to.equal('view');
-    if (v.kind === 'view') {
-      expect(v.methods).to.not.include('idp');
-      expect(v.linkedIdps).to.deep.equal([]);
+  it('lists idp for a browser-redirect IdP, omitting it when only LDAP is linked', async () => {
+    for (const { label, idp, link, offersIdp, expectedLinked } of LINKED_IDPS) {
+      const fake = new FakeAuthProvider({
+        users: [USER],
+        authMethods: { u1: ['idp'] },
+        capabilities: { externalIdp: true },
+      });
+      fake.setActiveIdPs?.([idp]);
+      fake.setIdpLinks?.('u1', [link]);
+      const s = await fake.createSession({}, { userId: 'u1' });
+      const sessions: SessionEntry[] = [
+        {
+          id: s.id,
+          token: s.token,
+          loginName: USER.loginName,
+          creationTs: s.changedAt,
+          expirationTs: s.expiresAt,
+          changeTs: s.changedAt,
+        },
+      ];
+      const v = await loadReauth(fake, sessions, {
+        returnTo: '/passkeys',
+        method: null,
+        domain: 'localhost',
+        emailDeliveryEnabled: false,
+        consoleUrl: 'https://console.acme.test',
+      });
+      expect(v.kind, `${label}: kind`).to.equal('view');
+      if (v.kind !== 'view') continue;
+      if (offersIdp) expect(v.methods, `${label}: methods`).to.include('idp');
+      else expect(v.methods, `${label}: methods`).to.not.include('idp');
+      expect(v.linkedIdps, `${label}: linkedIdps`).to.deep.equal(expectedLinked);
     }
   });
 });

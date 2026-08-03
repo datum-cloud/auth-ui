@@ -47,7 +47,11 @@ describe('removeAccount — ceremony requestId threading', () => {
   const liveSessions = [{ id: 's1', token: 'tok-s1', user: ALICE }];
   const cookie = [{ id: 's1', token: 'tok-s1', loginName: 'alice@acme.test' }];
 
-  it('carries an allowlisted requestId onto the /accounts redirect', () => {
+  const REQ = encodeURIComponent('oidc_V3-current');
+
+  it('carries an allowlisted requestId — and the ceremony organization when present — onto the /accounts redirect', () => {
+    // No organization: asserted with an EXACT equal, which also proves no stray params are
+    // appended. This is why it is not folded into the include-based case below.
     callService({
       fn: 'removeAccount',
       seed,
@@ -59,12 +63,13 @@ describe('removeAccount — ceremony requestId threading', () => {
       },
     }).then((v) => {
       const o = v.outcome as Outcome;
-      expect(o.kind).to.equal('redirect');
-      expect(o.location).to.equal(`/accounts?requestId=${encodeURIComponent('oidc_V3-current')}`);
+      expect(o.kind, 'requestId only: redirect').to.equal('redirect');
+      expect(o.location, 'requestId only: exact target').to.equal(`/accounts?requestId=${REQ}`);
     });
-  });
 
-  it('carries the ceremony organization onto the /accounts redirect (regression: removeSchema dropped it)', () => {
+    // With organization (regression: removeSchema dropped it). Both the ceremony id AND the
+    // org scope must survive, so "Add an account"/signup after a remove resolves the correct
+    // org instead of falling back to the default.
     callService({
       fn: 'removeAccount',
       seed,
@@ -81,11 +86,9 @@ describe('removeAccount — ceremony requestId threading', () => {
       },
     }).then((v) => {
       const o = v.outcome as Outcome;
-      expect(o.kind).to.equal('redirect');
-      // Both the ceremony id AND the org scope survive, so "Add an account"/signup after a remove
-      // resolves the correct org instead of falling back to the default.
-      expect(o.location).to.include(`requestId=${encodeURIComponent('oidc_V3-current')}`);
-      expect(o.location).to.include('organization=org-1');
+      expect(o.kind, 'with org: redirect').to.equal('redirect');
+      expect(o.location, 'with org: requestId survives').to.include(`requestId=${REQ}`);
+      expect(o.location, 'with org: org scope survives').to.include('organization=org-1');
     });
   });
 });

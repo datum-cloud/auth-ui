@@ -218,7 +218,11 @@ describe('resendEmailCode — action intent=resend (ownership gate)', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('submitEmailCode — action default verify intent', () => {
-  it('verifies the email and redirects to /authorize when active session + requestId are present', () => {
+  // The two target-shape cases: an ACTIVE session finalizes straight to /authorize, while no
+  // active session hands off to /verify/success carrying the ceremony context so the user can
+  // resume after signing in. Same call, same shape — only isSessionActive and the expected
+  // target differ. (The ownership-gate tests above are untouched.)
+  it('redirects to /authorize with an active session, and to /verify/success without one', () => {
     run({
       fn: 'submitEmailCode',
       request: { url: `${BASE_URL}/verify` },
@@ -236,12 +240,12 @@ describe('submitEmailCode — action default verify intent', () => {
     }).then((verdict) => {
       expect(verdict.ok, verdict.error ?? '').to.be.true;
       const r = verdict.outcome as Record<string, unknown>;
-      expect(r.ok).to.be.true;
-      expect(r.target).to.eq('/authorize?requestId=oidc_99');
+      expect(r.ok, 'active session: ok').to.be.true;
+      expect(r.target, 'active session: finalizes at /authorize').to.eq(
+        '/authorize?requestId=oidc_99'
+      );
     });
-  });
 
-  it('redirects to /verify/success carrying loginName/requestId/organization when no active session', () => {
     run({
       fn: 'submitEmailCode',
       request: { url: `${BASE_URL}/verify` },
@@ -260,11 +264,12 @@ describe('submitEmailCode — action default verify intent', () => {
     }).then((verdict) => {
       expect(verdict.ok, verdict.error ?? '').to.be.true;
       const r = verdict.outcome as Record<string, unknown>;
-      expect(r.ok).to.be.true;
-      expect(r.target as string).to.include('/verify/success?');
-      expect(r.target as string).to.include('loginName=alice%40acme.test');
-      expect(r.target as string).to.include('requestId=oidc_7');
-      expect(r.target as string).to.include('organization=org-1');
+      expect(r.ok, 'no session: ok').to.be.true;
+      const target = r.target as string;
+      expect(target, 'no session: hands off to /verify/success').to.include('/verify/success?');
+      expect(target, 'no session: loginName carried').to.include('loginName=alice%40acme.test');
+      expect(target, 'no session: requestId carried').to.include('requestId=oidc_7');
+      expect(target, 'no session: organization carried').to.include('organization=org-1');
     });
   });
 

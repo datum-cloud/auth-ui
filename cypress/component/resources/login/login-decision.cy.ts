@@ -38,32 +38,27 @@ describe('decideAfterIdentifier → discriminated Decision union', () => {
     expect(d).to.deep.equal({ kind: 'redirect', path: '/login/method' });
   });
 
-  it('two methods still route to /login/method', () => {
-    const d = decideAfterIdentifier({
-      methods: ['idp', 'password'],
-      settings: {
-        allowPassword: true,
-        allowExternalIdp: true,
-        passkeysType: 'not_allowed',
-      } as LoginSettings,
-      emailDeliveryEnabled: true,
-      context: PRIMARY,
-    });
-    expect(d).to.deep.equal({ kind: 'redirect', path: '/login/method' });
-  });
+  // Same settings, same full-object deep.equal — only the enrolled-method list and the
+  // expected destination vary.
+  const ROUTING: [label: string, methods: string[], path: string][] = [
+    ['two methods → the chooser', ['idp', 'password'], '/login/method'],
+    ['zero methods → the invite path', [], '/verify'],
+  ];
 
-  it('zero enrolled methods still routes to /verify (invite path)', () => {
-    const d = decideAfterIdentifier({
-      methods: [],
-      settings: {
-        allowPassword: true,
-        allowExternalIdp: true,
-        passkeysType: 'not_allowed',
-      } as LoginSettings,
-      emailDeliveryEnabled: true,
-      context: PRIMARY,
-    });
-    expect(d).to.deep.equal({ kind: 'redirect', path: '/verify' });
+  it('routes two enrolled methods to /login/method and zero enrolled methods to /verify (invite path)', () => {
+    for (const [label, methods, path] of ROUTING) {
+      const d = decideAfterIdentifier({
+        methods,
+        settings: {
+          allowPassword: true,
+          allowExternalIdp: true,
+          passkeysType: 'not_allowed',
+        } as LoginSettings,
+        emailDeliveryEnabled: true,
+        context: PRIMARY,
+      });
+      expect(d, label).to.deep.equal({ kind: 'redirect', path });
+    }
   });
 
   it('enrolled password but policy forbids it → PASSWORD_NOT_ALLOWED', () => {

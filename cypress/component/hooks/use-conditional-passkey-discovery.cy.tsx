@@ -131,13 +131,10 @@ describe('useConditionalPasskey — discovery mode', () => {
     cy.then(() => expect(verifyPosts).to.have.length(1));
   });
 
-  it('without auto-resolve the ceremony parks in armed — no discover POST', () => {
-    const { discoverPosts } = mountHarness({});
-    cy.get('[data-testid="phase"]').should('have.text', 'armed');
-    cy.then(() => expect(discoverPosts).to.have.length(0));
-  });
-
-  it('abort() retires discovery permanently', () => {
+  // Also covers the parked state: without auto-resolve the ceremony sits in `armed` and
+  // issues no discover POST — asserted here before the abort, on the same mount, so a
+  // separate test for it would repeat these exact assertions.
+  it('parks in armed without auto-resolve, and abort() retires discovery permanently', () => {
     const { discoverPosts, verifyPosts } = mountHarness({});
     cy.get('[data-testid="phase"]').should('have.text', 'armed');
     cy.get('[data-testid="abort"]').click();
