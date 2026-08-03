@@ -25,8 +25,13 @@ import type { LoginSettings, ProviderErrorCode } from '@/modules/auth/types';
 import { ProviderError } from '@/modules/auth/types';
 import { decideAfterIdentifier } from '@/resources/login/login-decision';
 import { isEmailLike } from '@/resources/login/login.schema';
+import {
+  GHOST_METHODS,
+  emailDomain,
+  resolveGhostPolicyOrg,
+} from '@/resources/login/method-options';
 import { nextStepFromSession, threadParams } from '@/resources/shared/next-step-params';
-import { resolveOrg } from '@/resources/shared/resolve-org';
+import { resolveOrg, resolvePolicyOrg } from '@/resources/shared/resolve-org';
 import { idpReturnUrls } from '@/resources/sso/idp-return-urls';
 import { paths } from '@/routes/paths';
 import { logAuthEvent, hashActor } from '@/server/observability';
@@ -69,6 +74,12 @@ export interface StartIdpInput {
    * is the real guard, this only improves the picker UX.
    */
   reauthHint?: string;
+  /**
+   * The POLICY org this intent was decided under, when it differs from `organization`.
+   * Rides on the success URL so the callback gates `allowRegister` (and auto-creates) in the
+   * SAME org whose IdP list the caller picked from. See IdpReturnOpts.policyOrg.
+   */
+  policyOrg?: string;
   /** MaxMind device-fingerprint token captured client-side; attached as session metadata. */
   deviceTrackingToken?: string;
 }
@@ -85,12 +96,21 @@ export type StartIdpResult = { ok: true; authUrl: string } | { ok: false; error:
  */
 export async function startIdpIntent(
   provider: AuthProvider,
-  { idpId, origin, requestId, organization, reauthHint, deviceTrackingToken }: StartIdpInput
+  {
+    idpId,
+    origin,
+    requestId,
+    organization,
+    reauthHint,
+    policyOrg,
+    deviceTrackingToken,
+  }: StartIdpInput
 ): Promise<StartIdpResult> {
   const slug = idpTypeToSlug(idpId) ?? idpId;
   const { success, failure } = idpReturnUrls(origin, slug, {
     requestId,
     organization,
+    policyOrg,
     deviceTrackingToken,
   });
   // Guard the provider call: a ProviderError (Zitadel unavailable / IdP intent rejected) is the
@@ -183,13 +203,6 @@ export type ResolveIdentifierResult =
   | ResolveIdentifierStartIdp
   | { ok: false; error: ResolveIdentifierError };
 
-/** Lowercased domain of an email-style identifier, or null when it is not an email. */
-function emailDomain(loginName: string): string | null {
-  const at = loginName.lastIndexOf('@');
-  if (at <= 0 || at === loginName.length - 1) return null;
-  return loginName.slice(at + 1).toLowerCase();
-}
-
 /**
  * Identifier step: resolve the user, create the ceremony session, decide the next
  * factor screen, and shape the ceremony-session entry + threaded query params.
@@ -247,16 +260,30 @@ export async function resolveIdentifier(
     }
   }
 
+  // The caller's already-fetched settings describe `organization`, so they are reusable only
+  // while the resolved org still equals it (domain discovery above may have moved `org`).
+  // Shared by BOTH branches below: the known path saves an RPC with it, and the unknown path
+  // must save exactly the same one — an extra provider round-trip on one side only is a timing
+  // difference between "account exists" and "account does not", which is what this whole flag
+  // exists to erase.
+  const reusableSettings =
+    threadedSettings && org !== undefined && org === organization ? threadedSettings : undefined;
+
   const user = await provider.findUser(loginName, org);
   if (!user) {
     // ignoreUnknownUsernames (settings-gated, DEFAULT-OFF): with the flag off this is
-    // byte-identical to before (USER_NOT_FOUND). With it on, proceed to the password
-    // step bound to the typed loginName but with NO user attached — the credential check
-    // then fails generically, identical to a wrong password for a real account.
-    // Org-first: resolve the org (explicit wins; else default org) before reading the policy that
-    // gates ignoreUnknownUsernames / disableLoginWithEmail. Reading raw `org` (often undefined
-    // here) returned INSTANCE settings, so these gates could diverge from the default org's policy.
-    const settings = await provider.getLoginSettings(await resolveOrg(provider, org));
+    // byte-identical to before (USER_NOT_FOUND). With it on, proceed bound to the typed loginName
+    // but with NO user attached — the credential check then fails generically, identical to a
+    // wrong password for a real account.
+    // Resolve the policy org from the identifier's DOMAIN, not the default org — see
+    // resolveGhostPolicyOrg. Reading the default org here judged `nobody@acme.test` under a
+    // different policy than `mia@acme.test`, and when the two disagreed on `allowPassword` the
+    // redirect targets split (known → /login/method, ghost → /error): the exact account-existence
+    // oracle this flag exists to close. It also gates ignoreUnknownUsernames /
+    // disableLoginWithEmail, which now answer for the org that actually claims the address.
+    const settings =
+      reusableSettings ??
+      (await provider.getLoginSettings(await resolveGhostPolicyOrg(provider, org, loginName)));
     if (settings.ignoreUnknownUsernames !== true) {
       // disableLoginWithEmail (settings-gated, DEFAULT-OFF): an email is never a valid loginname
       // under this policy, so the lookup already failed. Refine the generic not-found into a
@@ -280,7 +307,28 @@ export async function resolveIdentifier(
       sessionEntryFromSession(ghostSession, { loginName, organization: org, requestId })
     );
     const ghostParams = new URLSearchParams(threadParams(loginName, requestId, org));
-    return { ok: true, target: '/login/password', params: ghostParams, sessions: ghostSessions };
+    // ROUTE THE GHOST THROUGH THE REAL DECISION, never a target of its own.
+    //
+    // This branch's ONLY job is to be indistinguishable from a real account, and a hardcoded
+    // '/login/password' stopped being that the moment every known account with >= 1 usable method
+    // started resolving to /login/method: known → /login/method, unknown → /login/password turns
+    // the redirect target into a perfect account-existence oracle and silently disables the very
+    // setting that put us here. The collision was the protection, so re-establish it structurally —
+    // ask decideAfterIdentifier the same question a PASSWORD-ONLY account asks (GHOST_METHODS),
+    // under the same settings, and take the same answer. An org that forbids passwords sends both
+    // to /error; every other org sends both to /login/method, whose loader serves the ghost the
+    // identical chooser (see routes/login/method.tsx's ghost-subject note).
+    const ghostDecision = decideAfterIdentifier({
+      methods: [...GHOST_METHODS],
+      settings,
+      emailDeliveryEnabled,
+      context: { role: 'primary' },
+    });
+    if (ghostDecision.kind === 'redirect') {
+      Object.entries(ghostDecision.params ?? {}).forEach(([k, v]) => ghostParams.set(k, v));
+      return { ok: true, target: ghostDecision.path, params: ghostParams, sessions: ghostSessions };
+    }
+    return { ok: true, target: paths.error(), params: ghostParams, sessions: ghostSessions };
   }
   logAuthEvent('identifier', 'success', { actor: hashActor(loginName) });
 
@@ -294,13 +342,18 @@ export async function resolveIdentifier(
   // pinned and domain-discovery didn't run (org === undefined), the user may live in a
   // different org than the default. Use user.orgId as the authoritative org so the
   // settings (allowPassword, passkeysType, …) match the user's actual policies.
-  // The caller's threadedSettings are only reused when both the caller pinned an explicit
-  // org AND the user's org matches it (org !== undefined && org === organization).
-  const userOrg = org ?? user.orgId;
-  const settings =
-    threadedSettings && org !== undefined && org === organization
-      ? threadedSettings
-      : await provider.getLoginSettings(userOrg);
+  //
+  // resolvePolicyOrg, NOT a bare `org ?? user.orgId`: `User.orgId` is OPTIONAL, and when it was
+  // absent this read fell through to INSTANCE settings while /login/method's loader — which
+  // re-computes the very availability decided here — fell through to the DEFAULT ORG's. Those
+  // two policies can disagree, and when they do this function approves a method the chooser then
+  // computes away, bouncing the user to /error. Both sides now share the one helper.
+  // `reusableSettings` (computed above, shared with the unknown-identifier branch) already
+  // encodes the only condition under which the caller's threaded settings describe this org:
+  // an explicit `organization` that survived discovery — in which case resolvePolicyOrg is the
+  // identity on `org` anyway.
+  const userOrg = await resolvePolicyOrg(provider, org, user.orgId);
+  const settings = reusableSettings ?? (await provider.getLoginSettings(userOrg));
   const decision = decideAfterIdentifier({
     methods,
     settings,

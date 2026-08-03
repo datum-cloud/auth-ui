@@ -1,4 +1,5 @@
 import { checkA11y } from '../support/a11y';
+import { chooseMethodPassword } from '../support/session';
 
 describe('logout journey', () => {
   it('signs out, lands on /logout/success, and clears the session', () => {
@@ -7,6 +8,8 @@ describe('logout journey', () => {
     cy.get('input[name="loginName"]').type('alice@acme.test');
     // /login now renders 3 forms (identifier + 2 IdP buttons, Phase 4) — scope to the entry form.
     cy.get('input[name="loginName"]:visible').closest('form').submit();
+
+    chooseMethodPassword();
 
     cy.location('pathname').should('eq', '/id/login/password');
     cy.get('input[name="password"]').type('hunter2');

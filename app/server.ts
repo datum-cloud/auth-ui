@@ -13,6 +13,9 @@ import {
   reauthRateLimit,
   passkeysRateLimit,
   loginMethodRateLimit,
+  loginMethodIntentRateLimit,
+  loginMethodIntentIpRateLimit,
+  loginIdentifierRateLimit,
 } from '@/server/middleware/rate-limit';
 import { requestContext, type RequestContextEnv } from '@/server/middleware/request-context';
 import { appSecureHeaders, resolveFrameAncestors } from '@/server/middleware/secure-headers';
@@ -108,6 +111,9 @@ export default await createHonoServer<RequestContextEnv>({
     // normalized to lowercase by `normalizedPathname` in net.ts (toLowerCase + trailing-slash
     // strip + .data strip). Requests that do not match call `next()` immediately with no
     // meaningful overhead beyond a pathname parse.
+    // The identifier submit is what hands out the ceremony session /id/login/method's gate
+    // demands, so it needs its own ceiling — see the rationale in rate-limit.ts.
+    app.use('*', loginIdentifierRateLimit);
     app.use('*', loginPasswordRateLimit);
     app.use('*', signupRateLimit);
     app.use('*', passwordResetRateLimit);
@@ -120,6 +126,10 @@ export default await createHonoServer<RequestContextEnv>({
     app.use('*', reauthRateLimit);
     app.use('*', passkeysRateLimit);
     app.use('*', loginMethodRateLimit);
+    // The chooser GET is counted by BOTH tiers (tight ip|loginName, loose ip ceiling) —
+    // see the two-tier rationale in rate-limit.ts.
+    app.use('*', loginMethodIntentRateLimit);
+    app.use('*', loginMethodIntentIpRateLimit);
     app.get('/healthz', (c) => c.json({ status: 'ok' }));
     app.get('/readyz', (c) => c.json({ status: 'ready' }));
     app.get('/security', (c) =>

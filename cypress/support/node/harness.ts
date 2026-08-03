@@ -28,6 +28,7 @@ import {
   readSessions,
   type SessionEntry,
 } from '@/modules/auth/session/cookie';
+import { serializeIdpAutostart } from '@/modules/auth/session/idp-autostart';
 import {
   lastUsedLoginCookie,
   serializeLastUsedLogin,
@@ -92,6 +93,7 @@ import {
   type SsoActionDeps,
 } from '@/resources/sso';
 import { getActiveIdPs } from '@/resources/sso/idp-providers';
+import { idpReturnUrls } from '@/resources/sso/idp-return-urls';
 import { signInWithIdpIntent } from '@/resources/sso/idp-session';
 import { dispatchEmailCode, resendEmailCode, submitEmailCode } from '@/resources/verify';
 import {
@@ -153,6 +155,9 @@ import {
   mfaEnrollRateLimit,
   accountsRateLimit,
   verifyEmailSendRateLimit,
+  loginMethodIntentRateLimit,
+  loginMethodIntentIpRateLimit,
+  loginIdentifierRateLimit,
 } from '@/server/middleware/rate-limit';
 import { getTraceId, runWithTraceId } from '@/server/middleware/request-context';
 import {
@@ -215,7 +220,28 @@ async function buildCookieHeader(req: RequestSpec): Promise<string | undefined> 
   if (req.lastUsedLogin)
     parts.push((await serializeLastUsedLogin(req.lastUsedLogin)).split(';')[0]);
   if (req.passkeyHint) parts.push((await serializePasskeyHint(req.passkeyHint)).split(';')[0]);
+  if (req.idpAutostart) parts.push((await serializeIdpAutostart(req.idpAutostart)).split(';')[0]);
   return parts.length > 0 ? parts.join('; ') : undefined;
+}
+
+/**
+ * Rewrite a request url to carry the `policyOrg` + `policyOrgSig` pair a REAL IdP start would
+ * have minted (see RequestSpec.signPolicyOrg). Routed through `idpReturnUrls` itself rather than
+ * calling the signer directly, so the producer and the consumer under test are the shipping pair.
+ */
+function withSignedPolicyOrg(spec: RequestSpec): RequestSpec {
+  if (!spec.signPolicyOrg) return spec;
+  const minted = new URL(
+    idpReturnUrls('http://start.invalid', 'idp', { policyOrg: spec.signPolicyOrg }).success
+  );
+  const url = new URL(spec.url);
+  for (const key of ['policyOrg', 'policyOrgSig']) {
+    const value = minted.searchParams.get(key);
+    if (value !== null) url.searchParams.set(key, value);
+  }
+  // Keep the signature, swap the value it vouches for (see RequestSpec.tamperPolicyOrg).
+  if (spec.tamperPolicyOrg) url.searchParams.set('policyOrg', spec.tamperPolicyOrg);
+  return { ...spec, url: url.toString() };
 }
 
 /**
@@ -322,6 +348,11 @@ function buildProvider(s: Scenario): FakeAuthProvider {
     provider.deleteSession = (async () => {
       throw new Error('gone');
     }) as FakeAuthProvider['deleteSession'];
+  }
+  if (s.failStartIdpIntent) {
+    // No authUrl — exactly what a provider that accepted the call but produced nothing returns.
+    // startIdpIntent (login.service.ts) maps it to { ok: false, error: 'IDP_UNAVAILABLE' }.
+    provider.startIdpIntent = (async () => ({})) as FakeAuthProvider['startIdpIntent'];
   }
   if (s.freshness) {
     const { sessionId, token, verifiedAtMs } = s.freshness;
@@ -567,9 +598,15 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
     };
   }
 
-  const cookieHeader = s.request ? await buildCookieHeader(s.request) : undefined;
-  const request = s.request
-    ? buildRequest(s.request.url, cookieHeader, s.request.method, s.request.form !== undefined)
+  const requestSpec = s.request ? withSignedPolicyOrg(s.request) : undefined;
+  const cookieHeader = requestSpec ? await buildCookieHeader(requestSpec) : undefined;
+  const request = requestSpec
+    ? buildRequest(
+        requestSpec.url,
+        cookieHeader,
+        requestSpec.method,
+        requestSpec.form !== undefined
+      )
     : (undefined as unknown as Request);
 
   // Capture REAL audit output: logAuthEvent's default sink is console.log, read by reference at
@@ -2046,6 +2083,163 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
             const blocked = await app.request(new Request(url, { method: 'GET', headers: hd }));
             const body = (await blocked.json()) as { error: string };
             outcome = { blockedStatus: blocked.status, error: body.error };
+          } else if (
+            op === 'loginMethodIntentBlocked' ||
+            op === 'loginMethodIntentPerLoginName' ||
+            op === 'loginMethodIntentIpCeiling' ||
+            op === 'loginMethodIntentHtml429' ||
+            op === 'loginMethodIntentDataJson429'
+          ) {
+            // The chooser LOADER mints a real IdP intent for a sole-linked-IdP account, so a GET
+            // carrying ?loginName is state-changing and must be counted. TWO tiers guard it: a
+            // tight ip|loginName budget (10) and a loose ip-only ceiling (120). Both are mounted
+            // together here exactly as server.ts mounts them, so each case sees the real
+            // interaction rather than one tier in isolation.
+            const app = new Hono();
+            app.use('*', loginMethodIntentRateLimit);
+            app.use('*', loginMethodIntentIpRateLimit);
+            app.all('/id/login/method', (c) => c.json({ ok: true }, 200));
+            // Distinct per op: the module-level limiters are shared for the lifetime of the
+            // process, so each case needs its own bucket to stay independent.
+            const ip = {
+              loginMethodIntentBlocked: '10.5.0.1',
+              loginMethodIntentPerLoginName: '10.5.0.3',
+              loginMethodIntentIpCeiling: '10.5.0.4',
+              loginMethodIntentHtml429: '10.5.0.5',
+              loginMethodIntentDataJson429: '10.5.0.6',
+            }[op];
+            const hd = { 'x-forwarded-for': `1.2.3.4, ${ip}` };
+            const hit = async (loginName: string, path = '/id/login/method', accept?: string) => {
+              nowMs += 10;
+              const headers: Record<string, string> = { ...hd };
+              if (accept) headers.accept = accept;
+              return app.request(
+                new Request(`http://app${path}?loginName=${loginName}`, { method: 'GET', headers })
+              );
+            };
+            if (op === 'loginMethodIntentBlocked') {
+              const statuses: number[] = [];
+              for (let i = 0; i < 10; i++) statuses.push((await hit('alice')).status);
+              const blocked = await hit('alice');
+              outcome = {
+                allPassed: statuses.every((st) => st === 200),
+                blockedStatus: blocked.status,
+                retryAfter: blocked.headers.get('Retry-After') ?? undefined,
+              };
+            } else if (op === 'loginMethodIntentPerLoginName') {
+              // The tight tier is keyed per address: exhausting alice must not lock out bob from
+              // the same office. (The loose ip ceiling is what bounds enumeration breadth.)
+              for (let i = 0; i < 11; i++) await hit('alice');
+              const alice = await hit('alice');
+              const bob = await hit('bob');
+              outcome = { aliceStatus: alice.status, bobStatus: bob.status };
+            } else if (op === 'loginMethodIntentIpCeiling') {
+              // Spread across distinct addresses so the tight tier never trips — only the
+              // ip-only ceiling (120) can answer here.
+              const statuses: number[] = [];
+              for (let i = 0; i < 120; i++) statuses.push((await hit(`u${i}`)).status);
+              const blocked = await hit('u999');
+              outcome = {
+                allPassed: statuses.every((st) => st === 200),
+                blockedStatus: blocked.status,
+                retryAfter: blocked.headers.get('Retry-After') ?? undefined,
+              };
+            } else if (op === 'loginMethodIntentHtml429') {
+              // A rate-limited top-level GET navigation is RENDERED by the browser as the page —
+              // a raw JSON blob is what the user would see.
+              for (let i = 0; i < 11; i++) await hit('alice', '/id/login/method', 'text/html');
+              const blocked = await hit('alice', '/id/login/method', 'text/html');
+              const body = await blocked.text();
+              outcome = {
+                blockedStatus: blocked.status,
+                contentType: blocked.headers.get('content-type') ?? '',
+                hasHeading: /<h1[^>]*>Too many attempts<\/h1>/.test(body),
+                hasBackLink: body.includes('href="/id/login"'),
+                isRawJson: body.trim().startsWith('{'),
+              };
+            } else {
+              // The single-fetch (.data) variant is consumed by code, not rendered — JSON stays.
+              for (let i = 0; i < 11; i++) await hit('alice', '/id/login/method.data', 'text/html');
+              const blocked = await hit('alice', '/id/login/method.data', 'text/html');
+              const body = await blocked.text();
+              outcome = {
+                blockedStatus: blocked.status,
+                contentType: blocked.headers.get('content-type') ?? '',
+                error: (JSON.parse(body) as { error?: string }).error,
+              };
+            }
+          } else if (op === 'serverMountsChooserLimiters') {
+            // A limiter that exists but is never mounted throttles nothing. server.ts is the only
+            // wiring point, and it cannot be imported here without standing up the whole Hono app
+            // — so assert the wiring at the source, the same way the auth-context/csrf fitness
+            // checks in this harness do.
+            const src = readFileSync(join(process.cwd(), 'app/server.ts'), 'utf-8');
+            const mounted = (name: string) =>
+              src.includes(name) && src.includes(`app.use('*', ${name});`);
+            outcome = {
+              tightTierMounted: mounted('loginMethodIntentRateLimit'),
+              ipTierMounted: mounted('loginMethodIntentIpRateLimit'),
+              // The identifier POST is what hands out the ceremony session the chooser's gate
+              // demands, so leaving this one unmounted undercuts both tiers above.
+              identifierMounted: mounted('loginIdentifierRateLimit'),
+            };
+          } else if (op === 'loginIdentifierBlocked') {
+            // POST /id/login is the identifier submit — the endpoint that mints the ceremony
+            // session /id/login/method's gate demands, and the one that reveals existence
+            // directly whenever ignoreUnknownUsernames is off. ip-only (the loginName is in the
+            // POST body), 120/5min to mirror the chooser GET's ip ceiling.
+            const app = new Hono();
+            app.use('*', loginIdentifierRateLimit);
+            app.all('/id/login', (c) => c.json({ ok: true }, 200));
+            const hd = { 'x-forwarded-for': `1.2.3.4, 10.5.0.7` };
+            const post = async (path = '/id/login') => {
+              nowMs += 10;
+              return app.request(new Request(`http://app${path}`, { method: 'POST', headers: hd }));
+            };
+            const statuses: number[] = [];
+            for (let i = 0; i < 120; i++) statuses.push((await post()).status);
+            const blocked = await post();
+            // A GET must not spend the budget — only the submit is counted.
+            const getResp = await app.request(
+              new Request('http://app/id/login', { method: 'GET', headers: hd })
+            );
+            outcome = {
+              allPassed: statuses.every((s) => s === 200),
+              blockedStatus: blocked.status,
+              retryAfter: blocked.headers.get('retry-after'),
+              // The RR7 single-fetch variant normalizes to the same path, so it shares the bucket
+              // rather than slipping past the matcher.
+              dataVariantStatus: (await post('/id/login.data')).status,
+              getStatus: getResp.status,
+            };
+          } else if (op === 'loginMethodBareGetNoConsume') {
+            // Without ?loginName (or with an EMPTY one) the loader identifies nobody and only
+            // bounces to /login — nothing is minted and nothing is revealed, so it must not
+            // spend the budget of either tier.
+            const app = new Hono();
+            app.use('*', loginMethodIntentRateLimit);
+            app.use('*', loginMethodIntentIpRateLimit);
+            app.all('/id/login/method', (c) => c.json({ ok: true }, 200));
+            const ip = '10.5.0.2';
+            const hd = { 'x-forwarded-for': `1.2.3.4, ${ip}` };
+            for (let i = 0; i < 140; i++) {
+              nowMs += 10;
+              await app.request(
+                new Request('http://app/id/login/method', { method: 'GET', headers: hd })
+              );
+              nowMs += 10;
+              await app.request(
+                new Request('http://app/id/login/method?loginName=', { method: 'GET', headers: hd })
+              );
+            }
+            nowMs += 10;
+            const res = await app.request(
+              new Request('http://app/id/login/method?loginName=alice', {
+                method: 'GET',
+                headers: hd,
+              })
+            );
+            outcome = { identifiedStatus: res.status };
           } else if (op === 'verifyEmailNoSendNoConsume') {
             const app = new Hono();
             app.use('/id/verify', verifyEmailSendRateLimit);
@@ -2244,11 +2438,21 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
       }
 
       case 'loginAction': {
-        const { request } = await buildHandlerRequest(
-          s.request ?? { url: 'http://localhost/id/login', csrf: true }
-        );
-        const result = await loginAction({ request, params: {}, context: {} as never } as never);
-        response = await serializeResponse(result);
+        // Same providerRegistry.fake bridge as loginMethodLoader: this action resolves its own
+        // provider via providerForRequest, which is INDEPENDENT of the `provider` this harness
+        // built — so without the bridge a scenario `seed` (and recordCalls) would be ignored.
+        // A no-op when the scenario already uses the singleton.
+        const originalFake = providerRegistry.fake;
+        providerRegistry.fake = () => provider;
+        try {
+          const { request } = await buildHandlerRequest(
+            s.request ?? { url: 'http://localhost/id/login', csrf: true }
+          );
+          const result = await loginAction({ request, params: {}, context: {} as never } as never);
+          response = await serializeResponse(result);
+        } finally {
+          providerRegistry.fake = originalFake;
+        }
         break;
       }
 

@@ -3,6 +3,7 @@
 // Shared network primitives for server middleware: client-IP extraction from the
 // X-Forwarded-For header, and a factory that owns the common rate-limit middleware
 // shape (pathname-normalize → IP-extract → check → audit-on-429 → 429 response).
+import { APP_BASENAME } from '@/resources/shared/app-basename';
 import type { RateLimiter } from '@/server/middleware/rate-limit';
 import { logAuthEvent } from '@/server/observability';
 import type { Context, MiddlewareHandler } from 'hono';
@@ -44,6 +45,61 @@ const RATE_LIMITED_BODY = {
   message: 'Too many attempts. Please try again later.',
 } as const;
 
+/**
+ * True when this request is a TOP-LEVEL BROWSER NAVIGATION rather than a data fetch.
+ *
+ * Rate-limited POSTs and React-Router single-fetch `.data` requests are consumed by code (an
+ * action result, a fetcher) and must keep the JSON body every other limiter in this file
+ * returns. A rate-limited GET document request, by contrast, is rendered by the browser AS THE
+ * PAGE — a raw `{"error":"RATE_LIMITED"}` blob is what the user would see. Only that case gets
+ * HTML.
+ *
+ * `pathname` is already normalized (lowercased, `.data` stripped), so the raw URL is re-read here
+ * to tell `/id/login/method` from `/id/login/method.data`.
+ */
+function isTopLevelNavigation(c: Context): boolean {
+  if (c.req.method !== 'GET') return false;
+  if (new URL(c.req.url).pathname.toLowerCase().endsWith('.data')) return false;
+  return (c.req.header('accept') ?? '').includes('text/html');
+}
+
+/**
+ * Minimal, self-contained 429 page for a rate-limited top-level navigation.
+ *
+ * Hono middleware runs OUTSIDE the React/Lingui tree (same constraint as
+ * server/routes/saml-post.ts), so the copy is plain English here rather than a `<Trans>`.
+ * No script (the prod CSP is nonce-based + strict-dynamic and this response carries no nonce);
+ * the inline <style> is permitted by the policy's `style-src 'unsafe-inline'`.
+ * `retryAfterSeconds` is a number we computed, so it needs no escaping.
+ *
+ * The "Back to sign in" href is built from APP_BASENAME rather than a literal `/id`: this
+ * response is emitted by Hono middleware, OUTSIDE React Router, so nothing prefixes the basename
+ * for us and a hardcoded copy would silently 404 the only way off this page the moment the app
+ * moves (react-router.config.ts and vite.config.ts already read the same constant).
+ */
+export function renderRateLimitedPage(retryAfterSeconds: number): string {
+  const minutes = Math.ceil(retryAfterSeconds / 60);
+  const wait = retryAfterSeconds < 60 ? 'in a few seconds' : `in about ${minutes} minute(s)`;
+  return `<!doctype html><html lang="en"><head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Too many attempts</title>
+    <style>
+      body { font-family: system-ui, sans-serif; margin: 0; min-height: 100vh;
+             display: flex; align-items: center; justify-content: center; padding: 1.5rem; }
+      main { max-width: 28rem; }
+      h1 { font-size: 1.25rem; margin: 0 0 0.75rem; }
+      p { margin: 0 0 0.75rem; line-height: 1.5; }
+    </style>
+  </head><body>
+    <main>
+      <h1>Too many attempts</h1>
+      <p>You have made too many requests. Please try again ${wait}.</p>
+      <p><a href="${APP_BASENAME}/login">Back to sign in</a></p>
+    </main>
+  </body></html>`;
+}
+
 export interface CreateRateLimitOpts {
   /** The shared limiter instance (window + limit + store live here). */
   limiter: RateLimiter;
@@ -84,9 +140,11 @@ export function createRateLimit(opts: CreateRateLimitOpts): MiddlewareHandler {
     if (!allowed) {
       const fields = logFields ? logFields(c, ip, pathname) : { ip, path: pathname };
       logAuthEvent('rate_limit', 'failure', fields);
-      return c.json(RATE_LIMITED_BODY, 429, {
-        'Retry-After': String(Math.ceil(retryAfterMs / 1000)),
-      });
+      const retryAfterSeconds = Math.ceil(retryAfterMs / 1000);
+      const headers = { 'Retry-After': String(retryAfterSeconds) };
+      return isTopLevelNavigation(c)
+        ? c.html(renderRateLimitedPage(retryAfterSeconds), 429, headers)
+        : c.json(RATE_LIMITED_BODY, 429, headers);
     }
     await next();
   };

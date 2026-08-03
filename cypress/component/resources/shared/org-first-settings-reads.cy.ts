@@ -19,7 +19,13 @@ describe('login/method loader — org-first getLoginSettings + getBranding', () 
     callService({
       fn: 'loginMethodLoader',
       provider: 'singleton',
-      request: { url: `http://localhost/id/login/method?loginName=${ALICE}` },
+      request: {
+        url: `http://localhost/id/login/method?loginName=${ALICE}`,
+        // The chooser loader is session-gated: it only identifies a user the ceremony has
+        // already planted a LIVE session for (the identifier step writes it on the same
+        // response that redirects here).
+        sessions: [{ id: 's1', token: 'tok-s1', loginName: ALICE }],
+      },
       recordCalls: ['getDefaultOrg', 'getLoginSettings', 'getBranding'],
     }).then((v) => {
       expect(v.calls?.getDefaultOrg).to.have.length(1);
@@ -34,12 +40,65 @@ describe('login/method loader — org-first getLoginSettings + getBranding', () 
       provider: 'singleton',
       request: {
         url: `http://localhost/id/login/method?loginName=${ALICE}&organization=org-explicit`,
+        sessions: [{ id: 's1', token: 'tok-s1', loginName: ALICE }],
       },
       recordCalls: ['getDefaultOrg', 'getLoginSettings', 'getBranding'],
     }).then((v) => {
       expect(v.calls?.getDefaultOrg).to.have.length(0);
       expect(v.calls?.getLoginSettings?.[0]?.[0]).to.equal('org-explicit');
       expect(v.calls?.getBranding?.[0]?.[0]).to.equal('org-explicit');
+    });
+  });
+});
+
+describe('resolveIdentifier — post-identifier policy org agrees with the chooser', () => {
+  // The identifier step decides a user HAS a usable method and routes them to /login/method,
+  // whose loader then RE-computes that availability. If the two read a different org's policy the
+  // loader can compute `available: []` for a user the decision just approved and bounce them to
+  // /error. They previously agreed only for users WITH an orgId: `User.orgId` is OPTIONAL, and
+  // when it was absent this side fell through to INSTANCE settings (getLoginSettings(undefined))
+  // while the chooser fell through to the DEFAULT ORG's. alice has no orgId, so she is exactly
+  // that case.
+  it('with NO ?organization AND no user.orgId, reads the DEFAULT org (not instance settings)', () => {
+    callService({
+      fn: 'loginAction',
+      provider: 'singleton',
+      request: {
+        url: 'http://localhost/id/login',
+        form: { loginName: ALICE },
+        csrf: true,
+      },
+      recordCalls: ['getLoginSettings'],
+    }).then((v) => {
+      // LAST call, not a fixed index: resolveIdentifier's domain-discovery probe reads the
+      // BASE/instance settings first by design (the org isn't known yet), so the post-identifier
+      // read is the final one.
+      const orgArgs = (v.calls?.getLoginSettings ?? []).map((args) => args[0]);
+      expect(orgArgs.length, 'the post-identifier settings read ran').to.be.greaterThan(1);
+      expect(orgArgs.at(-1), 'must not fall through to INSTANCE settings').to.equal(
+        'org-default-fake'
+      );
+      // And the decision still routes to the chooser rather than a policy dead end.
+      expect(v.response?.location ?? '').to.contain('/login/method');
+    });
+  });
+
+  it('a user WITH an orgId still gets their OWN org, never the default', () => {
+    callService({
+      fn: 'loginAction',
+      seed: {
+        users: [{ id: 'u1', loginName: 'mia@acme.test', orgId: 'org-mia' }],
+        authMethods: { u1: ['password'] },
+      },
+      request: {
+        url: 'http://localhost/id/login',
+        form: { loginName: 'mia@acme.test' },
+        csrf: true,
+      },
+      recordCalls: ['getLoginSettings'],
+    }).then((v) => {
+      const orgArgs = (v.calls?.getLoginSettings ?? []).map((args) => args[0]);
+      expect(orgArgs.at(-1)).to.equal('org-mia');
     });
   });
 });

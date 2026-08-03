@@ -83,6 +83,37 @@ export const verifyEmailSendRateLimit: MiddlewareHandler = createRateLimit({
   key: (_c, ip) => ip,
 });
 
+// One shared limiter for the IDENTIFIER submit, POST /id/login: 120 attempts / 5 min per ip.
+//
+// This endpoint was the one unthrottled member of the auth surface, and the chooser work made
+// that load-bearing rather than incidental: /id/login/method's session gate demands a ceremony
+// session for the probed loginName, and THIS is the endpoint that hands one out. Unthrottled, a
+// prober mints cookies for as many addresses as they like and the gate costs them a single extra
+// request each. It is also the endpoint that reveals existence directly whenever
+// ignoreUnknownUsernames is off (302 vs an inline USER_NOT_FOUND).
+//
+// IP-ONLY, deliberately. The loginName is in the POST body (body-stream hazard — the RR7 action
+// downstream calls `await request.formData()`, and a Hono request body reads once), so a tight
+// ip|loginName tier would need a `c.req.raw.clone()` and an async key, which createRateLimit's
+// synchronous `key` contract does not take. An ip-only ceiling is what bounds enumeration
+// BREADTH anyway; per-account brute force is not the threat at this step (no credential is
+// submitted here) and Zitadel's failedAttempts policy backstops the password step that follows.
+//
+// 120/5min MIRRORS loginMethodIntentIpRateLimit on purpose — same endpoint class (one hit per
+// sign-in, on the most travelled path in the product), so the two halves of the same ceremony
+// cannot disagree about what a busy NAT'd office looks like. ~24 identifier submits/minute from
+// a single egress IP.
+const loginIdentifierLimiter = new RateLimiter({ limit: 120, windowMs: 5 * 60_000 });
+
+// Mounted on '*' in server.ts. Self-guards on POST + the normalized path (which strips the RR7
+// single-fetch `.data` suffix, so the hydrated submit is counted too).
+export const loginIdentifierRateLimit: MiddlewareHandler = createRateLimit({
+  limiter: loginIdentifierLimiter,
+  match: (c, pathname) => c.req.method === 'POST' && pathname === '/id/login',
+  key: (_c, ip) => ip,
+  logFields: (c, ip, pathname) => ({ ip, path: pathname }),
+});
+
 // One shared limiter for /login/password: 5 attempts / 5 min per (ip + loginName).
 const passwordLimiter = new RateLimiter({ limit: 5, windowMs: 5 * 60_000 });
 
@@ -291,4 +322,50 @@ export const loginMethodRateLimit: MiddlewareHandler = createRateLimit({
   limiter: loginMethodLimiter,
   match: (c, pathname) => c.req.method === 'POST' && pathname === '/id/login/method',
   key: (_c, ip) => ip,
+});
+
+// The /id/login/method LOADER is state-changing too, and the limiter above never saw it.
+// When the identified user's only usable method is a single linked IdP, the loader mints a real
+// Zitadel IdP intent and 302s to the provider (routes/login/method.tsx) — so
+// `GET /id/login/method?loginName=X` changes provider-side state AND its redirect names the
+// exact IdP that address uses. That is the same linked-IdP identity oracle the POST comment
+// above describes, reachable by URL alone. (The loader now also requires a live ceremony session
+// for that loginName, which closes the oracle to an unauthenticated prober; these limiters stay
+// as the defence-in-depth layer underneath it, exactly like the POST's.)
+//
+// Matching requires a NON-EMPTY `loginName`: a bare GET (and a `?loginName=` with nothing in it)
+// only bounces to /login and touches nothing, so it must not spend anyone's budget.
+//
+// SEPARATE BUDGET from the POST, deliberately. The POST is a chooser click; this GET is an
+// ordinary page load on what is now the destination of EVERY post-identifier sign-in.
+//
+// TWO TIERS, because one key cannot serve both goals:
+//   • ip|loginName (10/5min) — the TIGHT one. Bounds how many intents can be minted against ONE
+//     address, which is what repeated probing of a known account (and the Back-button intent
+//     storm) looks like. A human signing in spends 1; a reload or two still fits.
+//   • ip (120/5min) — the LOOSE CEILING. Keying only by (ip, loginName) would hand an
+//     enumerator a fresh bucket per probed address, so breadth still needs an ip-only cap. It is
+//     deliberately generous: this path is now on every single sign-in, and a whole office behind
+//     one NAT egress IP must not 429 during a busy morning. 120/5min leaves ~24 sign-ins/minute
+//     from a single IP while still capping scripted enumeration breadth.
+// Both are mounted; a request is counted by each, and whichever trips first answers 429.
+const loginMethodIntentLimiter = new RateLimiter({ limit: 10, windowMs: 5 * 60_000 });
+const loginMethodIntentIpLimiter = new RateLimiter({ limit: 120, windowMs: 5 * 60_000 });
+
+/** Shared self-guard: only an identified GET on the chooser is state-changing. */
+const isIdentifiedChooserGet = (c: Context, pathname: string): boolean =>
+  c.req.method === 'GET' && pathname === '/id/login/method' && normalizedLoginName(c) !== '';
+
+export const loginMethodIntentRateLimit: MiddlewareHandler = createRateLimit({
+  limiter: loginMethodIntentLimiter,
+  match: isIdentifiedChooserGet,
+  key: (c, ip) => `${ip}|${normalizedLoginName(c)}`,
+  logFields: (c, ip) => ({ ip, actor: hashActor(normalizedLoginName(c)), tier: 'ip+loginName' }),
+});
+
+export const loginMethodIntentIpRateLimit: MiddlewareHandler = createRateLimit({
+  limiter: loginMethodIntentIpLimiter,
+  match: isIdentifiedChooserGet,
+  key: (_c, ip) => ip,
+  logFields: (c, ip, pathname) => ({ ip, path: pathname, tier: 'ip' }),
 });

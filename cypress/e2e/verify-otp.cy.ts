@@ -1,4 +1,5 @@
 import { checkA11y } from '../support/a11y';
+import { chooseMethodPassword } from '../support/session';
 
 /**
  * Establishes a session cookie for the given loginName by driving the full
@@ -21,6 +22,7 @@ function loginAndGetSession(loginName: string) {
   cy.contains('button', 'Email').click();
   cy.get('input[name="loginName"]').type(loginName);
   cy.get('input[name="loginName"]:visible').closest('form').submit();
+  chooseMethodPassword();
   cy.location('pathname').should('eq', '/id/login/password');
   cy.get('input[name="password"]').type('hunter2');
   cy.get('input[name="password"]:visible').closest('form').submit();

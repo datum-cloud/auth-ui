@@ -63,3 +63,42 @@ export async function resolveOrg(
 ): Promise<string | undefined> {
   return urlOrg ?? env.ZITADEL_DEFAULT_ORG_ID ?? (await getCachedDefaultOrg(provider)) ?? undefined;
 }
+
+/**
+ * The POLICY org for a POST-IDENTIFIER decision — i.e. every read (`getLoginSettings`,
+ * `getActiveIdPs`) that decides which sign-in methods an IDENTIFIED user may use.
+ *
+ * Precedence: the ceremony's explicit `?organization=` wins, else the org the FOUND USER
+ * actually belongs to, else {@link resolveOrg}'s default-org fallback.
+ *
+ * SHARED ON PURPOSE. `resolveIdentifier` (login.service.ts) decides a user has a usable method
+ * and routes them to /login/method; that route's loader then RE-computes the same availability.
+ * If the two resolve a different org they read different policies, and the loader can compute
+ * `available: []` for a user the decision just approved — a bounce to /error on the product's
+ * most travelled path. They previously agreed only for users WITH an `orgId`: `User.orgId` is
+ * optional, and when it was absent the decision fell through to INSTANCE settings while the
+ * loader fell through to the DEFAULT ORG's. Routing both through this one helper makes the
+ * agreement structural instead of coincidental.
+ *
+ * KNOWN, PRE-EXISTING: `urlOrg` is the raw `?organization=` query param and it WINS here, so
+ * whoever composes a URL — not only the ceremony that minted it — picks which org's policy
+ * decides an identified user's available methods. A permissive org named there can re-enable a
+ * method the user's own org disabled (`allowPassword`, `passkeysType`); a restrictive one can
+ * collapse their options to a single IdP. That is the trust level `?organization=` has always
+ * carried (every per-method screen was directly reachable with it long before this chooser
+ * existed) and the credential checks downstream are enforced by Zitadel, not by these settings —
+ * but note the chooser LOADER is a STATE-CHANGING consumer of it, since a collapsed option set
+ * can trigger the sole-IdP auto-start, which the per-method screens never did. Closing it means
+ * authenticating the param the way sso's `policyOrg` now is (see server/signed-param.ts);
+ * deliberately out of scope here because it predates and outlives this flow.
+ *
+ * A subject that resolves to NO account has no `userOrgId` for the middle rung and must not
+ * silently fall through to the default org — see `resolveGhostPolicyOrg` (login/method-options).
+ */
+export async function resolvePolicyOrg(
+  provider: AuthProvider,
+  urlOrg: string | undefined,
+  userOrgId: string | undefined
+): Promise<string | undefined> {
+  return resolveOrg(provider, urlOrg ?? userOrgId);
+}
