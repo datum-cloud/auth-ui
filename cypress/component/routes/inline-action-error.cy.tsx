@@ -48,12 +48,10 @@ function mountAt(
 describe('accounts — inline action error (no toast)', () => {
   const loaderData = { csrfToken: 't', accounts: [] };
 
-  it('renders a role="alert" banner when actionData.error is set', () => {
+  it('renders a role="alert" banner when actionData.error is set, and NO banner when there is no action error', () => {
     mountAt(AccountPicker, 'accounts', '/accounts', loaderData, { error: 'SESSION_EXPIRED' });
     cy.get('[role="alert"]').should('exist');
-  });
 
-  it('renders NO alert banner when there is no action error', () => {
     mountAt(AccountPicker, 'accounts', '/accounts', loaderData);
     cy.contains('Choose an account').should('exist');
     cy.get('[role="alert"]').should('not.exist');

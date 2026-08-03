@@ -65,23 +65,20 @@ function mountPasskeys(
 }
 
 describe('/id/passkeys — UI contract', () => {
-  it('active row: no badge, trash trigger with aria-label opens the danger confirm dialog', () => {
+  it('renders an active row with no badge or Added line, plus the identity switch link', () => {
     mountPasskeys();
     cy.contains('Seeded laptop').should('be.visible');
     cy.contains('Active').should('not.exist');
+    // Seeded row carries no createdAt → no "Added <date>" second line.
+    cy.contains('Added ').should('not.exist');
+    // Identity row + sign-out (folded in — same bare mountPasskeys() fixture).
+    cy.contains('Logged in as').should('be.visible');
+    cy.contains('mia@acme.test').should('be.visible');
+    cy.findByRole('link', { name: /not you\?/i }).should('have.attr', 'href', '/accounts');
+    cy.contains('button', 'Sign out').should('be.visible');
     cy.get('button[aria-label="Remove Seeded laptop"]').should('exist').click();
     cy.contains('Remove this passkey?').should('be.visible');
     cy.contains('button', 'Remove passkey').should('be.visible');
-  });
-
-  it('inactive row keeps a muted Inactive badge', () => {
-    mountPasskeys({
-      view: {
-        ...BASE_LOADER.view,
-        passkeys: [{ id: 'pk2', state: 'inactive', name: 'Stuck enrollment' }],
-      },
-    });
-    cy.contains('Inactive').should('be.visible');
   });
 
   it('successful removal opens the sign-out-others dialog; Not now closes it', () => {
@@ -119,51 +116,38 @@ describe('/id/passkeys — UI contract', () => {
     cy.get('ul').should('not.exist');
   });
 
-  it('shows the active login name, a "Not you?" switch link, and a sign-out action', () => {
-    mountPasskeys();
-    cy.contains('Logged in as').should('be.visible');
-    cy.contains('mia@acme.test').should('be.visible');
-    cy.findByRole('link', { name: /not you\?/i }).should('have.attr', 'href', '/accounts');
-    cy.contains('button', 'Sign out').should('be.visible');
-  });
-
-  it('row with createdAt renders the muted "Added <date>" second line', () => {
-    const createdAt = '2026-07-21T10:00:00.000Z';
+  it('renders the muted Added <date> line for rows with createdAt', () => {
     // Same Intl path the app uses — deterministic across CI timezones.
-    const expected = new Intl.DateTimeFormat('en', { dateStyle: 'medium' }).format(
-      new Date(createdAt)
-    );
+    const fmt = (iso: string) =>
+      new Intl.DateTimeFormat('en', { dateStyle: 'medium' }).format(new Date(iso));
+
+    const activeCreatedAt = '2026-07-21T10:00:00.000Z';
     mountPasskeys({
       view: {
         ...BASE_LOADER.view,
-        passkeys: [{ id: 'pk1', state: 'active', name: 'Seeded laptop', createdAt }],
+        passkeys: [
+          { id: 'pk1', state: 'active', name: 'Seeded laptop', createdAt: activeCreatedAt },
+        ],
       },
     });
     // Styling contract: the date line must carry the muted/small-text treatment.
-    cy.contains(`Added ${expected}`)
+    cy.contains(`Added ${fmt(activeCreatedAt)}`)
       .should('be.visible')
       .and('have.class', 'text-muted-foreground')
       .and('have.class', 'text-xs');
-  });
 
-  it('row without createdAt renders no Added line (no created-at metadata)', () => {
-    mountPasskeys();
-    cy.contains('Seeded laptop').should('be.visible');
-    cy.contains('Added ').should('not.exist');
-  });
-
-  it('inactive row with createdAt renders both the Inactive badge and the Added line', () => {
-    const createdAt = '2026-07-15T08:30:00.000Z';
-    const expected = new Intl.DateTimeFormat('en', { dateStyle: 'medium' }).format(
-      new Date(createdAt)
-    );
+    // Inactive row: badge AND date line together. Subsumes the standalone
+    // "inactive row keeps a muted Inactive badge" case (strict subset of this one).
+    const inactiveCreatedAt = '2026-07-15T08:30:00.000Z';
     mountPasskeys({
       view: {
         ...BASE_LOADER.view,
-        passkeys: [{ id: 'pk2', state: 'inactive', name: 'Stuck enrollment', createdAt }],
+        passkeys: [
+          { id: 'pk2', state: 'inactive', name: 'Stuck enrollment', createdAt: inactiveCreatedAt },
+        ],
       },
     });
     cy.contains('Inactive').should('be.visible');
-    cy.contains(`Added ${expected}`).should('be.visible');
+    cy.contains(`Added ${fmt(inactiveCreatedAt)}`).should('be.visible');
   });
 });

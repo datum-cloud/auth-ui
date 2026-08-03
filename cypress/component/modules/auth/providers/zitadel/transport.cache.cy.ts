@@ -18,24 +18,28 @@ import { callService } from '../../../../../support/node/call-service';
 import type { Verdict } from '../../../../../support/node/call-service';
 
 describe('transport client cache', () => {
-  it('does not grow unbounded across many distinct session tokens', () => {
+  // Both ops chained in one test, matching the pattern transport.cy.ts already uses for 4
+  // chained calls. Each callService spawns a fresh Bun process, so the two remain fully
+  // independent; the only cost is that a cap failure would mask the rotated-token result.
+  it("does not grow unbounded across many distinct session tokens, and a rotated token does not reuse the previous token's client", () => {
     callService({
       fn: 'transportCacheCheck',
       transportOp: 'clientCacheCap',
       request: { url: 'https://z.test' },
     }).then((v: Verdict) => {
       const { size, max } = v.outcome as { size: number; max: number };
-      expect(size).to.be.at.most(max);
+      expect(size, 'clientCacheCap: size <= max').to.be.at.most(max);
     });
-  });
 
-  it("a rotated token does not reuse the previous token's client", () => {
     callService({
       fn: 'transportCacheCheck',
       transportOp: 'clientCacheRotatedToken',
       request: { url: 'https://z.test' },
     }).then((v: Verdict) => {
-      expect((v.outcome as { distinct: boolean }).distinct).to.equal(true);
+      expect(
+        (v.outcome as { distinct: boolean }).distinct,
+        'clientCacheRotatedToken: distinct client'
+      ).to.equal(true);
     });
   });
 });

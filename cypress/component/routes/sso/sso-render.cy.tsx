@@ -11,7 +11,6 @@
 // allowUnlink-gate, and multi-identity permutations are cut here.
 import SsoIndex from '@/routes/sso/index';
 import SsoLdap from '@/routes/sso/ldap';
-import SsoError from '@/routes/sso/provider/error';
 import { ConformAdapter } from '@datum-cloud/datum-ui/form/adapters/conform';
 import { setupI18n } from '@lingui/core';
 import { I18nProvider } from '@lingui/react';
@@ -96,13 +95,17 @@ describe('SsoIndex — unlink guard: dialog confirm + disabled sole sign-in meth
     allowUnlink: true,
   };
 
-  it('disables the Unlink control for the sole-method (unlinkable:false) row', () => {
+  it('disables Unlink for the sole-method row, and shows the active login name', () => {
     mountRoute(SsoIndex, 'sso-index', '/sso', '/sso', loaderData);
     cy.contains('Linked accounts').should('exist');
     // Inert via aria-disabled (kept focusable for a11y), not the native `disabled` attribute.
     cy.get('button[aria-disabled="true"]').contains('Unlink').should('exist');
+    // Identity/sign-out row (folded in — same mount).
+    cy.contains('Logged in as').should('exist');
+    cy.contains(loaderData.loginName).should('exist');
+    cy.findByRole('link', { name: /not you\?/i }).should('have.attr', 'href', '/accounts');
+    cy.get('form[action="/id/logout?index"]').contains('button', 'Sign out').should('exist');
   });
-
   it('keeps the unlink confirm form out of the DOM until the dialog is opened', () => {
     mountRoute(SsoIndex, 'sso-index', '/sso', '/sso', loaderData);
     cy.contains('Linked accounts').should('exist');
@@ -116,26 +119,8 @@ describe('SsoIndex — unlink guard: dialog confirm + disabled sole sign-in meth
     // …and exposes an enabled submit button to complete the unlink (the "Confirm submits" path).
     cy.get('button[type="submit"]').contains('Unlink').should('exist').and('not.be.disabled');
   });
-
-  it('shows the active login name with a "Not you?" switch link and a Sign out control', () => {
-    mountRoute(SsoIndex, 'sso-index', '/sso', '/sso', loaderData);
-    cy.contains('Logged in as').should('exist');
-    cy.contains(loaderData.loginName).should('exist');
-    cy.findByRole('link', { name: /not you\?/i }).should('have.attr', 'href', '/accounts');
-    cy.get('form[action="/id/logout?index"]').contains('button', 'Sign out').should('exist');
-  });
 });
-
-// ── sso/provider/error ────────────────────────────────────────────────────────
-
-describe('SsoError — typed paths.login.index() emits the byte-frozen login URL', () => {
-  it('"Back to sign in" link resolves to the byte-frozen /login URL', () => {
-    mountRoute(
-      SsoError,
-      'sso-error',
-      '/sso/:provider/error',
-      '/sso/google/error?reason=access-denied'
-    );
-    cy.contains('a', /Back to sign in/i).should('have.attr', 'href', '/login');
-  });
-});
+// sso/provider/error's "Back to sign in" → bare /login assertion lived here too, but it was a
+// literal duplicate of provider-error-render.cy.tsx's "degrades to a bare /login when no
+// ceremony context is present" (same component, same expected href; only an unused `reason`
+// query param differed). Removed as a true duplicate — that file remains its sole owner.

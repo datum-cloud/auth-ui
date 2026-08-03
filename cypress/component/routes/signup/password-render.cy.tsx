@@ -63,16 +63,15 @@ function mountPassword(
 }
 
 describe('signup/password — render adoption', () => {
-  it('renders the ceremony-owned BackLink pointing to /signup', () => {
+  it('renders the ceremony BackLink to /signup and threads requestId + organization', () => {
+    // Bare fixture: the ceremony-owned BackLink resolves to /signup.
     mountPassword();
     cy.findByRole('link', { name: /back/i }, { timeout: 6000 }).should(
       'have.attr',
       'href',
       '/signup'
     );
-  });
 
-  it('"Not you?" link threads the ceremony requestId + organization back to /signup (not a bare /signup)', () => {
     // Seed real ceremony params so the assertion actually exercises threading — with the bare
     // fixture (requestId/organization undefined) the href degrades to "/signup" no matter whether
     // threading works, is hardcoded, or is wired to the wrong fields, so it proves nothing.

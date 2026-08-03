@@ -4,14 +4,15 @@
 // Zod verify code schema → browser-side Chai only.
 import { verifyCodeSchema } from '@/resources/verify/verify.schema';
 
-describe('verifyCodeSchema', () => {
-  it('accepts userId and code at minimum', () => {
-    const result = verifyCodeSchema.safeParse({ userId: 'u1', code: '123456' });
-    expect(result.success).to.equal(true);
-  });
+const CASES: [label: string, input: Record<string, string>, accepted: boolean][] = [
+  ['userId + code (the minimum)', { userId: 'u1', code: '123456' }, true],
+  ['missing code', { userId: 'u1' }, false],
+];
 
-  it('rejects missing code', () => {
-    const result = verifyCodeSchema.safeParse({ userId: 'u1' });
-    expect(result.success).to.equal(false);
+describe('verifyCodeSchema', () => {
+  it('accepts userId and code at minimum, rejecting input with the code missing', () => {
+    for (const [label, input, accepted] of CASES) {
+      expect(verifyCodeSchema.safeParse(input).success, label).to.equal(accepted);
+    }
   });
 });

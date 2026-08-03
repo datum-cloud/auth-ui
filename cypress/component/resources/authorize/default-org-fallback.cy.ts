@@ -8,7 +8,7 @@
 import { callService } from '../../../support/node/call-service';
 
 describe('/authorize — explicit-only org threading', () => {
-  it('does NOT thread an organization into /login when the OIDC request carries no org scope', () => {
+  it('threads only an explicit org-id scope into /login', () => {
     callService({
       fn: 'resolveAuthorize',
       seed: {
@@ -17,15 +17,14 @@ describe('/authorize — explicit-only org threading', () => {
       },
       request: { url: 'http://localhost/id/authorize?authRequest=req1' },
     }).then((v) => {
-      expect(v.response?.status).to.equal(302);
+      expect(v.response?.status, 'no org scope: status').to.equal(302);
       const loc = v.response?.location ?? '';
-      expect(loc).to.contain('/login');
-      expect(loc).to.contain('requestId=oidc_req1');
-      expect(loc).to.not.contain('organization='); // explicit-only → absent for a no-org request
+      expect(loc, 'no org scope: bootstraps /login').to.contain('/login');
+      expect(loc, 'no org scope: requestId threaded').to.contain('requestId=oidc_req1');
+      // explicit-only → the seeded default org must NOT leak in here.
+      expect(loc, 'no org scope: organization absent').to.not.contain('organization=');
     });
-  });
 
-  it('threads the explicit org scope into /login when the OIDC request carries an org-id scope', () => {
     callService({
       fn: 'resolveAuthorize',
       seed: {
@@ -40,10 +39,10 @@ describe('/authorize — explicit-only org threading', () => {
       },
       request: { url: 'http://localhost/id/authorize?authRequest=req2' },
     }).then((v) => {
-      expect(v.response?.status).to.equal(302);
+      expect(v.response?.status, 'explicit org scope: status').to.equal(302);
       const loc = v.response?.location ?? '';
-      expect(loc).to.contain('/login');
-      expect(loc).to.contain('organization=99999');
+      expect(loc, 'explicit org scope: bootstraps /login').to.contain('/login');
+      expect(loc, 'explicit org scope: threaded verbatim').to.contain('organization=99999');
     });
   });
 });

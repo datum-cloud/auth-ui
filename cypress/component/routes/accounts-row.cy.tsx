@@ -49,8 +49,10 @@ const account = (over: Record<string, unknown> = {}) => ({
 });
 
 describe('accounts row — switch form structure', () => {
-  it('renders the switch form with CSRF + sessionId hidden inputs, and keeps remove as a SEPARATE form', () => {
-    mountAccounts({ csrfToken: 'csrf-tok', accounts: [account()] });
+  it('renders switch and remove as separate forms, with CSRF + sessionId and an IdP badge', () => {
+    mountAccounts({ csrfToken: 'csrf-tok', accounts: [account({ idpName: 'Google' })] });
+    // IdP badge branch (folded in from its own test — same mount, one extra account field).
+    cy.contains('Google').should('exist');
     cy.get('form:has(input[name="intent"][value="switch"])').within(() => {
       cy.get('input[name="sessionId"]').should('have.value', 's1');
       cy.get('input[name="csrf"]').should('have.value', 'csrf-tok');
@@ -64,11 +66,6 @@ describe('accounts row — switch form structure', () => {
         expect($switch[0]).not.to.equal($remove[0]);
       });
     });
-  });
-
-  it('renders an IdP badge when idpName is present', () => {
-    mountAccounts({ csrfToken: 't', accounts: [account({ idpName: 'Google' })] });
-    cy.contains('Google').should('exist');
   });
 
   it('threads organization (alongside requestId) through the switch/remove hidden inputs and "Add another account" (regression: organization silently dropped)', () => {
@@ -97,21 +94,30 @@ describe('accounts row — switch form structure', () => {
 });
 
 describe('addAccountHref', () => {
-  it('carries an OIDC ceremony requestId and organization', () => {
-    expect(
-      addAccountHref({ requestId: 'oidc_abc', organization: 'org-1', userCode: null })
-    ).to.equal('/login?requestId=oidc_abc&organization=org-1&add=1');
-  });
-
-  it('prefers the device user_code, rewriting it as a device_ requestId', () => {
-    expect(
-      addAccountHref({ requestId: 'oidc_abc', organization: undefined, userCode: 'WDJB-MJHT' })
-    ).to.equal('/login?requestId=device_WDJB-MJHT&add=1');
-  });
-
-  it('omits absent values rather than emitting empty params', () => {
-    expect(addAccountHref({ requestId: null, organization: undefined, userCode: null })).to.equal(
-      '/login?add=1'
-    );
+  it('builds the add-account href for ceremony, device, and bare inputs', () => {
+    const rows: Array<{
+      label: string;
+      args: Parameters<typeof addAccountHref>[0];
+      expected: string;
+    }> = [
+      {
+        label: 'carries an OIDC ceremony requestId and organization',
+        args: { requestId: 'oidc_abc', organization: 'org-1', userCode: null },
+        expected: '/login?requestId=oidc_abc&organization=org-1&add=1',
+      },
+      {
+        label: 'prefers the device user_code, rewriting it as a device_ requestId',
+        args: { requestId: 'oidc_abc', organization: undefined, userCode: 'WDJB-MJHT' },
+        expected: '/login?requestId=device_WDJB-MJHT&add=1',
+      },
+      {
+        label: 'omits absent values rather than emitting empty params',
+        args: { requestId: null, organization: undefined, userCode: null },
+        expected: '/login?add=1',
+      },
+    ];
+    for (const row of rows) {
+      expect(addAccountHref(row.args), row.label).to.equal(row.expected);
+    }
   });
 });

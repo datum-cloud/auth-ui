@@ -39,33 +39,25 @@ function mountAt(
   return mount(withProviders(<RouterProvider router={router} />));
 }
 
-describe('password BackLink', () => {
-  it('password/new renders a Back link to /login/password (preserving the query)', () => {
-    mountAt(PasswordNew, 'password-new', '/password/new', {
-      csrfToken: 't',
-      code: 'c',
-      userId: 'u',
-      organization: undefined,
-      requestId: undefined,
-    });
+describe('password BackLink + inline action error (no toast)', () => {
+  const loaderData = {
+    csrfToken: 't',
+    code: 'c',
+    userId: 'u',
+    organization: undefined,
+    requestId: undefined,
+  };
+
+  it('renders a Back link preserving the query, and a role=alert banner on error', () => {
+    mountAt(PasswordNew, 'password-new', '/password/new', loaderData);
     cy.contains(/Choose a new password/i).should('exist');
     cy.get('a[href*="/login/password"]')
       .should('exist')
       .and(($a) => {
         expect($a.attr('href')).to.include('loginName=a%40b.test');
       });
-  });
-});
 
-describe('password inline action error (no toast)', () => {
-  it('password/new renders a role="alert" banner when actionData.error is set', () => {
-    mountAt(
-      PasswordNew,
-      'password-new',
-      '/password/new',
-      { csrfToken: 't', code: 'c', userId: 'u', organization: undefined, requestId: undefined },
-      { error: 'INVALID_INPUT' }
-    );
+    mountAt(PasswordNew, 'password-new', '/password/new', loaderData, { error: 'INVALID_INPUT' });
     cy.get('[role="alert"]').should('exist');
   });
 });

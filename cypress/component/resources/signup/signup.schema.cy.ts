@@ -4,40 +4,32 @@
 // Zod registration + password schemas → browser-side Chai only.
 import { registerSchema, signupPasswordSchema } from '@/resources/signup/signup.schema';
 
-describe('registerSchema', () => {
-  it('accepts a valid registration and rejects an invalid email', () => {
-    expect(
-      registerSchema.safeParse({
-        email: 'alice@acme.test',
-        firstName: 'Alice',
-        lastName: 'Acme',
-      }).success
-    ).to.equal(true);
-    expect(
-      registerSchema.safeParse({
-        email: 'not-an-email',
-        firstName: 'Alice',
-        lastName: 'Acme',
-      }).success
-    ).to.equal(false);
-  });
-});
+describe('registerSchema / signupPasswordSchema', () => {
+  it('accepts a valid registration, rejects a bad email, and requires matching passwords', () => {
+    for (const [label, email, accepted] of [
+      ['valid email', 'alice@acme.test', true],
+      ['invalid email', 'not-an-email', false],
+    ] as const) {
+      expect(
+        registerSchema.safeParse({ email, firstName: 'Alice', lastName: 'Acme' }).success,
+        label
+      ).to.equal(accepted);
+    }
 
-describe('signupPasswordSchema', () => {
-  it('rejects mismatched passwords with a clear message and accepts matching ones', () => {
     const mismatch = signupPasswordSchema.safeParse({
       password: 'correct-horse',
       confirm: 'wrong-horse',
     });
-    expect(mismatch.success).to.equal(false);
+    expect(mismatch.success, 'mismatched passwords rejected').to.equal(false);
     if (!mismatch.success) {
       const confirmError = mismatch.error.issues.find((i) => i.path.includes('confirm'));
-      expect(confirmError?.message).to.equal('Passwords must match');
+      expect(confirmError?.message, 'error on the confirm path').to.equal('Passwords must match');
     }
 
     expect(
       signupPasswordSchema.safeParse({ password: 'correct-horse', confirm: 'correct-horse' })
-        .success
+        .success,
+      'matching passwords accepted'
     ).to.equal(true);
   });
 });

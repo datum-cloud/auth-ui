@@ -13,31 +13,40 @@ import { callService } from '../../../support/node/call-service';
 const RECORD = ['getDefaultOrg', 'getActiveIdPs'] as const;
 
 describe('SSO IdP-display flows — org-first / default-org fallback', () => {
-  describe('idp-providers wrapper (the choke point)', () => {
-    it('with NO org, threads the resolved default org into getActiveIdPs (not undefined)', () => {
-      callService({
-        fn: 'activeIdPsProbe',
-        provider: 'singleton',
-        request: { url: 'http://localhost/id/sso' },
-        recordCalls: [...RECORD],
-      }).then((v) => {
-        expect(v.calls?.getDefaultOrg).to.have.length(1);
-        expect(v.calls?.getActiveIdPs?.[0]?.[0]).to.equal('org-default-fake');
+  // Both flows assert the identical two-call shape, differing only by which entry point
+  // drives the choke point. Chained in one test; each callService spawns a fresh Bun
+  // process, so the two remain independent.
+  it('resolves the default org for the active-IdP lookup on both entry points', () => {
+    callService({
+      fn: 'activeIdPsProbe',
+      provider: 'singleton',
+      request: { url: 'http://localhost/id/sso' },
+      recordCalls: [...RECORD],
+    })
+      .then((v) => {
+        expect(v.calls?.getDefaultOrg, 'activeIdPsProbe: getDefaultOrg called once').to.have.length(
+          1
+        );
+        expect(
+          v.calls?.getActiveIdPs?.[0]?.[0],
+          'activeIdPsProbe: resolved org threaded through'
+        ).to.equal('org-default-fake');
+        return callService({
+          fn: 'runSsoAction',
+          provider: 'singleton',
+          request: {
+            url: 'http://localhost/id/sso',
+            form: { intent: 'start', provider: 'google' },
+          },
+          recordCalls: [...RECORD],
+        });
+      })
+      .then((v) => {
+        expect(v.calls?.getDefaultOrg, 'runSsoAction: getDefaultOrg called once').to.have.length(1);
+        expect(
+          v.calls?.getActiveIdPs?.[0]?.[0],
+          'runSsoAction: resolved org threaded through'
+        ).to.equal('org-default-fake');
       });
-    });
-  });
-
-  describe('runSsoAction (start intent)', () => {
-    it('with NO organization, resolves the default org for the active-IdP lookup', () => {
-      callService({
-        fn: 'runSsoAction',
-        provider: 'singleton',
-        request: { url: 'http://localhost/id/sso', form: { intent: 'start', provider: 'google' } },
-        recordCalls: [...RECORD],
-      }).then((v) => {
-        expect(v.calls?.getDefaultOrg).to.have.length(1);
-        expect(v.calls?.getActiveIdPs?.[0]?.[0]).to.equal('org-default-fake');
-      });
-    });
   });
 });

@@ -102,21 +102,22 @@ describe('setup/mfa — shared primitive adoption', () => {
   describe('F4 — Authenticator app link is announced once (decorative icon)', () => {
     const totpLoader = { ...IDENTITY, offerableKeys: ['totpOtp', 'emailOtp'] };
 
-    it('renders the Authenticator icon as a decorative img (alt="" + aria-hidden)', () => {
+    it('renders the Authenticator icon as decorative, and suppresses the Back link', () => {
       mountRoute(SetupMfa, 'mfa', totpLoader);
       cy.get('img[src*="totp.png"]')
         .should('have.attr', 'alt', '')
         .and('have.attr', 'aria-hidden', 'true');
+
+      // Entry-step BackLink suppression, folded in from the "setup/* — BackLink renders to
+      // the predecessor" block. Kept as its own mount so the offerableKeys input is unchanged:
+      // auth-ceremony.cy.tsx proves the showBackLink mechanism, this proves setup/mfa wires it.
+      mountRoute(SetupMfa, 'mfa', { ...IDENTITY, offerableKeys: ['passkey'] });
+      cy.get('a[href*="/login/password"]').should('not.exist');
     });
   });
 });
 
 describe('setup/* — BackLink renders to the predecessor', () => {
-  it('setup/mfa suppresses the Back link (entry step)', () => {
-    mountRoute(SetupMfa, 'mfa', { ...IDENTITY, offerableKeys: ['passkey'] });
-    cy.get('a[href*="/login/password"]').should('not.exist');
-  });
-
   it('clicking Back on /setup/passkey does not disable "Register passkey" while the predecessor loads', () => {
     // Regression: WebAuthnButton's busy state defaulted to navigation.state !== 'idle',
     // which is also true for an UNRELATED Link navigation elsewhere on the page (the

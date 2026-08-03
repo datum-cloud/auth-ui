@@ -7,29 +7,10 @@
 // regression guard (failedAttempts must still win over message discrimination). Code-9
 // already/verified mapping is exercised in mappers.cy.ts and verify.adapter.cy.ts, so it is not
 // repeated here.
-import { normalizeError, toRegisterRequest } from '@/modules/auth/providers/zitadel/mappers';
-import { ProviderError } from '@/modules/auth/types';
-
-// minimal ConnectError shape
-const ce = (code: number, message = 'boom', details: unknown[] = []) => ({
-  code,
-  message,
-  findDetails: () => details,
-});
-
-describe('normalizeError Phase 2 extensions', () => {
-  it('maps code 3 + /complexity/i to PASSWORD_COMPLEXITY, code 6 to ALREADY_EXISTS, and preserves P1: failedAttempts wins over message discrimination', () => {
-    const complexity = normalizeError(ce(3, 'Password does not meet complexity requirements'));
-    expect(complexity).to.be.instanceOf(ProviderError);
-    expect(complexity.code).to.equal('PASSWORD_COMPLEXITY');
-    expect(normalizeError(ce(6, 'user already exists')).code).to.equal('ALREADY_EXISTS');
-
-    // P1 regression: failedAttempts still wins over message discrimination
-    const e = normalizeError(ce(3, 'complexity check', [{ failedAttempts: 1 }]));
-    expect(e.code).to.equal('INVALID_CREDENTIALS');
-    expect(e.detail?.failedAttempts).to.equal(1);
-  });
-});
+// The Phase 2 normalizeError extensions (code 3 + /complexity/i → PASSWORD_COMPLEXITY, code 6 →
+// ALREADY_EXISTS) and the P1 failedAttempts-wins regression guard now live in mappers.cy.ts,
+// alongside the rest of the normalizeError coverage — one function, one table.
+import { toRegisterRequest } from '@/modules/auth/providers/zitadel/mappers';
 
 describe('toRegisterRequest', () => {
   it('maps minimal input to AddHumanUser shape, and includes organization/passwordType/email-verification oneofs when provided', () => {

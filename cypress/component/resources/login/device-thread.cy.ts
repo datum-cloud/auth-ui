@@ -24,54 +24,60 @@ function makeProvider() {
   });
 }
 
+// 755-M8: the two requestId prefixes take DIFFERENT post-password hops — device_ goes
+// straight to /signed-in, oidc_ keeps the /authorize finalization carve-out. Same ceremony,
+// same assertion shape, so one table with the expected destination per prefix.
+const CEREMONIES: Array<{
+  label: string;
+  requestId: string;
+  targetPattern: RegExp;
+  mustNotContain?: string;
+}> = [
+  {
+    label: 'device_ requestId reaches /signed-in',
+    requestId: REQUEST_ID,
+    targetPattern: /^\/signed-in/,
+    mustNotContain: '/authorize',
+  },
+  {
+    label: 'oidc_ requestId keeps the /authorize finalization carve-out',
+    requestId: 'oidc_V2_abc123',
+    targetPattern: /^\/authorize/,
+  },
+];
+
 describe('device_ requestId threading through the login ceremony', () => {
-  it('password flow accepts a device_ requestId and threads it (not rejected)', async () => {
-    const fake = makeProvider();
+  it('threads the requestId through identifier → password, sending device_ to /signed-in and oidc_ to /authorize (755-M8)', async () => {
+    for (const { label, requestId, targetPattern, mustNotContain } of CEREMONIES) {
+      const fake = makeProvider();
 
-    // 1) identifier step establishes the ceremony session entry.
-    const idResult = await resolveIdentifier(fake, [], {
-      loginName: 'alice@acme.test',
-      requestId: REQUEST_ID,
-      emailDeliveryEnabled: true,
-    });
-    expect(idResult.ok).to.equal(true);
-    if (!idResult.ok) return;
-    expect(idResult.sessions.length).to.be.greaterThan(0);
+      // 1) identifier step establishes the ceremony session entry.
+      const idResult = await resolveIdentifier(fake, [], {
+        loginName: 'alice@acme.test',
+        requestId,
+        emailDeliveryEnabled: true,
+      });
+      expect(idResult.ok, `${label}: identifier step`).to.equal(true);
+      if (!idResult.ok) return;
+      expect(idResult.sessions.length, `${label}: ceremony session created`).to.be.greaterThan(0);
 
-    // 2) password step must accept the threaded device_ requestId.
-    const pwResult = await verifyLoginPassword(fake, idResult.sessions, {
-      loginName: 'alice@acme.test',
-      password: 'hunter2',
-      requestId: REQUEST_ID,
-    });
-    expect(pwResult.ok).to.equal(true);
-    if (!pwResult.ok) return;
-    // The device_ requestId survives into the post-password redirect target.
-    expect(pwResult.target).to.contain(`requestId=${REQUEST_ID}`);
-    // 755-M8: a device_ requestId must reach /signed-in (NOT /authorize finalization).
-    expect(pwResult.target).to.match(/^\/signed-in/);
-    expect(pwResult.target).not.to.contain('/authorize');
-  });
+      // 2) password step must accept the threaded requestId.
+      const pwResult = await verifyLoginPassword(fake, idResult.sessions, {
+        loginName: 'alice@acme.test',
+        password: 'hunter2',
+        requestId,
+      });
+      expect(pwResult.ok, `${label}: password step`).to.equal(true);
+      if (!pwResult.ok) return;
 
-  it('755-M8: an oidc_ requestId STILL takes the /authorize finalization carve-out', async () => {
-    const fake = makeProvider();
-    const oidcReq = 'oidc_V2_abc123';
-    const idResult = await resolveIdentifier(fake, [], {
-      loginName: 'alice@acme.test',
-      requestId: oidcReq,
-      emailDeliveryEnabled: true,
-    });
-    expect(idResult.ok).to.equal(true);
-    if (!idResult.ok) return;
-    const pwResult = await verifyLoginPassword(fake, idResult.sessions, {
-      loginName: 'alice@acme.test',
-      password: 'hunter2',
-      requestId: oidcReq,
-    });
-    expect(pwResult.ok).to.equal(true);
-    if (!pwResult.ok) return;
-    // Non-device requestIds keep the OIDC finalization hop to /authorize.
-    expect(pwResult.target).to.match(/^\/authorize/);
-    expect(pwResult.target).to.contain(`requestId=${oidcReq}`);
+      // The requestId survives into the post-password redirect target.
+      expect(pwResult.target, `${label}: requestId survives`).to.contain(`requestId=${requestId}`);
+      expect(pwResult.target, `${label}: destination`).to.match(targetPattern);
+      if (mustNotContain) {
+        expect(pwResult.target, `${label}: no ${mustNotContain} hop`).not.to.contain(
+          mustNotContain
+        );
+      }
+    }
   });
 });

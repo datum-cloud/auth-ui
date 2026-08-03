@@ -30,14 +30,14 @@ function run(s: Scenario): Cypress.Chainable<Verdict> {
 // RED: orgId === undefined. GREEN: orgId === 'org-default-fake'.
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe('registerAndLinkIdp — default-org resolution on bare flow (no organization)', () => {
-  it('calls register with the resolved default org (not undefined) when organization is omitted', () => {
-    run({
-      fn: 'registerAndLinkIdp',
-      request: { url: `${BASE_URL}/signup` },
-      provider: 'singleton',
-      // No organization in signupInput → bare flow
-      signupInput: {
+describe('register paths — default-org resolution on bare flow (no organization)', () => {
+  // Four byte-identical assertions that differed only by `fn` and the signupInput payload.
+  // Kept as a labeled table so a failure still names which register path regressed.
+  const BARE_FLOW: [fn: string, path: string, signupInput: Record<string, unknown>][] = [
+    [
+      'registerAndLinkIdp',
+      '/signup',
+      {
         email: 'idp-bare@test.com',
         firstName: 'Idp',
         lastName: 'Bare',
@@ -47,97 +47,59 @@ describe('registerAndLinkIdp — default-org resolution on bare flow (no organiz
         idpUserId: 'g-bare',
         idpUserName: 'idp-bare@test.com',
       },
-      recordCalls: ['register'],
-    }).then((verdict) => {
-      expect(verdict.ok, verdict.error ?? '').to.be.true;
-      const registerCalls = (verdict.calls?.['register'] ?? []) as Array<[Record<string, unknown>]>;
-      expect(registerCalls.length, 'register was called').to.be.greaterThan(0);
-      const registerInput = registerCalls[0][0];
-      expect(registerInput.orgId, 'orgId must be the resolved default org, not undefined').to.equal(
-        'org-default-fake'
-      );
-    });
-  });
-});
-
-describe('registerPasskeyFirst — default-org resolution on bare flow (no organization)', () => {
-  it('calls register with the resolved default org (not undefined) when organization is omitted', () => {
-    run({
-      fn: 'registerPasskeyFirst',
-      request: { url: `${BASE_URL}/signup` },
-      provider: 'singleton',
-      signupInput: {
+    ],
+    [
+      'registerPasskeyFirst',
+      '/signup',
+      {
         email: 'passkey-bare@test.com',
         firstName: 'Passkey',
         lastName: 'Bare',
         requireVerification: false,
         origin: ORIGIN,
-        // No organization → bare flow
       },
-      recordCalls: ['register'],
-    }).then((verdict) => {
-      expect(verdict.ok, verdict.error ?? '').to.be.true;
-      const registerCalls = (verdict.calls?.['register'] ?? []) as Array<[Record<string, unknown>]>;
-      expect(registerCalls.length, 'register was called').to.be.greaterThan(0);
-      const registerInput = registerCalls[0][0];
-      expect(registerInput.orgId, 'orgId must be the resolved default org, not undefined').to.equal(
-        'org-default-fake'
-      );
-    });
-  });
-});
-
-describe('registerWithPassword — default-org resolution on bare flow (no organization)', () => {
-  it('calls register with the resolved default org (not undefined) when organization is omitted', () => {
-    run({
-      fn: 'registerWithPassword',
-      request: { url: `${BASE_URL}/signup/password` },
-      provider: 'singleton',
-      signupInput: {
+    ],
+    [
+      'registerWithPassword',
+      '/signup/password',
+      {
         email: 'pw-bare@test.com',
         firstName: 'Pw',
         lastName: 'Bare',
         password: 'hunter2hunter2',
         requireVerification: false,
         origin: ORIGIN,
-        // No organization → bare flow
       },
-      recordCalls: ['register'],
-    }).then((verdict) => {
-      expect(verdict.ok, verdict.error ?? '').to.be.true;
-      const registerCalls = (verdict.calls?.['register'] ?? []) as Array<[Record<string, unknown>]>;
-      expect(registerCalls.length, 'register was called').to.be.greaterThan(0);
-      const registerInput = registerCalls[0][0];
-      expect(registerInput.orgId, 'orgId must be the resolved default org, not undefined').to.equal(
-        'org-default-fake'
-      );
-    });
-  });
-});
+    ],
+    [
+      'registerEmailLinkSignup',
+      '/signup',
+      { email: 'emaillink-bare@test.com', firstName: 'Email', lastName: 'Bare', origin: ORIGIN },
+    ],
+  ];
 
-describe('registerEmailLinkSignup — default-org resolution on bare flow (no organization)', () => {
-  it('calls register with the resolved default org (not undefined) when organization is omitted', () => {
-    run({
-      fn: 'registerEmailLinkSignup',
-      request: { url: `${BASE_URL}/signup` },
-      provider: 'singleton',
-      signupInput: {
-        email: 'emaillink-bare@test.com',
-        firstName: 'Email',
-        lastName: 'Bare',
-        origin: ORIGIN,
-        // No organization → bare flow
-      },
-      recordCalls: ['register'],
-    }).then((verdict) => {
-      expect(verdict.ok, verdict.error ?? '').to.be.true;
-      const registerCalls = (verdict.calls?.['register'] ?? []) as Array<[Record<string, unknown>]>;
-      expect(registerCalls.length, 'register was called').to.be.greaterThan(0);
-      const registerInput = registerCalls[0][0];
-      expect(registerInput.orgId, 'orgId must be the resolved default org, not undefined').to.equal(
-        'org-default-fake'
-      );
-    });
+  it('every register path calls register with the resolved default org (not undefined) when organization is omitted', () => {
+    for (const [fn, path, signupInput] of BARE_FLOW) {
+      run({
+        fn,
+        request: { url: `${BASE_URL}${path}` },
+        provider: 'singleton',
+        // No organization in signupInput → bare flow
+        signupInput,
+        recordCalls: ['register'],
+      } as Scenario).then((verdict) => {
+        expect(verdict.ok, `${fn}: ${verdict.error ?? ''}`).to.be.true;
+        const registerCalls = (verdict.calls?.['register'] ?? []) as Array<
+          [Record<string, unknown>]
+        >;
+        expect(registerCalls.length, `${fn}: register was called`).to.be.greaterThan(0);
+        const registerInput = registerCalls[0][0];
+        expect(
+          registerInput.orgId,
+          `${fn}: orgId must be the resolved default org, not undefined`
+        ).to.equal('org-default-fake');
+      });
+    }
   });
 });
 
@@ -195,7 +157,10 @@ describe('registerEmailLinkSignup', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 
 describe('registerWithPassword — verification skip (requireVerification=false)', () => {
-  it('calls register with emailVerified:true and NO verifyUrlTemplate when requireVerification=false', () => {
+  // The two register-arg cases stay written out rather than table-driven: they assert
+  // DIFFERENT fields with different matchers (a present non-empty string vs. undefined),
+  // so a shared row shape would either lose a matcher or obscure which field failed.
+  it('sets emailVerified without verifyUrlTemplate when verification is off, and the inverse when on', () => {
     // RED: before the fix, register was always called with verifyUrlTemplate and no emailVerified.
     // GREEN: when requireVerification=false, emailVerified:true + no verifyUrlTemplate.
     run({
@@ -215,37 +180,14 @@ describe('registerWithPassword — verification skip (requireVerification=false)
     }).then((verdict) => {
       expect(verdict.ok, verdict.error ?? '').to.be.true;
       const registerCalls = (verdict.calls?.['register'] ?? []) as Array<[Record<string, unknown>]>;
-      expect(registerCalls.length, 'register was called once').to.equal(1);
+      expect(registerCalls.length, 'no-verify: register was called once').to.equal(1);
       const arg = registerCalls[0][0];
       // Must be pre-verified — Zitadel marks email verified, sends nothing.
-      expect(arg.emailVerified, 'emailVerified must be true').to.equal(true);
+      expect(arg.emailVerified, 'no-verify: emailVerified must be true').to.equal(true);
       // Must NOT include verifyUrlTemplate — that would trigger Zitadel's sendCode path.
-      expect(arg.verifyUrlTemplate, 'verifyUrlTemplate must be absent').to.be.undefined;
+      expect(arg.verifyUrlTemplate, 'no-verify: verifyUrlTemplate must be absent').to.be.undefined;
     });
-  });
 
-  it('result is a redirect (not sent-with-session) when requireVerification=false', () => {
-    run({
-      fn: 'registerWithPassword',
-      request: { url: `${BASE_URL}/signup/password` },
-      provider: 'singleton',
-      signupInput: {
-        email: 'noverify2@test.com',
-        firstName: 'No',
-        lastName: 'Verify',
-        password: 'hunter2hunter2',
-        requireVerification: false,
-        origin: ORIGIN,
-      },
-    }).then((verdict) => {
-      expect(verdict.ok, verdict.error ?? '').to.be.true;
-      const r = verdict.outcome as Record<string, unknown>;
-      // No-verification path must redirect, never stall on "check your email".
-      expect(r.kind).to.equal('redirect');
-    });
-  });
-
-  it('calls register with verifyUrlTemplate and NO emailVerified when requireVerification=true (existing path unchanged)', () => {
     run({
       fn: 'registerWithPassword',
       request: { url: `${BASE_URL}/signup/password` },
@@ -263,33 +205,45 @@ describe('registerWithPassword — verification skip (requireVerification=false)
     }).then((verdict) => {
       expect(verdict.ok, verdict.error ?? '').to.be.true;
       const registerCalls = (verdict.calls?.['register'] ?? []) as Array<[Record<string, unknown>]>;
-      expect(registerCalls.length, 'register was called once').to.equal(1);
+      expect(registerCalls.length, 'with-verify: register was called once').to.equal(1);
       const arg = registerCalls[0][0];
       // Verification ON: verifyUrlTemplate present, emailVerified absent/falsy.
-      expect(arg.verifyUrlTemplate, 'verifyUrlTemplate must be present').to.be.a('string').and.not
-        .be.empty;
-      expect(arg.emailVerified, 'emailVerified must be absent').to.be.undefined;
+      expect(arg.verifyUrlTemplate, 'with-verify: verifyUrlTemplate must be present').to.be.a(
+        'string'
+      ).and.not.be.empty;
+      expect(arg.emailVerified, 'with-verify: emailVerified must be absent').to.be.undefined;
     });
   });
 
-  it('result is sent-with-session when requireVerification=true (existing path unchanged)', () => {
-    run({
-      fn: 'registerWithPassword',
-      request: { url: `${BASE_URL}/signup/password` },
-      provider: 'singleton',
-      signupInput: {
-        email: 'withverify2@test.com',
-        firstName: 'With',
-        lastName: 'Verify',
-        password: 'hunter2hunter2',
-        requireVerification: true,
-        origin: ORIGIN,
-      },
-    }).then((verdict) => {
-      expect(verdict.ok, verdict.error ?? '').to.be.true;
-      const r = verdict.outcome as Record<string, unknown>;
-      expect(r.kind).to.equal('sent-with-session');
-    });
+  // Kept as its own `it()` rather than a helper invoked from the test above: assertions that
+  // live in a plain function are only as alive as their call site, and orphaning that one
+  // call would silently retire them — no failing test, no change in reported test count.
+  const OUTCOMES: [requireVerification: boolean, expectedKind: string][] = [
+    // No-verification path must redirect, never stall on "check your email".
+    [false, 'redirect'],
+    [true, 'sent-with-session'],
+  ];
+
+  it('resolves to a redirect when requireVerification=false and to sent-with-session when it is true', () => {
+    for (const [requireVerification, expectedKind] of OUTCOMES) {
+      run({
+        fn: 'registerWithPassword',
+        request: { url: `${BASE_URL}/signup/password` },
+        provider: 'singleton',
+        signupInput: {
+          email: `outcome-${expectedKind}@test.com`,
+          firstName: 'Outcome',
+          lastName: 'Verify',
+          password: 'hunter2hunter2',
+          requireVerification,
+          origin: ORIGIN,
+        },
+      }).then((verdict) => {
+        expect(verdict.ok, verdict.error ?? '').to.be.true;
+        const r = verdict.outcome as Record<string, unknown>;
+        expect(r.kind, `requireVerification=${requireVerification}`).to.equal(expectedKind);
+      });
+    }
   });
 });
 

@@ -6,27 +6,42 @@
 // Migrated from: app/routes/__tests__/paths.test.ts
 import { paths } from '@/routes/paths';
 
-describe("paths.ts — typed builders return today's exact strings", () => {
-  it('builds login ceremony paths', () => {
-    expect(paths.login.index()).to.equal('/login');
-    expect(paths.login.method()).to.equal('/login/method');
-    expect(paths.login.password()).to.equal('/login/password');
-    expect(paths.login.verify.email({})).to.equal('/login/verify/email');
-    expect(paths.login.verify.email({ loginName: 'a@b.test', code: '123' })).to.equal(
-      '/login/verify/email?loginName=a%40b.test&code=123'
-    );
-    expect(paths.login.verify.sms({})).to.equal('/login/verify/sms');
-    expect(paths.login.verify.authenticator({})).to.equal('/login/verify/authenticator');
-  });
+// Every builder is a pure call → exact string, so the whole surface is one table.
+// Rows are evaluated eagerly: these are pure functions with no side effects.
+const CASES: [label: string, actual: string, expected: string][] = [
+  ['login.index', paths.login.index(), '/login'],
+  ['login.method', paths.login.method(), '/login/method'],
+  ['login.password', paths.login.password(), '/login/password'],
+  ['login.verify.email (bare)', paths.login.verify.email({}), '/login/verify/email'],
+  [
+    'login.verify.email (params URL-encoded)',
+    paths.login.verify.email({ loginName: 'a@b.test', code: '123' }),
+    '/login/verify/email?loginName=a%40b.test&code=123',
+  ],
+  ['login.verify.sms', paths.login.verify.sms({}), '/login/verify/sms'],
+  [
+    'login.verify.authenticator',
+    paths.login.verify.authenticator({}),
+    '/login/verify/authenticator',
+  ],
+  ['passkeys (bare)', paths.passkeys(), '/passkeys'],
+  ['reauth (bare)', paths.reauth(), '/reauth'],
+  [
+    'reauth (method + returnTo encoded)',
+    paths.reauth({ method: 'password', returnTo: '/passkeys' }),
+    '/reauth?method=password&returnTo=%2Fpasskeys',
+  ],
+  [
+    'passkeys (absolute returnTo encoded)',
+    paths.passkeys({ returnTo: 'https://portal.test/settings' }),
+    '/passkeys?returnTo=https%3A%2F%2Fportal.test%2Fsettings',
+  ],
+];
 
-  it('builds passkey-management and reauth paths', () => {
-    expect(paths.passkeys()).to.equal('/passkeys');
-    expect(paths.reauth()).to.equal('/reauth');
-    expect(paths.reauth({ method: 'password', returnTo: '/passkeys' })).to.equal(
-      '/reauth?method=password&returnTo=%2Fpasskeys'
-    );
-    expect(paths.passkeys({ returnTo: 'https://portal.test/settings' })).to.equal(
-      '/passkeys?returnTo=https%3A%2F%2Fportal.test%2Fsettings'
-    );
+describe("paths.ts — typed builders return today's exact strings", () => {
+  it('builds every login ceremony, passkey-management and reauth path, URL-encoding params', () => {
+    for (const [label, actual, expected] of CASES) {
+      expect(actual, label).to.equal(expected);
+    }
   });
 });

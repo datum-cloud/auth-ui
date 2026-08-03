@@ -9,41 +9,47 @@
 import { callService } from '../../../../support/node/call-service';
 
 describe('cookie layer', () => {
-  it('round-trips a session list through serialize → parse', () => {
-    callService({
-      fn: 'cookieRoundTripCheck',
-      cookieOp: 'roundTrip2',
-      request: { url: 'http://localhost/id' },
-    }).then((v) => {
-      expect((v.outcome as { ids: string[] }).ids).to.deep.equal(['s1', 's2']);
-    });
-  });
-
-  it('returns [] for a tampered cookie value (invalid signature)', () => {
+  // The three ops chain in one test, matching the established cy.task chaining pattern. Each
+  // callService spawns a fresh Bun process, so they stay fully independent; the only cost is
+  // that an earlier failure masks the later results. The TAMPER check therefore runs FIRST —
+  // it is the signature-verification assertion, and it must never be the one that gets masked.
+  it('rejects a tampered cookie, round-trips a session list, and caps the value at 2048 bytes', () => {
     callService({
       fn: 'cookieRoundTripCheck',
       cookieOp: 'tampered',
       request: { url: 'http://localhost/id' },
-    }).then((v) => {
-      expect((v.outcome as { result: string[] }).result).to.deep.equal([]);
-    });
-  });
-
-  it('overflow: serialized value ≤ 2048 bytes and only newest entries survive', () => {
-    callService({
-      fn: 'cookieRoundTripCheck',
-      cookieOp: 'overflow',
-      request: { url: 'http://localhost/id' },
-    }).then((v) => {
-      const o = v.outcome as {
-        bytes: number;
-        parsedIds: string[];
-        expectedIds: string[];
-        parsedLen: number;
-      };
-      expect(o.bytes).to.be.at.most(2048);
-      expect(o.parsedIds).to.deep.equal(o.expectedIds);
-      expect(o.parsedLen).to.be.lessThan(10);
-    });
+    })
+      .then((v) => {
+        expect((v.outcome as { result: string[] }).result, 'tampered: parses to []').to.deep.equal(
+          []
+        );
+        return callService({
+          fn: 'cookieRoundTripCheck',
+          cookieOp: 'roundTrip2',
+          request: { url: 'http://localhost/id' },
+        });
+      })
+      .then((v) => {
+        expect((v.outcome as { ids: string[] }).ids, 'roundTrip2: ids survive').to.deep.equal([
+          's1',
+          's2',
+        ]);
+        return callService({
+          fn: 'cookieRoundTripCheck',
+          cookieOp: 'overflow',
+          request: { url: 'http://localhost/id' },
+        });
+      })
+      .then((v) => {
+        const o = v.outcome as {
+          bytes: number;
+          parsedIds: string[];
+          expectedIds: string[];
+          parsedLen: number;
+        };
+        expect(o.bytes, 'overflow: bytes <= 2048').to.be.at.most(2048);
+        expect(o.parsedIds, 'overflow: only newest entries survive').to.deep.equal(o.expectedIds);
+        expect(o.parsedLen, 'overflow: fewer than the 10 written').to.be.lessThan(10);
+      });
   });
 });

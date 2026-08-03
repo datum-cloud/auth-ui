@@ -147,35 +147,34 @@ describe('requestPasskeyAttestation / requestU2FAttestation — challenge audit 
 });
 
 describe('requestWebAuthnChallenge — guard-fail bounce target threading', () => {
-  it('bounces to /login threading requestId + organization when there is no matching session (mirrors the attestation siblings)', () => {
-    callService({
-      fn: 'requestWebAuthnChallenge',
-      provider: 'singleton',
-      request: { url: 'http://localhost/id/login/passkey' }, // no sessions
-      attestationInput: {
-        loginName: 'ghost@nowhere.test',
-        domain: 'localhost',
-        requestId: 'oidc_V2_789',
-        organization: 'org-1',
-      },
-    }).then((v) => {
-      const o = v.outcome as { kind: string; target?: string };
-      expect(o.kind).to.equal('redirect');
-      expect(o.target).to.equal('/login?requestId=oidc_V2_789&organization=org-1');
-    });
-  });
+  // Same call, same assertion shape — only the ceremony context and expected target vary.
+  const BOUNCES: [label: string, ceremony: Record<string, string>, expectedTarget: string][] = [
+    [
+      // Mirrors the attestation siblings: a dead session mid-ceremony must resume after re-login.
+      'requestId + organization',
+      { requestId: 'oidc_V2_789', organization: 'org-1' },
+      '/login?requestId=oidc_V2_789&organization=org-1',
+    ],
+    ['no ceremony context', {}, '/login'],
+  ];
 
-  it('bounces to a bare /login when no ceremony context is present', () => {
-    callService({
-      fn: 'requestWebAuthnChallenge',
-      provider: 'singleton',
-      request: { url: 'http://localhost/id/login/passkey' }, // no sessions
-      attestationInput: { loginName: 'ghost@nowhere.test', domain: 'localhost' },
-    }).then((v) => {
-      const o = v.outcome as { kind: string; target?: string };
-      expect(o.kind).to.equal('redirect');
-      expect(o.target).to.equal('/login');
-    });
+  it('bounces to /login when there is no matching session, threading requestId + organization when present and bare otherwise', () => {
+    for (const [label, ceremony, expectedTarget] of BOUNCES) {
+      callService({
+        fn: 'requestWebAuthnChallenge',
+        provider: 'singleton',
+        request: { url: 'http://localhost/id/login/passkey' }, // no sessions
+        attestationInput: {
+          loginName: 'ghost@nowhere.test',
+          domain: 'localhost',
+          ...ceremony,
+        },
+      }).then((v) => {
+        const o = v.outcome as { kind: string; target?: string };
+        expect(o.kind, `${label}: redirect`).to.equal('redirect');
+        expect(o.target, `${label}: target`).to.equal(expectedTarget);
+      });
+    }
   });
 });
 

@@ -18,19 +18,25 @@ const GENERIC = {
 };
 
 describe('authErrorMessage', () => {
-  it('returns the exact mapped message for each known code', () => {
+  it('returns the exact mapped message for every known code, and the generic fallback for an unknown code or null/undefined', () => {
+    // Every catalogued code resolves to its own entry...
     const codes = Object.keys(AUTH_ERRORS) as AuthErrorCode[];
     for (const code of codes) {
-      expect(authErrorMessage(code)).to.deep.equal(AUTH_ERRORS[code]);
+      expect(authErrorMessage(code), `known code ${code}`).to.deep.equal(AUTH_ERRORS[code]);
+    }
+
+    // ...and everything outside the catalog collapses to the generic message.
+    const UNKNOWN: [label: string, input: string | null | undefined][] = [
+      ['unknown code', 'not_a_real_code'],
+      ['null', null],
+      ['undefined', undefined],
+    ];
+    for (const [label, input] of UNKNOWN) {
+      expect(authErrorMessage(input), label).to.deep.equal(GENERIC);
     }
   });
 
-  it('returns the generic fallback for an unknown code, and for null/undefined', () => {
-    expect(authErrorMessage('not_a_real_code')).to.deep.equal(GENERIC);
-    expect(authErrorMessage(null)).to.deep.equal(GENERIC);
-    expect(authErrorMessage(undefined)).to.deep.equal(GENERIC);
-  });
-
+  // Kept standalone: the tamper/XSS invariant, with its own not.include assertions.
   it('does NOT echo a tampered/raw query value back to the caller (security)', () => {
     const tampered = '<script>alert(1)</script>';
     const result = authErrorMessage(tampered);
@@ -43,16 +49,20 @@ describe('authErrorMessage', () => {
 });
 
 describe('providerErrorCode', () => {
-  it('maps UNAVAILABLE to service_unavailable', () => {
-    expect(providerErrorCode('UNAVAILABLE')).to.equal('service_unavailable');
+  const MAPPINGS: [label: string, input: string | undefined, expected: string][] = [
+    ['UNAVAILABLE is the one specific mapping', 'UNAVAILABLE', 'service_unavailable'],
+    ['other provider code', 'DEADLINE_EXCEEDED', 'signin_failed'],
+    ['unknown code', 'UNKNOWN', 'signin_failed'],
+    ['undefined', undefined, 'signin_failed'],
+  ];
+
+  it('maps UNAVAILABLE to service_unavailable and falls back to signin_failed for any other code or undefined', () => {
+    for (const [label, input, expected] of MAPPINGS) {
+      expect(providerErrorCode(input), label).to.equal(expected);
+    }
   });
 
-  it('falls back to signin_failed for any other code, or for undefined', () => {
-    expect(providerErrorCode('DEADLINE_EXCEEDED')).to.equal('signin_failed');
-    expect(providerErrorCode('UNKNOWN')).to.equal('signin_failed');
-    expect(providerErrorCode(undefined)).to.equal('signin_failed');
-  });
-
+  // Kept standalone: a closure property over the catalog, not an input→output row.
   it('only ever returns a known AuthErrorCode (so authErrorMessage never falls through)', () => {
     const result = providerErrorCode('UNAVAILABLE');
     expect(AUTH_ERRORS[result]).to.not.be.undefined;

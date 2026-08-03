@@ -30,13 +30,22 @@ describe('session store (cookie-array logic)', () => {
     expect(listSessions(next, NOW)).to.have.length(1);
     expect(mostRecent(next)?.changeTs).to.equal('2');
   });
-  it('drops expired sessions on list', () => {
+  it('drops expired sessions but keeps an entry with an empty expirationTs', () => {
+    // Mixed list first: proves listSessions filters PER ENTRY rather than keeping or
+    // dropping the whole array, which the single-entry table below cannot show.
     const expired = { ...base, id: 's2', expirationTs: '1' };
     expect(listSessions([base, expired], NOW)).to.have.length(1);
-  });
-  it('KEEPS an entry with an empty expirationTs (Zitadel session created without a lifetime → no expirationDate)', () => {
-    const noExpiry = { ...base, id: 's3', expirationTs: '' };
-    expect(listSessions([noExpiry], NOW)).to.have.length(1);
+
+    for (const [expirationTs, kept] of [
+      ['1', false],
+      ['9999999999999', true],
+      ['', true],
+    ] as const) {
+      expect(
+        listSessions([{ ...base, id: 's3', expirationTs }], NOW),
+        `expirationTs=${JSON.stringify(expirationTs)}`
+      ).to.have.length(kept ? 1 : 0);
+    }
   });
   it('caps the cookie at the byte budget, evicting the oldest by changeTs first', () => {
     const sizeOf = (list: SessionEntry[]) => list.length * 800;
@@ -118,12 +127,15 @@ describe('byLoginName', () => {
 
 describe('needsLivenessCheck', () => {
   const livenessBase = { id: 's', token: 't', loginName: 'a', creationTs: '0', changeTs: '0' };
-  it('flags an entry with an empty expirationTs (unknown expiry → must verify with provider)', () => {
-    expect(needsLivenessCheck({ ...livenessBase, expirationTs: '' })).to.equal(true);
-  });
-  it('does not flag an entry with a known future expiry', () => {
-    expect(
-      needsLivenessCheck({ ...livenessBase, expirationTs: '2099-01-01T00:00:00.000Z' })
-    ).to.equal(false);
+  it('flags an unknown expiry, but not a known future one', () => {
+    for (const [expirationTs, flagged] of [
+      ['', true],
+      ['2099-01-01T00:00:00.000Z', false],
+    ] as const) {
+      expect(
+        needsLivenessCheck({ ...livenessBase, expirationTs }),
+        `expirationTs=${JSON.stringify(expirationTs)}`
+      ).to.equal(flagged);
+    }
   });
 });

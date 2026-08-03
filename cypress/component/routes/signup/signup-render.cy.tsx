@@ -80,7 +80,7 @@ function mountSignup(data: unknown, onSubmitFormData?: (form: FormData) => void)
 }
 
 describe('signup/index — render adoption', () => {
-  it('emits csrf + requestId + organization hidden inputs on the IdP button form', () => {
+  it('emits csrf + requestId + organization on the IdP form, and hides Email entry when disabled', () => {
     mountSignup(loaderData());
     cy.contains('Google', { timeout: 6000 }).should('exist');
     // The first form is the IdP form; it must carry csrf, requestId, organization.
@@ -91,9 +91,7 @@ describe('signup/index — render adoption', () => {
         cy.get('input[type="hidden"][name="requestId"]').should('have.value', 'rq-123');
         cy.get('input[type="hidden"][name="organization"]').should('have.value', 'acme');
       });
-  });
 
-  it('shows IdP button and hides Email entry button when emailDeliveryEnabled=false (IdP-only signup)', () => {
     // view.allowEmailEntry=false when delivery is off — the Email button must not appear.
     mountSignup(
       loaderData({

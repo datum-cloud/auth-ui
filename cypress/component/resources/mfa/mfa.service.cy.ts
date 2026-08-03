@@ -23,17 +23,15 @@ describe('chooseMfaMethod — findUser failure audit (security: routing continue
     mfaInput: { loginName: 'alice@acme.test' },
   };
 
-  it('emits an mfa_method_chosen failure audit line when findUser throws', () => {
+  // All three assertions read DIFFERENT fields of the SAME verdict — the scenario was being
+  // re-run identically three times. One run, all assertions.
+  it('audits a findUser failure with a hashed actor, and still routes to the use-screen', () => {
     callService(scenario).then((v) => {
       const failure = v.audit.find(
         (e) => e.event === 'mfa_method_chosen' && e.outcome === 'failure'
       );
       expect(failure, 'a failure audit event').to.not.equal(undefined);
-    });
-  });
 
-  it('still emits the success routing event even when findUser throws (routing continues)', () => {
-    callService(scenario).then((v) => {
       const success = v.audit.find(
         (e) => e.event === 'mfa_method_chosen' && e.outcome === 'success'
       );
@@ -42,14 +40,8 @@ describe('chooseMfaMethod — findUser failure audit (security: routing continue
       const o = v.outcome as { ok: boolean; target?: string };
       expect(o.ok).to.equal(true);
       expect(o.target ?? '').to.include('/login/verify/authenticator');
-    });
-  });
 
-  it('does NOT put raw loginName in the failure audit fields (hashed actor only)', () => {
-    callService(scenario).then((v) => {
-      const failure = v.audit.find(
-        (e) => e.event === 'mfa_method_chosen' && e.outcome === 'failure'
-      );
+      // No PII leak: the failure line must carry a hashed actor, never the raw loginName.
       expect(failure?.loginName, 'no raw loginName').to.equal(undefined);
       expect(typeof failure?.actor, 'hashed actor present').to.equal('string');
     });
@@ -108,24 +100,16 @@ describe('resolveMfaSetup — auto-skip when no MFA methods are offerable', () =
     mfaInput: { loginName: 'nomfa@test.example' },
   };
 
-  it('returns a redirect (not setup) when no MFA methods are offerable', () => {
+  // Three assertions on three fields of the SAME verdict — one run instead of three.
+  it('returns a redirect (not setup) whose target does not loop back to /setup/mfa, and emits an mfa_skip success audit line', () => {
     callService(baseScenario).then((v) => {
-      const o = v.outcome as { kind: string; offerableKeys?: unknown[] };
+      const o = v.outcome as { kind: string; target?: string; offerableKeys?: unknown[] };
       expect(o.kind, 'auto-skip: kind must be redirect, not setup').to.equal('redirect');
-    });
-  });
-
-  it('redirect target does not loop back to /setup/mfa', () => {
-    callService(baseScenario).then((v) => {
-      const o = v.outcome as { kind: string; target?: string };
       expect(o.target ?? '', 'target must not loop back to /setup/mfa').to.not.include(
         '/setup/mfa'
       );
-    });
-  });
 
-  it('emits an mfa_skip success audit line on auto-skip', () => {
-    callService(baseScenario).then((v) => {
+      // Stamping the skip is what prevents a re-prompt loop.
       const skipAudit = v.audit.find((e) => e.event === 'mfa_skip' && e.outcome === 'success');
       expect(skipAudit, 'mfa_skip success audit must be emitted').to.not.equal(undefined);
     });
@@ -210,16 +194,11 @@ describe('resolveMfaSetup — normal path returns offerableKeys when MFA methods
     mfaInput: { loginName: 'alice@acme.test' },
   };
 
-  it('returns kind: setup (not redirect) when offerable MFA methods exist', () => {
+  // Both assertions read the SAME verdict — one run instead of two.
+  it('returns kind: setup (not redirect) with a non-empty offerableKeys when MFA capabilities are enabled', () => {
     callService(scenario).then((v) => {
       const o = v.outcome as { kind: string; offerableKeys?: string[] };
       expect(o.kind, 'chooser renders when methods available').to.equal('setup');
-    });
-  });
-
-  it('offerableKeys is non-empty when MFA capabilities are enabled', () => {
-    callService(scenario).then((v) => {
-      const o = v.outcome as { kind: string; offerableKeys?: string[] };
       expect((o.offerableKeys ?? []).length, 'offerable keys non-empty').to.be.greaterThan(0);
     });
   });

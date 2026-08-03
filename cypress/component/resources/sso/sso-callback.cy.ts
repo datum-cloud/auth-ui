@@ -23,24 +23,134 @@ const isSignedInOrAuthorize = (loc: string) => loc === '/signed-in' || loc.start
 const CB = (provider = 'google', query = 'id=intent-1&token=tok-1') =>
   `https://auth.localtest.me/sso/${provider}/callback?${query}`;
 
-describe('processIdpCallback — provider error handling', () => {
-  it('redirects to the SSO error page and logs idp.signin failure when retrieveIdpIntent throws', () => {
-    callService({
+// Every scripted-failure path that must land on the SSO error page with a SPECIFIC, actionable
+// reason rather than the generic signin_failed. Merged from four separate describes that each
+// drove processIdpCallback with one scripted error and asserted the same result shape.
+//
+// NOT merged here: the same-email collision hard error (reason=account-exists) — that one also
+// asserts the no-session-cookie and PII-safe-audit properties of the default fail-closed
+// posture, and stays standalone below.
+const AUTOLINK_INTENT: Scenario['idpIntent'] = {
+  userId: null,
+  information: { idpId: 'idp-g', idpUserId: 'g-al', idpUserName: 'you@gmail.com' },
+  draft: { email: 'you@gmail.com', firstName: 'You', lastName: 'User', emailVerified: true },
+};
+const AUTOLINK_SEED = {
+  users: [{ id: 'u1', loginName: 'you@gmail.com', displayName: 'You User' }],
+};
+
+interface ErrorCase {
+  label: string;
+  scenario: Scenario;
+  /** Substrings that MUST appear in the redirect Location. */
+  includes: string[];
+  /** Substrings that must NOT appear — the point of the 755-J1/K1 reason mapping. */
+  excludes: string[];
+  /** Audit event that must carry a failure outcome. */
+  auditFailure?: string;
+  /** Needle that must NOT appear in Set-Cookie (no session may be minted). */
+  noCookieNeedle?: string;
+}
+
+const ERROR_CASES: ErrorCase[] = [
+  {
+    label: 'retrieveIdpIntent throws',
+    scenario: {
       fn: 'processIdpCallback',
       provider: 'singleton',
       slug: 'google',
       idpIntentError: 'UNAVAILABLE',
       request: { url: CB('google', 'id=intent1&token=tok') },
-    }).then((v) => {
-      expect(v.response?.status).to.equal(302);
-      expect(v.response?.location ?? '').to.include('/sso/google/error');
-      expect(hasAudit(v.audit, 'idp.signin', 'failure')).to.equal(true);
-    });
+    },
+    includes: ['/sso/google/error'],
+    excludes: [],
+    auditFailure: 'idp.signin',
+  },
+  {
+    // 755-J1: ALREADY_EXISTS on the link must stay distinguishable from a generic failure.
+    label: '755-J1 link ALREADY_EXISTS → identity-linked-elsewhere',
+    scenario: {
+      fn: 'processIdpCallback',
+      slug: 'google',
+      env: { ALLOW_IDP_AUTO_LINK: 'true' }, // legacy auto-link path under test (Step-5 catch)
+      seed: AUTOLINK_SEED,
+      idpIntent: AUTOLINK_INTENT,
+      addIdpLinkError: 'ALREADY_EXISTS',
+      request: { url: CB() },
+    },
+    includes: ['/sso/google/error', 'reason=identity-linked-elsewhere'],
+    excludes: ['reason=signin_failed'],
+    auditFailure: 'idp.link',
+    noCookieNeedle: 'sess-',
+  },
+  {
+    label: '755-J1 link non-ALREADY_EXISTS → providerErrorCode (signin_failed)',
+    scenario: {
+      fn: 'processIdpCallback',
+      slug: 'google',
+      env: { ALLOW_IDP_AUTO_LINK: 'true' }, // legacy auto-link path under test (Step-5 catch)
+      seed: AUTOLINK_SEED,
+      idpIntent: AUTOLINK_INTENT,
+      addIdpLinkError: 'FAILED_PRECONDITION',
+      request: { url: CB() },
+    },
+    includes: ['/sso/google/error', 'reason=signin_failed'],
+    excludes: ['identity-linked-elsewhere'],
+  },
+  {
+    // 755-K1 real-world bug: findUser's same-email pre-check only matches Zitadel's exact
+    // loginName, so an org whose loginName differs from the raw email (the Zitadel
+    // domain-suffix default) never finds a real collision — decideIdpCallback falls through to
+    // auto-create believing the user is new, and Zitadel's own addHumanUser then correctly
+    // rejects the duplicate with ALREADY_EXISTS. The auto-create catch must not collapse that
+    // into the actionable-less signin_failed, the way the sibling `link` branch already avoids.
+    label: '755-K1 auto-create ALREADY_EXISTS → registration-conflict',
+    scenario: {
+      fn: 'processIdpCallback',
+      slug: 'google',
+      seed: {}, // no existing users — decision routes to auto-create, mirroring the miss
+      idpIntent: REGISTER_INTENT_VERIFIED,
+      registerError: 'ALREADY_EXISTS',
+      request: { url: CB() },
+    },
+    includes: ['/sso/google/error', 'reason=registration-conflict'],
+    excludes: ['reason=signin_failed'],
+    auditFailure: 'idp.register',
+  },
+];
+
+describe('processIdpCallback — scripted-failure reason mapping', () => {
+  it('maps every scripted failure to a specific actionable reason', () => {
+    for (const c of ERROR_CASES) {
+      callService(c.scenario).then((v) => {
+        expect(v.response?.status, `${c.label}: status`).to.equal(302);
+        const loc = v.response?.location ?? '';
+        for (const needle of c.includes) {
+          expect(loc, `${c.label}: location includes ${needle}`).to.include(needle);
+        }
+        for (const needle of c.excludes) {
+          expect(loc, `${c.label}: location excludes ${needle}`).to.not.include(needle);
+        }
+        if (c.auditFailure) {
+          expect(
+            hasAudit(v.audit, c.auditFailure, 'failure'),
+            `${c.label}: ${c.auditFailure} failure audited`
+          ).to.equal(true);
+        }
+        if (c.noCookieNeedle) {
+          expect(v.response?.setCookie ?? '', `${c.label}: no session minted`).to.not.include(
+            c.noCookieNeedle
+          );
+        }
+      });
+    }
   });
 });
 
 describe('processIdpCallback — existing same-email account auto-link (Task-3)', () => {
-  it('auto-links and signs in when existing account is passwordless + email is IdP-verified', () => {
+  // Both success paths land the same way (302 → signed-in/authorize with a session cookie);
+  // they differ only in whether an existing same-email account is seeded.
+  it('signs in with a session cookie on both the auto-link and auto-create paths', () => {
     callService({
       fn: 'processIdpCallback',
       slug: 'google',
@@ -49,13 +159,13 @@ describe('processIdpCallback — existing same-email account auto-link (Task-3)'
       idpIntent: REGISTER_INTENT_VERIFIED,
       request: { url: CB() },
     }).then((v) => {
-      expect(v.response?.status).to.equal(302);
-      expect(isSignedInOrAuthorize(v.response?.location ?? '')).to.equal(true);
-      expect(v.response?.setCookie ?? '').to.include('sessions=');
+      expect(v.response?.status, 'auto-link: status').to.equal(302);
+      expect(isSignedInOrAuthorize(v.response?.location ?? ''), 'auto-link: signed in').to.equal(
+        true
+      );
+      expect(v.response?.setCookie ?? '', 'auto-link: session minted').to.include('sessions=');
     });
-  });
 
-  it('auto-creates and signs in when no existing account with the same email (new IdP user)', () => {
     callService({
       fn: 'processIdpCallback',
       slug: 'google',
@@ -75,7 +185,11 @@ describe('processIdpCallback — existing same-email account auto-link (Task-3)'
     });
   });
 
-  it('forwards a deviceTrackingToken on the callback URL to the new session as MaxMind metadata (IdP fraud-signal parity)', () => {
+  // Both the auto-CREATE path (fresh identity) and the SIGN-IN path (an ALREADY-linked IdP
+  // identity, intent.userId present) must forward deviceTrackingToken to the resulting
+  // session's metadata — the sign-in path via signInWithIdpIntent's own deviceTrackingToken
+  // opt. Merged from two describes that asserted the same property on the two branches.
+  it('forwards deviceTrackingToken to the session on both the auto-create and sign-in paths', () => {
     callService({
       fn: 'processIdpCallback',
       slug: 'google',
@@ -83,14 +197,46 @@ describe('processIdpCallback — existing same-email account auto-link (Task-3)'
       idpIntent: REGISTER_INTENT_VERIFIED,
       request: { url: CB('google', 'id=intent-1&token=tok-1&deviceTrackingToken=mm-idp-token-1') },
       inspect: { lastCreateSessionOpts: true },
-    }).then((v) => {
-      expect(v.response?.status).to.equal(302);
-      expect(isSignedInOrAuthorize(v.response?.location ?? '')).to.equal(true);
-      const opts = v.inspect?.lastCreateSessionOpts as {
-        metadata?: Record<string, unknown>;
-      } | null;
-      expect(opts?.metadata?.['maxmind/tracking-token']).to.equal('mm-idp-token-1');
-    });
+    })
+      .then((v) => {
+        expect(v.response?.status, 'auto-create: status').to.equal(302);
+        expect(
+          isSignedInOrAuthorize(v.response?.location ?? ''),
+          'auto-create: signed in'
+        ).to.equal(true);
+        const opts = v.inspect?.lastCreateSessionOpts as {
+          metadata?: Record<string, unknown>;
+        } | null;
+        expect(opts?.metadata?.['maxmind/tracking-token'], 'auto-create: token forwarded').to.equal(
+          'mm-idp-token-1'
+        );
+
+        return callService({
+          fn: 'processIdpCallback',
+          slug: 'google',
+          seed: {
+            users: [{ id: 'u-signin', loginName: 'linked@idp.test', displayName: 'Linked' }],
+          },
+          idpIntent: {
+            userId: 'u-signin',
+            information: { idpId: 'idp-g', idpUserId: 'g-linked', idpUserName: 'linked@idp.test' },
+            draft: null,
+          },
+          request: {
+            url: CB('google', 'id=intent-si&token=tok-si&deviceTrackingToken=mm-idp-token-signin'),
+          },
+          inspect: { lastCreateSessionOpts: true },
+        });
+      })
+      .then((v) => {
+        expect(v.response?.status, 'sign-in: status').to.equal(302);
+        const opts = v.inspect?.lastCreateSessionOpts as {
+          metadata?: Record<string, unknown>;
+        } | null;
+        expect(opts?.metadata?.['maxmind/tracking-token'], 'sign-in: token forwarded').to.equal(
+          'mm-idp-token-signin'
+        );
+      });
   });
 });
 
@@ -119,34 +265,6 @@ describe('processIdpCallback — account-link-by-email observability log (PII-sa
   });
 });
 
-describe('processIdpCallback — sign-in path MaxMind fraud-signal parity', () => {
-  // Mirrors the auto-create test above — the sign-in path (an ALREADY-linked IdP identity,
-  // intent.userId present) must forward deviceTrackingToken to the resulting session's metadata
-  // exactly like a fresh registration does, via signInWithIdpIntent's own deviceTrackingToken opt.
-  it('forwards a deviceTrackingToken on the callback URL to the session on a returning-user sign-in', () => {
-    callService({
-      fn: 'processIdpCallback',
-      slug: 'google',
-      seed: { users: [{ id: 'u-signin', loginName: 'linked@idp.test', displayName: 'Linked' }] },
-      idpIntent: {
-        userId: 'u-signin',
-        information: { idpId: 'idp-g', idpUserId: 'g-linked', idpUserName: 'linked@idp.test' },
-        draft: null,
-      },
-      request: {
-        url: CB('google', 'id=intent-si&token=tok-si&deviceTrackingToken=mm-idp-token-signin'),
-      },
-      inspect: { lastCreateSessionOpts: true },
-    }).then((v) => {
-      expect(v.response?.status).to.equal(302);
-      const opts = v.inspect?.lastCreateSessionOpts as {
-        metadata?: Record<string, unknown>;
-      } | null;
-      expect(opts?.metadata?.['maxmind/tracking-token']).to.equal('mm-idp-token-signin');
-    });
-  });
-});
-
 describe('processIdpCallback — last-used-login Set-Cookie', () => {
   const IDP = 'idp-g';
 
@@ -164,78 +282,6 @@ describe('processIdpCallback — last-used-login Set-Cookie', () => {
     }).then((v) => {
       expect(v.response?.status).to.equal(302);
       expect(v.response?.lastUsedLogin).to.equal(`idp:${IDP}`);
-    });
-  });
-});
-
-describe('processIdpCallback — 755-J1 link failure reason mapping', () => {
-  const AUTOLINK_INTENT: Scenario['idpIntent'] = {
-    userId: null,
-    information: { idpId: 'idp-g', idpUserId: 'g-al', idpUserName: 'you@gmail.com' },
-    draft: { email: 'you@gmail.com', firstName: 'You', lastName: 'User', emailVerified: true },
-  };
-
-  it('maps ALREADY_EXISTS to reason=identity-linked-elsewhere (not signin_failed)', () => {
-    callService({
-      fn: 'processIdpCallback',
-      slug: 'google',
-      env: { ALLOW_IDP_AUTO_LINK: 'true' }, // legacy auto-link path under test (Step-5 catch)
-      seed: { users: [{ id: 'u1', loginName: 'you@gmail.com', displayName: 'You User' }] },
-      idpIntent: AUTOLINK_INTENT,
-      addIdpLinkError: 'ALREADY_EXISTS',
-      request: { url: CB() },
-    }).then((v) => {
-      expect(v.response?.status).to.equal(302);
-      const loc = v.response?.location ?? '';
-      expect(loc).to.include('/sso/google/error');
-      expect(loc).to.include('reason=identity-linked-elsewhere');
-      expect(loc).to.not.include('reason=signin_failed');
-      expect(hasAudit(v.audit, 'idp.link', 'failure')).to.equal(true);
-      expect(v.response?.setCookie ?? '').to.not.include('sess-');
-    });
-  });
-
-  it('maps a non-ALREADY_EXISTS link ProviderError through providerErrorCode (signin_failed)', () => {
-    callService({
-      fn: 'processIdpCallback',
-      slug: 'google',
-      env: { ALLOW_IDP_AUTO_LINK: 'true' }, // legacy auto-link path under test (Step-5 catch)
-      seed: { users: [{ id: 'u1', loginName: 'you@gmail.com', displayName: 'You User' }] },
-      idpIntent: AUTOLINK_INTENT,
-      addIdpLinkError: 'FAILED_PRECONDITION',
-      request: { url: CB() },
-    }).then((v) => {
-      expect(v.response?.status).to.equal(302);
-      const loc = v.response?.location ?? '';
-      expect(loc).to.include('/sso/google/error');
-      expect(loc).to.include('reason=signin_failed');
-      expect(loc).to.not.include('identity-linked-elsewhere');
-    });
-  });
-});
-
-describe('processIdpCallback — 755-K1 auto-create failure reason mapping', () => {
-  // Real-world bug: findUser's same-email pre-check only matches Zitadel's exact loginName, so an
-  // org whose loginName differs from the raw email (the Zitadel domain-suffix default) never finds
-  // a real collision — decideIdpCallback falls through to auto-create believing the user is new,
-  // and Zitadel's own addHumanUser then correctly rejects the duplicate with ALREADY_EXISTS. The
-  // auto-create catch block must not collapse that into the generic, actionable-less signin_failed
-  // the same way the sibling `link` branch already avoids doing for its own ALREADY_EXISTS case.
-  it('maps ALREADY_EXISTS from a fresh registration to a clear reason (not signin_failed)', () => {
-    callService({
-      fn: 'processIdpCallback',
-      slug: 'google',
-      seed: {}, // no existing users — decision routes to auto-create, mirroring the missed collision
-      idpIntent: REGISTER_INTENT_VERIFIED,
-      registerError: 'ALREADY_EXISTS',
-      request: { url: CB() },
-    }).then((v) => {
-      expect(v.response?.status).to.equal(302);
-      const loc = v.response?.location ?? '';
-      expect(loc).to.include('/sso/google/error');
-      expect(loc).to.include('reason=registration-conflict');
-      expect(loc).to.not.include('reason=signin_failed');
-      expect(hasAudit(v.audit, 'idp.register', 'failure')).to.equal(true);
     });
   });
 });
@@ -266,7 +312,9 @@ describe('processIdpCallback — default-org resolution for IdP auto-create (bar
   // FIX: resolveOrg(provider, organization) → 'org-default-fake' → register receives that org.
   // The fake does NOT throw on undefined orgId (it ignores it), so we assert the ARG, not
   // the outcome, to get a genuine RED before the fix.
-  it('calls register with the resolved default org (not undefined) on a bare flow (no ?organization=)', () => {
+  // Both consumers of the resolved org were driven by an IDENTICAL scenario differing only by
+  // which call it recorded — one run now records both.
+  it('calls register AND getLoginSettings with the resolved default org (not undefined) on a bare flow (no ?organization=)', () => {
     callService({
       fn: 'processIdpCallback',
       slug: 'google',
@@ -275,12 +323,13 @@ describe('processIdpCallback — default-org resolution for IdP auto-create (bar
       idpIntent: REGISTER_INTENT_VERIFIED,
       // No organization= in the callback URL → raw organization is undefined
       request: { url: CB('google', 'id=intent-1&token=tok-1') },
-      // Capture the args passed to provider.register
-      recordCalls: ['register'],
+      // Capture the args passed to both provider calls
+      recordCalls: ['register', 'getLoginSettings'],
     }).then((v) => {
       // Must route to success (not an error page)
       expect(v.response?.status).to.equal(302);
       expect(isSignedInOrAuthorize(v.response?.location ?? '')).to.equal(true);
+
       // The register call must receive the resolved default org, NOT undefined
       const registerCalls = (v.calls?.['register'] ?? []) as Array<[Record<string, unknown>]>;
       expect(registerCalls.length, 'register was called').to.be.greaterThan(0);
@@ -288,24 +337,13 @@ describe('processIdpCallback — default-org resolution for IdP auto-create (bar
       expect(registerInput.orgId, 'orgId must be the resolved default org, not undefined').to.equal(
         'org-default-fake'
       );
-    });
-  });
 
-  it('calls getLoginSettings with the resolved default org (not undefined) on a bare flow', () => {
-    callService({
-      fn: 'processIdpCallback',
-      slug: 'google',
-      seed: {},
-      idpIntent: REGISTER_INTENT_VERIFIED,
-      request: { url: CB('google', 'id=intent-1&token=tok-1') },
-      recordCalls: ['getLoginSettings'],
-    }).then((v) => {
       const settingsCalls = (v.calls?.['getLoginSettings'] ?? []) as Array<[string | undefined]>;
       expect(settingsCalls.length, 'getLoginSettings was called').to.be.greaterThan(0);
-      const orgArg = settingsCalls[0][0];
-      expect(orgArg, 'getLoginSettings must receive resolved default org, not undefined').to.equal(
-        'org-default-fake'
-      );
+      expect(
+        settingsCalls[0][0],
+        'getLoginSettings must receive resolved default org, not undefined'
+      ).to.equal('org-default-fake');
     });
   });
 });
@@ -499,30 +537,38 @@ describe('processIdpCallback — fresh-identity link ceremony (Req 2)', () => {
 });
 
 describe('processIdpCallback — passkey-hint write', () => {
-  it('auto-link sign-in writes passkey-hint = the IdP-vouched loginName', () => {
-    callService({
-      fn: 'processIdpCallback',
-      slug: 'google',
-      env: { ALLOW_IDP_AUTO_LINK: 'true' },
-      seed: { users: [{ id: 'u1', loginName: 'you@gmail.com', displayName: 'You User' }] },
-      idpIntent: REGISTER_INTENT_VERIFIED,
-      request: { url: CB() },
-    }).then((v) => {
-      expect(v.response?.status).to.equal(302);
-      expect(v.response?.passkeyHint).to.equal('you@gmail.com');
-    });
-  });
+  // Both success paths must write passkey-hint = the loginName the session lands on:
+  // auto-link uses the IdP-vouched existing loginName, auto-create the freshly created one.
+  const HINT_CASES: Array<{ label: string; scenario: Scenario }> = [
+    {
+      label: 'auto-link',
+      scenario: {
+        fn: 'processIdpCallback',
+        slug: 'google',
+        env: { ALLOW_IDP_AUTO_LINK: 'true' },
+        seed: { users: [{ id: 'u1', loginName: 'you@gmail.com', displayName: 'You User' }] },
+        idpIntent: REGISTER_INTENT_VERIFIED,
+        request: { url: CB() },
+      },
+    },
+    {
+      label: 'auto-create',
+      scenario: {
+        fn: 'processIdpCallback',
+        slug: 'google',
+        seed: { users: [] }, // no existing account → auto-create path
+        idpIntent: REGISTER_INTENT_VERIFIED,
+        request: { url: CB() },
+      },
+    },
+  ];
 
-  it('auto-create writes passkey-hint = the freshly created loginName', () => {
-    callService({
-      fn: 'processIdpCallback',
-      slug: 'google',
-      seed: { users: [] }, // no existing account → auto-create path
-      idpIntent: REGISTER_INTENT_VERIFIED,
-      request: { url: CB() },
-    }).then((v) => {
-      expect(v.response?.status).to.equal(302);
-      expect(v.response?.passkeyHint).to.equal('you@gmail.com');
-    });
+  it('writes passkey-hint = the signed-in loginName on both the auto-link and auto-create paths', () => {
+    for (const c of HINT_CASES) {
+      callService(c.scenario).then((v) => {
+        expect(v.response?.status, `${c.label}: status`).to.equal(302);
+        expect(v.response?.passkeyHint, `${c.label}: passkey-hint`).to.equal('you@gmail.com');
+      });
+    }
   });
 });

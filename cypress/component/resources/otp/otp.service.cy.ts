@@ -85,17 +85,17 @@ describe('submitOtpCode — accepts 8-digit delivered codes (Bug B)', () => {
 
   const field = (channel: 'email' | 'sms') => (channel === 'email' ? 'otpEmail' : 'otpSms');
 
-  (['email', 'sms'] as const).forEach((channel) => {
-    it(`${channel}: accepts an 8-digit code and forwards it to the provider (not INVALID_INPUT)`, () => {
+  it('both channels accept an 8-digit code and forward it to the provider (not INVALID_INPUT)', () => {
+    for (const channel of ['email', 'sms'] as const) {
       run(channel, '86230120').then((v) => {
         const o = v.outcome as { ok: boolean; target?: string };
-        expect(o.ok).to.equal(true);
-        expect(typeof o.target).to.equal('string');
+        expect(o.ok, `${channel}: ok`).to.equal(true);
+        expect(typeof o.target, `${channel}: target`).to.equal('string');
         const forwarded = (v.calls?.updateSession ?? [])
           .map((c) => (c[2] as Record<string, unknown>)[field(channel)])
           .filter((x): x is string => typeof x === 'string');
-        expect(forwarded).to.include('86230120');
+        expect(forwarded, `${channel}: code forwarded`).to.include('86230120');
       });
-    });
+    }
   });
 });

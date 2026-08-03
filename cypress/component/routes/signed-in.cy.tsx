@@ -34,19 +34,13 @@ function mountSignedIn(loginName: string | null = 'mia@acme.test') {
 }
 
 describe('/signed-in — identity + switch-account link + sign-out', () => {
-  it('shows "You are signed in as <loginName>" with a "Not you?" link to /accounts', () => {
+  it('renders the signed-in identity with a Not you? link and a Sign out form posting to ?index', () => {
     mountSignedIn();
     cy.contains('You are signed in as').should('be.visible');
     cy.contains('mia@acme.test').should('be.visible');
     cy.findByRole('link', { name: /not you\?/i }).should('have.attr', 'href', '/accounts');
-  });
-
-  it('the Sign out form posts to /id/logout?index', () => {
-    mountSignedIn();
     cy.get('form[action="/id/logout?index"]').contains('button', 'Sign out').should('be.visible');
-  });
 
-  it('renders no identity line when loginName is absent', () => {
     mountSignedIn(null);
     cy.contains('You are signed in as').should('not.exist');
   });

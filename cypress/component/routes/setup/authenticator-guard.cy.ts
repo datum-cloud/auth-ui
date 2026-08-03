@@ -10,29 +10,31 @@ import { callService } from '../../../support/node/call-service';
 
 const BASE = 'http://localhost/id/setup/authenticator';
 
-describe('/setup/authenticator loader — broken-session guard', () => {
-  it('no active session WITHOUT requestId → redirect to bare /login', () => {
-    callService({
-      fn: 'setupAuthenticatorLoader',
-      request: { url: `${BASE}?loginName=alice%40acme.test` },
-    }).then((v) => {
-      expect(v.error).to.be.undefined;
-      expect(v.response!.isResponse).to.be.true;
-      expect(v.response!.status).to.equal(302);
-      expect(v.response!.location).to.equal('/login');
-    });
-  });
+const GUARD_ROWS = [
+  {
+    label: 'WITHOUT requestId → bare /login',
+    url: `${BASE}?loginName=alice%40acme.test`,
+    expectedLocation: '/login',
+  },
+  {
+    label: 'WITH requestId → preserves requestId + organization',
+    url: `${BASE}?loginName=alice%40acme.test&requestId=rq1&organization=acme`,
+    expectedLocation: '/login?requestId=rq1&organization=acme',
+  },
+] as const;
 
-  it('no active session WITH requestId → redirect preserves requestId + organization', () => {
-    callService({
-      fn: 'setupAuthenticatorLoader',
-      request: {
-        url: `${BASE}?loginName=alice%40acme.test&requestId=rq1&organization=acme`,
-      },
-    }).then((v) => {
-      expect(v.response!.isResponse).to.be.true;
-      expect(v.response!.status).to.equal(302);
-      expect(v.response!.location).to.equal('/login?requestId=rq1&organization=acme');
+describe('/setup/authenticator loader — broken-session guard', () => {
+  it('no active session → redirect to /login, preserving ceremony params when present', () => {
+    GUARD_ROWS.forEach(({ label, url, expectedLocation }) => {
+      callService({
+        fn: 'setupAuthenticatorLoader',
+        request: { url },
+      }).then((v) => {
+        expect(v.error, `${label}: error`).to.be.undefined;
+        expect(v.response!.isResponse, `${label}: isResponse`).to.be.true;
+        expect(v.response!.status, `${label}: status`).to.equal(302);
+        expect(v.response!.location, `${label}: location`).to.equal(expectedLocation);
+      });
     });
   });
 });

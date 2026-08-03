@@ -11,14 +11,26 @@ function ActionErrorHarness({ actionData }: { actionData: unknown }) {
   return <div data-testid="msg">{msg ?? '__undefined__'}</div>;
 }
 
-describe('useAuthActionError', () => {
-  it('resolves the message from actionData.error (inline-only surface, no toast)', () => {
-    cy.mount(<ActionErrorHarness actionData={{ error: 'INVALID_CREDENTIALS' }} />);
-    cy.get('[data-testid="msg"]').should('have.text', 'Incorrect credentials. Please try again.');
-  });
+const CASES: ReadonlyArray<{ label: string; actionData: unknown; expected: string }> = [
+  {
+    label: 'known error code',
+    actionData: { error: 'INVALID_CREDENTIALS' },
+    expected: 'Incorrect credentials. Please try again.',
+  },
+  {
+    label: 'no error → undefined',
+    actionData: undefined,
+    expected: '__undefined__',
+  },
+];
 
-  it('returns undefined for actionData without an error', () => {
-    cy.mount(<ActionErrorHarness actionData={undefined} />);
-    cy.get('[data-testid="msg"]').should('have.text', '__undefined__');
+describe('useAuthActionError', () => {
+  it('resolves actionData.error to a message, undefined without an error (inline-only surface, no toast)', () => {
+    for (const row of CASES) {
+      cy.mount(<ActionErrorHarness actionData={row.actionData} />);
+      cy.get('[data-testid="msg"]').should(($el) => {
+        expect($el, row.label).to.have.text(row.expected);
+      });
+    }
   });
 });

@@ -16,13 +16,12 @@ const settings: LoginSettings = {
 const NOW = Date.parse('2026-01-01T00:00:00Z');
 
 describe('nextStep', () => {
-  it('routes to /signed-in when password is verified and no MFA is forced', () => {
-    const factors: Factors = { password: { verifiedAt: new Date('2026-01-01T00:00:00Z') } };
-    expect(nextStep({ factors, settings, nowMs: NOW })).to.equal('/signed-in');
-  });
-  it('routes to /setup/mfa?force=true&checkAfter=true when MFA is forced but no 2nd factor is enrolled', () => {
-    const factors: Factors = { password: { verifiedAt: new Date('2026-01-01T00:00:00Z') } };
-    const result = nextStep({
+  const factors: Factors = { password: { verifiedAt: new Date('2026-01-01T00:00:00Z') } };
+
+  it('routes to /signed-in when MFA is not forced, and to /setup/mfa?force=true when it is', () => {
+    expect(nextStep({ factors, settings, nowMs: NOW }), 'not forced').to.equal('/signed-in');
+
+    const forced = nextStep({
       factors,
       settings: { ...settings, forceMfa: true },
       nowMs: NOW,
@@ -31,8 +30,8 @@ describe('nextStep', () => {
       userVerified: false,
       mfaInitSkippedAt: null,
     });
-    expect(result).to.contain('/setup/mfa');
-    expect(result).to.contain('force=true');
-    expect(result).to.contain('checkAfter=true');
+    expect(forced, 'forced: path').to.contain('/setup/mfa');
+    expect(forced, 'forced: force flag').to.contain('force=true');
+    expect(forced, 'forced: checkAfter flag').to.contain('checkAfter=true');
   });
 });

@@ -42,19 +42,22 @@ describe('classifyWebAuthnError', () => {
     ['SecurityError', 'security'],
     ['NetworkError', 'unknown'], // a DOMException whose name is not mapped
   ];
-  for (const [name, reason] of cases) {
-    it(`maps DOMException "${name}" → "${reason}"`, () => {
-      expect(classifyWebAuthnError(new DOMException('boom', name))).to.equal(reason);
-    });
-  }
+  it('maps every spec DOMException name to its stable reason, and every non-DOMException value → "unknown"', () => {
+    for (const [name, reason] of cases) {
+      expect(classifyWebAuthnError(new DOMException('boom', name)), name).to.equal(reason);
+    }
 
-  it('maps a plain Error and other non-DOMException values → "unknown"', () => {
-    expect(classifyWebAuthnError(new Error('nope'))).to.equal('unknown');
-    // A plain object carrying a spoofed WebAuthn name is still not a DOMException.
-    expect(classifyWebAuthnError({ name: 'NotAllowedError' })).to.equal('unknown');
-    expect(classifyWebAuthnError('NotAllowedError')).to.equal('unknown');
-    expect(classifyWebAuthnError(null)).to.equal('unknown');
-    expect(classifyWebAuthnError(undefined)).to.equal('unknown');
+    // Nothing that merely LOOKS like a DOMException may be classified — a plain object
+    // carrying a spoofed WebAuthn name is still not a DOMException.
+    for (const [label, value] of [
+      ['plain Error', new Error('nope')],
+      ['spoofed name object', { name: 'NotAllowedError' }],
+      ['bare string', 'NotAllowedError'],
+      ['null', null],
+      ['undefined', undefined],
+    ] as const) {
+      expect(classifyWebAuthnError(value), label).to.equal('unknown');
+    }
   });
 });
 
@@ -77,66 +80,73 @@ function ensureWebAuthnEnv(): void {
   }
 }
 
-describe('marshalAssertion (sign-in) ceremony error handling', () => {
-  it('maps a null credential (user-cancel) to WebAuthnCeremonyError reason "not-allowed"', () => {
-    ensureWebAuthnEnv();
-    cy.stub(window.navigator.credentials, 'get').resolves(null);
-    return marshalAssertion(PK_GET).then(
-      () => {
-        throw new Error('expected a WebAuthnCeremonyError');
-      },
-      (err: unknown) => {
-        expect(err).to.be.instanceOf(WebAuthnCeremonyError);
-        expect((err as WebAuthnCeremonyError).reason).to.equal('not-allowed');
-      }
-    );
-  });
+/**
+ * Re-stub navigator.credentials for the next row. cy.stub auto-restores BETWEEN tests, not
+ * within one — so a table that stubs the same method twice in a single `it` throws
+ * "Attempted to wrap create which is already wrapped" without this explicit restore.
+ */
+function stubCredential(method: 'get' | 'create', failure: DOMException | null): void {
+  ensureWebAuthnEnv();
+  const creds = window.navigator.credentials as unknown as Record<string, { restore?: () => void }>;
+  creds[method]?.restore?.();
+  const stub = cy.stub(window.navigator.credentials, method);
+  if (failure) stub.rejects(failure);
+  else stub.resolves(null); // null credential === user cancel
+}
 
-  it('classifies a thrown DOMException (NotAllowedError → "not-allowed")', () => {
-    ensureWebAuthnEnv();
-    cy.stub(window.navigator.credentials, 'get').rejects(
-      new DOMException('no authenticator', 'NotAllowedError')
-    );
-    return marshalAssertion(PK_GET).then(
-      () => {
-        throw new Error('expected a WebAuthnCeremonyError');
-      },
-      (err: unknown) => {
-        expect(err).to.be.instanceOf(WebAuthnCeremonyError);
-        expect((err as WebAuthnCeremonyError).reason).to.equal('not-allowed');
-      }
-    );
-  });
-});
+// Both ceremonies, both failure modes: a null return (user-cancel) and a thrown DOMException.
+const CEREMONIES: Array<{
+  label: string;
+  method: 'get' | 'create';
+  failure: DOMException | null;
+  run: () => Promise<unknown>;
+  reason: WebAuthnReason;
+}> = [
+  {
+    label: 'marshalAssertion (sign-in) null credential',
+    method: 'get',
+    failure: null,
+    run: () => marshalAssertion(PK_GET),
+    reason: 'not-allowed',
+  },
+  {
+    label: 'marshalAssertion (sign-in) NotAllowedError',
+    method: 'get',
+    failure: new DOMException('no authenticator', 'NotAllowedError'),
+    run: () => marshalAssertion(PK_GET),
+    reason: 'not-allowed',
+  },
+  {
+    label: 'createAttestation (enroll) InvalidStateError',
+    method: 'create',
+    failure: new DOMException('excluded credential present', 'InvalidStateError'),
+    run: () => createAttestation(PK_CREATE),
+    reason: 'already-registered',
+  },
+  {
+    label: 'createAttestation (enroll) null credential',
+    method: 'create',
+    failure: null,
+    run: () => createAttestation(PK_CREATE),
+    reason: 'not-allowed',
+  },
+];
 
-describe('createAttestation (enroll) ceremony error handling', () => {
-  it('classifies a thrown DOMException (InvalidStateError → "already-registered")', () => {
-    ensureWebAuthnEnv();
-    cy.stub(window.navigator.credentials, 'create').rejects(
-      new DOMException('excluded credential present', 'InvalidStateError')
-    );
-    return createAttestation(PK_CREATE).then(
-      () => {
-        throw new Error('expected a WebAuthnCeremonyError');
-      },
-      (err: unknown) => {
-        expect(err).to.be.instanceOf(WebAuthnCeremonyError);
-        expect((err as WebAuthnCeremonyError).reason).to.equal('already-registered');
-      }
-    );
-  });
+describe('marshalAssertion / createAttestation ceremony error handling', () => {
+  it('rejects with a classified WebAuthnCeremonyError on a null credential and a thrown DOMException', async () => {
+    for (const { label, method, failure, run, reason } of CEREMONIES) {
+      stubCredential(method, failure);
 
-  it('maps a null credential (user-cancel) to WebAuthnCeremonyError reason "not-allowed"', () => {
-    ensureWebAuthnEnv();
-    cy.stub(window.navigator.credentials, 'create').resolves(null);
-    return createAttestation(PK_CREATE).then(
-      () => {
-        throw new Error('expected a WebAuthnCeremonyError');
-      },
-      (err: unknown) => {
-        expect(err).to.be.instanceOf(WebAuthnCeremonyError);
-        expect((err as WebAuthnCeremonyError).reason).to.equal('not-allowed');
+      let thrown: unknown = null;
+      try {
+        await run();
+      } catch (err) {
+        thrown = err;
       }
-    );
+      expect(thrown, `${label}: rejected with a WebAuthnCeremonyError`).to.be.instanceOf(
+        WebAuthnCeremonyError
+      );
+      expect((thrown as WebAuthnCeremonyError).reason, `${label}: reason`).to.equal(reason);
+    }
   });
 });

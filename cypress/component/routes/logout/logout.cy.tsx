@@ -26,17 +26,18 @@ function mountLogout() {
   });
   return mount(withProviders(<RouterProvider router={router} />));
 }
-
 describe('Logout confirm form — index-route POST disambiguation', () => {
-  it('targets the index action via ?index (not the action-less layout)', () => {
+  it('targets the index action via ?index, falling back to the generic confirm copy', () => {
     mountLogout();
     cy.contains('button', /sign out/i).should('exist');
     cy.get('form').should('have.attr', 'method', 'post');
     // Native <form> posts to its action verbatim. Without ?index, RR routes POST to the
     // action-less logout/layout (→ 405); ?index targets routes/logout/index which owns the action.
     cy.get('form').invoke('attr', 'action').should('include', '?index');
+    // mountLogout() seeds no loginName — the same falsy branch the standalone
+    // no-active-session test used to mount separately (loginName: '').
+    cy.contains('Are you sure you want to sign out?').should('be.visible');
   });
-
   it('shows "Sign out of <loginName>" when an active session exists (no switch link)', () => {
     const router = createMemoryRouter([{ id: 'logout', path: '/logout', element: <Logout /> }], {
       initialEntries: ['/logout'],
@@ -52,14 +53,5 @@ describe('Logout confirm form — index-route POST disambiguation', () => {
     // link (which targets /login). This assertion catches if showLink={false} is accidentally removed.
     cy.contains(/not you\?/i).should('not.exist');
     cy.get('a[href="/login"], a[href^="/login?"]').should('not.exist');
-  });
-
-  it('falls back to the generic confirm copy when there is no active session', () => {
-    const router = createMemoryRouter([{ id: 'logout', path: '/logout', element: <Logout /> }], {
-      initialEntries: ['/logout'],
-      hydrationData: { loaderData: { logout: { csrfToken: 'test-csrf', loginName: '' } } },
-    });
-    mount(withProviders(<RouterProvider router={router} />));
-    cy.contains('Are you sure you want to sign out?').should('be.visible');
   });
 });

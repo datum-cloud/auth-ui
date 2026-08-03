@@ -30,32 +30,39 @@ describe('ALLOW_IDP_UNLINK env parsing (SEC-5, fail-closed)', () => {
 });
 
 describe('runSsoAction — provider error handling', () => {
-  it('start: provider error returns a handled redirect and logs failure (no 500)', () => {
+  it('handles a provider error with a redirect and failure audit, preserving org scope', () => {
     callService({
       fn: 'runSsoAction',
       provider: 'singleton',
       startIdpIntentError: 'UNAVAILABLE',
       request: { url: BASE, form: { intent: 'start', provider: 'google' } },
-    }).then((v) => {
-      expect([302, 502]).to.include(v.response?.status);
-      expect(v.audit.some((e) => e.outcome === 'failure')).to.equal(true);
-    });
-  });
-
-  it('start: provider error threads organization into the error redirect (so the "Back to sign in" link keeps org scope)', () => {
-    callService({
-      fn: 'runSsoAction',
-      provider: 'singleton',
-      startIdpIntentError: 'UNAVAILABLE',
-      request: {
-        url: BASE,
-        form: { intent: 'start', provider: 'google', organization: 'org-1' },
-      },
-    }).then((v) => {
-      expect(v.response?.status).to.equal(302);
-      expect(v.response?.location ?? '').to.include('organization=org-1');
-      expect(v.audit.some((e) => e.outcome === 'failure')).to.equal(true);
-    });
+    })
+      .then((v) => {
+        expect([302, 502], 'bare: handled status, not a 500').to.include(v.response?.status);
+        expect(
+          v.audit.some((e) => e.outcome === 'failure'),
+          'bare: failure audited'
+        ).to.equal(true);
+        return callService({
+          fn: 'runSsoAction',
+          provider: 'singleton',
+          startIdpIntentError: 'UNAVAILABLE',
+          request: {
+            url: BASE,
+            form: { intent: 'start', provider: 'google', organization: 'org-1' },
+          },
+        });
+      })
+      .then((v) => {
+        expect(v.response?.status, 'with org: redirect').to.equal(302);
+        expect(v.response?.location ?? '', 'with org: org scope preserved').to.include(
+          'organization=org-1'
+        );
+        expect(
+          v.audit.some((e) => e.outcome === 'failure'),
+          'with org: failure audited'
+        ).to.equal(true);
+      });
   });
 });
 
@@ -71,8 +78,8 @@ describe('runSsoAction — start: provider slug is hardened against URL-injectio
   });
 });
 
-describe('runSsoAction — IdP start: organization must be threaded into idpReturnUrls', () => {
-  it('sso start threads organization into the IdP success return URL (trusted origin, not Host)', () => {
+describe('runSsoAction — IdP start: params must be threaded into idpReturnUrls', () => {
+  it('threads organization and deviceTrackingToken into the IdP return url from the trusted origin', () => {
     callService({
       fn: 'runSsoAction',
       provider: 'singleton',
@@ -82,32 +89,36 @@ describe('runSsoAction — IdP start: organization must be threaded into idpRetu
         url: SPOOFED,
         form: { intent: 'start', provider: 'google', organization: 'org-123' },
       },
-    }).then((v) => {
-      const calls = v.calls?.startIdpIntent ?? [];
-      expect(calls.length).to.equal(1);
-      const urls = calls[0][1] as { success: string; failure: string };
-      expect(urls.success).to.include(`${PUBLIC_ORIGIN}/id/sso/`);
-      expect(urls.success).to.include('organization=org-123');
-    });
-  });
-});
-
-describe('runSsoAction — IdP start: deviceTrackingToken must be threaded into idpReturnUrls', () => {
-  it('sso start threads deviceTrackingToken into the IdP success return URL (MaxMind fraud-signal parity)', () => {
-    callService({
-      fn: 'runSsoAction',
-      provider: 'singleton',
-      env: { PUBLIC_ORIGIN },
-      recordCalls: ['startIdpIntent'],
-      request: {
-        url: BASE,
-        form: { intent: 'start', provider: 'google', deviceTrackingToken: 'mm-token-xyz' },
-      },
-    }).then((v) => {
-      const calls = v.calls?.startIdpIntent ?? [];
-      expect(calls.length).to.equal(1);
-      const urls = calls[0][1] as { success: string; failure: string };
-      expect(urls.success).to.include('deviceTrackingToken=mm-token-xyz');
-    });
+    })
+      .then((v) => {
+        const calls = v.calls?.startIdpIntent ?? [];
+        expect(calls.length, 'organization: startIdpIntent called once').to.equal(1);
+        const urls = calls[0][1] as { success: string; failure: string };
+        // The request Host is evil.example — the return URL must still be built from the
+        // trusted PUBLIC_ORIGIN, never the attacker-controlled Host header.
+        expect(urls.success, 'organization: trusted origin, not Host').to.include(
+          `${PUBLIC_ORIGIN}/id/sso/`
+        );
+        expect(urls.success, 'organization: threaded').to.include('organization=org-123');
+        return callService({
+          fn: 'runSsoAction',
+          provider: 'singleton',
+          env: { PUBLIC_ORIGIN },
+          recordCalls: ['startIdpIntent'],
+          request: {
+            url: BASE,
+            form: { intent: 'start', provider: 'google', deviceTrackingToken: 'mm-token-xyz' },
+          },
+        });
+      })
+      .then((v) => {
+        const calls = v.calls?.startIdpIntent ?? [];
+        expect(calls.length, 'deviceTrackingToken: startIdpIntent called once').to.equal(1);
+        const urls = calls[0][1] as { success: string; failure: string };
+        // MaxMind fraud-signal parity.
+        expect(urls.success, 'deviceTrackingToken: threaded').to.include(
+          'deviceTrackingToken=mm-token-xyz'
+        );
+      });
   });
 });

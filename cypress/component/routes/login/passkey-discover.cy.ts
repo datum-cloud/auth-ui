@@ -72,81 +72,89 @@ describe('/login/passkey-discover action', () => {
     });
   });
 
-  it('kill switch (AUTH_PASSKEY_DISCOVERY_ENABLED=false) → the SAME opaque 400', () => {
-    callService({
-      fn: 'passkeyDiscoverAction',
-      provider: 'singleton',
-      env: { AUTH_PASSKEY_DISCOVERY_ENABLED: 'false' },
-      request: { url: URL, form: { credential: assertionWith(B64_U5) }, csrf: true },
-    }).then((v) => {
-      expect(v.response?.status).to.equal(400);
-      expect((v.response?.dataBody as { error?: string }).error).to.equal('DISCOVERY_FAILED');
-      expect(
-        v.audit?.some(
-          (a) =>
-            a.event === 'passkey_discover' &&
-            a.outcome === 'failure' &&
-            (a as { reason?: string }).reason === 'disabled'
-        ),
-        'audited as disabled'
-      ).to.equal(true);
-    });
+  // ENUMERATION PARITY: every user-dependent failure must collapse into the SAME opaque
+  // 400, so a caller cannot distinguish "no such user" from "user has no passkey" from
+  // "key is non-resident". One table precisely because the property IS that these inputs
+  // are indistinguishable to the caller — scattered across separate tests it reads as
+  // coincidence rather than contract.
+  //
+  // Where an operator-facing audit reason exists it is asserted per row: parity is
+  // caller-facing only, and operators must still get the specific cause.
+  const OPAQUE_FAILURES: Array<{
+    label: string;
+    scenario: Parameters<typeof callService>[0];
+    auditReason?: string;
+  }> = [
+    {
+      label: 'kill switch (AUTH_PASSKEY_DISCOVERY_ENABLED=false)',
+      scenario: {
+        fn: 'passkeyDiscoverAction',
+        provider: 'singleton',
+        env: { AUTH_PASSKEY_DISCOVERY_ENABLED: 'false' },
+        request: { url: URL, form: { credential: assertionWith(B64_U5) }, csrf: true },
+      },
+      auditReason: 'disabled',
+    },
+    {
+      label: 'absent userHandle (non-resident key)',
+      scenario: {
+        fn: 'passkeyDiscoverAction',
+        provider: 'singleton',
+        request: { url: URL, form: { credential: assertionWith(null) }, csrf: true },
+      },
+    },
+    {
+      label: 'unknown userHandle',
+      scenario: {
+        fn: 'passkeyDiscoverAction',
+        provider: 'singleton',
+        request: { url: URL, form: { credential: assertionWith(B64_UNKNOWN) }, csrf: true },
+      },
+      auditReason: 'unresolved_user',
+    },
+    {
+      label: 'user without a passkey method',
+      scenario: {
+        fn: 'passkeyDiscoverAction',
+        provider: 'singleton',
+        request: { url: URL, form: { credential: assertionWith(B64_U1) }, csrf: true },
+      },
+    },
+    {
+      label: 'malformed credential JSON (shape violations are non-events)',
+      scenario: {
+        fn: 'passkeyDiscoverAction',
+        provider: 'singleton',
+        request: { url: URL, form: { credential: 'not-json{' }, csrf: true },
+      },
+    },
+  ];
+
+  it('collapses every user-dependent failure into the SAME opaque DISCOVERY_FAILED 400, with the real reason only in the audit', () => {
+    for (const { label, scenario, auditReason } of OPAQUE_FAILURES) {
+      callService(scenario).then((v) => {
+        expect(v.response?.status, `${label}: status`).to.equal(400);
+        expect(
+          (v.response?.dataBody as { error?: string }).error,
+          `${label}: opaque body`
+        ).to.equal('DISCOVERY_FAILED');
+        if (auditReason) {
+          expect(
+            v.audit?.some(
+              (a) =>
+                a.event === 'passkey_discover' &&
+                a.outcome === 'failure' &&
+                (a as { reason?: string }).reason === auditReason
+            ),
+            `${label}: audited as ${auditReason}`
+          ).to.equal(true);
+        }
+      });
+    }
   });
 
-  it('absent userHandle (non-resident key) → opaque DISCOVERY_FAILED 400', () => {
-    callService({
-      fn: 'passkeyDiscoverAction',
-      provider: 'singleton',
-      request: { url: URL, form: { credential: assertionWith(null) }, csrf: true },
-    }).then((v) => {
-      expect(v.response?.status).to.equal(400);
-      expect((v.response?.dataBody as { error?: string }).error).to.equal('DISCOVERY_FAILED');
-    });
-  });
-
-  it('unknown userHandle → the SAME opaque DISCOVERY_FAILED 400, real reason in the audit', () => {
-    callService({
-      fn: 'passkeyDiscoverAction',
-      provider: 'singleton',
-      request: { url: URL, form: { credential: assertionWith(B64_UNKNOWN) }, csrf: true },
-    }).then((v) => {
-      expect(v.response?.status).to.equal(400);
-      expect((v.response?.dataBody as { error?: string }).error).to.equal('DISCOVERY_FAILED');
-      // Enumeration parity is CALLER-facing only — operators get the specific reason.
-      expect(
-        v.audit?.some(
-          (a) =>
-            a.event === 'passkey_discover' &&
-            a.outcome === 'failure' &&
-            (a as { reason?: string }).reason === 'unresolved_user'
-        ),
-        'audited as unresolved_user'
-      ).to.equal(true);
-    });
-  });
-
-  it('user without a passkey method → the SAME opaque DISCOVERY_FAILED 400', () => {
-    callService({
-      fn: 'passkeyDiscoverAction',
-      provider: 'singleton',
-      request: { url: URL, form: { credential: assertionWith(B64_U1) }, csrf: true },
-    }).then((v) => {
-      expect(v.response?.status).to.equal(400);
-      expect((v.response?.dataBody as { error?: string }).error).to.equal('DISCOVERY_FAILED');
-    });
-  });
-
-  it('malformed credential JSON → opaque DISCOVERY_FAILED 400 (shape violations are non-events)', () => {
-    callService({
-      fn: 'passkeyDiscoverAction',
-      provider: 'singleton',
-      request: { url: URL, form: { credential: 'not-json{' }, csrf: true },
-    }).then((v) => {
-      expect(v.response?.status).to.equal(400);
-      expect((v.response?.dataBody as { error?: string }).error).to.equal('DISCOVERY_FAILED');
-    });
-  });
-
+  // Kept out of the table: a DIFFERENT error code. The schema boundary is not
+  // user-dependent and is therefore deliberately outside the parity contract.
   it('missing credential field → INVALID_INPUT 400 (schema boundary, not user-dependent)', () => {
     callService({
       fn: 'passkeyDiscoverAction',

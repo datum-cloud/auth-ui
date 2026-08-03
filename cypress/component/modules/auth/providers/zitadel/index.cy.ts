@@ -11,6 +11,7 @@
 // (build a request, forward it, map the response) and are merged into a single test.
 // isInstanceAdmin's bearer-token forwarding and the RPC deadline behavior are kept standalone.
 import { ZitadelAuthProvider } from '@/modules/auth/providers/zitadel/index';
+import { TIMEOUTS } from '@/modules/auth/providers/zitadel/timeouts';
 import * as transport from '@/modules/auth/providers/zitadel/transport';
 import { ProviderError } from '@/modules/auth/types';
 import { AuthFactorState } from '@zitadel/proto/zitadel/user/v2/user_pb';
@@ -123,7 +124,15 @@ describe('ZitadelAuthProvider — isInstanceAdmin', () => {
 // ── RPC deadline ───────────────────────────────────────────────────────────────
 
 describe('ZitadelAuthProvider — RPC deadline', () => {
-  it('rejects a never-resolving RPC with a deadline error instead of hanging', async () => {
+  it('exposes bounded admin-check and gRPC deadlines, and rejects a hanging RPC', async () => {
+    // Range gates for both deadline constants, folded in from the standalone timeouts.cy.ts.
+    // GRPC_CALL_MS is additionally proven behaviorally below; ADMIN_CHECK_MS has no behavioral
+    // test anywhere, so its bounds check is kept here rather than dropped.
+    expect(TIMEOUTS.ADMIN_CHECK_MS).to.be.greaterThan(0);
+    expect(TIMEOUTS.ADMIN_CHECK_MS).to.be.at.most(30_000);
+    expect(TIMEOUTS.GRPC_CALL_MS).to.be.greaterThan(0);
+    expect(TIMEOUTS.GRPC_CALL_MS).to.be.at.most(30_000);
+
     // Sinon fake timers — synchronous API so the fake clock is in place *before*
     // provider() creates its internal deadline setTimeout (GRPC_CALL_MS = 10 000 ms).
     // cy.clock() is asynchronous (queued), so it cannot guarantee the clock is ready
@@ -252,17 +261,37 @@ describe('ZitadelAuthProvider — session/credential request building', () => {
 // These tests drive that metadata RPC into failure and assert the primary operation still
 // resolves, plus the listPasskeys join behaviour (present/absent createdAt per row).
 describe('ZitadelAuthProvider — passkey metadata best-effort scopes', () => {
-  it('verifyPasskey resolves even when the setUserMetadata created-at stamp throws', async () => {
-    const verifySpy = cy.stub().resolves({});
-    stubClient({
-      verifyPasskeyRegistration: verifySpy,
-      setUserMetadata: async () => {
-        throw new Error('metadata backend down');
+  it('verifyPasskey/removePasskey resolve even when their best-effort metadata RPC throws', async () => {
+    const rows = [
+      {
+        label: 'verifyPasskey survives setUserMetadata failure',
+        rpc: 'verifyPasskeyRegistration',
+        metaRpc: 'setUserMetadata',
+        run: (p: ZitadelAuthProvider) => p.verifyPasskey('u1', 'pk1', { fake: true }),
       },
-    });
-    // Must not throw — enrollment is not allowed to fail because of the best-effort stamp.
-    await provider().verifyPasskey('u1', 'pk1', { fake: true });
-    expect(verifySpy).to.have.callCount(1);
+      {
+        label: 'removePasskey survives deleteUserMetadata failure',
+        rpc: 'removePasskey',
+        metaRpc: 'deleteUserMetadata',
+        run: (p: ZitadelAuthProvider) => p.removePasskey('u1', 'pk1'),
+      },
+    ] as const;
+
+    for (const row of rows) {
+      // Fresh free-standing stub per row (nothing is wrapped, so no restore hazard);
+      // stubClient() replaces the whole transport impl for the row.
+      const primarySpy = cy.stub().resolves({});
+      stubClient({
+        [row.rpc]: primarySpy,
+        [row.metaRpc]: async () => {
+          throw new Error('metadata backend down');
+        },
+      });
+      // Must not throw — the primary operation is not allowed to fail because of the
+      // best-effort metadata RPC (created-at stamp on enroll; key cleanup on removal).
+      await row.run(provider());
+      expect(primarySpy, row.label).to.have.callCount(1);
+    }
   });
 
   it('listPasskeys degrades to date-less rows (all createdAt absent) when listUserMetadata throws', async () => {
@@ -309,19 +338,6 @@ describe('ZitadelAuthProvider — passkey metadata best-effort scopes', () => {
     // Absence must be a missing property (omitted via the `...(createdAt ? {...} : {})` spread),
     // not just an undefined value.
     expect(pk2).to.not.have.property('createdAt');
-  });
-
-  it('removePasskey resolves even when the deleteUserMetadata cleanup throws', async () => {
-    const removeSpy = cy.stub().resolves({});
-    stubClient({
-      removePasskey: removeSpy,
-      deleteUserMetadata: async () => {
-        throw new Error('metadata backend down');
-      },
-    });
-    // Must not throw — removal succeeded; an orphaned metadata key is harmless.
-    await provider().removePasskey('u1', 'pk1');
-    expect(removeSpy).to.have.callCount(1);
   });
 });
 

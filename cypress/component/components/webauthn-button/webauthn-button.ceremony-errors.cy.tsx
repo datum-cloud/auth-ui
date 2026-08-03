@@ -44,6 +44,12 @@ function mountRejecting(
   cy.window().then((win) => {
     (win as unknown as { __webAuthnRealCeremony?: boolean }).__webAuthnRealCeremony = true;
     ensureWebAuthnEnv(win);
+    // A single test may drive more than one ceremony failure (one mount per DOMException).
+    // Cypress only auto-restores stubs BETWEEN tests, so re-stubbing the same method inside
+    // one test throws "Attempted to wrap create which is already wrapped" — undo the previous
+    // row's stub first. No-op on the first row, where nothing is wrapped yet.
+    const creds = win.navigator.credentials as unknown as Record<string, { restore?: () => void }>;
+    creds[method]?.restore?.();
     cy.stub(win.navigator.credentials, method).rejects(new win.DOMException('boom', domName));
   });
   cy.findByRole('button').should('not.be.disabled').click();
@@ -56,24 +62,38 @@ describe('WebAuthnButton enroll (attestation) failure copy', () => {
     cy.findByText(/verification failed/i).should('not.exist');
   });
 
-  it('InvalidStateError → already-registered', () => {
-    mountRejecting('attestation', 'create', 'InvalidStateError');
-    cy.findByText(/already have a passkey for this account/i).should('exist');
-  });
-
-  it("NotSupportedError → device can't create a passkey", () => {
-    mountRejecting('attestation', 'create', 'NotSupportedError');
-    cy.findByText(/can't create a passkey/i).should('exist');
-  });
-
-  it('SecurityError → security-reasons setup copy', () => {
-    mountRejecting('attestation', 'create', 'SecurityError');
-    cy.findByText(/passkey setup couldn't be completed for security reasons/i).should('exist');
-  });
-
-  it('unmapped DOMException → generic enroll copy', () => {
-    mountRejecting('attestation', 'create', 'NetworkError');
-    cy.findByText(/couldn't set up your passkey/i).should('exist');
+  // Each row is one full ceremony: remount, reject create() with the named DOMException,
+  // assert that reason's enroll copy. mountRejecting restores the previous row's stub and
+  // the remount clears the previous row's copy, so rows are independent; cy.log names the
+  // row in the command log right before its assertions.
+  it('classifies each remaining DOMException to its enroll copy', () => {
+    const rows: ReadonlyArray<{ label: string; domName: string; copy: RegExp }> = [
+      {
+        label: 'InvalidStateError → already-registered',
+        domName: 'InvalidStateError',
+        copy: /already have a passkey for this account/i,
+      },
+      {
+        label: "NotSupportedError → device can't create a passkey",
+        domName: 'NotSupportedError',
+        copy: /can't create a passkey/i,
+      },
+      {
+        label: 'SecurityError → security-reasons setup copy',
+        domName: 'SecurityError',
+        copy: /passkey setup couldn't be completed for security reasons/i,
+      },
+      {
+        label: 'unmapped DOMException (NetworkError) → generic enroll copy',
+        domName: 'NetworkError',
+        copy: /couldn't set up your passkey/i,
+      },
+    ];
+    for (const row of rows) {
+      cy.log(row.label);
+      mountRejecting('attestation', 'create', row.domName);
+      cy.findByText(row.copy).should('exist');
+    }
   });
 });
 
@@ -84,24 +104,34 @@ describe('WebAuthnButton sign-in (assertion) failure copy', () => {
     cy.findByText(/set up your passkey/i).should('exist');
   });
 
-  it("NotSupportedError → device can't use a passkey to sign in", () => {
-    mountRejecting('assertion', 'get', 'NotSupportedError');
-    cy.findByText(/can't use a passkey to sign in/i).should('exist');
-  });
-
-  it('SecurityError → security-reasons sign-in copy', () => {
-    mountRejecting('assertion', 'get', 'SecurityError');
-    cy.findByText(/passkey sign-in couldn't be completed for security reasons/i).should('exist');
-  });
-
-  it('unmapped DOMException → generic sign-in copy', () => {
-    mountRejecting('assertion', 'get', 'NetworkError');
-    cy.findByText(/verification failed/i).should('exist');
+  // Same table pattern as the enroll describe: one full ceremony per labeled row.
+  it('classifies NotSupportedError and SecurityError to their sign-in copy', () => {
+    const rows: ReadonlyArray<{ label: string; domName: string; copy: RegExp }> = [
+      {
+        label: "NotSupportedError → device can't use a passkey to sign in",
+        domName: 'NotSupportedError',
+        copy: /can't use a passkey to sign in/i,
+      },
+      {
+        label: 'SecurityError → security-reasons sign-in copy',
+        domName: 'SecurityError',
+        copy: /passkey sign-in couldn't be completed for security reasons/i,
+      },
+    ];
+    for (const row of rows) {
+      cy.log(row.label);
+      mountRejecting('assertion', 'get', row.domName);
+      cy.findByText(row.copy).should('exist');
+    }
   });
 
   // already-registered (InvalidStateError) does not apply to a sign-in ceremony; it falls
-  // back to the generic verification copy rather than showing enroll-only wording.
-  it('InvalidStateError → generic sign-in copy (already-registered N/A on sign-in)', () => {
+  // back to the generic verification copy rather than showing enroll-only wording — the
+  // same copy an unmapped DOMException (NetworkError) produces.
+  it('unmapped DOMException and InvalidStateError both → generic sign-in copy (already-registered N/A on sign-in)', () => {
+    mountRejecting('assertion', 'get', 'NetworkError');
+    cy.findByText(/verification failed/i).should('exist');
+
     mountRejecting('assertion', 'get', 'InvalidStateError');
     cy.findByText(/verification failed/i).should('exist');
     cy.findByText(/already have a passkey/i).should('not.exist');
