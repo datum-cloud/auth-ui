@@ -91,4 +91,33 @@ describe('removeAccount — ceremony requestId threading', () => {
       expect(o.location, 'with org: org scope survives').to.include('organization=org-1');
     });
   });
+
+  // The drop half of the allowlist, which the file header has claimed since it was written
+  // but nothing asserted. REQUEST_ID_PATTERN is /^(oidc|saml|device)_/ — anything else is
+  // attacker-supplied text that must never be reflected into a redirect the user follows.
+  // Without this, a build that threaded the form value verbatim passed every existing test.
+  const REJECTED: [label: string, requestId: string][] = [
+    ['an unknown prefix', 'evil_x'],
+    ['an absolute URL smuggled as a requestId', 'evil_https://evil.example/steal'],
+    ['a bare value with no prefix at all', 'V3-current'],
+  ];
+
+  it('drops a requestId that fails the prefix allowlist, redirecting to a bare /accounts rather than reflecting it', () => {
+    for (const [label, requestId] of REJECTED) {
+      callService({
+        fn: 'removeAccount',
+        seed,
+        liveSessions,
+        request: {
+          url: 'http://localhost/id/accounts',
+          sessions: cookie,
+          form: { intent: 'remove', sessionId: 's1', requestId },
+        },
+      }).then((v) => {
+        const o = v.outcome as Outcome;
+        expect(o.kind, `${label}: redirect`).to.equal('redirect');
+        expect(o.location, `${label}: value not reflected`).to.equal('/accounts');
+      });
+    }
+  });
 });
