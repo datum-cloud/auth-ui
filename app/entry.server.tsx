@@ -1,6 +1,7 @@
 // Observability: initialise Sentry FIRST so the SDK is active before any
 // application modules load.  This import is a no-op when SENTRY_DSN is unset.
 import { captureException } from '@/server/sentry.server';
+import { cspNonceContext } from '@/shared/load-context';
 import { createReadableStreamFromReadable } from '@react-router/node';
 import { isbot } from 'isbot';
 import { PassThrough } from 'node:stream';
@@ -10,7 +11,6 @@ import { PassThrough } from 'node:stream';
 import { renderToPipeableStream } from 'react-dom/server.node';
 import type { EntryContext, HandleErrorFunction, RouterContextProvider } from 'react-router';
 import { ServerRouter } from 'react-router';
-import { cspNonceContext } from '@/shared/load-context';
 
 // RR7 streamTimeout convention: how long to wait for the shell before aborting.
 // The abort timer fires streamTimeout + 1 000 ms after the shell deadline passes.

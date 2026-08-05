@@ -10,6 +10,7 @@ import { MaxMindTracker } from '@/modules/fraud/maxmind-tracker';
 import { loadMessages } from '@/modules/i18n/lingui';
 import { detectLocale } from '@/modules/i18n/lingui.server';
 import { env } from '@/server/infra/env.server';
+import { cspNonceContext } from '@/shared/load-context';
 import { authErrorMessage } from '@/utils/errors/auth-error';
 import { ConformAdapter } from '@datum-cloud/datum-ui/form/adapters/conform';
 import { ThemeProvider, ThemeScript } from '@datum-cloud/datum-ui/theme';
@@ -31,7 +32,6 @@ import {
   isRouteErrorResponse,
   type RouterContextProvider,
 } from 'react-router';
-import { cspNonceContext } from '@/shared/load-context';
 
 // Preload Alliance No1 Regular — primary body font (--font-sans in datum-ui alpha theme).
 // Eliminates FOIT and reduces LCP by starting the woff2 fetch in parallel with CSS parsing.

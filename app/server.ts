@@ -21,11 +21,11 @@ import { requestContext, type RequestContextEnv } from '@/server/middleware/requ
 import { appSecureHeaders, resolveFrameAncestors } from '@/server/middleware/secure-headers';
 import { registry, httpMetrics } from '@/server/observability';
 import { samlPostHandler } from '@/server/routes/saml-post';
+import { cspNonceContext, traceIdContext } from '@/shared/load-context';
 import { serveStatic } from 'hono/bun';
 import { compress } from 'hono/compress';
-import { cspNonceContext, traceIdContext } from '@/shared/load-context';
-import { createHonoServer } from 'react-router-hono-server/bun';
 import { RouterContextProvider } from 'react-router';
+import { createHonoServer } from 'react-router-hono-server/bun';
 
 // React Router 8 reads the load context through typed keys on a
 // RouterContextProvider instead of an augmented AppLoadContext interface.
