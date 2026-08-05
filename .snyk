@@ -1,0 +1,15 @@
+# Snyk (https://snyk.io) policy file
+version: v1.25.0
+ignore:
+  SNYK-JS-HONONODESERVER-18170429:
+    - '*':
+        reason: >-
+          False positive for this repo: @hono/node-server resolves to 2.1.0
+          (patched; fix is >=2.0.10) via a direct dependency and an overrides
+          floor of ^2.1.0. react-router-hono-server@3.0.0 declares an exact
+          "@hono/node-server": "2.0.6" dependency, and the Snyk manifest-only
+          scan reports that declared version because it cannot read bun.lock,
+          where the override resolves the single installed copy to 2.1.0.
+          Verified against node_modules: only 2.1.0 is installed.
+          Re-evaluate on expiry or when Snyk supports Bun lockfiles.
+        expires: 2026-11-01T00:00:00.000Z

@@ -150,13 +150,19 @@ jobs:
         #   form-data       ^4.0.6    cypress/axios accept ^4.0.x    fixes GHSA-hmw2-7cc7-3qxx (high)
         #   dompurify       ^3.4.13   isomorphic-dompurify accepts ^3.4.8   fixes GHSA-cmwh-pvxp-8882
         #   esbuild         ^0.28.1   vite accepts ^0.28; build + i18n extract verified   fixes GHSA-g7r4-m6w7-qqqr / GHSA-gv7w-rqvm-qjhr
-        #   brace-expansion ^2.1.4    every parent's minimatch now resolves on 2.x   fixes GHSA-mh99-v99m-4gvg / GHSA-rgw5-rvv9-x895
         #   postcss         ^8.5.25   vite/madge/precinct accept ^8.x   fixes GHSA-fxqj-rqcc-2cmp
         # There are NO ignored advisories: `bun audit` is clean with no --ignore flags.
-        # The two former exemptions are both genuinely fixed, not suppressed —
-        # GHSA-mh99-v99m-4gvg by the brace-expansion override (the parents that once
-        # straddled different majors have all converged on 2.x, so one range now covers
-        # them), and GHSA-qwww-vcr4-c8h2 by the react-router v8.3.0 upgrade.
+        # The two former exemptions are both genuinely fixed, not suppressed:
+        #   GHSA-mh99-v99m-4gvg / GHSA-rgw5-rvv9-x895 (brace-expansion) — fixed by the
+        #     dependency refresh alone, with NO override. Each consumer now nests its own
+        #     minimatch on brace-expansion 5.0.9 and the hoisted copy is 2.1.4; the
+        #     vulnerable range is >=2.0.0 <2.1.3, so every installed copy is patched.
+        #     Do NOT add a brace-expansion override to "help" here: the majors are not
+        #     interchangeable (v2 is a CJS default export, v4+ adds the named `expand`
+        #     that current minimatch imports), so pinning one range across all parents
+        #     breaks eslint and find-cypress-specs with
+        #     "(0 , brace_expansion_1.expand) is not a function".
+        #   GHSA-qwww-vcr4-c8h2 (react-router RSC CSRF) — fixed by the v8.3.0 upgrade.
         # If a NEW transitive advisory appears with no override-compatible fix, add a
         # documented `--ignore=<GHSA>` here as a temporary measure and open a remediation follow-up.
         run: bun audit
