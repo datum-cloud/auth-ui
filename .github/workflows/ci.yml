@@ -146,23 +146,20 @@ jobs:
       - name: Dependency audit (blocking)
         # All known transitive vulns are REMEDIATED via package.json `overrides` (each
         # parent's declared range accepts the patched version):
-        #   undici     ^7.28.0   jsdom accepts ^7.25.0          fixes 5 undici advisories (2 high)
-        #   form-data  ^4.0.6    cypress/axios accept ^4.0.x    fixes GHSA-hmw2-7cc7-3qxx (high)
-        #   dompurify  ^3.4.11   isomorphic-dompurify accepts ^3.4.8   fixes GHSA-cmwh-pvxp-8882
-        #   esbuild    ^0.28.1   vite accepts ^0.28; build + i18n extract verified   fixes GHSA-g7r4-m6w7-qqqr / GHSA-gv7w-rqvm-qjhr
-        # Two advisories are TEMPORARILY ignored — no override-compatible fix exists yet,
-        # tracked for a remediation follow-up (do not add more without the same scrutiny):
-        #   GHSA-mh99-v99m-4gvg  brace-expansion DoS — reaches the tree through seven parents'
-        #                        pinned minimatch versions, which span different brace-expansion
-        #                        majors; no single override range satisfies every parent.
-        #   GHSA-qwww-vcr4-c8h2  react-router RSC-mode CSRF bypass — NOT REACHABLE in this app:
-        #                        the vulnerable path is RSC mode, and react-router.config.ts runs
-        #                        plain framework SSR (ssr: true, no RSC entry, plugin, or package).
-        #                        Fixed only in >=8.3.0 — a major bump from the pinned ^7.18.1 that
-        #                        needs its own migration PR with full regression coverage.
+        #   undici          ^7.29.0   jsdom accepts ^7.25.0     fixes 5 undici advisories (1 high)
+        #   form-data       ^4.0.6    cypress/axios accept ^4.0.x    fixes GHSA-hmw2-7cc7-3qxx (high)
+        #   dompurify       ^3.4.13   isomorphic-dompurify accepts ^3.4.8   fixes GHSA-cmwh-pvxp-8882
+        #   esbuild         ^0.28.1   vite accepts ^0.28; build + i18n extract verified   fixes GHSA-g7r4-m6w7-qqqr / GHSA-gv7w-rqvm-qjhr
+        #   brace-expansion ^2.1.4    every parent's minimatch now resolves on 2.x   fixes GHSA-mh99-v99m-4gvg / GHSA-rgw5-rvv9-x895
+        #   postcss         ^8.5.25   vite/madge/precinct accept ^8.x   fixes GHSA-fxqj-rqcc-2cmp
+        # There are NO ignored advisories: `bun audit` is clean with no --ignore flags.
+        # The two former exemptions are both genuinely fixed, not suppressed —
+        # GHSA-mh99-v99m-4gvg by the brace-expansion override (the parents that once
+        # straddled different majors have all converged on 2.x, so one range now covers
+        # them), and GHSA-qwww-vcr4-c8h2 by the react-router v8.3.0 upgrade.
         # If a NEW transitive advisory appears with no override-compatible fix, add a
         # documented `--ignore=<GHSA>` here as a temporary measure and open a remediation follow-up.
-        run: bun audit --ignore=GHSA-mh99-v99m-4gvg --ignore=GHSA-qwww-vcr4-c8h2
+        run: bun audit
       - name: Generate SBOM (CycloneDX)
         run: bunx @cyclonedx/cdxgen@11.10.0 -t js -o sbom.cdx.json --spec-version 1.5
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2

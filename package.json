@@ -61,13 +61,15 @@
     "zod": "^4.4.3"
   },
   "overrides": {
-    "axios": "^1.18.0",
+    "axios": "^1.19.0",
+    "brace-expansion": "^2.1.4",
+    "postcss": "^8.5.25",
     "@opentelemetry/sdk-trace-base": "2.8.0",
     "@opentelemetry/core": "2.8.0",
     "@opentelemetry/resources": "2.8.0",
-    "undici": "^7.28.0",
+    "undici": "^7.29.0",
     "form-data": "^4.0.6",
-    "dompurify": "^3.4.11",
+    "dompurify": "^3.4.13",
     "esbuild": "^0.28.1",
     "@hono/node-server": "^2.1.0",
     "@bufbuild/protobuf": "2.13.0"
