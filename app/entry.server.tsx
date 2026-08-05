@@ -1,6 +1,7 @@
 // Observability: initialise Sentry FIRST so the SDK is active before any
 // application modules load.  This import is a no-op when SENTRY_DSN is unset.
 import { captureException } from '@/server/sentry.server';
+import { cspNonceContext } from '@/shared/load-context';
 import { createReadableStreamFromReadable } from '@react-router/node';
 import { isbot } from 'isbot';
 import { PassThrough } from 'node:stream';
@@ -8,7 +9,7 @@ import { PassThrough } from 'node:stream';
 // resolves to server.bun.js (Web Streams only — no renderToPipeableStream). This SSR
 // path uses Node streams (PassThrough + @react-router/node), so pin the node build.
 import { renderToPipeableStream } from 'react-dom/server.node';
-import type { AppLoadContext, EntryContext, HandleErrorFunction } from 'react-router';
+import type { EntryContext, HandleErrorFunction, RouterContextProvider } from 'react-router';
 import { ServerRouter } from 'react-router';
 
 // RR7 streamTimeout convention: how long to wait for the shell before aborting.
@@ -20,11 +21,13 @@ export default async function handleRequest(
   responseStatusCode: number,
   responseHeaders: Headers,
   reactRouterContext: EntryContext,
-  loadContext: AppLoadContext
+  loadContext: RouterContextProvider
 ) {
   const callbackName = isbot(request.headers.get('user-agent') ?? '')
     ? 'onAllReady'
     : 'onShellReady';
+
+  const cspNonce = loadContext.get(cspNonceContext);
 
   return new Promise<Response>((resolve, reject) => {
     let shellRendered = false;
@@ -32,11 +35,11 @@ export default async function handleRequest(
     let abortTimer: ReturnType<typeof setTimeout>;
 
     const { pipe, abort } = renderToPipeableStream(
-      <ServerRouter context={reactRouterContext} url={request.url} nonce={loadContext?.cspNonce} />,
+      <ServerRouter context={reactRouterContext} url={request.url} nonce={cspNonce} />,
       {
         // Thread the per-request CSP nonce so React marks inline scripts with it.
         // Undefined in dev (Hono uses 'unsafe-inline' there instead of NONCE).
-        nonce: loadContext?.cspNonce,
+        nonce: cspNonce,
         [callbackName]() {
           shellRendered = true;
           clearTimeout(abortTimer);

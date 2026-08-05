@@ -10,6 +10,7 @@ import { MaxMindTracker } from '@/modules/fraud/maxmind-tracker';
 import { loadMessages } from '@/modules/i18n/lingui';
 import { detectLocale } from '@/modules/i18n/lingui.server';
 import { env } from '@/server/infra/env.server';
+import { cspNonceContext } from '@/shared/load-context';
 import { authErrorMessage } from '@/utils/errors/auth-error';
 import { ConformAdapter } from '@datum-cloud/datum-ui/form/adapters/conform';
 import { ThemeProvider, ThemeScript } from '@datum-cloud/datum-ui/theme';
@@ -29,7 +30,7 @@ import {
   useRouteLoaderData,
   useRouteError,
   isRouteErrorResponse,
-  type AppLoadContext,
+  type RouterContextProvider,
 } from 'react-router';
 
 // Preload Alliance No1 Regular — primary body font (--font-sans in datum-ui alpha theme).
@@ -48,7 +49,7 @@ export const links: LinksFunction = () => [
 export async function loader({
   request,
   context,
-}: LoaderFunctionArgs & { context: AppLoadContext }) {
+}: LoaderFunctionArgs & { context: RouterContextProvider }) {
   const locale = detectLocale(request);
   const messages = await loadMessages(locale);
   // Thread the per-request CSP nonce into the route data so Layout can pass it to
@@ -57,7 +58,7 @@ export async function loader({
   return {
     locale,
     messages,
-    cspNonce: context?.cspNonce,
+    cspNonce: context.get(cspNonceContext),
     rybbitSiteId: resolveRybbitSiteId(env.RYBBIT_SITE_ID),
     rybbitTag: env.RYBBIT_TAG,
     maxmindAccountId: env.MAXMIND_ACCOUNT_ID ?? '',
