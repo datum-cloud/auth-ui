@@ -1,4 +1,4 @@
-import { stubServerModulesForCypress } from './cypress/support/vite-cypress-stubs';
+import { stubServerModulesForCypress } from './cypress/support/vite-cypress-stubs.ts';
 import { lingui } from '@lingui/vite-plugin';
 import { reactRouter } from '@react-router/dev/vite';
 import tailwindcss from '@tailwindcss/vite';
@@ -30,7 +30,7 @@ export default defineConfig(() => {
     },
     resolve: { tsconfigPaths: true },
     plugins: [
-      ...(isCypress ? [stubServerModulesForCypress(__dirname)] : []),
+      ...(isCypress ? [stubServerModulesForCypress(import.meta.dirname)] : []),
       tailwindcss(),
       isCypress ? react() : reactRouter(),
       reactRouterHonoServer({
