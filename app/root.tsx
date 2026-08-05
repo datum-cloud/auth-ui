@@ -29,8 +29,9 @@ import {
   useRouteLoaderData,
   useRouteError,
   isRouteErrorResponse,
-  type AppLoadContext,
+  type RouterContextProvider,
 } from 'react-router';
+import { cspNonceContext } from '@/shared/load-context';
 
 // Preload Alliance No1 Regular — primary body font (--font-sans in datum-ui alpha theme).
 // Eliminates FOIT and reduces LCP by starting the woff2 fetch in parallel with CSS parsing.
@@ -48,7 +49,7 @@ export const links: LinksFunction = () => [
 export async function loader({
   request,
   context,
-}: LoaderFunctionArgs & { context: AppLoadContext }) {
+}: LoaderFunctionArgs & { context: RouterContextProvider }) {
   const locale = detectLocale(request);
   const messages = await loadMessages(locale);
   // Thread the per-request CSP nonce into the route data so Layout can pass it to
@@ -57,7 +58,7 @@ export async function loader({
   return {
     locale,
     messages,
-    cspNonce: context?.cspNonce,
+    cspNonce: context.get(cspNonceContext),
     rybbitSiteId: resolveRybbitSiteId(env.RYBBIT_SITE_ID),
     rybbitTag: env.RYBBIT_TAG,
     maxmindAccountId: env.MAXMIND_ACCOUNT_ID ?? '',

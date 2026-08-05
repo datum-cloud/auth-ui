@@ -23,15 +23,14 @@ import { registry, httpMetrics } from '@/server/observability';
 import { samlPostHandler } from '@/server/routes/saml-post';
 import { serveStatic } from 'hono/bun';
 import { compress } from 'hono/compress';
+import { cspNonceContext, traceIdContext } from '@/shared/load-context';
 import { createHonoServer } from 'react-router-hono-server/bun';
+import { RouterContextProvider } from 'react-router';
 
-declare module 'react-router' {
-  interface AppLoadContext {
-    traceId: string;
-    // CSP nonce threading: per-request nonce from hono secure-headers.
-    cspNonce: string | undefined;
-  }
-}
+// React Router 8 reads the load context through typed keys on a
+// RouterContextProvider instead of an augmented AppLoadContext interface.
+// The keys are defined in @/shared/load-context so client-reachable readers
+// (root.tsx, entry.server.tsx) don't have to import this server entry.
 
 export default await createHonoServer<RequestContextEnv>({
   // Supplying onGracefulShutdown activates react-router-hono-server/bun's built-in
@@ -149,14 +148,14 @@ export default await createHonoServer<RequestContextEnv>({
     app.get('/id/sso/saml-post', samlPostHandler);
   },
   getLoadContext(c) {
-    return {
-      traceId: c.get('traceId'),
-      // Step 4: thread the per-request CSP nonce into the load context so the root
-      // loader can pass it to <Scripts nonce> / <ScrollRestoration nonce> /
-      // renderToPipeableStream. Hono stores it under 'secureHeadersNonce' (confirmed
-      // in node_modules/hono/dist/middleware/secure-headers/secure-headers.js).
-      // In dev mode, NONCE is not used (unsafe-inline instead), so c.get returns undefined.
-      cspNonce: c.get('secureHeadersNonce') as string | undefined,
-    };
+    const context = new RouterContextProvider();
+    context.set(traceIdContext, c.get('traceId'));
+    // Step 4: thread the per-request CSP nonce into the load context so the root
+    // loader can pass it to <Scripts nonce> / <ScrollRestoration nonce> /
+    // renderToPipeableStream. Hono stores it under 'secureHeadersNonce' (confirmed
+    // in node_modules/hono/dist/middleware/secure-headers/secure-headers.js).
+    // In dev mode, NONCE is not used (unsafe-inline instead), so c.get returns undefined.
+    context.set(cspNonceContext, c.get('secureHeadersNonce') as string | undefined);
+    return context;
   },
 });
