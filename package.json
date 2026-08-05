@@ -12,7 +12,8 @@
     "lint:ci": "bunx eslint \"app/**/*.{ts,tsx}\"",
     "format": "bunx prettier --write \"**/*.{js,jsx,ts,tsx,json,css,md}\"",
     "prepare": "lefthook install || true",
-    "typecheck": "bunx react-router typegen && tsc",
+    "typecheck": "bunx react-router typegen && ./node_modules/typescript-native/bin/tsc",
+    "typecheck:watch": "bunx react-router typegen && ./node_modules/typescript-native/bin/tsc --noEmit --watch",
     "typecheck:cypress": "tsc -p cypress/tsconfig.json --noEmit",
     "i18n:extract": "lingui extract --clean",
     "i18n:compile": "lingui compile --typescript",
@@ -122,6 +123,7 @@
     "start-server-and-test": "^3.0.12",
     "tailwindcss": "^4.3.3",
     "typescript": "^6.0.3",
+    "typescript-native": "npm:typescript@^7.0.2",
     "typescript-eslint": "^8.66.0",
     "vite": "^8.2.0",
     "vite-plugin-babel-macros": "^1.0.6"

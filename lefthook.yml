@@ -13,7 +13,10 @@ pre-commit:
       auto_add: true
     typecheck:
       glob: '*.{ts,tsx}'
-      run: bunx tsc --noEmit
+      # Explicit path, not bare `tsc`/`bunx tsc`: two packages ship a tsc bin
+      # (typescript and the typescript-native alias), so bare resolution is
+      # nondeterministic. This must be the native (Go) TypeScript 7 compiler.
+      run: ./node_modules/typescript-native/bin/tsc --noEmit
       stage_fixed: false
     i18n:
       glob: 'app/**/*.{ts,tsx}'
