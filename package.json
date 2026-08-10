@@ -63,6 +63,7 @@
   "overrides": {
     "axios": "^1.19.0",
     "postcss": "^8.5.25",
+    "nanoid": "^3.3.17",
     "@opentelemetry/sdk-trace-base": "2.8.0",
     "@opentelemetry/core": "2.8.0",
     "@opentelemetry/resources": "2.8.0",
