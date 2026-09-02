@@ -68,6 +68,12 @@ export interface ReauthCheck {
  * IdP path passes its IdP-vouched name as well. This does not widen who may pass the guard: both
  * labels are vouched for by the same completed authentication, so accepting either recognizes one
  * identity under two spellings rather than admitting a second identity.
+ *
+ * TODO(#1485): `alsoAccept` is TRANSITIONAL and its only caller is idp-session.ts. The cookies it
+ * exists for are self-expiring — `sessionsCookie` has a 24h maxAge — so once the #1485 fix has
+ * been deployed for longer than that, no cookie carrying an IdP handle can still be presented.
+ * Drop the parameter and the argument then; the guard reverts to comparing the canonical loginName
+ * alone, which is strictly tighter than both this and the pre-fix behavior.
  */
 export async function checkReauthIntent(
   request: Request,

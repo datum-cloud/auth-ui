@@ -17,6 +17,11 @@ const VALID_CRED = JSON.stringify({ id: 'cred-1' });
 const sessionsFor = (organization?: string) => [
   { id: 's1', token: 't1', loginName: ALICE, organization },
 ];
+// The PROVIDER-side counterpart of sessionsFor(). A cookie entry is only half a session: enrollment
+// now resolves the enrollee from the session that entry is bound to rather than by name, so the
+// session has to actually exist and carry its user — as every real one does. A bare cookie entry
+// with no provider session is a DEAD session, and enrollment must refuse it.
+const liveAlice = () => [{ id: 's1', token: 't1', user: { id: 'u1', loginName: ALICE } }];
 
 describe('requestPasskeyAttestation / requestU2FAttestation — challenge audit + provider-sequence parity', () => {
   it('records a failure audit with a hashed actor for provider errors, drives the correct provider methods per config (never crossing passkey/U2F), and redirects to /login with no matching session', () => {
@@ -24,6 +29,7 @@ describe('requestPasskeyAttestation / requestU2FAttestation — challenge audit 
       fn: 'requestPasskeyAttestation',
       provider: 'singleton',
       failPasskeyRegisterLink: true, // plain Error
+      liveSessions: liveAlice(),
       request: { url: 'http://localhost/id/setup/passkey', sessions: sessionsFor() },
       attestationInput: { loginName: ALICE, domain: 'localhost' },
     }).then((v) => {
@@ -51,6 +57,7 @@ describe('requestPasskeyAttestation / requestU2FAttestation — challenge audit 
       fn: 'requestPasskeyAttestation',
       provider: 'singleton',
       passkeyRegisterLinkError: 'UNAVAILABLE',
+      liveSessions: liveAlice(),
       request: { url: 'http://localhost/id/setup/passkey', sessions: sessionsFor() },
       attestationInput: { loginName: ALICE, domain: 'localhost' },
     }).then((v) => {
@@ -70,6 +77,7 @@ describe('requestPasskeyAttestation / requestU2FAttestation — challenge audit 
     callService({
       fn: 'requestPasskeyAttestation',
       provider: 'singleton',
+      liveSessions: liveAlice(),
       request: { url: 'http://localhost/id/setup/passkey', sessions: sessionsFor() },
       attestationInput: { loginName: ALICE, domain: 'localhost' },
       recordCalls: ['passkeyRegisterLink', 'registerPasskey', 'registerU2F'],
@@ -86,6 +94,7 @@ describe('requestPasskeyAttestation / requestU2FAttestation — challenge audit 
     callService({
       fn: 'requestU2FAttestation',
       provider: 'singleton',
+      liveSessions: liveAlice(),
       request: { url: 'http://localhost/id/setup/security-key', sessions: sessionsFor() },
       attestationInput: { loginName: ALICE, domain: 'localhost' },
       recordCalls: ['passkeyRegisterLink', 'registerPasskey', 'registerU2F'],
@@ -176,21 +185,27 @@ describe('requestPasskeyAttestation — enrollee resolution for legacy IdP cooki
     });
   });
 
-  it('still bounces to /login when the session itself resolves no user', () => {
-    // The fallback must not become a way to enroll against an unresolvable identity.
+  it('bounces to /login when the session resolves no user, even though the NAME resolves', () => {
+    // The name is deliberately one findUser CAN resolve, so the only thing standing between this
+    // request and an enrollment is the session check. Reinstating a findUser fallback — the shape
+    // this code had before — turns this into a challenge, which is precisely the account-takeover
+    // path resolveSessionUser exists to close. Keep the two spellings equal here or the assertion
+    // silently stops testing anything.
     callService({
       fn: 'requestPasskeyAttestation',
       seed: { users: [{ id: 'u1', loginName: ZITADEL_LOGIN_NAME }] },
-      liveSessions: [{ id: 's1', token: 't1' }],
+      liveSessions: [{ id: 's1', token: 't1' }], // live, but bound to NO user
       request: {
         url: 'http://localhost/id/setup/passkey',
-        sessions: [{ id: 's1', token: 't1', loginName: GITHUB_HANDLE }],
+        sessions: [{ id: 's1', token: 't1', loginName: ZITADEL_LOGIN_NAME }],
       },
-      attestationInput: { loginName: GITHUB_HANDLE, domain: 'localhost' },
+      attestationInput: { loginName: ZITADEL_LOGIN_NAME, domain: 'localhost' },
+      recordCalls: ['passkeyRegisterLink'],
     }).then((v) => {
       const o = v.outcome as { kind: string; target?: string };
-      expect(o.kind).to.equal('redirect');
+      expect(o.kind, 'no challenge without a session-bound user').to.equal('redirect');
       expect(o.target).to.equal('/login');
+      expect(v.calls?.passkeyRegisterLink ?? [], 'no enrollment attempted').to.have.length(0);
     });
   });
 });
@@ -294,7 +309,7 @@ describe('verifyPasskeyEnrollment', () => {
       provider: 'singleton',
       // The sudo gate reads the ACTIVE session's factors — seed s1 live (the
       // singleton stamps REAL factor timestamps, so the 10-min window passes).
-      liveSessions: [{ id: 's1', token: 't1' }],
+      liveSessions: liveAlice(),
       request: { url: 'http://localhost/id/setup/passkey', sessions: sessionsFor('org-1') },
       verifyEnrollInput: {
         credential: VALID_CRED,
@@ -316,6 +331,7 @@ describe('verifyPasskeyEnrollment', () => {
     callService({
       fn: 'verifyPasskeyEnrollment',
       provider: 'singleton',
+      liveSessions: liveAlice(),
       request: { url: 'http://localhost/id/setup/passkey', sessions: sessionsFor() },
       verifyEnrollInput: { credential: 'not-json', passkeyId: 'pk-1', loginName: ALICE },
       recordCalls: ['verifyPasskey'],
@@ -330,7 +346,7 @@ describe('verifyPasskeyEnrollment', () => {
       failVerifyPasskey: 'INVALID_CREDENTIALS',
       // Seed the live session so the sudo gate passes and the scenario still
       // exercises the INVALID_CREDENTIALS mapping.
-      liveSessions: [{ id: 's1', token: 't1' }],
+      liveSessions: liveAlice(),
       request: { url: 'http://localhost/id/setup/passkey', sessions: sessionsFor() },
       verifyEnrollInput: { credential: VALID_CRED, passkeyId: 'pk-1', loginName: ALICE },
     }).then((v) => {
@@ -356,7 +372,7 @@ describe('verifyPasskeyEnrollment', () => {
     callService({
       fn: 'verifyPasskeyEnrollment',
       provider: 'singleton',
-      liveSessions: [{ id: 's1', token: 't1' }],
+      liveSessions: liveAlice(),
       sessionResults: { s1: { mode: 'throw', code: 'PERMISSION_DENIED' } },
       request: { url: 'http://localhost/id/setup/passkey', sessions: sessionsFor() },
       verifyEnrollInput: { credential: VALID_CRED, passkeyId: 'pk-1', loginName: ALICE },

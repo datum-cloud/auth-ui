@@ -3123,21 +3123,27 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
     // Round-trip through the REAL cookie module: a spec that hand-decoded the base64 payload would
     // only prove it agrees with itself, whereas parsing what serializeSessions actually produced
     // proves the identity survives the write the browser receives.
+    // Every service that writes this cookie emits exactly ONE `sessions=` Set-Cookie, so the value
+    // IS the whole string — there is no multi-cookie header to split apart here.
     const written = (outcome as { setCookie?: unknown } | undefined)?.setCookie;
-    const sessionsStr =
-      typeof written === 'string'
-        ? written.split(/,(?=\s*[^;=]+=)/).find((c) => c.trim().startsWith('sessions='))
-        : undefined;
     let entries: Array<{ id: string; loginName: string; organization?: string }> | null = null;
-    if (sessionsStr) {
+    if (typeof written === 'string' && written.startsWith('sessions=')) {
       try {
-        const parsed = await sessionsCookie.parse(sessionsStr.split(';')[0].trim());
+        const parsed: unknown = await sessionsCookie.parse(written.split(';')[0]);
+        // Shape-check rather than cast: a spec asserting on `loginName` must fail loudly if the
+        // payload ever stops carrying one, not read `undefined` as though it were the value.
         entries = Array.isArray(parsed)
-          ? parsed.map((e: { id: string; loginName: string; organization?: string }) => ({
-              id: e.id,
-              loginName: e.loginName,
-              organization: e.organization,
-            }))
+          ? parsed.flatMap((raw: unknown) => {
+              const e = raw as { id?: unknown; loginName?: unknown; organization?: unknown };
+              if (typeof e.id !== 'string' || typeof e.loginName !== 'string') return [];
+              return [
+                {
+                  id: e.id,
+                  loginName: e.loginName,
+                  organization: typeof e.organization === 'string' ? e.organization : undefined,
+                },
+              ];
+            })
           : null;
       } catch {
         entries = null;
