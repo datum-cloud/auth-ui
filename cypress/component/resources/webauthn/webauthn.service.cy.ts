@@ -146,6 +146,55 @@ describe('requestPasskeyAttestation / requestU2FAttestation — challenge audit 
   });
 });
 
+describe('requestPasskeyAttestation — enrollee resolution for legacy IdP cookies (issue #1485)', () => {
+  // Sessions minted before the idp-session loginName fix carry the IdP-side HANDLE in the cookie,
+  // so findUser(loginName) — which matches on exact loginName OR exact email — misses and the
+  // setup screen bounces to /login even though the session is perfectly live. Those cookies live
+  // up to 12h, so the read side must self-heal from the session's own bound user instead of
+  // trusting the name to resolve.
+  const ZITADEL_LOGIN_NAME = 'octocat@datum.net';
+  const GITHUB_HANDLE = 'octocat';
+
+  it('resolves the enrollee from the live session when the cookie holds an IdP handle', () => {
+    callService({
+      fn: 'requestPasskeyAttestation',
+      seed: { users: [{ id: 'u1', loginName: ZITADEL_LOGIN_NAME }] },
+      liveSessions: [{ id: 's1', token: 't1', user: { id: 'u1', loginName: ZITADEL_LOGIN_NAME } }],
+      request: {
+        url: 'http://localhost/id/setup/passkey',
+        sessions: [{ id: 's1', token: 't1', loginName: GITHUB_HANDLE }],
+      },
+      attestationInput: { loginName: GITHUB_HANDLE, domain: 'localhost' },
+      recordCalls: ['passkeyRegisterLink'],
+    }).then((v) => {
+      const o = v.outcome as { kind: string; target?: string; passkeyId?: string };
+      // Before the fix this was { kind: 'redirect', target: '/login' } — the reported symptom.
+      expect(o.kind, 'challenge, not a /login bounce').to.equal('challenge');
+      expect(typeof o.passkeyId).to.equal('string');
+      // Enrollment must bind to the session's user, never to a name-search result.
+      expect(v.calls?.passkeyRegisterLink?.[0]?.[0]).to.equal('u1');
+    });
+  });
+
+  it('still bounces to /login when the session itself resolves no user', () => {
+    // The fallback must not become a way to enroll against an unresolvable identity.
+    callService({
+      fn: 'requestPasskeyAttestation',
+      seed: { users: [{ id: 'u1', loginName: ZITADEL_LOGIN_NAME }] },
+      liveSessions: [{ id: 's1', token: 't1' }],
+      request: {
+        url: 'http://localhost/id/setup/passkey',
+        sessions: [{ id: 's1', token: 't1', loginName: GITHUB_HANDLE }],
+      },
+      attestationInput: { loginName: GITHUB_HANDLE, domain: 'localhost' },
+    }).then((v) => {
+      const o = v.outcome as { kind: string; target?: string };
+      expect(o.kind).to.equal('redirect');
+      expect(o.target).to.equal('/login');
+    });
+  });
+});
+
 describe('requestWebAuthnChallenge — guard-fail bounce target threading', () => {
   // Same call, same assertion shape — only the ceremony context and expected target vary.
   const BOUNCES: [label: string, ceremony: Record<string, string>, expectedTarget: string][] = [

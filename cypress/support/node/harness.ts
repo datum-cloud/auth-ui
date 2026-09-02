@@ -3119,6 +3119,32 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
   if (s.inspect?.lastCreateSessionOpts) {
     inspect.lastCreateSessionOpts = provider.lastCreateSessionOpts ?? null;
   }
+  if (s.inspect?.cookieSessions) {
+    // Round-trip through the REAL cookie module: a spec that hand-decoded the base64 payload would
+    // only prove it agrees with itself, whereas parsing what serializeSessions actually produced
+    // proves the identity survives the write the browser receives.
+    const written = (outcome as { setCookie?: unknown } | undefined)?.setCookie;
+    const sessionsStr =
+      typeof written === 'string'
+        ? written.split(/,(?=\s*[^;=]+=)/).find((c) => c.trim().startsWith('sessions='))
+        : undefined;
+    let entries: Array<{ id: string; loginName: string; organization?: string }> | null = null;
+    if (sessionsStr) {
+      try {
+        const parsed = await sessionsCookie.parse(sessionsStr.split(';')[0].trim());
+        entries = Array.isArray(parsed)
+          ? parsed.map((e: { id: string; loginName: string; organization?: string }) => ({
+              id: e.id,
+              loginName: e.loginName,
+              organization: e.organization,
+            }))
+          : null;
+      } catch {
+        entries = null;
+      }
+    }
+    inspect.cookieSessions = entries;
+  }
 
   const audit = auditLines.map(parseAuditLine).filter((e): e is AuditEvent => e !== null);
 

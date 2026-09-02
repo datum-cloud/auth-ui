@@ -417,6 +417,13 @@ interface ResolvedEnrollee {
  *
  * SessionEntry carries no userId field, so the user is resolved via findUser. Either guard
  * failing yields the typed sentinel the caller maps to its own redirect/typed error.
+ *
+ * A findUser MISS is not proof the account is gone (issue #1485). findUser matches an exact
+ * loginName or an exact email, while the cookie's loginName is only as good as whatever minted
+ * it — IdP sessions created before the idp-session fix stored the IdP-side handle ('octocat'),
+ * which matches neither. Those cookies stay valid for up to 12h, so fall back to the id the live
+ * session is already bound to rather than bouncing a perfectly good session to /login. The lookup
+ * is lazy: an account whose name resolves normally still costs exactly one RPC.
  */
 async function resolveEnrollee(
   provider: AuthProvider,
@@ -428,9 +435,19 @@ async function resolveEnrollee(
   if (!entry) return null;
 
   const user = await provider.findUser(loginName, organization);
-  if (!user) return null;
+  if (user) return { entry, userId: user.id };
 
-  return { entry, userId: user.id };
+  // The stored token may be stale/revoked provider-side, which getSession throws for rather than
+  // returning null — same recovery as passkeys.service.ts's resolveActive: treat it as no session
+  // at all (the caller redirects), never an unhandled 500.
+  let session: Session | null;
+  try {
+    session = await provider.getSession(entry.id, entry.token);
+  } catch (err) {
+    if (!isStaleSessionError(err)) throw err;
+    session = null;
+  }
+  return session?.user?.id ? { entry, userId: session.user.id } : null;
 }
 
 // ── SETUP: passkey attestation loader ─────────────────────────────────────────

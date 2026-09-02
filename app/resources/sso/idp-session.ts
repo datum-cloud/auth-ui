@@ -139,12 +139,21 @@ export async function signInWithIdpIntent(
     { requestId, orgId: organization, userId, metadata, userAgent }
   );
 
-  // The post-create getUser(userId) lookup is elided. The only value it read was
-  // `loginName`, and every caller already supplies it via `fallbackLoginName` — the callback
-  // passes `intent.information.idpUserName` (the IdP-vouched login name) and LDAP passes the
-  // entered username. The cookie's loginName is a display/last-used hint, so this is
-  // behavior-identical while saving one RPC per sign-in.
-  const loginName = fallbackLoginName ?? '';
+  // The cookie's loginName is an IDENTITY KEY, not a display hint (issue #1485): byLoginName()
+  // matches on it, findUser() is called with it, and /accounts compares it against the provider
+  // session's user to decide "Session active" vs "Needs re-authentication". `fallbackLoginName`
+  // carries the IDP-SIDE name — the callback passes intent.information.idpUserName, which for
+  // GitHub is the bare account handle ('octocat'), never the Zitadel loginName
+  // ('octocat@datum.net'); GitHub does not even expose an email there. Storing it made every
+  // later lookup miss, so /setup/passkey bounced to /login and /accounts showed a live session
+  // as needing re-auth.
+  //
+  // Prefer the session's own bound user. This does NOT reinstate the getUser() RPC this path
+  // dropped: createSession already reads the full Session entity back (zitadel/session.ts —
+  // CreateSessionResponse carries no user, so one follow-up getSession is mandatory there), so
+  // user.loginName is already in hand. The IdP-vouched name stays the fallback for sessions that
+  // resolve no user (e.g. LDAP).
+  const loginName = session.user?.loginName ?? fallbackLoginName ?? '';
 
   // RE-AUTH identity guard (shared across all factors via checkReauthIntent). When this sign-in
   // was started to re-authenticate a specific account (the `reauth-intent` cookie carries that
@@ -154,7 +163,10 @@ export async function signInWithIdpIntent(
   // being re-authenticated: keep both and bounce to the picker so the user chooses. (A rare
   // cross-method false mismatch only adds a picker step — never loses data.) This is the hard
   // guard; the IdP-side login_hint is only best-effort pre-selection.
-  const reauth = await checkReauthIntent(request, loginName);
+  // The intent was recorded from the COOKIE entry's loginName (reauthRedirect). A session minted
+  // before the fix above recorded the IdP handle there, so accept the IdP-vouched name too —
+  // otherwise every legacy IdP re-auth false-mismatches into the picker for the cookie's 12h life.
+  const reauth = await checkReauthIntent(request, loginName, fallbackLoginName);
 
   const entries = await readSessions(request);
   const withNew = addSession(
