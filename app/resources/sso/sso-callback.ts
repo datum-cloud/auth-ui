@@ -380,10 +380,14 @@ export async function processIdpCallback(
             metadata,
           }
         );
-        // Elide the post-create getUser(decision.userId) lookup — the cookie's
-        // loginName is a display hint and intent.information.idpUserName already carries the
-        // IdP-vouched login name (behavior-identical, one fewer RPC on the link/auto-link path).
-        const loginName = intent.information.idpUserName;
+        // Same identity-key rule as idp-session.ts (issue #1485): the cookie's loginName is NOT a
+        // display hint — byLoginName() keys on it, findUser() is called with it, /accounts compares
+        // it against the session user, and it is what the passkey-hint cookie below carries into
+        // arm-login-passkey's findUser(hint). intent.information.idpUserName is the IDP-SIDE name,
+        // which for GitHub is the bare handle ('octocat'), not the Zitadel loginName
+        // ('octocat@datum.net'). createSession already read the full Session entity back, so the
+        // canonical name is in hand here without reinstating the getUser() RPC this path dropped.
+        const loginName = session.user?.loginName ?? intent.information.idpUserName;
         const next = addSession(
           entries,
           sessionEntryFromSession(session, { loginName, organization, requestId })
