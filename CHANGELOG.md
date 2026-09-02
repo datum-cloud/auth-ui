@@ -6,6 +6,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+- Signing in with an external identity provider (e.g. GitHub) stored the provider's
+  own username in the session instead of the Datum login name, so "Add passkey"
+  redirected to the login screen and the account picker showed a live session as
+  needing re-authentication.
+- Adding a sign-in method (passkey, security key, authenticator app, email or SMS
+  code) now identifies the account from the active session rather than by name, so
+  sessions created before this fix recover without signing in again.
+
 ## [0.1.0] — 2026-06-23
 
 First public-release candidate. Covers the enterprise audit-remediation run

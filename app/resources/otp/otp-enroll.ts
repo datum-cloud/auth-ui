@@ -31,6 +31,7 @@ import {
   loginBounceTarget,
 } from '@/resources/shared/next-step-params';
 import { resolveOrg } from '@/resources/shared/resolve-org';
+import { resolveSessionUser } from '@/resources/shared/resolve-session-user';
 import { providerForRequest } from '@/server/auth-context.server';
 import { getCsrfToken, assertCsrf } from '@/server/csrf';
 import { logAuthEvent } from '@/server/observability';
@@ -139,10 +140,13 @@ export function createOtpEnrollHandlers(cfg: OtpEnrollConfig) {
 
     const { loginName, requestId, organization, checkAfter } = parsed.data;
 
-    // Guard: active session required.
+    // Guard: a LIVE session is required, and the enrollment binds to the user THAT session
+    // authenticated as — not to whoever currently holds the name. The old findUser-by-name
+    // resolution bounced legacy IdP cookies (issue #1485) and, after a loginName reassignment,
+    // would have enrolled the OTP factor against a different account (see resolveSessionUser).
     const sessions = await readSessions(request);
-    const entry = byLoginName(sessions, loginName, organization);
-    if (!entry) {
+    const resolved = await resolveSessionUser(provider, sessions, loginName, organization);
+    if (!resolved) {
       logAuthEvent('mfa_enroll', 'failure', {
         loginName,
         factor: cfg.factor,
@@ -151,18 +155,7 @@ export function createOtpEnrollHandlers(cfg: OtpEnrollConfig) {
       return data({ error: 'SESSION_EXPIRED' as const }, { status: 400 });
     }
 
-    // Resolve userId — SessionEntry carries no userId field.
-    const user = await provider.findUser(loginName, organization);
-    if (!user) {
-      logAuthEvent('mfa_enroll', 'failure', {
-        loginName,
-        factor: cfg.factor,
-        reason: 'session_expired',
-      });
-      return data({ error: 'SESSION_EXPIRED' as const }, { status: 400 });
-    }
-
-    const userId = user.id;
+    const { entry, userId } = resolved;
 
     try {
       await cfg.enroll(provider, userId);

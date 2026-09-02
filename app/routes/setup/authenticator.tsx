@@ -9,6 +9,7 @@ import { setupSkipSchema } from '@/resources/mfa/mfa.schema';
 import { enrollTotp } from '@/resources/otp';
 import { otpCodeClientSchema } from '@/resources/otp/otp.schema';
 import { readCeremonyParams } from '@/resources/shared/ceremony-params';
+import { resolveSessionUser } from '@/resources/shared/resolve-session-user';
 import { redirectToLogin } from '@/routes/login-bounce';
 import { providerForRequest } from '@/server/auth-context.server';
 import { loaderCsrf, assertCsrf } from '@/server/csrf';
@@ -36,15 +37,14 @@ export async function loader({ request }: LoaderFunctionArgs) {
   const skip = setupSkipSchema.safeParse(Object.fromEntries(url.searchParams));
   const { force, checkAfter } = skip.success ? skip.data : {};
 
-  // Guard: require an active session for this loginName (mirror login.verify.authenticator.tsx).
+  // Guard: require a LIVE session for this loginName, and bind the enrollment to the user that
+  // session authenticated as — never to whoever currently holds the name. Resolving by name here
+  // both bounced legacy IdP cookies to /login (issue #1485) and, after a loginName reassignment,
+  // would have registered the authenticator against a different account (see resolveSessionUser).
   const sessions = await readSessions(request);
-  const entry = byLoginName(sessions, loginName, organization);
-  if (!entry) return redirect(redirectToLogin(requestId, organization));
-
-  // Resolve userId via findUser — SessionEntry carries no userId field (mirror login.mfa.tsx).
   const provider = providerForRequest(request);
-  const user = await provider.findUser(loginName, organization);
-  if (!user) return redirect(redirectToLogin(requestId, organization));
+  const resolved = await resolveSessionUser(provider, sessions, loginName, organization);
+  if (!resolved) return redirect(redirectToLogin(requestId, organization));
 
   // Register TOTP: returns deterministic { uri, secret } in fake; real adapter generates a new key.
   // A user who ALREADY has verified TOTP makes registerTotp throw (ALREADY_EXISTS /
@@ -53,7 +53,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
   let uri: string;
   let secret: string;
   try {
-    ({ uri, secret } = await provider.registerTotp(user.id));
+    ({ uri, secret } = await provider.registerTotp(resolved.userId));
   } catch (err) {
     if (err instanceof ProviderError) return redirect(redirectToLogin(requestId, organization));
     throw err;

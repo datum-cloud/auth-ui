@@ -61,13 +61,30 @@ export interface ReauthCheck {
  * casing than what was stored — an exact compare would false-mismatch case-insensitive accounts).
  * A non-null intent always yields a clearCookie; on mismatch the caller keeps both accounts and
  * routes to the picker instead of completing the ceremony as the unintended identity.
+ *
+ * `alsoAccept` lets a caller name the SAME identity under a second label. The intent is recorded
+ * from the cookie entry's loginName (see reauthRedirect), and an IdP session minted before the
+ * issue #1485 fix recorded the IdP-side handle there rather than the Zitadel loginName — so the
+ * IdP path passes its IdP-vouched name as well. This does not widen who may pass the guard: both
+ * labels are vouched for by the same completed authentication, so accepting either recognizes one
+ * identity under two spellings rather than admitting a second identity.
+ *
+ * TODO(#1485): `alsoAccept` is TRANSITIONAL and its only caller is idp-session.ts. The cookies it
+ * exists for are self-expiring — `sessionsCookie` has a 24h maxAge — so once the #1485 fix has
+ * been deployed for longer than that, no cookie carrying an IdP handle can still be presented.
+ * Drop the parameter and the argument then; the guard reverts to comparing the canonical loginName
+ * alone, which is strictly tighter than both this and the pre-fix behavior.
  */
 export async function checkReauthIntent(
   request: Request,
-  authedLoginName: string
+  authedLoginName: string,
+  alsoAccept?: string
 ): Promise<ReauthCheck> {
   const intent = await readReauthIntent(request);
   if (intent === null) return { intent: null, mismatch: false };
-  const mismatch = authedLoginName.trim().toLowerCase() !== intent.trim().toLowerCase();
+  const target = intent.trim().toLowerCase();
+  const mismatch = ![authedLoginName, alsoAccept].some(
+    (name) => name !== undefined && name.trim() !== '' && name.trim().toLowerCase() === target
+  );
   return { intent, mismatch, clearCookie: await clearReauthIntent() };
 }

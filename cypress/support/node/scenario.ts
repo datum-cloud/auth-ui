@@ -497,6 +497,12 @@ export interface Scenario {
     lastCreateSessionFingerprintId?: boolean;
     /** Read the full lastCreateSessionOpts object (batch 8e: metadata / userAgent assertions). */
     lastCreateSessionOpts?: boolean;
+    /**
+     * HMAC round-trip the `sessions` cookie the service WROTE (outcome.setCookie) back into
+     * entries, via the REAL cookie module. Lets a spec assert which identity was persisted —
+     * not merely that some cookie was set. Null when the outcome carries no `sessions=` cookie.
+     */
+    cookieSessions?: boolean;
   };
   // ── signup service inputs (batch 8e) ────────────────────────────────────────────────────────
   /** Input struct for the signup service functions (registerWithPassword, registerPasskeyFirst,

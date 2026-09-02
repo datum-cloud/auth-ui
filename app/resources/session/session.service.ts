@@ -221,7 +221,11 @@ async function resolveNextPath(
     factors: session.factors,
     settings: loginSettings,
     enrolledMethods,
-    loginName: entry.loginName,
+    // The session's own name, not the cookie label: the next step's URL carries this loginName
+    // into flows that resolve a user from it, and a cookie minted before the issue #1485 fix (or
+    // before a rename) holds a stale one. Matches the `session.user?.loginName ?? loginName`
+    // idiom already used by otp.service / mfa.service / webauthn.service.
+    loginName: session.user?.loginName ?? entry.loginName,
     userVerified,
     mfaInitSkippedAt: session.user?.mfaInitSkippedAt ?? null,
     requestId,
@@ -277,7 +281,7 @@ function enrichSessionEntry(
     factors: pSession.factors,
     settings: loginSettings,
     enrolledMethods,
-    loginName: entry.loginName,
+    loginName: pSession.user?.loginName ?? entry.loginName,
     userVerified,
     mfaInitSkippedAt: pSession.user?.mfaInitSkippedAt ?? null,
     // Display-only enrichment: do NOT thread the cookie-baked requestId (a long-expired OIDC/SAML
@@ -293,7 +297,12 @@ function enrichSessionEntry(
     organization: entry.organization,
     displayName: pSession.user?.displayName,
     nextPath,
-    isActive: entry.loginName === pSession.user?.loginName,
+    // Liveness, not label equality. This used to compare the cookie's loginName against the
+    // session's, so a perfectly live session whose cookie carried a different spelling of the same
+    // identity rendered as "Needs re-authentication" — exactly what issue #1485 reported for
+    // GitHub accounts. A session the provider resolved to a user IS active; a dead one never gets
+    // here (the !pSession branch above already returns the degraded card).
+    isActive: pSession.user !== undefined,
   };
 }
 

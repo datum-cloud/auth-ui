@@ -22,6 +22,7 @@ import { byLoginName, type SessionEntry } from '@/modules/auth/session/cookie';
 import type { AuthMethod, LoginSettings, ProviderCapabilities } from '@/modules/auth/types';
 import { nextStepFromSession, threadParams } from '@/resources/shared/next-step-params';
 import { resolveOrg } from '@/resources/shared/resolve-org';
+import { resolveSessionUser } from '@/resources/shared/resolve-session-user';
 import { logAuthEvent, hashActor } from '@/server/observability';
 import { z } from 'zod';
 
@@ -67,15 +68,16 @@ export async function resolveMfaPicker(
   sessions: SessionEntry[],
   { loginName, requestId, organization }: MfaPickerInput
 ): Promise<MfaPickerResult> {
-  const entry = byLoginName(sessions, loginName, organization);
-  if (!entry) return { kind: 'redirect', target: '/login' };
-
-  const user = await provider.findUser(loginName, organization);
-  if (!user) return { kind: 'redirect', target: '/login' };
+  // The picker lists the factors of the user this session authenticated as — resolving by name
+  // instead both bounced legacy IdP cookies to /login (issue #1485) and, after a loginName
+  // reassignment, would have listed a DIFFERENT account's factors (see resolveSessionUser).
+  const resolved = await resolveSessionUser(provider, sessions, loginName, organization);
+  if (!resolved) return { kind: 'redirect', target: '/login' };
+  const { userId } = resolved;
 
   // Org-first: an explicit org wins, else the default org (old app's `organization ?? getDefaultOrg()`).
   const [allMethods, settings] = await Promise.all([
-    provider.listAuthMethods(user.id),
+    provider.listAuthMethods(userId),
     provider.getLoginSettings(await resolveOrg(provider, organization)),
   ]);
 
@@ -275,11 +277,11 @@ export async function resolveMfaSetup(
   sessions: SessionEntry[],
   { loginName, requestId, organization }: MfaSetupInput
 ): Promise<MfaSetupResult> {
-  const entry = byLoginName(sessions, loginName, organization);
-  if (!entry) return { kind: 'redirect', target: '/login' };
-
-  const user = await provider.findUser(loginName, organization);
-  if (!user) return { kind: 'redirect', target: '/login' };
+  // Same identity rule as the picker: the setup nudge — and the skip it can stamp — belong to the
+  // user this session authenticated as, never to whoever currently holds the name.
+  const resolved = await resolveSessionUser(provider, sessions, loginName, organization);
+  if (!resolved) return { kind: 'redirect', target: '/login' };
+  const { entry, userId } = resolved;
 
   const capabilities = provider.capabilities;
   // Org-first: an explicit org wins, else the default org (old app's `organization ?? getDefaultOrg()`).
@@ -291,8 +293,8 @@ export async function resolveMfaSetup(
   // the same screen as a manual skip. Stamping suppresses the /setup/mfa nudge on the
   // next nextStep call (otherwise mfaInitSkippedAt=null would re-route back here).
   if (offerableKeys.length === 0) {
-    logAuthEvent('mfa_skip', 'success', { userId: user.id, reason: 'no_offerable_methods' });
-    await provider.setMfaInitSkipped(user.id);
+    logAuthEvent('mfa_skip', 'success', { userId, reason: 'no_offerable_methods' });
+    await provider.setMfaInitSkipped(userId);
 
     // Re-fetch so mfaInitSkippedAt is fresh (mirrors recordMfaSetupSkip's re-fetch).
     const refreshedUser = await provider.findUser(loginName, organization);
@@ -301,7 +303,7 @@ export async function resolveMfaSetup(
     if (!session) return { kind: 'redirect', target: '/login' };
 
     const [methods, refreshedSettings] = await Promise.all([
-      provider.listAuthMethods(user.id),
+      provider.listAuthMethods(userId),
       provider.getLoginSettings(await resolveOrg(provider, organization)),
     ]);
 
@@ -363,19 +365,15 @@ export async function recordMfaSetupSkip(
 
   const { loginName, requestId, organization } = parsed.data;
 
-  const entry = byLoginName(sessions, loginName, organization);
-  if (!entry) {
+  // setMfaInitSkipped writes to the resolved user, so it must be the session's own user — a
+  // name lookup could stamp the skip on a different account after a loginName reassignment.
+  const resolved = await resolveSessionUser(provider, sessions, loginName, organization);
+  if (!resolved) {
     logAuthEvent('mfa_skip', 'failure', { actor: hashActor(loginName), reason: 'session_expired' });
     return { ok: false, error: 'SESSION_EXPIRED' };
   }
 
-  const user = await provider.findUser(loginName, organization);
-  if (!user) {
-    logAuthEvent('mfa_skip', 'failure', { actor: hashActor(loginName), reason: 'session_expired' });
-    return { ok: false, error: 'SESSION_EXPIRED' };
-  }
-
-  const userId = user.id;
+  const { entry, userId } = resolved;
 
   // Record the skip timestamp.
   await provider.setMfaInitSkipped(userId);

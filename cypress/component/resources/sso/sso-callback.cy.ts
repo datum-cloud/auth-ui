@@ -286,6 +286,45 @@ describe('processIdpCallback — last-used-login Set-Cookie', () => {
   });
 });
 
+describe('processIdpCallback — link-path cookie identity (issue #1485)', () => {
+  // The link / auto-link branch mints its OWN session cookie rather than going through
+  // signInWithIdpIntent, so it needs the same identity-key rule. GitHub is the case that exposes
+  // it: IDPInformation.userName is the account handle, while the Datum account is known to
+  // Zitadel by its email-shaped loginName. Every other fixture in this file makes the two equal.
+  const ZITADEL_LOGIN_NAME = 'octo@datum.net';
+  const GITHUB_HANDLE = 'octocat';
+
+  it('writes the Zitadel loginName into both the sessions and passkey-hint cookies', () => {
+    callService({
+      fn: 'processIdpCallback',
+      slug: 'github',
+      env: { ALLOW_IDP_AUTO_LINK: 'true' },
+      seed: { users: [{ id: 'u-gh', loginName: ZITADEL_LOGIN_NAME, displayName: 'Octo Cat' }] },
+      idpIntent: {
+        userId: null,
+        information: { idpId: 'idp-gh', idpUserId: 'gh-1', idpUserName: GITHUB_HANDLE },
+        draft: {
+          email: ZITADEL_LOGIN_NAME,
+          firstName: 'Octo',
+          lastName: 'Cat',
+          emailVerified: true,
+        },
+      },
+      request: { url: CB('github', 'id=intent-gh&token=tok-gh') },
+      inspect: { cookieSessions: true },
+    }).then((v) => {
+      expect(v.response?.status).to.equal(302);
+      const entries = v.inspect?.cookieSessions as Array<{ loginName: string }> | null;
+      expect(entries, 'sessions cookie round-tripped').to.have.length(1);
+      expect(entries?.[0].loginName).to.equal(ZITADEL_LOGIN_NAME);
+      expect(entries?.[0].loginName).to.not.equal(GITHUB_HANDLE);
+      // The hint is fed straight into arm-login-passkey's findUser(hint); a handle there resolves
+      // to nothing, so the hint is dropped and conditional passkey arming silently never fires.
+      expect(v.response?.passkeyHint).to.equal(ZITADEL_LOGIN_NAME);
+    });
+  });
+});
+
 describe('processIdpCallback — same-email collision hard error (default: ALLOW_IDP_AUTO_LINK off)', () => {
   it('redirects to the SSO error page with reason=account-exists instead of auto-linking', () => {
     callService({

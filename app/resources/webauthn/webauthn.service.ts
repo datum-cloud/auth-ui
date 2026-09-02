@@ -31,6 +31,7 @@ import {
   loginBounceTarget,
 } from '@/resources/shared/next-step-params';
 import { resolveOrg } from '@/resources/shared/resolve-org';
+import { resolveSessionUser } from '@/resources/shared/resolve-session-user';
 import { isSudoFresh } from '@/resources/shared/sudo';
 import { logAuthEvent, hashActor } from '@/server/observability';
 import { getOrCreateFingerprintId, userAgentFromRequest } from '@/server/user-agent';
@@ -405,34 +406,6 @@ export async function verifyWebAuthnAssertion(
   return { ok: true, target, sessions: next };
 }
 
-// ── SETUP (attestation) shared session/user resolution ────────────────────────
-
-interface ResolvedEnrollee {
-  entry: SessionEntry;
-  userId: string;
-}
-
-/**
- * Resolve the active session + userId for an enrollment flow.
- *
- * SessionEntry carries no userId field, so the user is resolved via findUser. Either guard
- * failing yields the typed sentinel the caller maps to its own redirect/typed error.
- */
-async function resolveEnrollee(
-  provider: AuthProvider,
-  sessions: SessionEntry[],
-  loginName: string,
-  organization?: string
-): Promise<ResolvedEnrollee | null> {
-  const entry = byLoginName(sessions, loginName, organization);
-  if (!entry) return null;
-
-  const user = await provider.findUser(loginName, organization);
-  if (!user) return null;
-
-  return { entry, userId: user.id };
-}
-
 // ── SETUP: passkey attestation loader ─────────────────────────────────────────
 
 export interface AttestationLoaderInput {
@@ -481,8 +454,17 @@ export async function requestPasskeyAttestation(
   sessions: SessionEntry[],
   { loginName, requestId, organization, domain }: AttestationLoaderInput
 ): Promise<PasskeyAttestationResult> {
-  const resolved = await resolveEnrollee(provider, sessions, loginName, organization);
-  if (!resolved) return { kind: 'redirect', target: loginBounceTarget(requestId, organization) };
+  const resolved = await resolveSessionUser(provider, sessions, loginName, organization);
+  if (!resolved) {
+    // Was a SILENT 302: issue #1485 reproduced for a week with nothing but health probes in the
+    // pod logs, because this bounce left no trace. A typed event makes the next one greppable.
+    logAuthEvent('mfa_enroll_challenge', 'failure', {
+      actor: hashActor(loginName),
+      factor: 'passkey',
+      reason: 'session_expired',
+    });
+    return { kind: 'redirect', target: loginBounceTarget(requestId, organization) };
+  }
 
   const { userId } = resolved;
 
@@ -540,8 +522,15 @@ export async function requestU2FAttestation(
   sessions: SessionEntry[],
   { loginName, requestId, organization, domain }: AttestationLoaderInput
 ): Promise<U2FAttestationResult> {
-  const resolved = await resolveEnrollee(provider, sessions, loginName, organization);
-  if (!resolved) return { kind: 'redirect', target: loginBounceTarget(requestId, organization) };
+  const resolved = await resolveSessionUser(provider, sessions, loginName, organization);
+  if (!resolved) {
+    logAuthEvent('mfa_enroll_challenge', 'failure', {
+      actor: hashActor(loginName),
+      factor: 'u2f',
+      reason: 'session_expired',
+    });
+    return { kind: 'redirect', target: loginBounceTarget(requestId, organization) };
+  }
 
   const { userId } = resolved;
 
@@ -641,10 +630,10 @@ async function verifyEnrollment(
   cfg: EnrollmentConfig,
   { credential, loginName, requestId, organization, checkAfter }: EnrollmentCommonInput
 ): Promise<EnrollResult> {
-  const resolved = await resolveEnrollee(provider, sessions, loginName, organization);
+  const resolved = await resolveSessionUser(provider, sessions, loginName, organization);
   if (!resolved) return { ok: false, error: 'SESSION_EXPIRED' };
 
-  const { entry, userId } = resolved;
+  const { entry, userId, session: sudoSession } = resolved;
 
   let parsedCredential: unknown;
   try {
@@ -653,36 +642,18 @@ async function verifyEnrollment(
     return { ok: false, error: 'INVALID_INPUT' };
   }
 
-  // Sudo gate — the active session must carry an authentication factor
-  // verified within the sudo window. Runs before the provider verify so a hijacked or
-  // unattended stale session can never plant a persistent credential.
-  if (cfg.requireSudo) {
-    // A stored session token can be stale/revoked (e.g. created in a different browser)
-    // by the time this route sees it — getSession throws a non-transient ProviderError
-    // in that case rather than returning null. Same recovery as passkeys.service.ts's
-    // resolveActive: treat it as no session at all, not an unhandled 500.
-    let sudoSession: Session | null;
-    try {
-      sudoSession = await provider.getSession(entry.id, entry.token);
-    } catch (err) {
-      if (isStaleSessionError(err)) {
-        logAuthEvent('mfa_enroll', 'failure', {
-          userId,
-          factor: cfg.factor,
-          reason: 'session_expired',
-        });
-        return { ok: false, error: 'SESSION_EXPIRED' };
-      }
-      throw err;
-    }
-    if (!sudoSession || !isSudoFresh(sudoSession.factors, Date.now())) {
-      logAuthEvent('mfa_enroll', 'failure', {
-        userId,
-        factor: cfg.factor,
-        reason: 'sudo_required',
-      });
-      return { ok: false, error: 'SUDO_REQUIRED' };
-    }
+  // Sudo gate — the active session must carry an authentication factor verified within the sudo
+  // window. Runs before the provider verify so a hijacked or unattended stale session can never
+  // plant a persistent credential. The session is the one resolveSessionUser already read (it had
+  // to, to bind userId), so the gate costs no second round-trip; a stale/revoked token never
+  // reaches here at all — it resolves to null above and returns SESSION_EXPIRED.
+  if (cfg.requireSudo && !isSudoFresh(sudoSession.factors, Date.now())) {
+    logAuthEvent('mfa_enroll', 'failure', {
+      userId,
+      factor: cfg.factor,
+      reason: 'sudo_required',
+    });
+    return { ok: false, error: 'SUDO_REQUIRED' };
   }
 
   try {
