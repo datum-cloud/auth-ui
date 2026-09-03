@@ -84,6 +84,16 @@ const schema = z
       .string()
       .optional()
       .transform((v) => v === 'true' || v === '1'),
+    // Whether email VERIFICATION is required before a signup can complete. Distinct from
+    // AUTH_EMAIL_DELIVERY_ENABLED (which says whether mail can be sent at all): an environment
+    // can have delivery wired and still skip verification. Unset => OFF, matching the legacy
+    // default this replaces (was a raw process.env read in app/server/env.ts).
+    // Phase B: deleted entirely after the B4 production flip, along with every
+    // `requireVerification: false` branch it keeps alive.
+    EMAIL_VERIFICATION: z
+      .string()
+      .optional()
+      .transform((v) => v === 'true' || v === '1'),
     // Operational kill switch for the usernameless discovery entry points (the /login
     // loader's identity-challenge arm and the /login/passkey-discover action). Default ON
     // — unset keeps the feature live; ONLY the explicit strings 'false'/'0' disable it.

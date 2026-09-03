@@ -78,6 +78,39 @@ describe('env schema — PUBLIC_ORIGIN (verification-link origin; anti Host-head
   });
 });
 
+// ── EMAIL_VERIFICATION (default false; 'true'/'1' coercion, mirroring delivery) ──
+// Phase B promotes this out of a raw process.env read (app/server/env.ts). The coercion
+// mirrors AUTH_EMAIL_DELIVERY_ENABLED exactly — same mechanism, neighbouring flag.
+
+describe('env schema — EMAIL_VERIFICATION (default false)', () => {
+  it("defaults to false, coerces 'true' and '1' to true, and treats any other value as false", () => {
+    callService({ fn: 'envSchemaFull', parseEnvRaw: { ...BASE } }).then((v) => {
+      expect((v.outcome.data as Record<string, unknown>).EMAIL_VERIFICATION).to.equal(false);
+    });
+
+    callService({
+      fn: 'envSchemaFull',
+      parseEnvRaw: { ...BASE, EMAIL_VERIFICATION: 'true' },
+    }).then((v) => {
+      expect((v.outcome.data as Record<string, unknown>).EMAIL_VERIFICATION).to.equal(true);
+    });
+
+    callService({
+      fn: 'envSchemaFull',
+      parseEnvRaw: { ...BASE, EMAIL_VERIFICATION: '1' },
+    }).then((v) => {
+      expect((v.outcome.data as Record<string, unknown>).EMAIL_VERIFICATION).to.equal(true);
+    });
+
+    callService({
+      fn: 'envSchemaFull',
+      parseEnvRaw: { ...BASE, EMAIL_VERIFICATION: 'yes' },
+    }).then((v) => {
+      expect((v.outcome.data as Record<string, unknown>).EMAIL_VERIFICATION).to.equal(false);
+    });
+  });
+});
+
 // ── SENTRY_TRACES_SAMPLE_RATE ─────────────────────────────────────────────────
 // Representative "invalid type is rejected" case for numeric coercion/validation.
 

@@ -1,3 +1,5 @@
+import { env } from '@/server/infra/env.server';
+
 /**
  * Returns true when email verification is required for signup; false (the default) when it is not.
  *
@@ -12,13 +14,7 @@
  * Security caveat: verification is skipped by default globally. This is safe today only
  * because production is IdP-only (no email+password signup path is exposed). Any environment
  * that enables password signup and wants verified emails MUST set EMAIL_VERIFICATION=true.
- *
- * TODO: EMAIL_VERIFICATION is currently read raw off `env` and is NOT in the validated env
- * schema (app/server/infra/env.server.ts). Promote it into that schema with a typed default
- * (false) and documentation so it becomes a first-class config knob rather than a raw read.
  */
-export function requireEmailVerification(
-  env: Record<string, string | undefined> = process.env
-): boolean {
-  return env.EMAIL_VERIFICATION === 'true';
+export function requireEmailVerification(): boolean {
+  return env.EMAIL_VERIFICATION;
 }

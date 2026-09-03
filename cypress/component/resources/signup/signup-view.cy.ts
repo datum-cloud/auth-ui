@@ -68,15 +68,17 @@ describe('resolveSignupView', () => {
     ],
     [
       // RED→GREEN: before the fix allowEmailEntry was true when delivery was off. With
-      // delivery off the whole email path must hide so signup is IdP-only (no password
-      // option and verification required — passkeys also need delivery).
-      'delivery off hides the entire email path regardless of Zitadel policy',
+      // delivery off the email ENTRY path must hide so signup is IdP-only. showPasskey
+      // stays true (Phase B decoupling): passkey display no longer implies an email send
+      // of its own — the passkey intent routes through the email-link path, whose mail
+      // requirement is allowEmailEntry's to enforce, not showPasskey's.
+      'delivery off hides the email path but not the passkey flag (Phase B decoupling)',
       [base, idps, false, true],
       {
         showIdpButtons: true,
         allowEmailEntry: false,
         showEmailLink: false,
-        showPasskey: false,
+        showPasskey: true,
         showPassword: false,
         signupUnavailable: false,
       },
@@ -135,12 +137,11 @@ describe('resolveSignupView', () => {
     [
       // base has allowPassword:false and passkeysType:'allowed' — even with verification
       // not required, no method can complete without delivery, so email entry stays
-      // hidden. RED→GREEN for passkey: before the fix it was shown whenever
-      // passkeysType==='allowed', ignoring that passkey signup also sends a verification
-      // email and therefore requires delivery.
-      'no password, delivery off (no non-delivery-gated method)',
+      // hidden. showPasskey stays true (Phase B decoupling): display is policy-only;
+      // delivery gating belongs to allowEmailEntry and the server-side delivery guard.
+      'no password, delivery off (email entry hidden, passkey flag policy-only)',
       [base, [], false, false],
-      { allowEmailEntry: false, showPasskey: false },
+      { allowEmailEntry: false, showPasskey: true },
     ],
     [
       // allowEmailEntry is true in this case → signup is not unavailable.
