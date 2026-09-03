@@ -1,10 +1,10 @@
 // app/resources/signup/signup.service.ts
 //
 // Pass 2 extraction: the action BUSINESS logic for the signup domain — the
-// register-and-link (IdP) compose, the password-first hand-off, the passkey-first
-// register, and the password-set register, each with their enumeration-safe
-// ALREADY_EXISTS handling and post-register routing. React rendering, CSRF, the
-// final redirect()/data() wiring and cookie serialization stay in the route modules.
+// register-and-link (IdP) compose, the password-first hand-off, the passwordless email-link
+// register, and the password-set register, each with their enumeration-safe ALREADY_EXISTS
+// handling and post-register routing. React rendering, CSRF, the final redirect()/data()
+// wiring and cookie serialization stay in the route modules.
 //
 // Each function takes a provider + plain inputs (already parsed/validated by the
 // route's schema) + the caller's current session list, and returns a typed result
@@ -18,15 +18,38 @@ import {
   type SessionEntry,
 } from '@/modules/auth/session/cookie';
 import { ProviderError } from '@/modules/auth/types';
+import { APP_BASENAME } from '@/resources/shared/app-basename';
 import { authorizeHandbackTarget } from '@/resources/shared/next-step-params';
 import { resolveOrg } from '@/resources/shared/resolve-org';
 import { postRegisterStep } from '@/resources/signup/post-register';
+import { allowResend } from '@/resources/signup/signup-resend-limit';
 import {
-  verifyUrlTemplate,
   signupCompleteUrlTemplate,
+  verifyUrlTemplate,
 } from '@/resources/verify/verify-url-template';
+import { env } from '@/server/infra/env.server';
+import { sendVerificationMail } from '@/server/infra/verification-mail.server';
 import { logAuthEvent, hashActor } from '@/server/observability';
 import { realSleep, type Sleep } from '@/server/timing';
+
+// The webhook behind sendVerificationMail (buildActionURL, Task 1) appends its OWN
+// `?code=...&userId=...` onto whatever `returnTo` it's given — unlike verifyUrlTemplate /
+// signupCompleteUrlTemplate, which hand Zitadel a template carrying literal {{.Code}}/
+// {{.UserID}}/{{.OrgID}} placeholders for ZITADEL to substitute. There is no such
+// substitution pass here, so this builds `returnTo` with REAL values (no placeholders) —
+// the caller supplies whatever it already resolved (organization, requestId).
+function verificationReturnTo(
+  origin: string,
+  path: string,
+  params: { requestId?: string; organization?: string; next?: string }
+): string {
+  const qs = new URLSearchParams();
+  if (params.requestId) qs.set('requestId', params.requestId);
+  if (params.organization) qs.set('organization', params.organization);
+  if (params.next) qs.set('next', params.next);
+  const query = qs.toString();
+  return `${origin}${APP_BASENAME}${path}${query ? `?${query}` : ''}`;
+}
 
 /**
  * Zitadel session-metadata key for the MaxMind device-tracking token. This string is a
@@ -181,32 +204,6 @@ export function passwordFirstHandoff(input: PasswordFirstHandoffInput): SignupRe
   return { kind: 'redirect-only', target: `/signup/password?${params}` };
 }
 
-// ── passkey-first register (no allowPassword) ──────────────────────────────────
-
-export interface PasskeyFirstRegisterInput {
-  email: string;
-  firstName: string;
-  lastName: string;
-  organization?: string;
-  requestId?: string;
-  /** Whether the org requires email verification (requireEmailVerification()). */
-  requireVerification: boolean;
-  /**
-   * TRUSTED app origin (scheme + host) from trustedAppOrigin(request) — used to
-   * steer the verification mail's link back to OUR /verify route. MUST come from
-   * trusted config (PUBLIC_ORIGIN), never the request Host header, to prevent
-   * Host-header email-link injection.
-   */
-  origin: string;
-  /** MaxMind device-fingerprint token captured client-side; attached as session metadata. */
-  deviceTrackingToken?: string;
-  /** Zitadel session userAgent metadata (Device/Location in cloud-portal). */
-  userAgent?: SessionOpts['userAgent'];
-}
-
-export type PasskeyFirstRegisterResult =
-  SignupSentWithSessionResult | SignupSentResult | SignupRedirectResult;
-
 type RegisteredUser = Awaited<ReturnType<AuthProvider['register']>>;
 
 // Short pause before the single retry below — long enough to give Zitadel's read replicas a
@@ -243,17 +240,20 @@ async function retryOnceIfNotFound<T>(
 }
 
 /**
- * Shared enumeration-safe register flow for the passkey-first and with-password
- * paths. Both share: the createSession → addSession wiring, the require-verification
- * success/ALREADY_EXISTS audits (identical 'signup.requested'), and the
- * no-verification ALREADY_EXISTS audit. They DIVERGE on:
- *   - `register`: the provider.register call (passkey-first omits password and only
- *     attaches verifyUrlTemplate when verification is required; with-password always
- *     passes a password + verifyUrlTemplate).
- *   - `hasPassword`: feeds postRegisterStep.
- *   - `noVerifySuccessAudit`: the no-verification success path emits DIFFERENT audit
- *     — passkey-first 'signup.requested'{actor,organization}, with-password
- *     'signup.created'{userId,actor(loginName)}. Parameterized, never collapsed.
+ * Enumeration-safe register flow for the with-password path (/signup/password).
+ *
+ * Kept as a named function rather than folded into its single caller: it holds the
+ * read-after-write retry wiring and the ALREADY_EXISTS parity contract, which are the parts
+ * that have to stay readable and separately testable.
+ *
+ * HISTORY — this was parameterized for TWO callers. The passkey-first path was retired in
+ * Phase B (the passkey intent now routes through registerEmailLinkSignup), so `hasPassword`
+ * and `noVerifySuccessAudit` were dropped: with one caller they were constants dressed as
+ * config. `register` stays a callback because the caller picks between two different
+ * provider.register payloads depending on requireVerification.
+ *
+ * The ALREADY_EXISTS branch returns the IDENTICAL response to the success branch when
+ * verification is required, so a duplicate email is indistinguishable from a fresh signup.
  */
 async function runEnumerationSafeRegister(
   provider: AuthProvider,
@@ -265,9 +265,7 @@ async function runEnumerationSafeRegister(
     deviceTrackingToken?: string;
     userAgent?: SessionOpts['userAgent'];
     requireVerification: boolean;
-    hasPassword: boolean;
     register: () => Promise<RegisteredUser>;
-    noVerifySuccessAudit: (user: RegisteredUser) => void;
   }
 ): Promise<SignupSentWithSessionResult | SignupSentResult | SignupRedirectResult> {
   const { email, organization, requestId, deviceTrackingToken, userAgent } = cfg;
@@ -310,17 +308,22 @@ async function runEnumerationSafeRegister(
   try {
     const user = await retryOnceIfNotFound(() => cfg.register());
     const sessions = await retryOnceIfNotFound(() => persistSession(user));
-    // Audit shape DIVERGES per path — parameterized, never collapsed to one event.
-    cfg.noVerifySuccessAudit(user);
+    // 'signup.created' (NOT 'signup.requested'), carrying userId and hashing loginName. This
+    // was a caller-supplied callback while the passkey-first path emitted a different event;
+    // that path is gone, so the one remaining shape is written out here directly.
+    logAuthEvent('signup.created', 'success', {
+      userId: user.id,
+      actor: hashActor(user.loginName),
+    });
     // Fired server-side (not the client trackAuthEvent) because this path redirects the
     // browser straight to postRegisterStep's target without ever rendering the
     // "Check your email" page that carries the client-side TrackOnMount.
     trackServerEvent('signup_submitted', {
       userId: user.id,
-      properties: { channel: cfg.hasPassword ? 'password' : 'passkey' },
+      properties: { channel: 'password' },
     });
     const target = postRegisterStep({
-      hasPassword: cfg.hasPassword,
+      hasPassword: true,
       emailVerified: false,
       requireVerification: false,
       loginName: user.loginName,
@@ -339,55 +342,9 @@ async function runEnumerationSafeRegister(
   }
 }
 
-/**
- * Passkey-first path: register directly, then apply enumeration-safe handling.
- *
- * When verification is required, both the fresh-signup and the ALREADY_EXISTS
- * branches yield the generic check-your-email response (the success branch also
- * persists a ceremony session so the /verify return flow can resume). When
- * verification is off, register and route forward via postRegisterStep; a
- * duplicate still yields the generic response.
- */
-export async function registerPasskeyFirst(
-  provider: AuthProvider,
-  list: SessionEntry[],
-  input: PasskeyFirstRegisterInput
-): Promise<PasskeyFirstRegisterResult> {
-  const { email, firstName, lastName, organization, requestId, origin } = input;
-  // Resolve the effective registration org — org-first (explicit orgId from the ceremony URL),
-  // then ZITADEL_DEFAULT_ORG_ID env pin, then the provider's instance Default Organization.
-  // Raw `organization` is undefined on a bare (no ?organization=) flow, causing Zitadel's
-  // FAILED_PRECONDITION on addHumanUser when no org is supplied to register().
-  // createSession in runEnumerationSafeRegister also receives the resolved org via `organization`.
-  const registrationOrg = await resolveOrg(provider, organization);
-
-  return runEnumerationSafeRegister(provider, list, {
-    email,
-    organization: registrationOrg,
-    requestId,
-    deviceTrackingToken: input.deviceTrackingToken,
-    userAgent: input.userAgent,
-    requireVerification: input.requireVerification,
-    hasPassword: false,
-    // Passkey-first attaches verifyUrlTemplate ONLY when verification is required;
-    // the no-verification path registers without it (preserves original behavior).
-    register: () =>
-      input.requireVerification
-        ? provider.register({
-            email,
-            firstName,
-            lastName,
-            orgId: registrationOrg,
-            verifyUrlTemplate: verifyUrlTemplate({ origin, requestId }),
-          })
-        : provider.register({ email, firstName, lastName, orgId: registrationOrg }),
-    noVerifySuccessAudit: () =>
-      logAuthEvent('signup.requested', 'success', {
-        actor: hashActor(email),
-        organization: registrationOrg,
-      }),
-  });
-}
+// Phase B: registerPasskeyFirst was retired here. The `passkey` intent now routes through
+// registerEmailLinkSignup — one register path, one response shape (G7) — and the passkey
+// nudge happens on /signup/complete after the address is proven.
 
 // ── set-a-password register (/signup/password) ─────────────────────────────────
 
@@ -412,13 +369,10 @@ export type RegisterWithPasswordResult =
   SignupSentWithSessionResult | SignupSentResult | SignupRedirectResult;
 
 /**
- * /signup/password register: register with a password, then apply enumeration-safe
- * handling. Mirrors registerPasskeyFirst but always passes a password and uses the
- * `hasPassword: true` postRegisterStep when verification is off.
- *
- * Shared enumeration-safe registration: the success path and the ALREADY_EXISTS
- * path return the IDENTICAL response when verification is required, so a duplicate
- * email is indistinguishable from a fresh signup.
+ * /signup/password register: register with a password, then apply enumeration-safe handling
+ * via runEnumerationSafeRegister — the success path and the ALREADY_EXISTS path return the
+ * IDENTICAL response when verification is required, so a duplicate email is indistinguishable
+ * from a fresh signup.
  */
 export async function registerWithPassword(
   provider: AuthProvider,
@@ -440,43 +394,71 @@ export async function registerWithPassword(
     deviceTrackingToken: input.deviceTrackingToken,
     userAgent: input.userAgent,
     requireVerification: input.requireVerification,
-    hasPassword: true,
-    // When verification is skipped (EMAIL_VERIFICATION=false on staging): pass emailVerified:true
+    // When verification is skipped (AUTH_EMAIL_VERIFICATION_REQUIRED=false on staging): pass emailVerified:true
     // so Zitadel marks the email verified in-place and sends nothing. Omit verifyUrlTemplate
     // entirely — passing it alongside emailVerified is redundant and risks triggering the sendCode
     // path in a future Zitadel version.
     //
-    // When verification is required (the default/prod path): pass verifyUrlTemplate so Zitadel
-    // sends the verification email to the user's address. emailVerified is omitted — the user
-    // must click the link before their session is fully verified.
-    register: () =>
-      input.requireVerification
-        ? provider.register({
-            email,
-            firstName,
-            lastName,
-            password,
-            orgId: registrationOrg,
-            // Steer the verification mail's link back to OUR /verify route. requestId rides
-            // along so the post-verify step can resume an OIDC/SAML ceremony. Origin comes
-            // from trusted config (PUBLIC_ORIGIN), NOT the Host header, to block injection.
-            verifyUrlTemplate: verifyUrlTemplate({ origin, requestId }),
-          })
-        : provider.register({
-            email,
-            firstName,
-            lastName,
-            password,
-            orgId: registrationOrg,
-            // emailVerified:true → Zitadel marks verified immediately, sends no email.
-            emailVerified: true,
+    // When verification is required (the default/prod path): pass returnCode so Zitadel hands
+    // the plaintext code back on the result instead of emailing it itself — we deliver it
+    // through our own pipeline (sendVerificationMail) below. emailVerified is omitted — the
+    // user must submit the code before their session is fully verified.
+    //
+    // CRITICAL fallback (final-findings.md CRITICAL 1): auth-ui, zitadel-provider, and infra
+    // deploy independently, and infra wires VERIFICATION_MAIL_URL only in SOME environments —
+    // an auth-ui release can land before infra's URL is configured there. Unset MUST mean
+    // "behave exactly as before this pipeline existed": ask Zitadel to send its own mail via
+    // verifyUrlTemplate, rather than requesting returnCode and delivering the code nowhere.
+    register: async () => {
+      if (!input.requireVerification) {
+        return provider.register({
+          email,
+          firstName,
+          lastName,
+          password,
+          orgId: registrationOrg,
+          // emailVerified:true → Zitadel marks verified immediately, sends no email.
+          emailVerified: true,
+        });
+      }
+      if (!env.VERIFICATION_MAIL_URL) {
+        // Milo pipeline not configured in this environment — pre-Task-6 behavior: Zitadel
+        // sends its own mail to a link that lands on OUR /verify route.
+        return provider.register({
+          email,
+          firstName,
+          lastName,
+          password,
+          orgId: registrationOrg,
+          verifyUrlTemplate: verifyUrlTemplate({ origin, requestId }),
+        });
+      }
+      const user = await provider.register({
+        email,
+        firstName,
+        lastName,
+        password,
+        orgId: registrationOrg,
+        returnCode: true,
+      });
+      // G7: sendVerificationMail NEVER throws and resolves false on a delivery
+      // failure — that failure must NOT change the signup response (log-and-continue
+      // is the whole contract; the user recovers via resend). See
+      // verification-mail.server.ts.
+      if (user.emailCode) {
+        await sendVerificationMail({
+          userId: user.id,
+          code: user.emailCode,
+          // Origin comes from trusted config (PUBLIC_ORIGIN), NOT the Host header, to
+          // block injection — the same rule verifyUrlTemplate already followed.
+          returnTo: verificationReturnTo(origin, '/verify', {
+            requestId,
+            organization: registrationOrg,
           }),
-    // Distinct audit from the passkey path: 'signup.created' carrying userId, hashing loginName.
-    noVerifySuccessAudit: (user) =>
-      logAuthEvent('signup.created', 'success', {
-        userId: user.id,
-        actor: hashActor(user.loginName),
-      }),
+        });
+      }
+      return user;
+    },
   });
 }
 
@@ -495,8 +477,6 @@ export interface EmailLinkSignupInput {
    * Host-header email-link injection.
    */
   origin: string;
-  /** MaxMind device-fingerprint token captured client-side (unused in the sessionless path, reserved for future use). */
-  deviceTrackingToken?: string;
 }
 
 /**
@@ -507,9 +487,12 @@ export interface EmailLinkSignupInput {
  * silently discarded — the caller receives the IDENTICAL generic "sent" result
  * as a fresh signup, so account existence is not detectable.
  */
+// No SessionEntry[] parameter, unlike its sibling register functions: this path deliberately
+// creates NO session. The address is unproven until the emailed link is clicked, so the only
+// place a session is minted is /signup/complete. Taking a session list here would invite a
+// caller to assume otherwise.
 export async function registerEmailLinkSignup(
   provider: AuthProvider,
-  _list: SessionEntry[],
   input: EmailLinkSignupInput
 ): Promise<SignupSentResult> {
   const { email, firstName, lastName, organization, requestId, origin } = input;
@@ -519,19 +502,137 @@ export async function registerEmailLinkSignup(
   // FAILED_PRECONDITION on addHumanUser when no org is supplied to register().
   const registrationOrg = await resolveOrg(provider, organization);
   try {
-    await provider.register({
-      email,
-      firstName,
-      lastName,
-      orgId: registrationOrg,
-      verifyUrlTemplate: signupCompleteUrlTemplate({ origin, requestId, organization }),
-    });
+    // CRITICAL fallback (final-findings.md CRITICAL 1): auth-ui, zitadel-provider, and infra
+    // deploy independently, and infra wires VERIFICATION_MAIL_URL only in SOME environments —
+    // an auth-ui release can land before infra's URL is configured there. Unset MUST mean
+    // "behave exactly as before this pipeline existed": ask Zitadel to send its own mail via
+    // verifyUrlTemplate, rather than requesting returnCode and delivering the code nowhere.
+    if (!env.VERIFICATION_MAIL_URL) {
+      // Pre-Task-6 behavior: Zitadel sends its own mail to a link landing on
+      // /signup/complete (same destination signupCompleteUrlTemplate always built).
+      await provider.register({
+        email,
+        firstName,
+        lastName,
+        orgId: registrationOrg,
+        verifyUrlTemplate: signupCompleteUrlTemplate({
+          origin,
+          requestId,
+          organization: registrationOrg,
+        }),
+      });
+    } else {
+      const user = await provider.register({
+        email,
+        firstName,
+        lastName,
+        orgId: registrationOrg,
+        // returnCode: the code comes back in-band instead of Zitadel emailing it — delivered
+        // through OUR pipeline (sendVerificationMail) below, same as registerWithPassword's
+        // requireVerification arm and resendIfSquatted.
+        returnCode: true,
+      });
+      if (user.emailCode) {
+        // G7: sendVerificationMail NEVER throws and resolves false on a delivery failure — that
+        // failure must NOT change the signup response (log-and-continue is the whole contract;
+        // the user recovers via resend). See verification-mail.server.ts.
+        await sendVerificationMail({
+          userId: user.id,
+          code: user.emailCode,
+          // SAME destination + params signupCompleteUrlTemplate used to build for Zitadel's own
+          // sendCode path (requestId, organization, next=passkey) — just without the
+          // {{.Code}}/{{.UserID}} placeholders, which the milo webhook appends itself.
+          //
+          // organization is the RESOLVED registrationOrg, NOT the raw (possibly undefined on a
+          // bare flow) `organization` input — unlike signupCompleteUrlTemplate's
+          // `organization={{.OrgID}}`, which was a PLACEHOLDER Zitadel substituted with the
+          // resolved org at send time regardless of what this variable held, verificationReturnTo
+          // has no such substitution pass: it emits exactly what it's handed. Passing the raw
+          // value here silently dropped `organization` from the link on a bare (no ?organization=)
+          // signup, which made completeEmailLinkSignup's createSession lose org scoping.
+          returnTo: verificationReturnTo(origin, '/signup/complete', {
+            requestId,
+            organization: registrationOrg,
+            next: 'passkey',
+          }),
+        });
+      }
+    }
   } catch (error) {
     if (!(error instanceof ProviderError && error.code === 'ALREADY_EXISTS')) throw error;
-    // ENUMERATION SAFETY: fall through — identical response as the success path.
+    // SQUATTING FIX (inherited bug): an unverified, factorless account holds this address
+    // forever — the real owner's signup lands here every time and is silently dropped, so
+    // they can never sign up. Resend verification so the address stays claimable by whoever
+    // controls the inbox. A REAL account (any auth method enrolled) gets nothing.
+    //
+    // ENUMERATION SAFETY: both branches fall through to the identical response below. The
+    // rate-limit skip is likewise silent. An attacker learns nothing without the inbox.
+    // Residual, accepted in the spec: the resend branch makes an extra API call, so response
+    // TIMING differs.
+    //
+    // organization: registrationOrg (resolved), same fix as above — resendIfSquatted's
+    // returnTo would otherwise drop organization on the same bare-flow case.
+    await resendIfSquatted(provider, email, { origin, requestId, organization: registrationOrg });
   }
   logAuthEvent('signup.requested', 'success', { actor: hashActor(email), organization });
   return { kind: 'sent', email };
+}
+
+async function resendIfSquatted(
+  provider: AuthProvider,
+  email: string,
+  // `organization` MUST be the caller's already-RESOLVED registrationOrg, not a raw/possibly-
+  // undefined route param — verificationReturnTo emits it verbatim into `returnTo` (no Zitadel
+  // placeholder substitution happens here), so an unresolved value would silently drop
+  // organization from the emailed link on a bare (no ?organization=) signup.
+  link: { origin: string; requestId?: string; organization?: string }
+): Promise<void> {
+  try {
+    const user = await provider.findUser(email);
+    if (!user) return;
+    const methods = await provider.listAuthMethods(user.id);
+    if (methods.length > 0) return; // a real account — stay silent
+    if (!(await allowResend(email))) return; // mail-bombing guard — silent skip
+    // Same CRITICAL fallback as registerEmailLinkSignup above (final-findings.md CRITICAL 1):
+    // unset VERIFICATION_MAIL_URL means the milo pipeline isn't configured in this environment,
+    // so fall back to Zitadel's own resend-with-url-template path instead of requesting a
+    // returnCode we have no way to deliver.
+    if (!env.VERIFICATION_MAIL_URL) {
+      await provider.resendEmailCodeWithUrl(user.id, signupCompleteUrlTemplate(link));
+    } else {
+      // returnCode delivery: the code comes back in-band instead of Zitadel emailing it, and
+      // sendVerificationMail (never throws — see verification-mail.server.ts) delivers it through
+      // OUR pipeline, landing on the SAME /signup/complete?next=passkey destination
+      // signupCompleteUrlTemplate used to build for Zitadel's own sendCode path.
+      const code = await provider.resendEmailCode(user.id);
+      await sendVerificationMail({
+        userId: user.id,
+        code,
+        returnTo: verificationReturnTo(link.origin, '/signup/complete', {
+          requestId: link.requestId,
+          organization: link.organization,
+          next: 'passkey',
+        }),
+      });
+    }
+    // Audited under its OWN event, not the shared signup.requested. This dispatches mail to an
+    // address the submitter has not proven they own — a security-relevant outbound action that
+    // has to be attributable on its own. Safe for enumeration: the audit log is server-side
+    // only and never reaches the caller. Parity is a property of the RESPONSE, not the log.
+    logAuthEvent('signup_verification_resent', 'success', { actor: hashActor(email) });
+  } catch (error) {
+    // The RESULT is swallowed on purpose: this is a best-effort side effect on an already-
+    // generic response path, and letting an error change what the caller returns would create
+    // the enumeration oracle this whole function exists to avoid.
+    //
+    // The FAILURE is still audited. Total silence made a broken resend indistinguishable from a
+    // deliberate skip, so an outage stranding every squatted address would be invisible to
+    // operators. This audit is likewise server-side and cannot leak into the response.
+    logAuthEvent('signup_verification_resent', 'failure', {
+      actor: hashActor(email),
+      reason: error instanceof ProviderError ? error.code : 'UNKNOWN',
+    });
+  }
 }
 
 // ── email-link signup completion (/signup/complete) ────────────────────────────

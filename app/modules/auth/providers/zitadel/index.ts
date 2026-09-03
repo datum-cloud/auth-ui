@@ -18,6 +18,7 @@ import * as user from './user';
 import type {
   AuthProvider,
   RegisterInput,
+  RegisterResult,
   SessionChecks,
   SessionOpts,
 } from '@/modules/auth/auth-provider';
@@ -97,7 +98,7 @@ export class ZitadelAuthProvider implements AuthProvider {
   listAuthMethods(userId: string): Promise<AuthMethod[]> {
     return user.listAuthMethods(this.ctx, userId);
   }
-  register(input: RegisterInput): Promise<User> {
+  register(input: RegisterInput): Promise<RegisterResult> {
     return user.register(this.ctx, input);
   }
 
@@ -122,8 +123,13 @@ export class ZitadelAuthProvider implements AuthProvider {
   verifyInvite(userId: string, code: string): Promise<void> {
     return emailVerify.verifyInvite(this.ctx, userId, code);
   }
-  resendEmailCode(userId: string, urlTemplate: string): Promise<void> {
-    return emailVerify.resendEmailCode(this.ctx, userId, urlTemplate);
+  // sendCode delivery — verify.service.ts's manual resend from the /verify page.
+  resendEmailCodeWithUrl(userId: string, urlTemplate: string): Promise<void> {
+    return emailVerify.resendEmailCodeWithUrl(this.ctx, userId, urlTemplate);
+  }
+  // returnCode delivery — the provider returns the code instead of emailing it.
+  resendEmailCode(userId: string): Promise<string> {
+    return emailVerify.resendEmailCode(this.ctx, userId);
   }
   markEmailVerified(userId: string): Promise<void> {
     return emailVerify.markEmailVerified(this.ctx, userId);

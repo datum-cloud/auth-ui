@@ -50,4 +50,26 @@ describe('toRegisterRequest', () => {
       verification: { case: 'sendCode', value: { urlTemplate: tmpl } },
     });
   });
+
+  // Phase B pin (D-B2b): the spec's "CreateUser migration" names two payload properties —
+  // sendCode+urlTemplate and no password oneof — that AddHumanUser ALREADY satisfies. This
+  // test is evidence, not TDD: it passed on first run, and it exists so an RPC migration
+  // cannot silently change the wire payload of the most enumeration-sensitive call we make.
+  it('passwordless register emits sendCode + no password oneof (Phase B pinned payload)', () => {
+    const req = toRegisterRequest({
+      email: 'a@b.test',
+      firstName: 'A',
+      lastName: 'B',
+      orgId: 'org-1',
+      verifyUrlTemplate: 'https://auth.test/signup/complete?code={{.Code}}',
+    });
+    expect(req.passwordType).to.deep.equal({ case: undefined });
+    expect(req.email).to.deep.equal({
+      email: 'a@b.test',
+      verification: {
+        case: 'sendCode',
+        value: { urlTemplate: 'https://auth.test/signup/complete?code={{.Code}}' },
+      },
+    });
+  });
 });

@@ -97,7 +97,7 @@ describe('dispatchEmailCode — session-ownership gate on ?send=true', () => {
     });
   });
 
-  it('uses resendEmailCode (not sendEmailCode) for invite codes', () => {
+  it('uses resendEmailCodeWithUrl (not sendEmailCode) for invite codes', () => {
     run({
       ...sessionOwnerScenario({
         verifyEmailInput: {
@@ -106,13 +106,13 @@ describe('dispatchEmailCode — session-ownership gate on ?send=true', () => {
           invite: true,
         },
       }),
-      recordCalls: ['sendEmailCode', 'resendEmailCode'],
+      recordCalls: ['sendEmailCode', 'resendEmailCodeWithUrl'],
     }).then((verdict) => {
       expect(verdict.ok, verdict.error ?? '').to.be.true;
       const calls = verdict.calls as Record<string, unknown[][]>;
-      // Invite path uses resendEmailCode; sendEmailCode must NOT be called.
+      // Invite path uses resendEmailCodeWithUrl; sendEmailCode must NOT be called.
       expect(calls['sendEmailCode']).to.have.length(0);
-      expect(calls['resendEmailCode']).to.have.length(1);
+      expect(calls['resendEmailCodeWithUrl']).to.have.length(1);
     });
   });
 
@@ -148,7 +148,7 @@ describe('resendEmailCode — action intent=resend (ownership gate)', () => {
         origin: TRUSTED_ORIGIN,
         invite: false,
       },
-      recordCalls: ['resendEmailCode'],
+      recordCalls: ['resendEmailCodeWithUrl'],
     }).then((verdict) => {
       expect(verdict.ok, verdict.error ?? '').to.be.true;
       const r = verdict.outcome as Record<string, unknown>;
@@ -156,8 +156,8 @@ describe('resendEmailCode — action intent=resend (ownership gate)', () => {
       expect(r.notice).to.eq('CODE_SENT');
       // The URL template must be correct
       const calls = verdict.calls as Record<string, unknown[][]>;
-      expect(calls['resendEmailCode']).to.have.length(1);
-      const [, urlTemplate] = calls['resendEmailCode'][0] as [string, string];
+      expect(calls['resendEmailCodeWithUrl']).to.have.length(1);
+      const [, urlTemplate] = calls['resendEmailCodeWithUrl'][0] as [string, string];
       expect(urlTemplate).to.include(`${TRUSTED_ORIGIN}/id/verify?`);
       expect(urlTemplate).to.include('code={{.Code}}');
       expect(urlTemplate).to.not.include('%7B');
@@ -178,15 +178,15 @@ describe('resendEmailCode — action intent=resend (ownership gate)', () => {
         origin: TRUSTED_ORIGIN,
         invite: false,
       },
-      recordCalls: ['resendEmailCode'],
+      recordCalls: ['resendEmailCodeWithUrl'],
     }).then((verdict) => {
       expect(verdict.ok, verdict.error ?? '').to.be.true;
       const r = verdict.outcome as Record<string, unknown>;
       expect(r.ok).to.be.false;
       expect(r.error).to.eq('INVALID_INPUT');
-      // Gate blocks the flood — provider.resendEmailCode must NOT be called for a foreign userId.
+      // Gate blocks the flood — provider.resendEmailCodeWithUrl must NOT be called for a foreign userId.
       const calls = verdict.calls as Record<string, unknown[][]>;
-      expect(calls['resendEmailCode']).to.have.length(0);
+      expect(calls['resendEmailCodeWithUrl']).to.have.length(0);
     });
   });
 
@@ -201,14 +201,14 @@ describe('resendEmailCode — action intent=resend (ownership gate)', () => {
         origin: TRUSTED_ORIGIN,
         invite: false,
       },
-      recordCalls: ['resendEmailCode'],
+      recordCalls: ['resendEmailCodeWithUrl'],
     }).then((verdict) => {
       expect(verdict.ok, verdict.error ?? '').to.be.true;
       const r = verdict.outcome as Record<string, unknown>;
       expect(r.ok).to.be.false;
       expect(r.error).to.eq('INVALID_INPUT');
       const calls = verdict.calls as Record<string, unknown[][]>;
-      expect(calls['resendEmailCode']).to.have.length(0);
+      expect(calls['resendEmailCodeWithUrl']).to.have.length(0);
     });
   });
 });

@@ -7,7 +7,7 @@
 import { FakeAuthProvider } from '@/modules/auth/providers/fake/fake-provider';
 
 describe('FakeAuthProvider — Phase 2', () => {
-  it('register creates a findable user; verifyEmail with the seeded code marks it verified and makes resendEmailCode throw ALREADY_DONE; setPasswordWithCode accepts the reset code from sendPasswordReset and rejects a wrong code', async () => {
+  it('register creates a findable user; verifyEmail with the seeded code marks it verified and makes resendEmailCodeWithUrl throw ALREADY_DONE; setPasswordWithCode accepts the reset code from sendPasswordReset and rejects a wrong code', async () => {
     const p = new FakeAuthProvider();
     const user = await p.register({
       email: 'v@acme.test',
@@ -24,7 +24,7 @@ describe('FakeAuthProvider — Phase 2', () => {
 
     let err: { code?: string } | undefined;
     try {
-      await p.resendEmailCode(user.id, 'tmpl');
+      await p.resendEmailCodeWithUrl(user.id, 'tmpl');
     } catch (e) {
       err = e as { code?: string };
     }

@@ -205,8 +205,13 @@ export type ServiceFn =
   // vi.mock('@/server/observability') makes audit-shape assertions impossible in the browser bundle
   // (observability is stubbed to a no-op). Real audit runs in Bun node-side.
   | 'registerWithPassword'
-  | 'registerPasskeyFirst'
+  // D-RL: replay an ordered list of resendChecks through the real allowResend (node-side —
+  // the browser bundle stubs hashActor to '', collapsing every address into one key).
+  | 'allowResend'
   | 'registerEmailLinkSignup'
+  // D-RL rate-limit proof: the SAME signupInput submitted twice in one process, so the
+  // module-level limiter can actually fire; outcome is [first, second].
+  | 'registerEmailLinkSignupTwice'
   | 'registerAndLinkIdp'
   | 'completeEmailLinkSignup'
   // ── verify service (batch 8e) ──
@@ -254,6 +259,13 @@ export type ServiceFn =
   | 'resolveOrgProbe'
   // Hono /metrics route pinning test — unauthenticated GET returns 200 + metric name.
   | 'serverMetrics'
+  // ── verification-mail delivery client (Task 5) ────────────────────────────────
+  // Drives the REAL sendVerificationMail (app/server/infra/verification-mail.server.ts) against
+  // a local http listener the harness case starts itself. env.VERIFICATION_MAIL_URL is threaded
+  // via the generic `env` field below, applied BEFORE this module — and therefore env.server's
+  // load-time schema parse — loads (see run-scenario.ts). node:https is stubbed out of the Vite
+  // browser bundle by virtue of the `.server.ts` suffix, so this must run node-side.
+  | 'sendVerificationMail'
   // ── routes/login handlers (batch 13b) ────────────────────────────────────────
   // Login route loaders/actions are node-bound: they read a signed `sessions` cookie off a real
   // Request (Cookie header blocked by Fetch spec in the browser), and some need the signed
@@ -483,6 +495,7 @@ export interface Scenario {
     | 'register'
     | 'sendEmailCode'
     | 'resendEmailCode'
+    | 'resendEmailCodeWithUrl'
     | 'verifyEmail'
     | 'verifyInvite'
   >;
@@ -505,7 +518,12 @@ export interface Scenario {
     cookieSessions?: boolean;
   };
   // ── signup service inputs (batch 8e) ────────────────────────────────────────────────────────
-  /** Input struct for the signup service functions (registerWithPassword, registerPasskeyFirst,
+  /** Ordered (email, nowMs) checks replayed through the real allowResend (fn: 'allowResend').
+   *  Outcome is boolean[] verdicts. Every callService spawns a fresh Bun process, so limiter
+   *  state is naturally per-scenario — which is also why the rate-limit service test must run
+   *  both submissions inside ONE scenario (fn: 'registerEmailLinkSignupTwice'). */
+  resendChecks?: Array<{ email: string; nowMs: number }>;
+  /** Input struct for the signup service functions (registerWithPassword,
    *  registerEmailLinkSignup, registerAndLinkIdp, completeEmailLinkSignup). */
   signupInput?: {
     email: string;
@@ -713,6 +731,17 @@ export interface Scenario {
     | 'zitadelNoThrow' // getAuthProvider({zitadel, serviceUrl}) constructs without throwing → { threw }
     | 'registryKeys' // Object.keys(providerRegistry).sort() → { keys }
     | 'fakeSingleton'; // providerRegistry.fake() x2 → { same }
+
+  // ── verification-mail client (fn: 'sendVerificationMail'; Task 5) ──────────
+  /** Input for the REAL sendVerificationMail. */
+  verificationMailInput?: { userId: string; code: string; returnTo: string };
+  /** Whether the harness starts a local HTTP listener on env.VERIFICATION_MAIL_URL's port before
+   *  calling sendVerificationMail. false/omitted exercises the "unreachable" contract — nothing
+   *  is listening, so the client must resolve `false` without throwing. */
+  verificationMailListen?: boolean;
+  /** Status code the local listener responds with when `verificationMailListen` is true. Default
+   *  200 (also captures the received method/content-type/body as outcome.received). */
+  verificationMailStatus?: number;
 }
 
 /** A parsed logAuthEvent JSON line: { event, outcome, ...fields }. */
@@ -762,4 +791,12 @@ export interface Verdict {
   calls?: Record<string, unknown[][]>;
   /** Provider state read back post-call (e.g. { isDeviceAuthorized: { 'dev-1': true } }). */
   inspect?: Record<string, unknown>;
+  /**
+   * Every POST body the REAL sendVerificationMail client sent during this scenario, captured by
+   * the generic verificationMailListen listener (Task 6 returnTo regression coverage) —
+   * populated whether sendVerificationMail was called directly (fn: 'sendVerificationMail') or
+   * indirectly from inside a signup service (registerEmailLinkSignup, registerWithPassword,
+   * resendIfSquatted). undefined when verificationMailListen was not set or nothing was posted.
+   */
+  verificationMailReceived?: Array<{ method?: string; contentType?: string; body?: unknown }>;
 }

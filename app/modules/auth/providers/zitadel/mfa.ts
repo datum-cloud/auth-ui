@@ -22,7 +22,6 @@ import {
   HumanMFAInitSkippedRequestSchema,
   SetUserMetadataRequestSchema,
   ListUserMetadataRequestSchema,
-  DeleteUserMetadataRequestSchema,
 } from '@zitadel/proto/zitadel/user/v2/user_service_pb';
 
 // Zitadel rejects empty webauthn credential names (PasskeyName / TokenName must be 1–200
@@ -31,9 +30,13 @@ import {
 const DEFAULT_PASSKEY_NAME = 'Passkey';
 const DEFAULT_SECURITY_KEY_NAME = 'Security key';
 
-// User-metadata key carrying a passkey's enroll time. Written once at verify
-// success and never rewritten, so the ENTRY's creationDate (server clock) IS the
-// enroll time — the value stores an ISO copy purely as a debugging aid.
+// User-metadata key carrying a passkey's enroll time and display name. Written once at
+// verify success and never rewritten, so the ENTRY's creationDate (server clock) IS the
+// enroll time. The VALUE is JSON `{"created": "<ISO>", "name": "<passkey name>"}`:
+// `created` is a debugging copy (exactly as the old bare-ISO value was), and `name` is
+// read by zitadel-provider's passkey-removed handler to name the device in the removal
+// email. Passkeys enrolled before Phase B still carry the bare-ISO value; that parser
+// tolerates it as one of its documented degradation paths.
 const passkeyCreatedKey = (passkeyId: string): string => `passkey:${passkeyId}:created`;
 
 // The proto publicKeyCredentialCreationOptions is a google.protobuf.Struct (JsonObject)
@@ -109,12 +112,16 @@ export async function verifyPasskey(
   // [invalid_argument] (surfaced to us as INVALID_CREDENTIALS). Routes may pass a
   // user-supplied label; otherwise fall back to a non-empty default.
   const users = ctx.svc(UserService);
+  // Resolved ONCE and used twice: the same trimmed-or-default value must reach both
+  // Zitadel's passkeyName field and the metadata JSON below, or the name in the removal
+  // email drifts from the name the user sees in their passkey list.
+  const resolvedName = passkeyName?.trim() || DEFAULT_PASSKEY_NAME;
   await ctx.call(async () => {
     const req = create(VerifyPasskeyRegistrationRequestSchema, {
       userId,
       passkeyId,
       publicKeyCredential: cred as JsonObject,
-      passkeyName: passkeyName?.trim() || DEFAULT_PASSKEY_NAME,
+      passkeyName: resolvedName,
     });
     await users.verifyPasskeyRegistration(req, {});
   });
@@ -127,7 +134,13 @@ export async function verifyPasskey(
         metadata: [
           {
             key: passkeyCreatedKey(passkeyId),
-            value: new TextEncoder().encode(new Date().toISOString()),
+            // JSON, not a bare ISO string: zitadel-provider's passkey-removed handler reads
+            // `.name` from here to name the device in the removal email. The date is still
+            // sourced from the metadata ENTRY's server-clock creationDate (see listPasskeys) —
+            // `created` is a debugging copy, exactly as the bare-ISO value was.
+            value: new TextEncoder().encode(
+              JSON.stringify({ created: new Date().toISOString(), name: resolvedName })
+            ),
           },
         ],
       });
@@ -198,18 +211,13 @@ export async function removePasskey(
     const req = create(RemovePasskeyRequestSchema, { userId, passkeyId });
     await users.removePasskey(req, {});
   });
-  // Best-effort cleanup of the created-at key — never blocks the removal result.
-  try {
-    await ctx.call(async () => {
-      const req = create(DeleteUserMetadataRequestSchema, {
-        userId,
-        keys: [passkeyCreatedKey(passkeyId)],
-      });
-      await users.deleteUserMetadata(req, {});
-    });
-  } catch {
-    // Swallowed: an orphaned key is dropped by the listPasskeys join anyway.
-  }
+  // NO metadata cleanup here, deliberately. The `passkey:<id>:created` key must OUTLIVE the
+  // passkey: zitadel-provider's passkey-removed handler reads it after the removal event to
+  // name the device in the notification email, and a delete here would race that read — and
+  // win, since this is a direct sequential call and the handler is an async event round-trip.
+  // Harmless to the UI: listPasskeys joins metadata ONTO passkeys that exist, so an orphaned
+  // key never matches. Unbounded growth is an accepted residual (see the passkey-removed
+  // design, §"Unbounded tombstones").
 }
 
 export function registerU2F(

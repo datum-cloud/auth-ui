@@ -1,6 +1,7 @@
 import type {
   AuthProvider,
   RegisterInput,
+  RegisterResult,
   SessionChecks,
   SessionOpts,
 } from '@/modules/auth/auth-provider';
@@ -77,6 +78,14 @@ interface LdapUserSeed {
 }
 
 interface Seed {
+  /**
+   * Seeded users. Together with `authMethods` these express the three account states the
+   * G7 enumeration suite must distinguish:
+   *   • fresh               — email absent from this list
+   *   • existing verified   — present, and listed in `authMethods` (a real account)
+   *   • existing unverified — present, `authMethods` empty (the factorless squatter)
+   * register() throws ALREADY_EXISTS for the latter two, identically.
+   */
   users?: User[];
   passwords?: Record<string, string>; // userId → plaintext password
   authMethods?: Record<string, AuthMethod[]>; // userId → list of methods
@@ -295,7 +304,14 @@ export class FakeAuthProvider implements AuthProvider {
     return [...new Set<AuthMethod>([...seeded, ...dynamic])];
   }
 
-  async register(input: RegisterInput): Promise<User> {
+  async register(input: RegisterInput): Promise<RegisterResult> {
+    // Zitadel rejects a duplicate login name with ALREADY_EXISTS, and the whole
+    // enumeration-safe register flow (runEnumerationSafeRegister) is built around catching
+    // exactly that code. Without this, no Cypress test can reach the duplicate branch — which
+    // is the branch G7 exists to protect. Case-insensitive: Zitadel login names are.
+    const taken = this.users.some((u) => u.loginName.toLowerCase() === input.email.toLowerCase());
+    if (taken) throw new ProviderError('ALREADY_EXISTS', 'login name already taken');
+
     const id = `user-${++this.seq}`;
     const user: User = {
       id,
@@ -306,8 +322,12 @@ export class FakeAuthProvider implements AuthProvider {
     this.users = [...this.users, user];
     // When emailVerified:true the user is created already-verified (IdP register path).
     this.emailVerified.set(id, input.emailVerified === true);
-    this.emailCodes.set(id, `email-${id}`);
-    return user;
+    const code = `email-${id}`;
+    this.emailCodes.set(id, code);
+    // Mirrors the zitadel provider's toRegisterRequest priority (emailVerified > returnCode
+    // > verifyUrlTemplate > plain): emailCode is surfaced only for the returnCode path, never
+    // when emailVerified short-circuits it.
+    return input.returnCode && !input.emailVerified ? { ...user, emailCode: code } : user;
   }
 
   // ─── password ────────────────────────────────────────────────────────────────
@@ -347,9 +367,16 @@ export class FakeAuthProvider implements AuthProvider {
     return this.verifyEmail(userId, code);
   }
 
-  async resendEmailCode(userId: string, _urlTemplate: string): Promise<void> {
+  async resendEmailCodeWithUrl(userId: string, _urlTemplate: string): Promise<void> {
     if (this.emailVerified.get(userId)) throw new ProviderError('ALREADY_DONE', 'already verified');
     this.emailCodes.set(userId, `email-resend-${userId}`);
+  }
+
+  async resendEmailCode(userId: string): Promise<string> {
+    if (this.emailVerified.get(userId)) throw new ProviderError('ALREADY_DONE', 'already verified');
+    const code = `email-resend-${userId}`;
+    this.emailCodes.set(userId, code);
+    return code;
   }
 
   async markEmailVerified(userId: string): Promise<void> {

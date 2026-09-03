@@ -7,6 +7,39 @@
 // the suite), not production security logic. Coverage here is deliberately consolidated to one
 // representative test per distinct capability rather than one test per input permutation.
 import { FakeAuthProvider } from '@/modules/auth/providers/fake/fake-provider';
+import type { User } from '@/modules/auth/types';
+import { ProviderError } from '@/modules/auth/types';
+
+// Phase B (D-FAKE, G6): register() must model Zitadel's duplicate-login-name rejection, or no
+// Cypress test can reach the ALREADY_EXISTS branch the G7 enumeration suite exists to protect.
+describe('FakeAuthProvider — duplicate-email register (G7 prerequisite)', () => {
+  it('rejects a duplicate email with ALREADY_EXISTS', async () => {
+    const p = new FakeAuthProvider({ users: [{ id: 'u-1', loginName: 'taken@b.test' } as User] });
+    try {
+      await p.register({ email: 'taken@b.test', firstName: 'A', lastName: 'B' });
+      expect.fail('expected ALREADY_EXISTS');
+    } catch (e) {
+      expect(e).to.be.instanceOf(ProviderError);
+      expect((e as ProviderError).code).to.equal('ALREADY_EXISTS');
+    }
+  });
+
+  it('is case-insensitive on the email comparison', async () => {
+    const p = new FakeAuthProvider({ users: [{ id: 'u-1', loginName: 'Taken@B.test' } as User] });
+    try {
+      await p.register({ email: 'taken@b.test', firstName: 'A', lastName: 'B' });
+      expect.fail('expected ALREADY_EXISTS');
+    } catch (e) {
+      expect((e as ProviderError).code).to.equal('ALREADY_EXISTS');
+    }
+  });
+
+  it('still registers a fresh address', async () => {
+    const p = new FakeAuthProvider({ users: [{ id: 'u-1', loginName: 'taken@b.test' } as User] });
+    const u = await p.register({ email: 'fresh@b.test', firstName: 'A', lastName: 'B' });
+    expect(u.loginName).to.equal('fresh@b.test');
+  });
+});
 
 describe('FakeAuthProvider', () => {
   it('finds a seeded user by loginName, verifies the password factor only when a matching check is supplied, and tracks the designated admin session', async () => {

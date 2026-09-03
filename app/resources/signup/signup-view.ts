@@ -14,7 +14,7 @@ export interface SignupView {
  * Pure settings→render-booleans for the signup identifier + method screens. Mirrors
  * resolveLoginView so the routes map these straight to JSX presence.
  *
- * @param requireEmailVerification - whether EMAIL_VERIFICATION env is on (true = default/prod).
+ * @param requireEmailVerification - whether AUTH_EMAIL_VERIFICATION_REQUIRED env is on (true = default/prod).
  *   When false (staging/no-delivery deployment), password signup can skip verification and
  *   complete without sending any email, so email entry is safe to show even without delivery.
  */
@@ -53,12 +53,19 @@ export function resolveSignupView(
   // showEmailLink stays false without delivery even when allowEmailEntry is true.
   const showEmailLink = allowEmailEntry && emailDeliveryEnabled;
 
-  // Passkey signup (registerPasskeyFirst) sends a verification email ONLY when verification is
-  // required; with verification off it registers without one. We still hide passkey whenever
-  // delivery is off — even in the verification-off case where it could technically proceed — to
-  // keep the no-delivery method screen to the single well-exercised password path and avoid any
-  // "check your email" stranding. (allowEmailEntry above deliberately makes the opposite call for
-  // password entry, which completes with no email at all.)
+  // Passkey signup IS the email-link flow now (the passkey intent registers and sends the same
+  // verification mail; the nudge happens on /signup/complete), so it needs DELIVERY — and this
+  // flag mirrors the route action's guard exactly: policy + AUTH_EMAIL_DELIVERY_ENABLED.
+  //
+  // Deliberately NOT gated on allowEmailEntry, which is looser: that is true without delivery on
+  // a password + verification-off deployment, because password signup completes with no mail at
+  // all. The passkey intent cannot — the action rejects it with 400 INVALID_INPUT whenever
+  // delivery is off (routes/signup/method.tsx) — so gating on policy alone would render a button
+  // whose only possible outcome is a generic error.
+  //
+  // Also deliberately NOT gated on showEmailLink, which is TIGHTER: under disableLoginWithEmail
+  // the email-link button hides but the action still accepts intent=passkey, so borrowing that
+  // gate would hide a button that works. Match the guard, nothing more.
   const showPasskey = settings.passkeysType === 'allowed' && emailDeliveryEnabled;
 
   return {

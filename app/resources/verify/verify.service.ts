@@ -84,8 +84,8 @@ export async function dispatchEmailCode(
     const urlTemplate = verifyUrlTemplate({ origin, requestId, invite });
 
     if (invite) {
-      // Invite codes use resendEmailCode per the provider interface
-      await provider.resendEmailCode(userId, urlTemplate);
+      // Invite codes use resendEmailCodeWithUrl (sendCode delivery) per the provider interface
+      await provider.resendEmailCodeWithUrl(userId, urlTemplate);
     } else {
       await provider.sendEmailCode(userId, urlTemplate);
     }
@@ -164,7 +164,7 @@ export async function resendEmailCode(
 
   const urlTemplate = verifyUrlTemplate({ origin, requestId, invite });
   try {
-    await provider.resendEmailCode(userId, urlTemplate);
+    await provider.resendEmailCodeWithUrl(userId, urlTemplate);
     return { ok: true, notice: 'CODE_SENT' };
   } catch (error) {
     if (error instanceof ProviderError && error.code === 'ALREADY_DONE') {

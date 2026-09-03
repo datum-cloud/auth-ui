@@ -261,37 +261,88 @@ describe('ZitadelAuthProvider — session/credential request building', () => {
 // These tests drive that metadata RPC into failure and assert the primary operation still
 // resolves, plus the listPasskeys join behaviour (present/absent createdAt per row).
 describe('ZitadelAuthProvider — passkey metadata best-effort scopes', () => {
-  it('verifyPasskey/removePasskey resolve even when their best-effort metadata RPC throws', async () => {
-    const rows = [
-      {
-        label: 'verifyPasskey survives setUserMetadata failure',
-        rpc: 'verifyPasskeyRegistration',
-        metaRpc: 'setUserMetadata',
-        run: (p: ZitadelAuthProvider) => p.verifyPasskey('u1', 'pk1', { fake: true }),
+  it('verifyPasskey resolves even when the best-effort setUserMetadata RPC throws', async () => {
+    const primarySpy = cy.stub().resolves({});
+    stubClient({
+      verifyPasskeyRegistration: primarySpy,
+      setUserMetadata: async () => {
+        throw new Error('metadata backend down');
       },
-      {
-        label: 'removePasskey survives deleteUserMetadata failure',
-        rpc: 'removePasskey',
-        metaRpc: 'deleteUserMetadata',
-        run: (p: ZitadelAuthProvider) => p.removePasskey('u1', 'pk1'),
-      },
-    ] as const;
+    });
+    // Must not throw — the primary operation is not allowed to fail because of the
+    // best-effort metadata RPC (created-at stamp on enroll).
+    await provider().verifyPasskey('u1', 'pk1', { fake: true });
+    expect(primarySpy).to.have.callCount(1);
+  });
 
-    for (const row of rows) {
-      // Fresh free-standing stub per row (nothing is wrapped, so no restore hazard);
-      // stubClient() replaces the whole transport impl for the row.
-      const primarySpy = cy.stub().resolves({});
-      stubClient({
-        [row.rpc]: primarySpy,
-        [row.metaRpc]: async () => {
-          throw new Error('metadata backend down');
-        },
-      });
-      // Must not throw — the primary operation is not allowed to fail because of the
-      // best-effort metadata RPC (created-at stamp on enroll; key cleanup on removal).
-      await row.run(provider());
-      expect(primarySpy, row.label).to.have.callCount(1);
-    }
+  // Phase B (D-PK): the metadata VALUE is JSON {created, name}, not a bare ISO string —
+  // zitadel-provider's passkey-removed handler parses `.name` out of it to name the device
+  // in the removal email. The SAME resolved name must reach both the Zitadel passkeyName
+  // field and the metadata JSON.
+  it('stamps enroll metadata as JSON carrying the resolved passkey name', async () => {
+    const metaCalls: Array<{
+      userId: string;
+      metadata: Array<{ key: string; value: Uint8Array }>;
+    }> = [];
+    const verifySpy = cy.stub().resolves({});
+    stubClient({
+      verifyPasskeyRegistration: verifySpy,
+      setUserMetadata: async (req: {
+        userId: string;
+        metadata: Array<{ key: string; value: Uint8Array }>;
+      }) => {
+        metaCalls.push(req);
+        return {};
+      },
+    });
+
+    await provider().verifyPasskey('u1', 'pk-9', { fake: true }, '  MacBook Touch ID  ');
+
+    expect(verifySpy).to.have.been.calledWith(
+      Cypress.sinon.match({ passkeyName: 'MacBook Touch ID' }),
+      Cypress.sinon.match.any
+    );
+    expect(metaCalls).to.have.length(1);
+    expect(metaCalls[0].metadata[0].key).to.equal('passkey:pk-9:created');
+    const parsed = JSON.parse(new TextDecoder().decode(metaCalls[0].metadata[0].value));
+    expect(parsed.name).to.equal('MacBook Touch ID');
+    expect(parsed.created).to.match(/^\d{4}-\d{2}-\d{2}T/);
+  });
+
+  it('falls back to the default name in the metadata JSON when the route supplies none', async () => {
+    const metaCalls: Array<{ metadata: Array<{ key: string; value: Uint8Array }> }> = [];
+    stubClient({
+      verifyPasskeyRegistration: async () => ({}),
+      setUserMetadata: async (req: { metadata: Array<{ key: string; value: Uint8Array }> }) => {
+        metaCalls.push(req);
+        return {};
+      },
+    });
+
+    await provider().verifyPasskey('u1', 'pk-9', { fake: true }, undefined);
+
+    expect(JSON.parse(new TextDecoder().decode(metaCalls[0].metadata[0].value)).name).to.equal(
+      'Passkey'
+    );
+  });
+
+  // Phase B (D-PK): the created-at key must OUTLIVE the passkey. zitadel-provider's
+  // passkey-removed handler reads it AFTER the removal event to name the device in the
+  // notification email; deleting it here would race that read and win. This replaces the
+  // pre-Phase-B "removePasskey survives deleteUserMetadata failure" row — the RPC is now
+  // never issued at all.
+  it('leaves the created-at key in place after removal (tombstone for the removal email)', async () => {
+    const removeSpy = cy.stub().resolves({});
+    const deleteMetaSpy = cy.stub().resolves({});
+    stubClient({
+      removePasskey: removeSpy,
+      deleteUserMetadata: deleteMetaSpy,
+    });
+
+    await provider().removePasskey('u1', 'pk-9');
+
+    expect(removeSpy).to.have.callCount(1);
+    expect(deleteMetaSpy).to.have.callCount(0);
   });
 
   it('listPasskeys degrades to date-less rows (all createdAt absent) when listUserMetadata throws', async () => {

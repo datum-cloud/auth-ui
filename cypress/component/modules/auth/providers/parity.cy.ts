@@ -45,6 +45,7 @@ const PORT_METHODS = [
   'verifyEmail',
   'verifyInvite',
   'resendEmailCode',
+  'resendEmailCodeWithUrl',
   'getAuthRequest',
   'createCallback',
   'startIdpIntent',

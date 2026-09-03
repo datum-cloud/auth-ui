@@ -1,7 +1,7 @@
 // user capability — findUser, findOrgByDomain, getUser, listAuthMethods, register.
 import type { ZitadelCtx } from './context';
-import { toAuthMethods, toRegisterRequest, toUser } from './mappers';
-import type { RegisterInput } from '@/modules/auth/auth-provider';
+import { toAuthMethods, toRegisterRequest, toRegisterResult, toUser } from './mappers';
+import type { RegisterInput, RegisterResult } from '@/modules/auth/auth-provider';
 import type { AuthMethod, User } from '@/modules/auth/types';
 import { create } from '@zitadel/client';
 import { TextQueryMethod } from '@zitadel/proto/zitadel/object/v2/object_pb';
@@ -135,16 +135,20 @@ export function listAuthMethods(ctx: ZitadelCtx, userId: string): Promise<AuthMe
   });
 }
 
-export function register(ctx: ZitadelCtx, input: RegisterInput): Promise<User> {
+export function register(ctx: ZitadelCtx, input: RegisterInput): Promise<RegisterResult> {
   const users = ctx.svc(UserService);
   return ctx.call(async () => {
     const req = create(AddHumanUserRequestSchema, toRegisterRequest(input));
     const resp = await users.addHumanUser(req);
+    // toRegisterResult surfaces emailCode only when the request used returnCode delivery
+    // (see toRegisterRequest) and Zitadel actually returned one — never present otherwise.
+    const { emailCode } = toRegisterResult(resp);
     return {
       id: resp.userId,
       loginName: input.email,
       displayName: `${input.firstName} ${input.lastName}`,
       orgId: resp.details?.resourceOwner,
+      ...(emailCode ? { emailCode } : {}),
     };
   });
 }
