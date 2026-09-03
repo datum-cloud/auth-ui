@@ -6,7 +6,7 @@
       "name": "auth-ui",
       "dependencies": {
         "@bufbuild/protobuf": "^2.13.0",
-        "@conform-to/react": "1.20.2",
+        "@conform-to/react": "1.21.0",
         "@conform-to/zod": "1.20.2",
         "@datum-cloud/datum-ui": "^1.7.0",
         "@epic-web/client-hints": "^1.3.9",
@@ -170,9 +170,9 @@
 
     "@colors/colors": ["@colors/colors@1.5.0", "", {}, "sha512-ooWCrlZP11i8GImSjTHYHLkvFDP48nS4+204nGb1RiX/WXYHmJA2III9/e2DWVabCESdW7hBAEzHRqUn9OUVvQ=="],
 
-    "@conform-to/dom": ["@conform-to/dom@1.20.2", "", {}, "sha512-HfVb0XCHZijXODupqdV7+DrlZgJAYRQsXm/FpfFjKZO1P1S8LhlS7yMBTH2K5zkMyhk6fV/BvfUZi88Kp1EslA=="],
+    "@conform-to/dom": ["@conform-to/dom@1.21.0", "", {}, "sha512-Z4mZkWfFpKjD7/yDOPu/NFp2UEW3+Cc62Ox3WCyJI2kUcUILYrXfwwm9l0n+/+xBtMbDHatAPKMLaFMpJ0ajEQ=="],
 
-    "@conform-to/react": ["@conform-to/react@1.20.2", "", { "dependencies": { "@conform-to/dom": "1.20.2" }, "peerDependencies": { "react": ">=18", "react-dom": ">=18" } }, "sha512-UTsPZQwfIAXSbs3Q+h/xpHMWMlhJRNj1tG0VwXNua+uYQ2b2eL6MSTKtiE41tUnUWdjIWsvPWbQNk2dMvSQHDQ=="],
+    "@conform-to/react": ["@conform-to/react@1.21.0", "", { "dependencies": { "@conform-to/dom": "1.21.0" }, "peerDependencies": { "react": ">=18", "react-dom": ">=18" } }, "sha512-DIjEHrxzwhzIORvU+/7VLXZn6V6LdDThzgDb+1MlPZPVdMJqaHVwQxH6LJ1zeAb40LnSitqBR6s0xxmsaghULg=="],
 
     "@conform-to/zod": ["@conform-to/zod@1.20.2", "", { "dependencies": { "@conform-to/dom": "1.20.2" }, "peerDependencies": { "zod": "^3.21.0 || ^4.0.0" } }, "sha512-NMMmj1ND00s+AM9aFbNl15JI6VxNlvORYy4X7UbVM0kFsKIOP7pqU4TVKSVGTGKhOn1k2tnEieA0srVdgMe/CA=="],
 
@@ -1879,6 +1879,8 @@
     "@babel/helper-compilation-targets/semver": ["semver@6.3.1", "", { "bin": { "semver": "bin/semver.js" } }, "sha512-BR7VvDCVHO+q2xBEWskxS6DJE1qRnb7DxzUrogb71CWoSficBxYsiAGd+Kl0mmq/MprG9yArRkyrQxTO6XjMzA=="],
 
     "@babel/helper-create-class-features-plugin/semver": ["semver@6.3.1", "", { "bin": { "semver": "bin/semver.js" } }, "sha512-BR7VvDCVHO+q2xBEWskxS6DJE1qRnb7DxzUrogb71CWoSficBxYsiAGd+Kl0mmq/MprG9yArRkyrQxTO6XjMzA=="],
+
+    "@conform-to/zod/@conform-to/dom": ["@conform-to/dom@1.20.2", "", {}, "sha512-HfVb0XCHZijXODupqdV7+DrlZgJAYRQsXm/FpfFjKZO1P1S8LhlS7yMBTH2K5zkMyhk6fV/BvfUZi88Kp1EslA=="],
 
     "@cypress/xvfb/debug": ["debug@3.2.7", "", { "dependencies": { "ms": "^2.1.1" } }, "sha512-CFjzYYAi4ThfiQvizrFQevTTXHtnCqWfe7x1AhgEscTz6ZbLbfoLRLPugTQyBth6f8ZERVUSyWHFD/7Wu4t1XQ=="],
 
