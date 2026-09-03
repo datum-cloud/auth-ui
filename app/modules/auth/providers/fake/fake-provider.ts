@@ -77,6 +77,14 @@ interface LdapUserSeed {
 }
 
 interface Seed {
+  /**
+   * Seeded users. Together with `authMethods` these express the three account states the
+   * G7 enumeration suite must distinguish:
+   *   • fresh               — email absent from this list
+   *   • existing verified   — present, and listed in `authMethods` (a real account)
+   *   • existing unverified — present, `authMethods` empty (the factorless squatter)
+   * register() throws ALREADY_EXISTS for the latter two, identically.
+   */
   users?: User[];
   passwords?: Record<string, string>; // userId → plaintext password
   authMethods?: Record<string, AuthMethod[]>; // userId → list of methods
@@ -296,6 +304,15 @@ export class FakeAuthProvider implements AuthProvider {
   }
 
   async register(input: RegisterInput): Promise<User> {
+    // Zitadel rejects a duplicate login name with ALREADY_EXISTS, and the whole
+    // enumeration-safe register flow (runEnumerationSafeRegister) is built around catching
+    // exactly that code. Without this, no Cypress test can reach the duplicate branch — which
+    // is the branch G7 exists to protect. Case-insensitive: Zitadel login names are.
+    const taken = this.users.some(
+      (u) => u.loginName.toLowerCase() === input.email.toLowerCase()
+    );
+    if (taken) throw new ProviderError('ALREADY_EXISTS', 'login name already taken');
+
     const id = `user-${++this.seq}`;
     const user: User = {
       id,

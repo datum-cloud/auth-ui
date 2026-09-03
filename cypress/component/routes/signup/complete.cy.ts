@@ -13,21 +13,23 @@ import { callService } from '../../../support/node/call-service';
 
 describe('signup/complete — success path', () => {
   it('threads loginName and userId into the /setup/passkey redirect URL', () => {
+    // NOT alice@acme.test: that address is pre-seeded on the fake singleton (u1), and
+    // register() now rejects duplicates with ALREADY_EXISTS like the real provider (D-FAKE).
     callService({
       fn: 'signupCompleteLoader',
       provider: 'singleton',
       request: {
         url: 'http://localhost/id/signup/complete?next=passkey',
-        form: { registerEmail: 'alice@acme.test', firstName: 'Alice', lastName: 'Smith' },
+        form: { registerEmail: 'signup-fresh@acme.test', firstName: 'Alice', lastName: 'Smith' },
       },
     }).then((v) => {
       expect(v.response?.status).to.equal(302);
       const loc = v.response?.location ?? '';
       const url = new URL(loc, 'http://localhost');
       expect(url.pathname).to.equal('/setup/passkey');
-      expect(url.searchParams.get('loginName')).to.equal('alice@acme.test');
+      expect(url.searchParams.get('loginName')).to.equal('signup-fresh@acme.test');
       expect(url.searchParams.get('userId')).to.be.ok;
-      expect(v.response?.passkeyHint).to.equal('alice@acme.test');
+      expect(v.response?.passkeyHint).to.equal('signup-fresh@acme.test');
     });
   });
 });
