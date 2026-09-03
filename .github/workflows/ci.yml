@@ -25,14 +25,14 @@ env:
   CYPRESS_CACHE_FOLDER: ~/.cache/Cypress
 
 # Each job is self-sufficient: it restores the persistent bun *store* cache
-# (~/.bun/install/cache, which survives across runs) and runs its own
-# `bun install --frozen-lockfile`. We deliberately do NOT share node_modules
-# across jobs — a cache saved by the `install` job is not reliably visible to
-# needs-dependent jobs within the SAME run (GitHub Actions same-run cross-job
-# cache propagation gap), which previously left every downstream job with no
-# deps. With a warm store the per-job install is a few seconds; on a cold miss
-# it still produces a correct node_modules (just slower). The `install` job
-# warms the store once before the fan-out.
+# (~/.bun/install/cache, which survives across runs) and runs its own frozen
+# install via .github/scripts/install-deps.sh. We deliberately do NOT share
+# node_modules across jobs — a cache saved by the `install` job is not reliably
+# visible to needs-dependent jobs within the SAME run (GitHub Actions same-run
+# cross-job cache propagation gap), which previously left every downstream job
+# with no deps. With a warm store the per-job install is a few seconds; on a
+# cold miss it still produces a correct node_modules (just slower). The
+# `install` job warms the store once before the fan-out.
 
 jobs:
   install:
@@ -46,7 +46,7 @@ jobs:
         with:
           path: ${{ env.BUN_CACHE }}
           key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lock', '**/package.json') }}
-      - run: bun install --frozen-lockfile
+      - run: .github/scripts/install-deps.sh
 
   lint:
     name: Lint
@@ -60,7 +60,7 @@ jobs:
         with:
           path: ${{ env.BUN_CACHE }}
           key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lock', '**/package.json') }}
-      - run: bun install --frozen-lockfile
+      - run: .github/scripts/install-deps.sh
       - run: bun run lint:ci
 
   typecheck:
@@ -75,7 +75,7 @@ jobs:
         with:
           path: ${{ env.BUN_CACHE }}
           key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lock', '**/package.json') }}
-      - run: bun install --frozen-lockfile
+      - run: .github/scripts/install-deps.sh
       - run: bun run typecheck
       - run: bun run typecheck:cypress
 
@@ -95,7 +95,7 @@ jobs:
         with:
           path: ${{ env.BUN_CACHE }}
           key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lock', '**/package.json') }}
-      - run: bun install --frozen-lockfile
+      - run: .github/scripts/install-deps.sh
       - run: bunx cypress install
       - run: CYPRESS=true bunx cypress run --component
         env:
@@ -123,7 +123,7 @@ jobs:
         with:
           path: ${{ env.BUN_CACHE }}
           key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lock', '**/package.json') }}
-      - run: bun install --frozen-lockfile
+      - run: .github/scripts/install-deps.sh
       # Catches commits made with --no-verify that bypass the lefthook i18n hook.
       - run: bun run i18n:extract && bun run i18n:compile
         env:
@@ -142,7 +142,7 @@ jobs:
         with:
           path: ${{ env.BUN_CACHE }}
           key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lock', '**/package.json') }}
-      - run: bun install --frozen-lockfile
+      - run: .github/scripts/install-deps.sh
       - name: Dependency audit (blocking)
         # All known transitive vulns are REMEDIATED via package.json `overrides` (each
         # parent's declared range accepts the patched version):
@@ -187,7 +187,7 @@ jobs:
         with:
           path: ${{ env.BUN_CACHE }}
           key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lock', '**/package.json') }}
-      - run: bun install --frozen-lockfile
+      - run: .github/scripts/install-deps.sh
       - run: bun run build
       - run: bun run size
       - uses: actions/cache@27d5ce7f107fe9357f9df03efb73ab90386fccae # v5
@@ -213,7 +213,7 @@ jobs:
         with:
           path: ${{ env.BUN_CACHE }}
           key: ${{ runner.os }}-bun-${{ hashFiles('**/bun.lock', '**/package.json') }}
-      - run: bun install --frozen-lockfile
+      - run: .github/scripts/install-deps.sh
       - run: bunx cypress install
       - run: bun run test:e2e:fast
       - if: failure()
