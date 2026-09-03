@@ -259,6 +259,13 @@ export type ServiceFn =
   | 'resolveOrgProbe'
   // Hono /metrics route pinning test — unauthenticated GET returns 200 + metric name.
   | 'serverMetrics'
+  // ── verification-mail delivery client (Task 5) ────────────────────────────────
+  // Drives the REAL sendVerificationMail (app/server/infra/verification-mail.server.ts) against
+  // a local http listener the harness case starts itself. env.VERIFICATION_MAIL_URL is threaded
+  // via the generic `env` field below, applied BEFORE this module — and therefore env.server's
+  // load-time schema parse — loads (see run-scenario.ts). node:https is stubbed out of the Vite
+  // browser bundle by virtue of the `.server.ts` suffix, so this must run node-side.
+  | 'sendVerificationMail'
   // ── routes/login handlers (batch 13b) ────────────────────────────────────────
   // Login route loaders/actions are node-bound: they read a signed `sessions` cookie off a real
   // Request (Cookie header blocked by Fetch spec in the browser), and some need the signed
@@ -488,6 +495,7 @@ export interface Scenario {
     | 'register'
     | 'sendEmailCode'
     | 'resendEmailCode'
+    | 'resendEmailCodeWithUrl'
     | 'verifyEmail'
     | 'verifyInvite'
   >;
@@ -723,6 +731,17 @@ export interface Scenario {
     | 'zitadelNoThrow' // getAuthProvider({zitadel, serviceUrl}) constructs without throwing → { threw }
     | 'registryKeys' // Object.keys(providerRegistry).sort() → { keys }
     | 'fakeSingleton'; // providerRegistry.fake() x2 → { same }
+
+  // ── verification-mail client (fn: 'sendVerificationMail'; Task 5) ──────────
+  /** Input for the REAL sendVerificationMail. */
+  verificationMailInput?: { userId: string; code: string; returnTo: string };
+  /** Whether the harness starts a local HTTP listener on env.VERIFICATION_MAIL_URL's port before
+   *  calling sendVerificationMail. false/omitted exercises the "unreachable" contract — nothing
+   *  is listening, so the client must resolve `false` without throwing. */
+  verificationMailListen?: boolean;
+  /** Status code the local listener responds with when `verificationMailListen` is true. Default
+   *  200 (also captures the received method/content-type/body as outcome.received). */
+  verificationMailStatus?: number;
 }
 
 /** A parsed logAuthEvent JSON line: { event, outcome, ...fields }. */
@@ -772,4 +791,12 @@ export interface Verdict {
   calls?: Record<string, unknown[][]>;
   /** Provider state read back post-call (e.g. { isDeviceAuthorized: { 'dev-1': true } }). */
   inspect?: Record<string, unknown>;
+  /**
+   * Every POST body the REAL sendVerificationMail client sent during this scenario, captured by
+   * the generic verificationMailListen listener (Task 6 returnTo regression coverage) —
+   * populated whether sendVerificationMail was called directly (fn: 'sendVerificationMail') or
+   * indirectly from inside a signup service (registerEmailLinkSignup, registerWithPassword,
+   * resendIfSquatted). undefined when verificationMailListen was not set or nothing was posted.
+   */
+  verificationMailReceived?: Array<{ method?: string; contentType?: string; body?: unknown }>;
 }

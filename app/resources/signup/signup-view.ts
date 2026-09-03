@@ -14,7 +14,7 @@ export interface SignupView {
  * Pure settings→render-booleans for the signup identifier + method screens. Mirrors
  * resolveLoginView so the routes map these straight to JSX presence.
  *
- * @param requireEmailVerification - whether EMAIL_VERIFICATION env is on (true = default/prod).
+ * @param requireEmailVerification - whether AUTH_EMAIL_VERIFICATION_REQUIRED env is on (true = default/prod).
  *   When false (staging/no-delivery deployment), password signup can skip verification and
  *   complete without sending any email, so email entry is safe to show even without delivery.
  */

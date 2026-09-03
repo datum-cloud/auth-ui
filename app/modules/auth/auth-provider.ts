@@ -99,12 +99,30 @@ export interface RegisterInput {
    */
   verifyUrlTemplate?: string;
   /**
+   * When true, the provider does NOT send a verification email — it returns the plaintext
+   * code on the register result instead (Zitadel: AddHumanUserResponse.emailCode), so the
+   * caller can deliver it through its own pipeline. Takes precedence over verifyUrlTemplate
+   * (both request provider-side email verification; returnCode is the newer, self-delivery
+   * mechanism). Ignored when emailVerified is true.
+   */
+  returnCode?: boolean;
+  /**
    * When true, the user is created with an already-verified email (no verification
    * code is sent). Used on the IdP register path where the IdP has already vouched
-   * for the email address. Takes precedence over verifyUrlTemplate.
+   * for the email address. Takes precedence over verifyUrlTemplate and returnCode.
    */
   emailVerified?: boolean;
 }
+
+/**
+ * The result of `register()`. Almost always a plain `User`; `emailCode` is present ONLY when
+ * the input requested `returnCode: true` (and `emailVerified` was not set) — the plaintext
+ * email-verification code, returned in-band instead of being emailed by the provider, for
+ * the caller to deliver through its own pipeline.
+ *
+ * SECURITY: `emailCode` is a bearer credential — never log it.
+ */
+export type RegisterResult = User & { emailCode?: string };
 
 export interface AuthProvider {
   readonly capabilities: ProviderCapabilities;
@@ -135,7 +153,7 @@ export interface AuthProvider {
   findOrgByDomain(domain: string): Promise<{ orgId: string } | null>;
   getUser(id: string): Promise<User | null>;
   listAuthMethods(userId: string): Promise<AuthMethod[]>;
-  register(input: RegisterInput): Promise<User>; // P2
+  register(input: RegisterInput): Promise<RegisterResult>; // P2
 
   // session
   createSession(checks: SessionChecks, opts?: SessionOpts): Promise<Session>;
@@ -166,7 +184,19 @@ export interface AuthProvider {
   sendEmailCode(userId: string, urlTemplate: string): Promise<void>; // P2
   verifyEmail(userId: string, code: string): Promise<void>; // P2
   verifyInvite(userId: string, code: string): Promise<void>; // P2
-  resendEmailCode(userId: string, urlTemplate: string): Promise<void>; // P2
+  /**
+   * Resend the verification email via provider-sent mail (sendCode delivery) — the provider
+   * emails a link back to `urlTemplate`. Renamed from `resendEmailCode` so that name is free
+   * for the returnCode-delivery variant below.
+   */
+  resendEmailCodeWithUrl(userId: string, urlTemplate: string): Promise<void>; // P2
+  /**
+   * Resend the verification email via returnCode delivery: the provider does NOT send mail —
+   * it returns the plaintext code so the caller can deliver it through its own pipeline.
+   *
+   * SECURITY: the returned code is a bearer credential — never log it.
+   */
+  resendEmailCode(userId: string): Promise<string>;
 
   // protocol (oidc / saml)
   getAuthRequest(kind: 'oidc' | 'saml', requestId: string): Promise<AuthRequest>;

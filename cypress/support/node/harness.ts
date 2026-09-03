@@ -149,6 +149,7 @@ import { loader as verifyIndexLoader, action as verifyIndexAction } from '@/rout
 import { providerForRequest } from '@/server/composition';
 import { getCsrfToken, loaderCsrf, assertCsrf, assertCsrfWith } from '@/server/csrf';
 import { _envSchema } from '@/server/infra/env.server';
+import { sendVerificationMail } from '@/server/infra/verification-mail.server';
 import {
   loginPasswordRateLimit,
   webauthnVerifyRateLimit,
@@ -173,6 +174,7 @@ import { getOrCreateFingerprintId, userAgentFromRequest } from '@/server/user-ag
 import { SessionService } from '@zitadel/proto/zitadel/session/v2/session_service_pb';
 import { Hono } from 'hono';
 import { readFileSync } from 'node:fs';
+import { createServer } from 'node:http';
 import { join } from 'node:path';
 import { createCookie } from 'react-router';
 
@@ -444,9 +446,12 @@ function buildProvider(s: Scenario): FakeAuthProvider {
   }
   if (s.failResendEmailCode) {
     const code = s.failResendEmailCode as ConstructorParameters<typeof ProviderError>[0];
-    provider.resendEmailCode = (async () => {
+    // verify.service.ts's resend flow calls resendEmailCodeWithUrl (sendCode delivery) — patch
+    // THAT method, not the returnCode-delivery resendEmailCode, so the scripted failure
+    // actually intercepts the call this scenario flag is meant to simulate failing.
+    provider.resendEmailCodeWithUrl = (async () => {
       throw new ProviderError(code, `scripted resendEmailCode ${String(code)}`);
-    }) as FakeAuthProvider['resendEmailCode'];
+    }) as FakeAuthProvider['resendEmailCodeWithUrl'];
   }
   if (s.failVerifyEmail) {
     const code = s.failVerifyEmail as ConstructorParameters<typeof ProviderError>[0];
@@ -627,6 +632,45 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
 
   // Pre-Task-10 cases always supply request; Task-10 cases build their own requests internally.
   const sr = s.request ?? { url: '' };
+
+  // ── verification-mail delivery capture (generic — Task 6 returnTo regression coverage) ──────
+  // Any scenario can opt in via `verificationMailListen` to start a local HTTP listener on
+  // VERIFICATION_MAIL_URL's port BEFORE the scenario runs, capturing every POST body the REAL
+  // sendVerificationMail client sends — regardless of which `fn` triggers it: a direct
+  // 'sendVerificationMail' call (below), or an INDIRECT one from inside a signup service
+  // (registerEmailLinkSignup, registerWithPassword, resendIfSquatted) that imports and calls it
+  // itself. This is what closes the "nothing asserts on the built returnTo" gap — a scenario can
+  // assert on the returned `verificationMailReceived[]` instead of only on the boolean
+  // sendVerificationMail resolves. Was previously wired ONLY inside the 'sendVerificationMail'
+  // case itself (case-local, single-shot); generalized here so it captures across ANY fn.
+  let verificationMailServer: ReturnType<typeof createServer> | undefined;
+  const verificationMailReceived: Array<{
+    method?: string;
+    contentType?: string;
+    body?: unknown;
+  }> = [];
+  if (s.verificationMailListen) {
+    const port = Number(new URL(process.env.VERIFICATION_MAIL_URL ?? '').port);
+    verificationMailServer = createServer((req, res) => {
+      let raw = '';
+      req.on('data', (chunk) => {
+        raw += chunk;
+      });
+      req.on('end', () => {
+        verificationMailReceived.push({
+          method: req.method,
+          contentType: req.headers['content-type'],
+          body: raw ? JSON.parse(raw) : undefined,
+        });
+        res.writeHead(s.verificationMailStatus ?? 200, { 'content-type': 'application/json' });
+        res.end('{}');
+      });
+    });
+    await new Promise<void>((res2, rej2) => {
+      verificationMailServer?.once('error', rej2);
+      verificationMailServer?.listen(port, '127.0.0.1', () => res2());
+    });
+  }
 
   try {
     switch (s.fn) {
@@ -2397,15 +2441,33 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
 
       // ── Task 11 migrations ───────────────────────────────────────────────────────
       // env.server._envSchema comprehensive validation: takes parseEnvRaw, runs the REAL Zod
-      // schema (not the Vite browser stub), and returns full { success, data?, issues? }.
+      // schema (not the Vite browser stub), and returns full { success, data?, issues?, warnings }.
       case 'envSchemaFull': {
-        const result = _envSchema.safeParse(s.parseEnvRaw ?? {});
+        // The AUTH_EMAIL_VERIFICATION_REQUIRED resolution warns via console.warn on the deprecated
+        // EMAIL_VERIFICATION-only path. Intercept it here (scoped to this case, restored in the
+        // finally below) so specs can assert presence/absence without a real startup log to read.
+        const capturedWarnings: string[] = [];
+        const originalWarn = console.warn;
+        console.warn = (...args: unknown[]) => {
+          capturedWarnings.push(args.map((a) => (typeof a === 'string' ? a : String(a))).join(' '));
+        };
+        let result: ReturnType<typeof _envSchema.safeParse>;
+        try {
+          result = _envSchema.safeParse(s.parseEnvRaw ?? {});
+        } finally {
+          console.warn = originalWarn;
+        }
         if (result.success) {
-          outcome = { success: true, data: result.data as unknown as Record<string, unknown> };
+          outcome = {
+            success: true,
+            data: result.data as unknown as Record<string, unknown>,
+            warnings: capturedWarnings,
+          };
         } else {
           outcome = {
             success: false,
             issues: result.error.issues.map((i) => ({ path: i.path, message: i.message })),
+            warnings: capturedWarnings,
           };
         }
         break;
@@ -2433,6 +2495,20 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
           status: res.status,
           containsMetric: body.includes('auth_events_total'),
         };
+        break;
+      }
+
+      // ── verification-mail delivery client (Task 5) ──────────────────────────────────────────────
+      // Drives the REAL sendVerificationMail. The listener (when verificationMailListen is true)
+      // is now started generically above this switch, so every fn can share it; this case just
+      // reads back the first captured POST for backward-compat with existing single-call specs.
+      // verificationMailListen=false (the default) leaves nothing listening on that port,
+      // exercising the "unreachable" contract.
+      case 'sendVerificationMail': {
+        const result = await sendVerificationMail(
+          s.verificationMailInput ?? { userId: '', code: '', returnTo: '' }
+        );
+        outcome = { result, received: verificationMailReceived[0] };
         break;
       }
 
@@ -3099,6 +3175,9 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
   } finally {
     // eslint-disable-next-line no-console -- restore the intercepted audit sink
     console.log = originalLog;
+    if (verificationMailServer) {
+      await new Promise<void>((res2) => verificationMailServer?.close(() => res2()));
+    }
   }
 
   // Provider state read-back (e.g. isDeviceAuthorized).
@@ -3175,5 +3254,8 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
     auditLines,
     calls: s.recordCalls?.length ? calls : undefined,
     inspect: Object.keys(inspect).length ? inspect : undefined,
+    verificationMailReceived: verificationMailReceived.length
+      ? verificationMailReceived
+      : undefined,
   };
 }

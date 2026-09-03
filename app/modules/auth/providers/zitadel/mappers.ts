@@ -427,6 +427,10 @@ export function toRegisterRequest(input: RegisterInput): {
       }
     | {
         email: string;
+        verification: { case: 'returnCode'; value: Record<string, never> };
+      }
+    | {
+        email: string;
         verification: { case: 'isVerified'; value: true };
       };
   organization?: { org: { case: 'orgId'; value: string } };
@@ -434,18 +438,25 @@ export function toRegisterRequest(input: RegisterInput): {
     | { case: 'password'; value: { password: string; changeRequired: boolean } }
     | { case: undefined; value?: undefined };
 } {
-  // Priority: emailVerified > verifyUrlTemplate > plain (Zitadel default sends mail).
+  // Priority: emailVerified > returnCode > verifyUrlTemplate > plain (Zitadel default sends mail).
+  // returnCode: Zitadel does NOT send mail — it returns the plaintext code on the response
+  // (AddHumanUserResponse.emailCode; see toRegisterResult below) so the caller can deliver it
+  // through its own pipeline. Additive: existing callers that never set `returnCode` are
+  // unaffected — this branch is opt-in per the OTP-challenge returnCode precedent above
+  // (toChallengeRequest / toSessionChallenges).
   const emailField: ReturnType<typeof toRegisterRequest>['email'] = input.emailVerified
     ? { email: input.email, verification: { case: 'isVerified' as const, value: true as const } }
-    : input.verifyUrlTemplate
-      ? {
-          email: input.email,
-          verification: {
-            case: 'sendCode' as const,
-            value: { urlTemplate: input.verifyUrlTemplate },
-          },
-        }
-      : { email: input.email };
+    : input.returnCode
+      ? { email: input.email, verification: { case: 'returnCode' as const, value: {} } }
+      : input.verifyUrlTemplate
+        ? {
+            email: input.email,
+            verification: {
+              case: 'sendCode' as const,
+              value: { urlTemplate: input.verifyUrlTemplate },
+            },
+          }
+        : { email: input.email };
 
   return {
     profile: { givenName: input.firstName, familyName: input.lastName },
@@ -456,6 +467,28 @@ export function toRegisterRequest(input: RegisterInput): {
     passwordType: input.password
       ? { case: 'password' as const, value: { password: input.password, changeRequired: false } }
       : { case: undefined },
+  };
+}
+
+// Maps the AddHumanUserResponse to the neutral register result. `emailCode` is present ONLY
+// when the request used `email.verification.case === 'returnCode'` (see toRegisterRequest
+// above) — for sendCode/isVerified/plain requests Zitadel omits the field and this mapper
+// omits it too, matching the OTP-challenge convention (toSessionChallenges) of surfacing a
+// returnCode field only when Zitadel actually returned one.
+//
+// SECURITY: emailCode is a bearer credential (the plaintext email-verification code) —
+// callers must never log it, and this value must stay on the server-only auth-ui client.
+//
+// Wired into `user.ts`'s register(), which spreads `emailCode` (when present) onto the
+// AuthProvider.register() result (see auth-provider.ts's RegisterResult = User & { emailCode?
+// }). FakeAuthProvider.register() mirrors the same presence condition for parity.
+export function toRegisterResult(resp: { userId: string; emailCode?: string }): {
+  userId: string;
+  emailCode?: string;
+} {
+  return {
+    userId: resp.userId,
+    ...(resp.emailCode ? { emailCode: resp.emailCode } : {}),
   };
 }
 

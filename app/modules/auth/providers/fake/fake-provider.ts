@@ -1,6 +1,7 @@
 import type {
   AuthProvider,
   RegisterInput,
+  RegisterResult,
   SessionChecks,
   SessionOpts,
 } from '@/modules/auth/auth-provider';
@@ -303,7 +304,7 @@ export class FakeAuthProvider implements AuthProvider {
     return [...new Set<AuthMethod>([...seeded, ...dynamic])];
   }
 
-  async register(input: RegisterInput): Promise<User> {
+  async register(input: RegisterInput): Promise<RegisterResult> {
     // Zitadel rejects a duplicate login name with ALREADY_EXISTS, and the whole
     // enumeration-safe register flow (runEnumerationSafeRegister) is built around catching
     // exactly that code. Without this, no Cypress test can reach the duplicate branch — which
@@ -321,8 +322,12 @@ export class FakeAuthProvider implements AuthProvider {
     this.users = [...this.users, user];
     // When emailVerified:true the user is created already-verified (IdP register path).
     this.emailVerified.set(id, input.emailVerified === true);
-    this.emailCodes.set(id, `email-${id}`);
-    return user;
+    const code = `email-${id}`;
+    this.emailCodes.set(id, code);
+    // Mirrors the zitadel provider's toRegisterRequest priority (emailVerified > returnCode
+    // > verifyUrlTemplate > plain): emailCode is surfaced only for the returnCode path, never
+    // when emailVerified short-circuits it.
+    return input.returnCode && !input.emailVerified ? { ...user, emailCode: code } : user;
   }
 
   // ─── password ────────────────────────────────────────────────────────────────
@@ -362,9 +367,16 @@ export class FakeAuthProvider implements AuthProvider {
     return this.verifyEmail(userId, code);
   }
 
-  async resendEmailCode(userId: string, _urlTemplate: string): Promise<void> {
+  async resendEmailCodeWithUrl(userId: string, _urlTemplate: string): Promise<void> {
     if (this.emailVerified.get(userId)) throw new ProviderError('ALREADY_DONE', 'already verified');
     this.emailCodes.set(userId, `email-resend-${userId}`);
+  }
+
+  async resendEmailCode(userId: string): Promise<string> {
+    if (this.emailVerified.get(userId)) throw new ProviderError('ALREADY_DONE', 'already verified');
+    const code = `email-resend-${userId}`;
+    this.emailCodes.set(userId, code);
+    return code;
   }
 
   async markEmailVerified(userId: string): Promise<void> {
