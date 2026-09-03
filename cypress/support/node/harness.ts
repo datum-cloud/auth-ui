@@ -77,11 +77,11 @@ import { resolveOrg } from '@/resources/shared/resolve-org';
 // ── signup / verify services (batch 8e) ──
 import {
   registerAndLinkIdp,
-  registerPasskeyFirst,
   registerWithPassword,
   registerEmailLinkSignup,
   completeEmailLinkSignup,
 } from '@/resources/signup';
+import { allowResend, _resetResendLimiterForTests } from '@/resources/signup/signup-resend-limit';
 import {
   processIdpCallback,
   submitLdapCredentials,
@@ -940,20 +940,42 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
         });
         break;
       }
-      case 'registerPasskeyFirst': {
-        if (!s.signupInput) throw new Error('registerPasskeyFirst requires signupInput');
+      case 'allowResend': {
+        // Each callService spawns a fresh Bun process, so limiter state starts clean; the
+        // reset is a belt-and-braces guard against that process model ever changing.
+        _resetResendLimiterForTests();
+        const verdicts: boolean[] = [];
+        for (const c of s.resendChecks ?? []) {
+          verdicts.push(await allowResend(c.email, c.nowMs));
+        }
+        outcome = verdicts;
+        break;
+      }
+      case 'registerEmailLinkSignupTwice': {
+        // D-RL: both submissions must share one process, or the module-level rate limiter
+        // can never fire (every callService is a fresh Bun process).
+        if (!s.signupInput) throw new Error('registerEmailLinkSignupTwice requires signupInput');
         const i = s.signupInput;
-        outcome = await registerPasskeyFirst(provider, buildSessionEntries(sr.sessions), {
+        const signupInput = {
           email: i.email,
           firstName: i.firstName,
           lastName: i.lastName,
           organization: i.organization,
           requestId: i.requestId,
-          requireVerification: i.requireVerification ?? false,
           origin: i.origin ?? 'https://auth.datum.net',
           deviceTrackingToken: i.deviceTrackingToken,
-          userAgent: i.userAgent as never,
-        });
+        };
+        const first = await registerEmailLinkSignup(
+          provider,
+          buildSessionEntries(sr.sessions),
+          signupInput
+        );
+        const second = await registerEmailLinkSignup(
+          provider,
+          buildSessionEntries(sr.sessions),
+          signupInput
+        );
+        outcome = [first, second];
         break;
       }
       case 'registerEmailLinkSignup': {

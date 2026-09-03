@@ -49,17 +49,6 @@ describe('register paths — default-org resolution on bare flow (no organizatio
       },
     ],
     [
-      'registerPasskeyFirst',
-      '/signup',
-      {
-        email: 'passkey-bare@test.com',
-        firstName: 'Passkey',
-        lastName: 'Bare',
-        requireVerification: false,
-        origin: ORIGIN,
-      },
-    ],
-    [
       'registerWithPassword',
       '/signup/password',
       {
@@ -142,6 +131,81 @@ describe('registerEmailLinkSignup', () => {
         // Enumeration-safe: identical shape as a fresh signup.
         expect(dupeOutcome.kind).to.eq('sent');
         expect(dupeOutcome.email).to.eq('dupe@x.com');
+      });
+    });
+  });
+
+  // ── D-RL: resend-if-squatted, behind the per-address rate limit ─────────────
+  //
+  // Inherited bug: an unverified factorless account occupies its email forever — the real
+  // owner's later signup hits ALREADY_EXISTS → silent drop → they can never sign up. The fix
+  // resends verification when the squatting account is factorless; a REAL account (any auth
+  // method) gets nothing; a rate-limited resend is silently skipped. All three return the
+  // identical generic result — only the side effect (sendEmailCode) varies.
+  describe('resend-if-squatted (D-RL)', () => {
+    const squatSeed = { users: [{ id: 'u-1', loginName: 'squat@b.test', displayName: 'Sq' }] };
+    const input = {
+      email: 'squat@b.test',
+      firstName: 'A',
+      lastName: 'B',
+      origin: 'https://auth.test',
+    };
+
+    it('resends verification when the existing account is unverified and factorless', () => {
+      run({
+        fn: 'registerEmailLinkSignup',
+        request: { url: `${BASE_URL}/signup` },
+        provider: 'fresh',
+        seed: squatSeed,
+        signupInput: input,
+        recordCalls: ['sendEmailCode'],
+      }).then((v) => {
+        expect(v.ok, v.error ?? '').to.be.true;
+        expect(v.outcome).to.deep.equal({ kind: 'sent', email: 'squat@b.test' });
+        const sends = (v.calls?.['sendEmailCode'] ?? []) as Array<[string, string]>;
+        expect(sends.length, 'one resend to the squatting account').to.equal(1);
+        expect(sends[0][0]).to.equal('u-1');
+      });
+    });
+
+    it('stays silent when the existing account is real (has an auth method)', () => {
+      run({
+        fn: 'registerEmailLinkSignup',
+        request: { url: `${BASE_URL}/signup` },
+        provider: 'fresh',
+        seed: {
+          users: [{ id: 'u-1', loginName: 'real@b.test', displayName: 'R' }],
+          authMethods: { 'u-1': ['passkey'] },
+        },
+        signupInput: { ...input, email: 'real@b.test' },
+        recordCalls: ['sendEmailCode'],
+      }).then((v) => {
+        expect(v.ok, v.error ?? '').to.be.true;
+        expect(v.outcome).to.deep.equal({ kind: 'sent', email: 'real@b.test' });
+        expect((v.calls?.['sendEmailCode'] ?? []).length, 'no resend to a real account').to.equal(
+          0
+        );
+      });
+    });
+
+    it('returns the identical result when the resend is rate-limited (side effect diverges, response does not)', () => {
+      // BOTH submissions run inside ONE scenario/process: every callService spawns a fresh
+      // Bun process, so a cross-call test would silently reset the module-level limiter and
+      // prove nothing.
+      run({
+        fn: 'registerEmailLinkSignupTwice',
+        request: { url: `${BASE_URL}/signup` },
+        provider: 'fresh',
+        seed: squatSeed,
+        signupInput: input,
+        recordCalls: ['sendEmailCode'],
+      }).then((v) => {
+        expect(v.ok, v.error ?? '').to.be.true;
+        const [first, second] = v.outcome as [unknown, unknown];
+        // Exactly ONE send across both submissions — the second was rate-limited...
+        expect((v.calls?.['sendEmailCode'] ?? []).length).to.equal(1);
+        // ...and its response is indistinguishable from the first.
+        expect(second).to.deep.equal(first);
       });
     });
   });
@@ -248,15 +312,14 @@ describe('registerWithPassword — verification skip (requireVerification=false)
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Audit-event divergence guard
+// registerWithPassword — session metadata + audit-event shape
 //
-// registerPasskeyFirst and registerWithPassword share most of their flow BUT emit
-// DIFFERENT audit on the no-verification success path — the merge must NOT collapse:
-//   passkey-first  no-verify success → 'signup.requested' { actor, organization }
+// (Phase B: registerPasskeyFirst and its 'signup.requested' divergence leg were retired
+// with the intent collapse; the password path's audit shape is what remains to pin.)
 //   with-password  no-verify success → 'signup.created'   { userId, actor }
 // ─────────────────────────────────────────────────────────────────────────────
 
-describe('registerWithPassword / registerPasskeyFirst — session metadata + audit-event shape (divergence guard)', () => {
+describe('registerWithPassword — session metadata + audit-event shape', () => {
   const base = {
     email: 'dave@acme.test',
     firstName: 'Dave',
@@ -264,7 +327,7 @@ describe('registerWithPassword / registerPasskeyFirst — session metadata + aud
     origin: ORIGIN,
   };
 
-  it('forwards deviceTrackingToken as MaxMind session metadata; passkey-first no-verify success emits signup.requested while password no-verify success emits signup.created', () => {
+  it('forwards deviceTrackingToken as MaxMind session metadata; password no-verify success emits signup.created', () => {
     run({
       fn: 'registerWithPassword',
       request: { url: `${BASE_URL}/signup/password` },
@@ -290,27 +353,9 @@ describe('registerWithPassword / registerPasskeyFirst — session metadata + aud
       expect(opts?.userId).to.be.a('string').and.not.be.empty;
     });
 
-    run({
-      fn: 'registerPasskeyFirst',
-      request: { url: `${BASE_URL}/signup` },
-      provider: 'singleton',
-      signupInput: { ...base, organization: 'org-z', requireVerification: false },
-    }).then((verdict) => {
-      expect(verdict.ok, verdict.error ?? '').to.be.true;
-      const r = verdict.outcome as Record<string, unknown>;
-      expect(r.kind).to.eq('redirect');
-
-      // The passkey path uses 'signup.requested', NOT 'signup.created'.
-      const created = verdict.audit.find((e) => e.event === 'signup.created');
-      expect(created, 'should NOT emit signup.created').to.be.undefined;
-
-      const requested = verdict.audit.find((e) => e.event === 'signup.requested');
-      expect(requested?.outcome).to.eq('success');
-      expect(requested?.organization).to.eq('org-z');
-      expect(requested).to.have.property('actor');
-      expect(requested).to.not.have.property('userId');
-    });
-
+    // Phase B: the registerPasskeyFirst leg of this divergence guard was DELETED, not
+    // adapted — the passkey intent now routes through registerEmailLinkSignup, so the
+    // 'signup.requested'-with-organization audit shape it pinned no longer exists.
     run({
       fn: 'registerWithPassword',
       request: { url: `${BASE_URL}/signup/password` },

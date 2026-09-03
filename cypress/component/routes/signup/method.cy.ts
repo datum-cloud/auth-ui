@@ -34,6 +34,47 @@ describe('signup/method action — email-link', () => {
   });
 });
 
+// ── Action: passkey ≡ email-link (Phase B collapse) ───────────────────────────
+
+describe('signup/method action — passkey collapses into email-link (Phase B)', () => {
+  it('passkey intent returns the same generic response as email-link', () => {
+    callService({
+      fn: 'signupMethodAction',
+      seed: {},
+      env: { AUTH_EMAIL_DELIVERY_ENABLED: 'true' },
+      request: {
+        url: 'http://localhost/id/signup/method',
+        form: { intent: 'passkey', loginName: 'fresh@b.test', firstName: 'A', lastName: 'B' },
+        csrf: true,
+      },
+    }).then((pk) => {
+      callService({
+        fn: 'signupMethodAction',
+        seed: {},
+        env: { AUTH_EMAIL_DELIVERY_ENABLED: 'true' },
+        request: {
+          url: 'http://localhost/id/signup/method',
+          form: { intent: 'email-link', loginName: 'other@b.test', firstName: 'A', lastName: 'B' },
+          csrf: true,
+        },
+      }).then((link) => {
+        // Same shape entirely: data status, body modulo the submitted address, cookies.
+        expect(pk.response?.isResponse, 'passkey returns data, not a redirect').to.equal(
+          link.response?.isResponse
+        );
+        expect(pk.response?.dataStatus ?? 200).to.equal(link.response?.dataStatus ?? 200);
+        const pkBody = JSON.stringify(pk.response?.dataBody ?? {}).replace('fresh@b.test', '<a>');
+        const linkBody = JSON.stringify(link.response?.dataBody ?? {}).replace(
+          'other@b.test',
+          '<a>'
+        );
+        expect(pkBody).to.equal(linkBody);
+        expect(pk.response?.setCookies ?? []).to.deep.equal(link.response?.setCookies ?? []);
+      });
+    });
+  });
+});
+
 // ── Action: password ──────────────────────────────────────────────────────────
 
 describe('signup/method action — password', () => {

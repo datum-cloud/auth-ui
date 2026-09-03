@@ -205,8 +205,13 @@ export type ServiceFn =
   // vi.mock('@/server/observability') makes audit-shape assertions impossible in the browser bundle
   // (observability is stubbed to a no-op). Real audit runs in Bun node-side.
   | 'registerWithPassword'
-  | 'registerPasskeyFirst'
+  // D-RL: replay an ordered list of resendChecks through the real allowResend (node-side —
+  // the browser bundle stubs hashActor to '', collapsing every address into one key).
+  | 'allowResend'
   | 'registerEmailLinkSignup'
+  // D-RL rate-limit proof: the SAME signupInput submitted twice in one process, so the
+  // module-level limiter can actually fire; outcome is [first, second].
+  | 'registerEmailLinkSignupTwice'
   | 'registerAndLinkIdp'
   | 'completeEmailLinkSignup'
   // ── verify service (batch 8e) ──
@@ -505,7 +510,12 @@ export interface Scenario {
     cookieSessions?: boolean;
   };
   // ── signup service inputs (batch 8e) ────────────────────────────────────────────────────────
-  /** Input struct for the signup service functions (registerWithPassword, registerPasskeyFirst,
+  /** Ordered (email, nowMs) checks replayed through the real allowResend (fn: 'allowResend').
+   *  Outcome is boolean[] verdicts. Every callService spawns a fresh Bun process, so limiter
+   *  state is naturally per-scenario — which is also why the rate-limit service test must run
+   *  both submissions inside ONE scenario (fn: 'registerEmailLinkSignupTwice'). */
+  resendChecks?: Array<{ email: string; nowMs: number }>;
+  /** Input struct for the signup service functions (registerWithPassword,
    *  registerEmailLinkSignup, registerAndLinkIdp, completeEmailLinkSignup). */
   signupInput?: {
     email: string;

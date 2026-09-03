@@ -280,8 +280,10 @@ describe('ZitadelAuthProvider — passkey metadata best-effort scopes', () => {
   // in the removal email. The SAME resolved name must reach both the Zitadel passkeyName
   // field and the metadata JSON.
   it('stamps enroll metadata as JSON carrying the resolved passkey name', async () => {
-    const metaCalls: Array<{ userId: string; metadata: Array<{ key: string; value: Uint8Array }> }> =
-      [];
+    const metaCalls: Array<{
+      userId: string;
+      metadata: Array<{ key: string; value: Uint8Array }>;
+    }> = [];
     const verifySpy = cy.stub().resolves({});
     stubClient({
       verifyPasskeyRegistration: verifySpy,

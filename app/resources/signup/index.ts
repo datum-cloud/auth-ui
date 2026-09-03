@@ -2,7 +2,6 @@
 export {
   registerAndLinkIdp,
   passwordFirstHandoff,
-  registerPasskeyFirst,
   registerWithPassword,
   registerEmailLinkSignup,
   completeEmailLinkSignup,

@@ -3,15 +3,11 @@ import { AuthCeremony } from '@/components/auth-ceremony/auth-ceremony';
 import { AuthFormFields } from '@/components/auth-form/auth-form-fields';
 import { IdentityBadge } from '@/components/identity-badge/identity-badge';
 import { useAuthActionError } from '@/hooks/use-auth-action-error';
-import { readSessions, serializeSessions } from '@/modules/auth/session/cookie';
+import { readSessions } from '@/modules/auth/session/cookie';
 import { MaxMindTracker, syncMaxMindTokenToRef } from '@/modules/fraud/maxmind-tracker';
 import { genericCheckYourEmail } from '@/resources/schemas/check-your-email.schema';
 import { resolveOrg } from '@/resources/shared/resolve-org';
-import {
-  passwordFirstHandoff,
-  registerPasskeyFirst,
-  registerEmailLinkSignup,
-} from '@/resources/signup';
+import { passwordFirstHandoff, registerEmailLinkSignup } from '@/resources/signup';
 import { resolveSignupView } from '@/resources/signup/signup-view';
 import { signupMethodSchema } from '@/resources/signup/signup.schema';
 import { paths } from '@/routes/paths';
@@ -20,7 +16,6 @@ import { loaderCsrf, assertCsrf } from '@/server/csrf';
 import { requireEmailVerification } from '@/server/env';
 import { trustedAppOrigin } from '@/server/infra/app-origin.server';
 import { env } from '@/server/infra/env.server';
-import { getOrCreateFingerprintId, userAgentFromRequest } from '@/server/user-agent';
 import { actionError } from '@/utils/errors/auth-error';
 import { Button } from '@datum-cloud/datum-ui/button';
 import { Trans } from '@lingui/react/macro';
@@ -110,7 +105,14 @@ export async function action({ request }: ActionFunctionArgs) {
     return data({ error: 'INVALID_INPUT' as const }, { status: 400 });
   }
 
-  if (intent === 'email-link') {
+  // Phase B: `passkey` and `email-link` are the same flow. Both send one verification mail
+  // whose link lands on /signup/complete?...&next=passkey (the template hardcodes next —
+  // see verify-url-template.ts), and the passkey nudge happens THERE, after the address is
+  // proven. The retired passkey branch minted a factorless placeholder session BEFORE any
+  // ceremony; verification-first makes that unreachable. One register path, one response
+  // shape — which is what makes G7 holdable. The fingerprint cookie is likewise minted on
+  // the verification-link hop (complete.tsx), the only place a session is created now.
+  if (intent === 'email-link' || intent === 'passkey') {
     if (!env.AUTH_EMAIL_DELIVERY_ENABLED)
       return data({ error: 'INVALID_INPUT' as const }, { status: 400 });
     try {
@@ -124,55 +126,6 @@ export async function action({ request }: ActionFunctionArgs) {
         deviceTrackingToken,
       });
       return genericCheckYourEmail(result.email);
-    } catch (err) {
-      return actionError(err);
-    }
-  }
-
-  if (intent === 'passkey') {
-    try {
-      // Hoist session read so both the service call and the 'sent' fallback use the
-      // same snapshot. Also ensure a fingerprintId cookie exists for this browser:
-      // brand-new users arrive here without one, and the minted id must feed the
-      // userAgent so the first session already carries a stable fingerprint.
-      const sessions = await readSessions(request);
-      const [fingerprintId, fpCookie] = getOrCreateFingerprintId(request);
-      const result = await registerPasskeyFirst(provider, sessions, {
-        email: loginName,
-        firstName,
-        lastName,
-        organization,
-        requestId,
-        deviceTrackingToken,
-        userAgent: userAgentFromRequest(request, fingerprintId),
-        // A passkey proves device possession, not email ownership. When verification is REQUIRED,
-        // a brand-new email gets the 'sent-with-session' result below (→ "Check your email") and an
-        // existing email returns the enumeration-safe 'sent', indistinguishable from a new one.
-        // EMAIL_VERIFICATION is OFF by default (opt-in) — when off, this routes straight to
-        // /setup/passkey via the 'redirect' branch, minting a FACTORLESS placeholder session that
-        // only becomes an authenticated login once the WebAuthn ceremony completes (mirrors the old
-        // auth-ui /passkey/set wizard: pre-ceremony session carries no verified factor).
-        requireVerification: requireEmailVerification(),
-        origin: trustedAppOrigin(request),
-      });
-
-      if (result.kind === 'sent') {
-        // Enumeration defence (#16): emit a Set-Cookie on the duplicate-email path too so
-        // the presence of Set-Cookie cannot distinguish a fresh address from an existing one.
-        // We re-serialize the caller's unchanged session list (no new sessions were created).
-        const headers = new Headers({ 'set-cookie': await serializeSessions(sessions) });
-        if (fpCookie) headers.append('set-cookie', fpCookie);
-        return data({ sent: true as const, email: result.email }, { status: 200, headers });
-      }
-      if (result.kind === 'sent-with-session') {
-        const headers = new Headers({ 'set-cookie': await serializeSessions(result.sessions) });
-        if (fpCookie) headers.append('set-cookie', fpCookie);
-        return data({ sent: true as const, email: result.email }, { status: 200, headers });
-      }
-      // kind === 'redirect'
-      const headers = new Headers({ 'set-cookie': await serializeSessions(result.sessions) });
-      if (fpCookie) headers.append('set-cookie', fpCookie);
-      return redirect(result.target, { headers });
     } catch (err) {
       return actionError(err);
     }

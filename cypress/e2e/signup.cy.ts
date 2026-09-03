@@ -26,6 +26,20 @@ describe('signup → check your email', () => {
   });
 });
 
+// Phase B (D-B2d/G3): the verification-link hop — the landing site the collapsed passkey
+// intent depends on. The emailed link is /signup/complete?code=…&userId=…&next=passkey
+// (verify-url-template.ts hardcodes next); following it must verify the address, mint the
+// session, and land on /setup/passkey. Driven with the seeded u1 and its deterministic
+// pending code (`email-u1`) because the e2e environment may run with delivery off — the
+// submit half of the journey is covered by the password-route journey above and by the
+// component-level method/parity suites, which run with delivery on.
+describe('signup complete link → passkey setup', () => {
+  it('follows the verification link and lands on /setup/passkey', () => {
+    cy.visit('/id/signup/complete?code=email-u1&userId=u1&next=passkey');
+    cy.location('pathname').should('include', '/setup/passkey');
+  });
+});
+
 describe('verify email → success', () => {
   it('issues a code on load and verifies it', () => {
     // The seeded user u1 has a deterministic pending code (`email-u1`) set at fake

@@ -159,7 +159,7 @@ msgid "Change your password"
 msgstr "Change your password"
 
 #: app/routes/password/reset.tsx:109
-#: app/routes/signup/method.tsx:288
+#: app/routes/signup/method.tsx:242
 #: app/routes/signup/password.tsx:184
 msgid "Check your email"
 msgstr "Check your email"
@@ -286,7 +286,7 @@ msgstr "Email me a code"
 #: app/routes/login/index.tsx:567
 #: app/routes/login/index.tsx:577
 #: app/routes/login/method.tsx:411
-#: app/routes/signup/method.tsx:339
+#: app/routes/signup/method.tsx:293
 msgid "Email me a sign-in link"
 msgstr "Email me a sign-in link"
 
@@ -355,7 +355,7 @@ msgstr "Enter your password"
 msgid "Enter your SMS code"
 msgstr "Enter your SMS code"
 
-#: app/routes/signup/method.tsx:315
+#: app/routes/signup/method.tsx:269
 msgid "Finish creating your account"
 msgstr "Finish creating your account"
 
@@ -626,7 +626,7 @@ msgstr "Service temporarily unavailable. Please try again."
 msgid "Session active"
 msgstr "Session active"
 
-#: app/routes/signup/method.tsx:377
+#: app/routes/signup/method.tsx:331
 #: app/routes/signup/password.tsx:199
 msgid "Set a password"
 msgstr "Set a password"
@@ -719,7 +719,7 @@ msgstr "Signing in as"
 msgid "Signing in as <0>{loginName}</0>."
 msgstr "Signing in as <0>{loginName}</0>."
 
-#: app/routes/signup/method.tsx:319
+#: app/routes/signup/method.tsx:273
 #: app/routes/signup/password.tsx:203
 msgid "Signing up as"
 msgstr "Signing up as"
@@ -859,7 +859,7 @@ msgstr "Unlink"
 msgid "Unlink {providerLabel}?"
 msgstr "Unlink {providerLabel}?"
 
-#: app/routes/signup/method.tsx:358
+#: app/routes/signup/method.tsx:312
 msgid "Use a passkey"
 msgstr "Use a passkey"
 
@@ -938,7 +938,7 @@ msgstr "We've sent a password reset link to <0>{0}</0>"
 
 #. placeholder {0}: (actionData as { email: string }).email
 #. placeholder {0}: actionData.email
-#: app/routes/signup/method.tsx:290
+#: app/routes/signup/method.tsx:244
 #: app/routes/signup/password.tsx:186
 msgid "We've sent a verification link to <0>{0}</0>"
 msgstr "We've sent a verification link to <0>{0}</0>"

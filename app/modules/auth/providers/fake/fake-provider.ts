@@ -308,9 +308,7 @@ export class FakeAuthProvider implements AuthProvider {
     // enumeration-safe register flow (runEnumerationSafeRegister) is built around catching
     // exactly that code. Without this, no Cypress test can reach the duplicate branch — which
     // is the branch G7 exists to protect. Case-insensitive: Zitadel login names are.
-    const taken = this.users.some(
-      (u) => u.loginName.toLowerCase() === input.email.toLowerCase()
-    );
+    const taken = this.users.some((u) => u.loginName.toLowerCase() === input.email.toLowerCase());
     if (taken) throw new ProviderError('ALREADY_EXISTS', 'login name already taken');
 
     const id = `user-${++this.seq}`;
