@@ -78,36 +78,47 @@ describe('env schema — PUBLIC_ORIGIN (verification-link origin; anti Host-head
   });
 });
 
-// ── EMAIL_VERIFICATION (default false; 'true'/'1' coercion, mirroring delivery) ──
-// Phase B promotes this out of a raw process.env read (app/server/env.ts). The coercion
-// mirrors AUTH_EMAIL_DELIVERY_ENABLED exactly — same mechanism, neighbouring flag.
+// ── EMAIL_VERIFICATION (INVERSE polarity: default true, fail-closed) ───────────
+// Phase B promotes this out of a raw process.env read (app/server/env.ts) AND reverses its
+// default. It deliberately does NOT mirror AUTH_EMAIL_DELIVERY_ENABLED: delivery is
+// permissive-off, this is fail-closed-on, because verification-off makes signup pass
+// emailVerified:true and mint accounts on addresses nobody proved they own. Polarity here
+// matches AUTH_PASSKEY_DISCOVERY_ENABLED, the repo's other inverse flag.
 
-describe('env schema — EMAIL_VERIFICATION (default false)', () => {
-  it("defaults to false, coerces 'true' and '1' to true, and treats any other value as false", () => {
+describe('env schema — EMAIL_VERIFICATION (fail-closed, default true)', () => {
+  it("defaults to true when unset, and only an explicit 'false'/'0' disables it", () => {
+    // The security-critical case: a MISSING var must not silently skip verification.
     callService({ fn: 'envSchemaFull', parseEnvRaw: { ...BASE } }).then((v) => {
-      expect((v.outcome.data as Record<string, unknown>).EMAIL_VERIFICATION).to.equal(false);
+      expect(
+        (v.outcome.data as Record<string, unknown>).EMAIL_VERIFICATION,
+        'unset must FAIL CLOSED to required'
+      ).to.equal(true);
     });
 
-    callService({
-      fn: 'envSchemaFull',
-      parseEnvRaw: { ...BASE, EMAIL_VERIFICATION: 'true' },
-    }).then((v) => {
-      expect((v.outcome.data as Record<string, unknown>).EMAIL_VERIFICATION).to.equal(true);
-    });
+    for (const raw of ['false', '0']) {
+      callService({
+        fn: 'envSchemaFull',
+        parseEnvRaw: { ...BASE, EMAIL_VERIFICATION: raw },
+      }).then((v) => {
+        expect(
+          (v.outcome.data as Record<string, unknown>).EMAIL_VERIFICATION,
+          `explicit '${raw}' opts out`
+        ).to.equal(false);
+      });
+    }
 
-    callService({
-      fn: 'envSchemaFull',
-      parseEnvRaw: { ...BASE, EMAIL_VERIFICATION: '1' },
-    }).then((v) => {
-      expect((v.outcome.data as Record<string, unknown>).EMAIL_VERIFICATION).to.equal(true);
-    });
-
-    callService({
-      fn: 'envSchemaFull',
-      parseEnvRaw: { ...BASE, EMAIL_VERIFICATION: 'yes' },
-    }).then((v) => {
-      expect((v.outcome.data as Record<string, unknown>).EMAIL_VERIFICATION).to.equal(false);
-    });
+    // Anything else — including a typo'd opt-out — stays SAFE rather than silently disabling.
+    for (const raw of ['true', '1', 'yes', 'FALSE', '']) {
+      callService({
+        fn: 'envSchemaFull',
+        parseEnvRaw: { ...BASE, EMAIL_VERIFICATION: raw },
+      }).then((v) => {
+        expect(
+          (v.outcome.data as Record<string, unknown>).EMAIL_VERIFICATION,
+          `'${raw}' must not disable verification`
+        ).to.equal(true);
+      });
+    }
   });
 });
 

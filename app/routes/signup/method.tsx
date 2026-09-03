@@ -3,7 +3,6 @@ import { AuthCeremony } from '@/components/auth-ceremony/auth-ceremony';
 import { AuthFormFields } from '@/components/auth-form/auth-form-fields';
 import { IdentityBadge } from '@/components/identity-badge/identity-badge';
 import { useAuthActionError } from '@/hooks/use-auth-action-error';
-import { readSessions } from '@/modules/auth/session/cookie';
 import { MaxMindTracker, syncMaxMindTokenToRef } from '@/modules/fraud/maxmind-tracker';
 import { genericCheckYourEmail } from '@/resources/schemas/check-your-email.schema';
 import { resolveOrg } from '@/resources/shared/resolve-org';
@@ -116,14 +115,16 @@ export async function action({ request }: ActionFunctionArgs) {
     if (!env.AUTH_EMAIL_DELIVERY_ENABLED)
       return data({ error: 'INVALID_INPUT' as const }, { status: 400 });
     try {
-      const result = await registerEmailLinkSignup(provider, await readSessions(request), {
+      // No session list and no deviceTrackingToken: this path mints NO session, so there is
+      // nothing to attach fraud metadata to. Both are captured on the verification-link hop
+      // (/signup/complete), which is the only place a session is created now.
+      const result = await registerEmailLinkSignup(provider, {
         email: loginName,
         firstName,
         lastName,
         organization,
         requestId,
         origin: trustedAppOrigin(request),
-        deviceTrackingToken,
       });
       return genericCheckYourEmail(result.email);
     } catch (err) {

@@ -389,6 +389,12 @@ export const REQUIRED_EVENTS = [
   // --- Registration / verification ---
   'signup.requested',
   'signup.created',
+  // signup_verification_resent: verification mail re-sent to an UNVERIFIED, factorless account
+  // whose address a new signup collided with (the squatting fix). snake_case per the P5+
+  // convention for NEW events — the dot-case siblings above are frozen Phase 4 names.
+  // Emitted success AND failure from resendIfSquatted; the HTTP response is identical either
+  // way, so this log is the only place the side effect is observable.
+  'signup_verification_resent',
   'email.verified',
   'invite.verified',
   // --- Rate limiting (emitted by middleware, not routes — present in observability layer) ---

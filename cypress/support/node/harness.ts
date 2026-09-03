@@ -963,32 +963,22 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
           organization: i.organization,
           requestId: i.requestId,
           origin: i.origin ?? 'https://auth.datum.net',
-          deviceTrackingToken: i.deviceTrackingToken,
         };
-        const first = await registerEmailLinkSignup(
-          provider,
-          buildSessionEntries(sr.sessions),
-          signupInput
-        );
-        const second = await registerEmailLinkSignup(
-          provider,
-          buildSessionEntries(sr.sessions),
-          signupInput
-        );
+        const first = await registerEmailLinkSignup(provider, signupInput);
+        const second = await registerEmailLinkSignup(provider, signupInput);
         outcome = [first, second];
         break;
       }
       case 'registerEmailLinkSignup': {
         if (!s.signupInput) throw new Error('registerEmailLinkSignup requires signupInput');
         const i = s.signupInput;
-        outcome = await registerEmailLinkSignup(provider, buildSessionEntries(sr.sessions), {
+        outcome = await registerEmailLinkSignup(provider, {
           email: i.email,
           firstName: i.firstName,
           lastName: i.lastName,
           organization: i.organization,
           requestId: i.requestId,
           origin: i.origin ?? 'https://auth.datum.net',
-          deviceTrackingToken: i.deviceTrackingToken,
         });
         break;
       }

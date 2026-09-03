@@ -1,10 +1,10 @@
 // app/resources/signup/signup.service.ts
 //
 // Pass 2 extraction: the action BUSINESS logic for the signup domain — the
-// register-and-link (IdP) compose, the password-first hand-off, the passkey-first
-// register, and the password-set register, each with their enumeration-safe
-// ALREADY_EXISTS handling and post-register routing. React rendering, CSRF, the
-// final redirect()/data() wiring and cookie serialization stay in the route modules.
+// register-and-link (IdP) compose, the password-first hand-off, the passwordless email-link
+// register, and the password-set register, each with their enumeration-safe ALREADY_EXISTS
+// handling and post-register routing. React rendering, CSRF, the final redirect()/data()
+// wiring and cookie serialization stay in the route modules.
 //
 // Each function takes a provider + plain inputs (already parsed/validated by the
 // route's schema) + the caller's current session list, and returns a typed result
@@ -218,17 +218,20 @@ async function retryOnceIfNotFound<T>(
 }
 
 /**
- * Shared enumeration-safe register flow for the passkey-first and with-password
- * paths. Both share: the createSession → addSession wiring, the require-verification
- * success/ALREADY_EXISTS audits (identical 'signup.requested'), and the
- * no-verification ALREADY_EXISTS audit. They DIVERGE on:
- *   - `register`: the provider.register call (passkey-first omits password and only
- *     attaches verifyUrlTemplate when verification is required; with-password always
- *     passes a password + verifyUrlTemplate).
- *   - `hasPassword`: feeds postRegisterStep.
- *   - `noVerifySuccessAudit`: the no-verification success path emits DIFFERENT audit
- *     — passkey-first 'signup.requested'{actor,organization}, with-password
- *     'signup.created'{userId,actor(loginName)}. Parameterized, never collapsed.
+ * Enumeration-safe register flow for the with-password path (/signup/password).
+ *
+ * Kept as a named function rather than folded into its single caller: it holds the
+ * read-after-write retry wiring and the ALREADY_EXISTS parity contract, which are the parts
+ * that have to stay readable and separately testable.
+ *
+ * HISTORY — this was parameterized for TWO callers. The passkey-first path was retired in
+ * Phase B (the passkey intent now routes through registerEmailLinkSignup), so `hasPassword`
+ * and `noVerifySuccessAudit` were dropped: with one caller they were constants dressed as
+ * config. `register` stays a callback because the caller picks between two different
+ * provider.register payloads depending on requireVerification.
+ *
+ * The ALREADY_EXISTS branch returns the IDENTICAL response to the success branch when
+ * verification is required, so a duplicate email is indistinguishable from a fresh signup.
  */
 async function runEnumerationSafeRegister(
   provider: AuthProvider,
@@ -240,9 +243,7 @@ async function runEnumerationSafeRegister(
     deviceTrackingToken?: string;
     userAgent?: SessionOpts['userAgent'];
     requireVerification: boolean;
-    hasPassword: boolean;
     register: () => Promise<RegisteredUser>;
-    noVerifySuccessAudit: (user: RegisteredUser) => void;
   }
 ): Promise<SignupSentWithSessionResult | SignupSentResult | SignupRedirectResult> {
   const { email, organization, requestId, deviceTrackingToken, userAgent } = cfg;
@@ -285,17 +286,22 @@ async function runEnumerationSafeRegister(
   try {
     const user = await retryOnceIfNotFound(() => cfg.register());
     const sessions = await retryOnceIfNotFound(() => persistSession(user));
-    // Audit shape DIVERGES per path — parameterized, never collapsed to one event.
-    cfg.noVerifySuccessAudit(user);
+    // 'signup.created' (NOT 'signup.requested'), carrying userId and hashing loginName. This
+    // was a caller-supplied callback while the passkey-first path emitted a different event;
+    // that path is gone, so the one remaining shape is written out here directly.
+    logAuthEvent('signup.created', 'success', {
+      userId: user.id,
+      actor: hashActor(user.loginName),
+    });
     // Fired server-side (not the client trackAuthEvent) because this path redirects the
     // browser straight to postRegisterStep's target without ever rendering the
     // "Check your email" page that carries the client-side TrackOnMount.
     trackServerEvent('signup_submitted', {
       userId: user.id,
-      properties: { channel: cfg.hasPassword ? 'password' : 'passkey' },
+      properties: { channel: 'password' },
     });
     const target = postRegisterStep({
-      hasPassword: cfg.hasPassword,
+      hasPassword: true,
       emailVerified: false,
       requireVerification: false,
       loginName: user.loginName,
@@ -341,13 +347,10 @@ export type RegisterWithPasswordResult =
   SignupSentWithSessionResult | SignupSentResult | SignupRedirectResult;
 
 /**
- * /signup/password register: register with a password, then apply enumeration-safe
- * handling. Mirrors registerPasskeyFirst but always passes a password and uses the
- * `hasPassword: true` postRegisterStep when verification is off.
- *
- * Shared enumeration-safe registration: the success path and the ALREADY_EXISTS
- * path return the IDENTICAL response when verification is required, so a duplicate
- * email is indistinguishable from a fresh signup.
+ * /signup/password register: register with a password, then apply enumeration-safe handling
+ * via runEnumerationSafeRegister — the success path and the ALREADY_EXISTS path return the
+ * IDENTICAL response when verification is required, so a duplicate email is indistinguishable
+ * from a fresh signup.
  */
 export async function registerWithPassword(
   provider: AuthProvider,
@@ -369,7 +372,6 @@ export async function registerWithPassword(
     deviceTrackingToken: input.deviceTrackingToken,
     userAgent: input.userAgent,
     requireVerification: input.requireVerification,
-    hasPassword: true,
     // When verification is skipped (EMAIL_VERIFICATION=false on staging): pass emailVerified:true
     // so Zitadel marks the email verified in-place and sends nothing. Omit verifyUrlTemplate
     // entirely — passing it alongside emailVerified is redundant and risks triggering the sendCode
@@ -400,12 +402,6 @@ export async function registerWithPassword(
             // emailVerified:true → Zitadel marks verified immediately, sends no email.
             emailVerified: true,
           }),
-    // Distinct audit from the passkey path: 'signup.created' carrying userId, hashing loginName.
-    noVerifySuccessAudit: (user) =>
-      logAuthEvent('signup.created', 'success', {
-        userId: user.id,
-        actor: hashActor(user.loginName),
-      }),
   });
 }
 
@@ -424,8 +420,6 @@ export interface EmailLinkSignupInput {
    * Host-header email-link injection.
    */
   origin: string;
-  /** MaxMind device-fingerprint token captured client-side (unused in the sessionless path, reserved for future use). */
-  deviceTrackingToken?: string;
 }
 
 /**
@@ -436,9 +430,12 @@ export interface EmailLinkSignupInput {
  * silently discarded — the caller receives the IDENTICAL generic "sent" result
  * as a fresh signup, so account existence is not detectable.
  */
+// No SessionEntry[] parameter, unlike its sibling register functions: this path deliberately
+// creates NO session. The address is unproven until the emailed link is clicked, so the only
+// place a session is minted is /signup/complete. Taking a session list here would invite a
+// caller to assume otherwise.
 export async function registerEmailLinkSignup(
   provider: AuthProvider,
-  _list: SessionEntry[],
   input: EmailLinkSignupInput
 ): Promise<SignupSentResult> {
   const { email, firstName, lastName, organization, requestId, origin } = input;
@@ -484,10 +481,23 @@ async function resendIfSquatted(
     if (methods.length > 0) return; // a real account — stay silent
     if (!(await allowResend(email))) return; // mail-bombing guard — silent skip
     await provider.sendEmailCode(user.id, signupCompleteUrlTemplate(link));
-  } catch {
-    // Swallowed on purpose: this is a best-effort side effect on an already-generic response
-    // path. An error here must never change what the caller returns, or it becomes the
-    // enumeration oracle this whole function exists to avoid.
+    // Audited under its OWN event, not the shared signup.requested. This dispatches mail to an
+    // address the submitter has not proven they own — a security-relevant outbound action that
+    // has to be attributable on its own. Safe for enumeration: the audit log is server-side
+    // only and never reaches the caller. Parity is a property of the RESPONSE, not the log.
+    logAuthEvent('signup_verification_resent', 'success', { actor: hashActor(email) });
+  } catch (error) {
+    // The RESULT is swallowed on purpose: this is a best-effort side effect on an already-
+    // generic response path, and letting an error change what the caller returns would create
+    // the enumeration oracle this whole function exists to avoid.
+    //
+    // The FAILURE is still audited. Total silence made a broken resend indistinguishable from a
+    // deliberate skip, so an outage stranding every squatted address would be invisible to
+    // operators. This audit is likewise server-side and cannot leak into the response.
+    logAuthEvent('signup_verification_resent', 'failure', {
+      actor: hashActor(email),
+      reason: error instanceof ProviderError ? error.code : 'UNKNOWN',
+    });
   }
 }
 

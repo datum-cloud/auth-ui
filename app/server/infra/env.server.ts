@@ -86,14 +86,25 @@ const schema = z
       .transform((v) => v === 'true' || v === '1'),
     // Whether email VERIFICATION is required before a signup can complete. Distinct from
     // AUTH_EMAIL_DELIVERY_ENABLED (which says whether mail can be sent at all): an environment
-    // can have delivery wired and still skip verification. Unset => OFF, matching the legacy
-    // default this replaces (was a raw process.env read in app/server/env.ts).
+    // can have delivery wired and still skip verification.
+    //
+    // FAIL-CLOSED: unset => ON. Requiring proof of address ownership is the SAFE state, and the
+    // unsafe direction is not a mere nuisance — with verification off, registerWithPassword
+    // passes emailVerified:true, so a missing env var silently mints accounts on addresses
+    // nobody proved they own. Per the repo convention only explicitly-safe defaults may use the
+    // permissive `v === 'true'` form; this one inverts it, so ONLY an explicit 'false'/'0'
+    // skips verification. Deployments that genuinely skip it (no-delivery staging) must opt out
+    // in writing — see EMAIL_VERIFICATION in .env.example.
+    //
+    // NOTE: this REVERSES the legacy default (a raw process.env read in app/server/env.ts that
+    // treated unset as off). Any environment relying on unset must now set
+    // EMAIL_VERIFICATION=false explicitly.
     // Phase B: deleted entirely after the B4 production flip, along with every
     // `requireVerification: false` branch it keeps alive.
     EMAIL_VERIFICATION: z
       .string()
       .optional()
-      .transform((v) => v === 'true' || v === '1'),
+      .transform((v) => v !== 'false' && v !== '0'),
     // Operational kill switch for the usernameless discovery entry points (the /login
     // loader's identity-challenge arm and the /login/passkey-discover action). Default ON
     // — unset keeps the feature live; ONLY the explicit strings 'false'/'0' disable it.

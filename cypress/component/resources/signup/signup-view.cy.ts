@@ -68,17 +68,17 @@ describe('resolveSignupView', () => {
     ],
     [
       // RED→GREEN: before the fix allowEmailEntry was true when delivery was off. With
-      // delivery off the email ENTRY path must hide so signup is IdP-only. showPasskey
-      // stays true (Phase B decoupling): passkey display no longer implies an email send
-      // of its own — the passkey intent routes through the email-link path, whose mail
-      // requirement is allowEmailEntry's to enforce, not showPasskey's.
-      'delivery off hides the email path but not the passkey flag (Phase B decoupling)',
+      // delivery off the email ENTRY path must hide so signup is IdP-only. showPasskey goes
+      // with it: the passkey intent routes through the email-link path, so it inherits
+      // showEmailLink's delivery requirement exactly — the route action 400s intent=passkey
+      // whenever AUTH_EMAIL_DELIVERY_ENABLED is off.
+      'delivery off hides the entire email path, passkey included',
       [base, idps, false, true],
       {
         showIdpButtons: true,
         allowEmailEntry: false,
         showEmailLink: false,
-        showPasskey: true,
+        showPasskey: false,
         showPassword: false,
         signupUnavailable: false,
       },
@@ -136,12 +136,29 @@ describe('resolveSignupView', () => {
     ],
     [
       // base has allowPassword:false and passkeysType:'allowed' — even with verification
-      // not required, no method can complete without delivery, so email entry stays
-      // hidden. showPasskey stays true (Phase B decoupling): display is policy-only;
-      // delivery gating belongs to allowEmailEntry and the server-side delivery guard.
-      'no password, delivery off (email entry hidden, passkey flag policy-only)',
+      // not required, no method can complete without delivery, so email entry stays hidden.
+      // showPasskey is gated on delivery: the passkey intent IS the email-link flow and the
+      // route action 400s it without delivery, so the button must not render either.
+      'no password, delivery off (email entry and passkey both hidden)',
       [base, [], false, false],
-      { allowEmailEntry: false, showPasskey: true },
+      { allowEmailEntry: false, showPasskey: false },
+    ],
+    [
+      // REGRESSION GUARD — the one combination where allowEmailEntry and showEmailLink
+      // DISAGREE, and therefore the only one that can produce a dead passkey button.
+      // Password signup completes with no mail, so email entry shows and the user reaches
+      // /signup/method; but intent=passkey needs AUTH_EMAIL_DELIVERY_ENABLED, and the action
+      // rejects it with 400. Gating showPasskey on policy alone renders a button whose only
+      // possible outcome is a generic error. This is also the CURRENT production flag state
+      // (EMAIL_VERIFICATION and AUTH_EMAIL_DELIVERY_ENABLED both off), not a hypothetical.
+      'password + no verification + delivery off: user reaches /signup/method, passkey hidden',
+      [
+        { ...base, allowPassword: true, allowExternalIdp: false } as LoginSettings,
+        [],
+        false,
+        false,
+      ],
+      { allowEmailEntry: true, showEmailLink: false, showPasskey: false, showPassword: true },
     ],
     [
       // allowEmailEntry is true in this case → signup is not unavailable.

@@ -53,11 +53,20 @@ export function resolveSignupView(
   // showEmailLink stays false without delivery even when allowEmailEntry is true.
   const showEmailLink = allowEmailEntry && emailDeliveryEnabled;
 
-  // Passkey signup no longer implies an email send of its own: Phase B routes the passkey
-  // intent through the email-link path, so its mail requirement is exactly allowEmailEntry's.
-  // Gating on delivery a second time here would hide passkey on a delivery-off environment
-  // where email entry is nonetheless shown (password + verification-off staging).
-  const showPasskey = settings.passkeysType === 'allowed';
+  // Passkey signup IS the email-link flow now (the passkey intent registers and sends the same
+  // verification mail; the nudge happens on /signup/complete), so it needs DELIVERY — and this
+  // flag mirrors the route action's guard exactly: policy + AUTH_EMAIL_DELIVERY_ENABLED.
+  //
+  // Deliberately NOT gated on allowEmailEntry, which is looser: that is true without delivery on
+  // a password + verification-off deployment, because password signup completes with no mail at
+  // all. The passkey intent cannot — the action rejects it with 400 INVALID_INPUT whenever
+  // delivery is off (routes/signup/method.tsx) — so gating on policy alone would render a button
+  // whose only possible outcome is a generic error.
+  //
+  // Also deliberately NOT gated on showEmailLink, which is TIGHTER: under disableLoginWithEmail
+  // the email-link button hides but the action still accepts intent=passkey, so borrowing that
+  // gate would hide a button that works. Match the guard, nothing more.
+  const showPasskey = settings.passkeysType === 'allowed' && emailDeliveryEnabled;
 
   return {
     showIdpButtons,
