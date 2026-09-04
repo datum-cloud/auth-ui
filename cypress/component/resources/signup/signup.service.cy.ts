@@ -172,7 +172,11 @@ describe('registerEmailLinkSignup', () => {
       });
     });
 
-    it('stays silent when the existing account is real (has an auth method)', () => {
+    // A real account (any auth method enrolled) now DISCLOSES rather than staying silent: the
+    // caller surfaces 409 ALREADY_EXISTS, so a returning user is told instead of waiting for mail
+    // that was never sent. Deliberate narrowing of the enumeration guarantee — see
+    // enumeration-parity-signup.cy.ts. The squatted case above must stay generic regardless.
+    it('discloses when the existing account is real (has an auth method), and sends no mail', () => {
       run({
         fn: 'registerEmailLinkSignup',
         request: { url: `${BASE_URL}/signup` },
@@ -184,8 +188,8 @@ describe('registerEmailLinkSignup', () => {
         signupInput: { ...input, email: 'real@b.test' },
         recordCalls: ['resendEmailCodeWithUrl'],
       }).then((v) => {
-        expect(v.ok, v.error ?? '').to.be.true;
-        expect(v.outcome).to.deep.equal({ kind: 'sent', email: 'real@b.test' });
+        expect(v.ok, 'ALREADY_EXISTS propagates to the caller').to.be.false;
+        expect(String(v.error ?? '')).to.contain('already exists');
         expect(
           (v.calls?.['resendEmailCodeWithUrl'] ?? []).length,
           'no resend to a real account'

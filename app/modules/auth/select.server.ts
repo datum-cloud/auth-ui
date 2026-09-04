@@ -49,6 +49,17 @@ function makeFake(): FakeAuthProvider {
       // e2e seed: passkey naming journey — dedicated so enrollments never contaminate
       // the nofactor/mfa-skip ordering-sensitive fixtures.
       { id: 'u22', loginName: 'namer@acme.test', displayName: 'Namer' },
+      // e2e seed: signup → code-entry journey — a "squatted" address (present here but with
+      // NO entry in authMethods below, i.e. the factorless account documented on the Seed
+      // type above). Signing up with this address hits ALREADY_EXISTS, resendIfSquatted sees
+      // zero auth methods and resends rather than disclosing, and the generic "check your
+      // email" terminal renders. A brand-new address would ALSO reach that terminal, but its
+      // code is `email-<generatedId>` and the test has no way to learn that id; an ENROLLED
+      // seeded address (e.g. u1) short-circuits to 409 before the terminal ever renders. This
+      // squatter is the only fixture shape that reaches the terminal with a code the test can
+      // predict up front (`email-resend-u23` after the resend — see fake-provider.ts's
+      // resendEmailCode).
+      { id: 'u23', loginName: 'squatter@acme.test', displayName: 'Squatter' },
     ],
     // dev/e2e journey seed: without authMethods the /login action routes to /verify
     passwords: {

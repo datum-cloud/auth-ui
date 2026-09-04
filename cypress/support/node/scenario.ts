@@ -23,6 +23,8 @@ export type ProviderErrorCode =
 /** The FakeAuthProvider constructor seed, narrowed to the JSON-serializable subset the ported
  *  specs actually use. Mirrors the real `Seed` shape (see fake-provider.ts). */
 export interface ScenarioSeed {
+  /** Rotate session tokens on updateSession like real Zitadel (see FakeAuthProvider Seed). */
+  rotateSessionTokens?: boolean;
   users?: Array<{ id: string; loginName: string; displayName?: string; orgId?: string }>;
   passwords?: Record<string, string>;
   authMethods?: Record<string, string[]>;
@@ -68,6 +70,18 @@ export interface LiveSessionSeed {
   id: string;
   token: string;
   user?: { id: string; loginName: string; displayName?: string };
+  /**
+   * Which authentication factors the seeded session carries, all stamped verified.
+   * Defaults to ['password'] — the historical behavior, a fully authenticated session.
+   *
+   * Exists so a scenario can express a session that is NOT primary-authenticated. The signup
+   * flow mints exactly that: otpEmail alone, which `primaryFresh` does not count as a primary
+   * factor. Without this seam a spec could only seed "authenticated" or "dead", and the case
+   * that actually matters — alive but factor-incomplete — was unreachable.
+   */
+  factorKinds?: Array<
+    'password' | 'passkey' | 'idpIntent' | 'totp' | 'otpEmail' | 'otpSms' | 'u2f'
+  >;
 }
 
 /** A cookie entry the harness signs into a real `sessions` cookie via the REAL cookie module. */
@@ -299,6 +313,7 @@ export type ServiceFn =
   | 'deviceCompleteLoader'
   | 'deviceIndexLoader'
   | 'signupCompleteLoader'
+  | 'signupSuccessLoader'
   | 'signupMethodLoader'
   | 'signupMethodAction'
   | 'signupPasswordLoader'
@@ -758,7 +773,7 @@ export interface SerializedResponse {
   location?: string | null;
   setCookie?: string | null;
   /** Entries parsed back out of the `sessions` Set-Cookie (node-only HMAC round-trip). */
-  cookieEntries?: Array<{ id: string }> | null;
+  cookieEntries?: Array<{ id: string; loginName?: string; organization?: string }> | null;
   /** Every Set-Cookie header value (undici getSetCookie) — for multi-cookie responses. */
   setCookies?: string[];
   /** Parsed `last-used-login` token (e.g. `idp:<idpId>`), or null when absent. */
@@ -789,6 +804,14 @@ export interface Verdict {
   auditLines: string[];
   /** Recorded provider call args, keyed by method name. */
   calls?: Record<string, unknown[][]>;
+  /**
+   * Wall-clock milliseconds the dispatched `fn` took, measured INSIDE the node runner so the
+   * cy.task IPC round-trip is not counted. Intended only as a LOWER bound for constant-time
+   * assertions ("this branch waited for the deadline"): sleeps overshoot but never undershoot, so
+   * `at.least(floor)` is stable. Comparing two runs' elapsed times to each other would be flaky —
+   * don't.
+   */
+  elapsedMs?: number;
   /** Provider state read back post-call (e.g. { isDeviceAuthorized: { 'dev-1': true } }). */
   inspect?: Record<string, unknown>;
   /**

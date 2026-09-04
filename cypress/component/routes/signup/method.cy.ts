@@ -1,9 +1,11 @@
 // cypress/component/routes/signup/method.cy.ts
 //
 // cy.task port of app/routes/signup/__tests__/method.test.tsx.
-// Covers the signup/method action fan-out: email-link and password intents.
-// (passkey intent shares the same genericCheckYourEmail shape as email-link;
-// loader param-threading and input validation are covered structurally elsewhere.)
+// Covers the signup/method action, which is passkey-only: one register path, one response shape.
+//
+// It previously fanned out over three intents. 'email-link' and 'passkey' ran BYTE-IDENTICAL
+// bodies (two buttons, one behavior) and 'password' handed off to /signup/password; the screen
+// now offers passkey alone, and signupMethodSchema rejects the other two at the parse boundary.
 import { callService } from '../../../support/node/call-service';
 
 const IDENTITY = {
@@ -12,9 +14,9 @@ const IDENTITY = {
   lastName: 'Doe',
 };
 
-// ── Action: email-link ────────────────────────────────────────────────────────
+// ── Action: passkey (the only intent) ─────────────────────────────────────────
 
-describe('signup/method action — email-link', () => {
+describe('signup/method action — passkey', () => {
   it('returns sent=true with status 200 (genericCheckYourEmail)', () => {
     callService({
       fn: 'signupMethodAction',
@@ -22,7 +24,7 @@ describe('signup/method action — email-link', () => {
       env: { AUTH_EMAIL_DELIVERY_ENABLED: 'true' },
       request: {
         url: 'http://localhost/id/signup/method',
-        form: { intent: 'email-link', ...IDENTITY },
+        form: { intent: 'passkey', ...IDENTITY },
         csrf: true,
       },
     }).then((v) => {
@@ -34,67 +36,29 @@ describe('signup/method action — email-link', () => {
   });
 });
 
-// ── Action: passkey ≡ email-link (Phase B collapse) ───────────────────────────
-
-describe('signup/method action — passkey collapses into email-link (Phase B)', () => {
-  it('passkey intent returns the same generic response as email-link', () => {
-    callService({
-      fn: 'signupMethodAction',
-      seed: {},
-      env: { AUTH_EMAIL_DELIVERY_ENABLED: 'true' },
-      request: {
-        url: 'http://localhost/id/signup/method',
-        form: { intent: 'passkey', loginName: 'fresh@b.test', firstName: 'A', lastName: 'B' },
-        csrf: true,
-      },
-    }).then((pk) => {
+// ── Action: retired intents are rejected server-side ──────────────────────────
+//
+// The buttons are gone from the screen, but hiding a control is display-only. These assert the
+// ENFORCEMENT half: a hand-crafted POST — or a form cached in a tab opened before the change —
+// cannot reach a path signup no longer offers. Both fail closed at signupMethodSchema, so
+// neither registers an account nor hands off to /signup/password.
+describe('signup/method action — retired intents fail closed', () => {
+  for (const intent of ['email-link', 'password'] as const) {
+    it(`rejects intent=${intent} with 400 INVALID_INPUT and no redirect`, () => {
       callService({
         fn: 'signupMethodAction',
-        seed: {},
+        provider: 'singleton',
         env: { AUTH_EMAIL_DELIVERY_ENABLED: 'true' },
         request: {
           url: 'http://localhost/id/signup/method',
-          form: { intent: 'email-link', loginName: 'other@b.test', firstName: 'A', lastName: 'B' },
+          form: { intent, ...IDENTITY },
           csrf: true,
         },
-      }).then((link) => {
-        // Same shape entirely: data status, body modulo the submitted address, cookies.
-        expect(pk.response?.isResponse, 'passkey returns data, not a redirect').to.equal(
-          link.response?.isResponse
-        );
-        expect(pk.response?.dataStatus ?? 200).to.equal(link.response?.dataStatus ?? 200);
-        const pkBody = JSON.stringify(pk.response?.dataBody ?? {}).replace('fresh@b.test', '<a>');
-        const linkBody = JSON.stringify(link.response?.dataBody ?? {}).replace(
-          'other@b.test',
-          '<a>'
-        );
-        expect(pkBody).to.equal(linkBody);
-        expect(pk.response?.setCookies ?? []).to.deep.equal(link.response?.setCookies ?? []);
+      }).then((v) => {
+        expect(v.response?.isResponse, `${intent}: must not redirect`).to.equal(false);
+        expect(v.response?.dataStatus, intent).to.equal(400);
+        expect(v.response?.dataBody, intent).to.have.property('error', 'INVALID_INPUT');
       });
     });
-  });
-});
-
-// ── Action: password ──────────────────────────────────────────────────────────
-
-describe('signup/method action — password', () => {
-  it('redirects to /signup/password with identity params (302)', () => {
-    callService({
-      fn: 'signupMethodAction',
-      provider: 'singleton',
-      request: {
-        url: 'http://localhost/id/signup/method',
-        form: { intent: 'password', ...IDENTITY },
-        csrf: true,
-      },
-    }).then((v) => {
-      expect(v.response?.isResponse).to.equal(true);
-      expect(v.response?.status).to.equal(302);
-      const loc = v.response?.location ?? '';
-      expect(loc).to.include('/signup/password');
-      expect(loc).to.include('loginName=john.doe%40example.com');
-      expect(loc).to.include('firstName=John');
-      expect(loc).to.include('lastName=Doe');
-    });
-  });
+  }
 });

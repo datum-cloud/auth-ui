@@ -11,7 +11,7 @@ describe('signup identifier & method schemas', () => {
 
     expect(
       signupMethodSchema.safeParse({
-        intent: 'email-link',
+        intent: 'passkey',
         loginName: 'a@b.com',
         firstName: 'A',
         lastName: 'B',
@@ -25,5 +25,20 @@ describe('signup identifier & method schemas', () => {
         lastName: 'B',
       }).success
     ).to.equal(false);
+
+    // Signup is passkey-only. The two RETIRED intents must fail at the parse boundary, so a
+    // hand-crafted POST (or a form cached from before the screen changed) cannot reach a branch
+    // the UI no longer offers — this is the server-side half of hiding those buttons.
+    for (const intent of ['email-link', 'password']) {
+      expect(
+        signupMethodSchema.safeParse({
+          intent,
+          loginName: 'a@b.com',
+          firstName: 'A',
+          lastName: 'B',
+        }).success,
+        `retired intent ${intent} must be rejected`
+      ).to.equal(false);
+    }
   });
 });
