@@ -10,6 +10,7 @@ import type {
   AuthRequest,
   BrandingTheme,
   DeviceAuthRequest,
+  Factors,
   IdProvider,
   IdpIntentResult,
   IdpLink,
@@ -78,6 +79,12 @@ interface LdapUserSeed {
 }
 
 interface Seed {
+  /**
+   * Rotate the session token on every updateSession, as real Zitadel does. Off by default because
+   * the suite was written against a non-rotating fake. Opt in to exercise a caller that persists
+   * the PRE-update token and leaves the browser holding a stale one.
+   */
+  rotateSessionTokens?: boolean;
   /**
    * Seeded users. Together with `authMethods` these express the three account states the
    * G7 enumeration suite must distinguish:
@@ -190,7 +197,13 @@ export class FakeAuthProvider implements AuthProvider {
   /** Last opts passed to createSession — test-only, lets specs assert userId + metadata. */
   lastCreateSessionOpts: SessionOpts | undefined;
 
+  /** See Seed.rotateSessionTokens. */
+  private readonly rotateSessionTokens: boolean;
+  /** Monotonic suffix so each rotated token is distinct and traceable in a failure message. */
+  private sessionTokenRotations = 0;
+
   constructor(seed: Seed = {}) {
+    this.rotateSessionTokens = seed.rotateSessionTokens ?? false;
     this.users = seed.users ?? [];
     // e2e fixture: each SEEDED user gets a deterministic pending email code (`email-<id>`),
     // so the verify-and-advance journey works without the `?send=true` dispatch — which is
@@ -471,7 +484,12 @@ export class FakeAuthProvider implements AuthProvider {
       throw new ProviderError('NOT_FOUND', 'Session not found');
     }
 
-    let updated: Session = { ...s, changedAt: FIXED_NOW };
+    // Zitadel issues a NEW session token on every update; a caller that keeps using the old one
+    // gets NOT_FOUND. Opt-in (see Seed.rotateSessionTokens) so existing specs are unaffected.
+    const nextToken = this.rotateSessionTokens
+      ? `${s.token}-r${++this.sessionTokenRotations}`
+      : s.token;
+    let updated: Session = { ...s, token: nextToken, changedAt: FIXED_NOW };
 
     if (checks.password !== undefined) {
       // FIDELITY NOTE: real Zitadel checks the session's OWN user; the users[0] fallback exists
@@ -864,14 +882,25 @@ export class FakeAuthProvider implements AuthProvider {
     this.callbackResults.delete(id);
   }
   // Seed a live session into the map so getSession(id, token) returns it (without createSession).
-  seedLiveSession(entry: { id: string; token: string; user?: User }): void {
+  seedLiveSession(entry: {
+    id: string;
+    token: string;
+    user?: User;
+    /** Factors to stamp verified. Defaults to ['password'] (a fully authenticated session);
+     *  pass e.g. ['otpEmail'] to seed one that is alive but NOT primary-authenticated. */
+    factorKinds?: Array<keyof Factors>;
+  }): void {
+    // stamp(): FIXED_NOW_DATE by default; a REAL Date under realFactorTimestamps so
+    // seeded sessions pass the sudo-freshness gate in node-harness scenarios.
+    const factors: Factors = {};
+    for (const kind of entry.factorKinds ?? ['password']) {
+      factors[kind] = { verifiedAt: this.stamp() };
+    }
     this.sessions.set(entry.id, {
       id: entry.id,
       token: entry.token,
       user: entry.user,
-      // stamp(): FIXED_NOW_DATE by default; a REAL Date under realFactorTimestamps so
-      // seeded sessions pass the sudo-freshness gate in node-harness scenarios.
-      factors: { password: { verifiedAt: this.stamp() } },
+      factors,
       expiresAt: FAR_FUTURE,
       changedAt: FIXED_NOW,
     });

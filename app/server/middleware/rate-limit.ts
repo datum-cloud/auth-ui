@@ -165,10 +165,18 @@ export const loginPasswordRateLimit: MiddlewareHandler = createRateLimit({
 // include it in the key when present so brute-force on a specific account is bounded.
 // For /signup/password the loginName is threaded as a URL param by signup.tsx; for /signup the
 // email is in the POST body (body-stream hazard) so the key degrades to ip-only.
+//
+// /signup/method is covered too: it was not, while it was an interstitial the throttled /signup
+// always passed through, but /signup now registers inline and /signup/method stays reachable as a
+// deep link — otherwise the one unthrottled way to make this app send mail. Its loginName is a URL
+// param, so it keys per-account.
 export const signupRateLimit: MiddlewareHandler = createRateLimit({
   limiter: signupLimiter,
   match: (c, pathname) =>
-    c.req.method === 'POST' && (pathname === '/id/signup' || pathname === '/id/signup/password'),
+    c.req.method === 'POST' &&
+    (pathname === '/id/signup' ||
+      pathname === '/id/signup/password' ||
+      pathname === '/id/signup/method'),
   key: (c, ip) => {
     const loginName = normalizedLoginName(c);
     return loginName ? `${ip}|${loginName}` : ip;

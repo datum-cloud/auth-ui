@@ -9,23 +9,13 @@
 // code causes completeEmailLinkSignup to throw inside verifyEmail → caught → 400
 // expired state, never a 500.
 import { AuthCard } from '@/components/auth-card/auth-card';
-import { readSessions, serializeSessions } from '@/modules/auth/session/cookie';
-import { serializeLastUsedLogin } from '@/modules/auth/session/last-used-login';
-import { serializePasskeyHint } from '@/modules/auth/session/passkey-hint';
 import { ProviderError } from '@/modules/auth/types';
-import { completeEmailLinkSignup } from '@/resources/signup';
+import { completeSignupHandoff } from '@/resources/signup/complete-handoff';
 import { paths } from '@/routes/paths';
 import { providerForRequest } from '@/server/auth-context.server';
-import { getOrCreateFingerprintId, userAgentFromRequest } from '@/server/user-agent';
 import { LinkButton } from '@datum-cloud/datum-ui/button';
 import { Trans } from '@lingui/react/macro';
-import {
-  data,
-  redirect,
-  useLoaderData,
-  type LoaderFunctionArgs,
-  type MetaFunction,
-} from 'react-router';
+import { data, useLoaderData, type LoaderFunctionArgs, type MetaFunction } from 'react-router';
 import { Link } from 'react-router';
 
 export const meta: MetaFunction = () => [{ title: 'Verifying your email' }];
@@ -44,6 +34,15 @@ export async function loader({ request }: LoaderFunctionArgs) {
   // Guard: both code and userId are required — without them the link is structurally invalid.
   // Surface requestId/organization alongside the error so "Start over" can resume the SAME
   // ceremony instead of dropping into an unscoped /signup.
+  //
+  // NOT the address. This route is an unauthenticated GET whose userId comes straight off the
+  // query string, and signupRateLimit does not cover it (POST only, and only /id/signup,
+  // /id/signup/password, /id/signup/method). Resolving that id to a loginName and returning it
+  // turned the route into an email-disclosure oracle: GET ?code=anything&userId=<any valid id>
+  // handed back that account's address. Presenting a code proves nothing — any string reaches the
+  // same failure path — so there is no shape of "the request has a claim to this address" to gate
+  // on here. Start over therefore drops back to /signup without a prefill; retyping an address
+  // costs one field, an enumeration oracle costs every mailbox in the instance.
   if (!code || !userId) {
     return data({ error: 'EXPIRED' as const, requestId, organization }, { status: 400 });
   }
@@ -58,13 +57,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
     if (!user) {
       return data({ error: 'EXPIRED' as const, requestId, organization }, { status: 400 });
     }
-    const sessions = await readSessions(request);
-    // Ensure a fingerprintId cookie exists for this browser. Email-link signup lands here
-    // without a prior session, so brand-new users may not yet have a fingerprint cookie.
-    // The minted id feeds userAgentFromRequest (not deviceTrackingToken, which is a MaxMind
-    // fraud signal kept only in the service metadata path).
-    const [fingerprintId, fpCookie] = getOrCreateFingerprintId(request);
-    const result = await completeEmailLinkSignup(provider, sessions, {
+    return await completeSignupHandoff(provider, request, {
       userId,
       code,
       loginName: user.loginName,
@@ -72,14 +65,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       requestId,
       next: next === 'passkey' ? 'passkey' : undefined,
       deviceTrackingToken,
-      userAgent: userAgentFromRequest(request, fingerprintId),
     });
-    const headers = new Headers();
-    headers.append('set-cookie', await serializeSessions(result.sessions));
-    headers.append('set-cookie', await serializeLastUsedLogin('email'));
-    headers.append('set-cookie', await serializePasskeyHint(user.loginName));
-    if (fpCookie) headers.append('set-cookie', fpCookie);
-    return redirect(result.target, { headers });
   } catch (err) {
     // Bad/expired/replayed code, or otpEmail FAILED_PRECONDITION — surface the friendly
     // expired state so a second click never causes a 500. Unexpected (non-provider)
@@ -99,7 +85,8 @@ export default function SignupComplete() {
 
   if (hasError) {
     // Carry the ceremony context threaded by the loader so "Start over" resumes the SAME
-    // OIDC/SAML/device ceremony instead of dropping into an unscoped /signup.
+    // OIDC/SAML/device ceremony instead of dropping into an unscoped /signup. Deliberately NOT
+    // the address — see the loader's guard for why this route cannot resolve one safely.
     const { requestId, organization } = loaderData as {
       error: 'EXPIRED';
       requestId?: string;

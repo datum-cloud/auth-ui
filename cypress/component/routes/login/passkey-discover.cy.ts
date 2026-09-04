@@ -31,6 +31,51 @@ function assertionWith(userHandle: string | null): string {
 
 const URL = 'http://localhost/id/login/passkey-discover';
 
+// REGRESSION: the minted ceremony session must be TAGGED with the ceremony's organization.
+//
+// The verify hop that follows resolves the session through byLoginName, whose filter is
+// `!organization || s.organization === organization`. Discover mints the entry, so an untagged
+// one is invisible to an org-scoped verify: discoverable login inside an org-scoped OIDC ceremony
+// failed as SESSION_EXPIRED within milliseconds — before any provider call — because the lookup
+// matched nothing. Observed live as a 5ms 400 with ?organization=, against an 871ms success
+// without it, on the same cookie and the same account.
+describe('/login/passkey-discover — ceremony org tagging', () => {
+  it('tags the minted session with the organization the client posted', () => {
+    callService({
+      fn: 'passkeyDiscoverAction',
+      provider: 'singleton',
+      request: {
+        url: URL,
+        form: { credential: assertionWith(B64_U5), organization: 'org-ceremony-1' },
+        csrf: true,
+      },
+    }).then((v) => {
+      expect(v.response?.status).to.equal(200);
+      const entries = v.response?.cookieEntries ?? [];
+      const mine = entries.filter((e) => e.loginName === PK_USER);
+      expect(mine, 'a ceremony entry was persisted').to.have.length.greaterThan(0);
+      expect(
+        mine.every((e) => e.organization === 'org-ceremony-1'),
+        'every minted entry carries the ceremony org, or an org-scoped verify cannot find it'
+      ).to.equal(true);
+    });
+  });
+
+  it('leaves the entry org-less for a bare sign-in that posts no organization', () => {
+    callService({
+      fn: 'passkeyDiscoverAction',
+      provider: 'singleton',
+      request: { url: URL, form: { credential: assertionWith(B64_U5) }, csrf: true },
+    }).then((v) => {
+      expect(v.response?.status).to.equal(200);
+      const mine = (v.response?.cookieEntries ?? []).filter((e) => e.loginName === PK_USER);
+      expect(mine, 'a ceremony entry was persisted').to.have.length.greaterThan(0);
+      // Correct, not a gap: a bare verify carries no org either, so the filter is skipped.
+      expect(mine.every((e) => e.organization === undefined)).to.equal(true);
+    });
+  });
+});
+
 describe('/login/passkey-discover action', () => {
   it('resolves the userHandle to a user-bound challenge; sessions cookie set, NO passkey-hint', () => {
     callService({

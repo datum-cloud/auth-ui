@@ -19,7 +19,7 @@ import {
 } from '@/modules/auth/session/cookie';
 import { ProviderError } from '@/modules/auth/types';
 import { APP_BASENAME } from '@/resources/shared/app-basename';
-import { authorizeHandbackTarget } from '@/resources/shared/next-step-params';
+import { authorizeHandbackTarget, threadParams } from '@/resources/shared/next-step-params';
 import { resolveOrg } from '@/resources/shared/resolve-org';
 import { postRegisterStep } from '@/resources/signup/post-register';
 import { allowResend } from '@/resources/signup/signup-resend-limit';
@@ -563,20 +563,58 @@ export async function registerEmailLinkSignup(
     // SQUATTING FIX (inherited bug): an unverified, factorless account holds this address
     // forever — the real owner's signup lands here every time and is silently dropped, so
     // they can never sign up. Resend verification so the address stays claimable by whoever
-    // controls the inbox. A REAL account (any auth method enrolled) gets nothing.
-    //
-    // ENUMERATION SAFETY: both branches fall through to the identical response below. The
-    // rate-limit skip is likewise silent. An attacker learns nothing without the inbox.
-    // Residual, accepted in the spec: the resend branch makes an extra API call, so response
-    // TIMING differs.
+    // controls the inbox.
     //
     // organization: registrationOrg (resolved), same fix as above — resendIfSquatted's
     // returnTo would otherwise drop organization on the same bare-flow case.
-    await resendIfSquatted(provider, email, { origin, requestId, organization: registrationOrg });
+    const verdict = await resendIfSquatted(provider, email, {
+      origin,
+      requestId,
+      organization: registrationOrg,
+    });
+
+    // DELIBERATE ENUMERATION DISCLOSURE, scoped to one case.
+    //
+    // This flow used to answer ALREADY_EXISTS with the same generic "check your email" a fresh
+    // address gets — no response could distinguish the two (the G7 gate). The cost in practice:
+    // a returning user was told to open a mail that was never sent, waited, and had no way to
+    // learn why. Product decision was to disclose. See the rewritten
+    // enumeration-parity-signup.cy.ts, which now asserts this boundary rather than blanket parity.
+    //
+    // ONLY 'enrolled' discloses. The squatted case MUST stay generic: that address is held by an
+    // account with no credential, nobody can sign in to it, and telling the real owner it is
+    // "already registered" would lock them out permanently — the exact bug the resend above
+    // exists to fix. 'unknown' (lookup failed) also stays generic, so a provider outage cannot
+    // manufacture a false "taken" error, and cannot become an oracle of its own.
+    if (verdict === 'enrolled') {
+      logAuthEvent('signup.requested', 'failure', {
+        actor: hashActor(email),
+        organization,
+        reason: 'already_exists',
+      });
+      throw new ProviderError(
+        'ALREADY_EXISTS',
+        'An account already exists for this address',
+        false
+      );
+    }
   }
   logAuthEvent('signup.requested', 'success', { actor: hashActor(email), organization });
   return { kind: 'sent', email };
 }
+
+/**
+ * What an ALREADY_EXISTS turned out to mean, so the caller can decide whether to disclose.
+ *
+ *  - 'squatted'  — the address is held by an unverified, FACTORLESS account. Verification was
+ *                  resent (or silently skipped by the mail-bomb guard). Must stay generic: the
+ *                  real owner has to be able to claim the address, and telling a stranger it is
+ *                  "taken" would strand them permanently on an account nobody can sign in to.
+ *  - 'enrolled'  — a real account with at least one auth method. Safe to disclose.
+ *  - 'unknown'   — the lookup itself failed. Falls back to the generic response: a provider
+ *                  outage must never become an oracle, and must never invent a "taken" error.
+ */
+type SquatVerdict = 'squatted' | 'enrolled' | 'unknown';
 
 async function resendIfSquatted(
   provider: AuthProvider,
@@ -586,13 +624,22 @@ async function resendIfSquatted(
   // placeholder substitution happens here), so an unresolved value would silently drop
   // organization from the emailed link on a bare (no ?organization=) signup.
   link: { origin: string; requestId?: string; organization?: string }
-): Promise<void> {
+): Promise<SquatVerdict> {
   try {
-    const user = await provider.findUser(email);
-    if (!user) return;
+    // SCOPED to the org the register actually targeted. Unscoped, this can resolve a DIFFERENT
+    // account than the one that raised ALREADY_EXISTS, and the verdict below is then computed for
+    // the wrong user: a factorless address in this org classified 'enrolled' off a namesake
+    // elsewhere throws the permanent lockout the squatted case exists to prevent, and the reverse
+    // aims the resend at an account the submitter never touched. Every other identity lookup with
+    // an org in hand scopes it (login.service, mfa.service, password.service); this one already
+    // had `link.organization` — the resolved registrationOrg — and was dropping it.
+    const user = await provider.findUser(email, link.organization);
+    // No user behind an ALREADY_EXISTS is a contradiction (a race, or a provider quirk).
+    // Treat it as unknown rather than asserting either way.
+    if (!user) return 'unknown';
     const methods = await provider.listAuthMethods(user.id);
-    if (methods.length > 0) return; // a real account — stay silent
-    if (!(await allowResend(email))) return; // mail-bombing guard — silent skip
+    if (methods.length > 0) return 'enrolled'; // a real account — caller may disclose
+    if (!(await allowResend(email))) return 'squatted'; // mail-bombing guard — silent skip
     // Same CRITICAL fallback as registerEmailLinkSignup above (final-findings.md CRITICAL 1):
     // unset VERIFICATION_MAIL_URL means the milo pipeline isn't configured in this environment,
     // so fall back to Zitadel's own resend-with-url-template path instead of requesting a
@@ -620,10 +667,12 @@ async function resendIfSquatted(
     // has to be attributable on its own. Safe for enumeration: the audit log is server-side
     // only and never reaches the caller. Parity is a property of the RESPONSE, not the log.
     logAuthEvent('signup_verification_resent', 'success', { actor: hashActor(email) });
+    return 'squatted';
   } catch (error) {
-    // The RESULT is swallowed on purpose: this is a best-effort side effect on an already-
-    // generic response path, and letting an error change what the caller returns would create
-    // the enumeration oracle this whole function exists to avoid.
+    // The RESULT is swallowed on purpose: a lookup/resend fault must not decide what the caller
+    // returns. It reports 'unknown', which the caller treats as "do not disclose" — so an outage
+    // degrades to the old generic response instead of inventing an "already registered" error
+    // for an address that may be free.
     //
     // The FAILURE is still audited. Total silence made a broken resend indistinguishable from a
     // deliberate skip, so an outage stranding every squatted address would be invisible to
@@ -632,6 +681,7 @@ async function resendIfSquatted(
       actor: hashActor(email),
       reason: error instanceof ProviderError ? error.code : 'UNKNOWN',
     });
+    return 'unknown';
   }
 }
 
@@ -719,7 +769,13 @@ export async function completeEmailLinkSignup(
   if (organization) params.set('organization', organization);
   if (requestId) params.set('requestId', requestId);
   params.set('force', 'false');
+  // checkAfter=false + returnTo: end at the signup terminal rather than running a ceremony the
+  // user did not ask for. Enrolling a passkey adds no factor to the session, whose only factor is
+  // the otpEmail proven above — which primaryFresh does not count — so post-enrollment routing
+  // originally sent the user to /login/password, a password they never set. returnTo is
+  // re-validated on the enroll POST.
   params.set('checkAfter', 'false');
+  params.set('returnTo', `/signup/success?${threadParams(loginName, requestId, organization)}`);
 
   return { kind: 'redirect', target: `/setup/passkey?${params.toString()}`, sessions };
 }

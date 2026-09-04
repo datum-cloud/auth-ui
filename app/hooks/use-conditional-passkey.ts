@@ -174,7 +174,13 @@ export function useConditionalPasskey(input: ConditionalPasskeyInput) {
       try {
         const res = await fetch(`${APP_BASENAME}${paths.login.passkeyDiscover()}`, {
           method: 'POST',
-          body: new URLSearchParams({ csrf: csrfToken, credential: JSON.stringify(credential) }),
+          // `organization` rides along so the session discover mints is tagged with this
+          // ceremony's org; the verify hop looks it up through an org-scoped filter.
+          body: new URLSearchParams({
+            csrf: csrfToken,
+            credential: JSON.stringify(credential),
+            ...(input.organization ? { organization: input.organization } : {}),
+          }),
         });
         if (abortedRef.current) return;
         // 409 = the tapped credential belongs to an account this browser is ALREADY

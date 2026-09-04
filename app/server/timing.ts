@@ -20,3 +20,30 @@ export const realSleep: Sleep = (ms) => new Promise<void>((r) => setTimeout(r, m
 export async function constantTimeNoop(sleep: Sleep = realSleep): Promise<void> {
   await sleep(CONSTANT_TIME_FLOOR_MS);
 }
+
+export interface DeadlineOptions {
+  sleep?: Sleep;
+  now?: () => number;
+  floorMs?: number;
+}
+
+/**
+ * Wait until `startedAt + floorMs`, whatever the caller already spent getting here.
+ *
+ * constantTimeNoop is a FLOOR, not a deadline: it adds a fixed delay to one branch and measures
+ * nothing. When the branch it is defending against is faster than the floor — the common case for
+ * a healthy provider — the padded branch becomes reliably SLOWER, which inverts the channel rather
+ * than closing it, and the two variances stay separable.
+ *
+ * A deadline collapses both: stamp t0 on entry, call this before every exit, and every branch
+ * leaves at the same wall-clock mark. The residual channel is only the tail where the real work
+ * already overran the floor.
+ *
+ * `sleep`/`now`/`floorMs` are injectable so the arithmetic is testable without a wall clock.
+ */
+export async function waitUntilDeadline(
+  startedAt: number,
+  { sleep = realSleep, now = Date.now, floorMs = CONSTANT_TIME_FLOOR_MS }: DeadlineOptions = {}
+): Promise<void> {
+  await sleep(Math.max(0, floorMs - (now() - startedAt)));
+}

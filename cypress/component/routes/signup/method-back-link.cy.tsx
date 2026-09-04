@@ -29,7 +29,9 @@ const LOADER_DATA = {
   requestId: undefined,
   deviceTrackingToken: undefined,
   maxmindAccountId: '',
-  view: { showEmailLink: false, showPasskey: false, showPassword: true },
+  // Passkey-only signup: showPasskey is the flag this screen actually reads. The other two
+  // remain in the shape (resolveSignupView still returns them for /signup) but are ignored here.
+  view: { showEmailLink: false, showPasskey: true, showPassword: false },
 };
 
 function mountSignupMethod() {
