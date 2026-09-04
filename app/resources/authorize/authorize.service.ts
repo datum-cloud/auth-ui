@@ -383,6 +383,14 @@ async function resolveSaml(
   } catch (error) {
     const code = error instanceof ProviderError ? error.code : undefined;
     logAuthEvent('authrequest_resolve', 'failure', { requestId: samlId, code });
+    // Same rule as the OIDC branch: an AUTHENTICATED user is not told their login session
+    // expired. NOT_FOUND means the ceremony died, not the sign-in — route to the signed-in
+    // terminal rather than a dead end. Transient faults still surface, and with no session the
+    // error is the only honest answer. See resolveOidcAuthorize for the full reasoning.
+    if (code === 'NOT_FOUND') {
+      const sessions = await readSessions(request);
+      if (mostRecent(sessions)) return { kind: 'redirect', location: '/signed-in' };
+    }
     return { kind: 'error-redirect', code: providerErrorCode(code) };
   }
 
@@ -433,6 +441,17 @@ async function resolveOidc(
     const code = error instanceof ProviderError ? error.code : undefined;
     // Log the resolution failure audit event before redirecting.
     logAuthEvent('authrequest_resolve', 'failure', { requestId: rawId, code });
+
+    // An authenticated user is not sent to "your login session has expired": a session in the
+    // cookie means the CEREMONY died, not the sign-in. NOT_FOUND only — a transient fault must
+    // still surface rather than silently dropping a live ceremony — and only with a session,
+    // since otherwise the error is the honest answer. /signed-in re-checks liveness itself.
+    if (code === 'NOT_FOUND') {
+      const sessions = await readSessions(request);
+      if (mostRecent(sessions)) {
+        return { kind: 'redirect', location: '/signed-in' };
+      }
+    }
     return { kind: 'error-redirect', code: providerErrorCode(code) };
   }
 

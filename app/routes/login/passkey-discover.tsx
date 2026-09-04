@@ -24,7 +24,11 @@ import { logAuthEvent, hashActor } from '@/server/observability';
 import { type ActionFunctionArgs } from 'react-router';
 import { z } from 'zod';
 
-const discoverSchema = z.object({ credential: z.string().min(1) });
+// `organization` is optional: a bare sign-in sends none and the entry is correctly org-less.
+const discoverSchema = z.object({
+  credential: z.string().min(1),
+  organization: z.string().optional(),
+});
 
 // Sanity bounds only — a userHandle is at most 64 bytes by WebAuthn spec; the
 // base64url of that is under 128 chars. Anything outside is a shape violation.
@@ -119,7 +123,8 @@ export async function action({ request }: ActionFunctionArgs) {
       request,
       sessions,
       user,
-      new URL(request.url).hostname
+      new URL(request.url).hostname,
+      parsed.data.organization
     );
   } catch {
     return opaque('mint_failed'); // deactivated user / provider hiccup
