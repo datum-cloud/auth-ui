@@ -29,6 +29,7 @@ export default [
     route('method', 'routes/signup/method.tsx'),
     route('password', 'routes/signup/password.tsx'),
     route('complete', 'routes/signup/complete.tsx'),
+    route('success', 'routes/signup/success.tsx'),
   ]),
 
   // password group — layout collapsed; prefix inlined per child.

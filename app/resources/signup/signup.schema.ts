@@ -44,9 +44,26 @@ export const signupIdentifierSchema = z.object({
   deviceTrackingToken: z.string().optional(),
 });
 
+// Screen 1 (/signup), code branch: the emailed code, typed instead of clicked.
+//
+// `code` carries NO shape rule — no length, charset or case. The format is Zitadel configuration
+// we do not own, so any rule here becomes a form that rejects valid codes the day that config
+// changes, and it fails before the request where there is no audit trail. Trim only.
+export const signupCodeSchema = z.object({
+  email: z.string().email(),
+  code: z.string().trim().min(1),
+  organization: z.string().optional(),
+  requestId: z.string().optional(),
+});
+
 // Screen 2 (/signup/method): which credential the user chose.
+//
+// Passkey-only: signup registers passkeys and nothing else. The retired 'email-link' and
+// 'password' intents are rejected HERE, at the parse boundary, so a hand-crafted POST (or a
+// stale form cached from before this change) fails closed rather than reaching a branch the
+// screen no longer offers.
 export const signupMethodSchema = z.object({
-  intent: z.enum(['email-link', 'passkey', 'password']),
+  intent: z.literal('passkey'),
   loginName: z.string().min(1),
   firstName: z.string().min(1),
   lastName: z.string().min(1),
