@@ -164,6 +164,9 @@ const schema = z
     // (a bare `*` is rejected). NEXT_PUBLIC_FRAME_ANCESTORS is the legacy alias from the
     // old Next.js app — FRAME_ANCESTORS is canonical and wins when both are set.
     FRAME_ANCESTORS: z.string().optional(),
+    // Public by design — this key ships in the page HTML. Its partner below is not.
+    RECAPTCHA_SITE_KEY: z.string().optional(),
+    RECAPTCHA_SECRET_KEY: z.string().optional(),
   })
   .superRefine((v, ctx) => {
     // Zitadel creds are only required when the Zitadel adapter is actually selected.
@@ -224,6 +227,28 @@ const schema = z
           '_CLIENT_KEY_FILE / _CA_CERT_FILE are not all set — mTLS to the webhook would fail on ' +
           'every call, and that failure is silent at runtime. Set all three, or unset ' +
           'VERIFICATION_MAIL_URL to disable delivery in this environment.',
+      });
+    }
+    // A site key without a secret renders the widget and fails every verification.
+    if (v.RECAPTCHA_SITE_KEY && !v.RECAPTCHA_SECRET_KEY) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['RECAPTCHA_SITE_KEY'],
+        message:
+          'RECAPTCHA_SITE_KEY is set but RECAPTCHA_SECRET_KEY is not — ' +
+          'verification would fail on every request',
+      });
+    }
+    // recaptcha.server.ts's hostname check silently no-ops without PUBLIC_ORIGIN, and it is the
+    // only control against token farming with our public site key on another domain.
+    if (v.RECAPTCHA_SECRET_KEY && !v.PUBLIC_ORIGIN) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['RECAPTCHA_SECRET_KEY'],
+        message:
+          'RECAPTCHA_SECRET_KEY is set but PUBLIC_ORIGIN is not — the reCAPTCHA hostname check ' +
+          'would silently no-op, disabling the only control against token farming on another ' +
+          'domain using our public site key',
       });
     }
   })

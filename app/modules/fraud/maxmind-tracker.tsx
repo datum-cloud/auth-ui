@@ -104,13 +104,10 @@ export function readMaxMindTrackingToken(): string | undefined {
  * captured the cookie — can send an EMPTY token even though `readMaxMindTrackingToken()` would
  * return one a moment later.
  *
- * Call this from the submit control's `onClick` handler (NOT a form `onSubmit`/React prop): a
- * click on a `type="submit"` button always fires — and is handled — strictly BEFORE the browser
- * dispatches the form's `submit` event, so writing the freshest token into the ref here is
- * guaranteed to land before the browser (or React Router's `<Form>`) reads the input's value out
- * of the DOM to build the request body. A form-level `onSubmit` prop can't offer that guarantee
- * here — some of these forms route `onSubmit` through validation/adapter layers that may already
- * be mid-flight collecting form data by the time it runs.
+ * Call this from the form's `onSubmit`, synchronously, before that handler snapshots FormData —
+ * the signup forms all do. A button `onClick` fires only for the trigger it is attached to, so a
+ * form that submits natively on Enter sends a stale value. signup/password.tsx is the last
+ * `onClick` caller and carries that gap; tolerable only because the route is retired.
  *
  * No-op when no token has been captured yet (leaves whatever the input already carries, e.g. the
  * server-round-tripped value from an earlier screen) or when the ref isn't attached.
