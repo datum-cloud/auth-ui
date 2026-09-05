@@ -163,8 +163,12 @@ describe('signup/index — MaxMind deviceTrackingToken submit-time sync', () => 
 // inline error) instead of loader data alone — createMemoryRouter's hydrationData accepts both
 // per route id, and the 'sent' branch in Signup() is reached by actionData, not loader state.
 // Follows the createMemoryRouter + hydrationData pattern in method-render.cy.tsx.
-function mountWithActionData(actionData: unknown, onSubmitFormData?: (form: FormData) => void) {
-  const data = loaderData();
+function mountWithActionData(
+  actionData: unknown,
+  onSubmitFormData?: (form: FormData) => void,
+  loaderOverrides: Record<string, unknown> = {}
+) {
+  const data = loaderData(loaderOverrides);
   const router = createMemoryRouter(
     [
       {
@@ -267,6 +271,202 @@ describe('signup/index — the code field validates no shape client-side', () =>
     cy.then(() => {
       expect(submitted[0].get('intent')).to.equal('code');
       expect(submitted[0].get('code'), 'sent verbatim, unaltered').to.equal('ab');
+    });
+  });
+});
+
+describe('signup/index — the reCAPTCHA token actually reaches the submitted request', () => {
+  const SITE_KEY = 'test-site-key';
+
+  function stubRecaptchaScriptRequest() {
+    cy.intercept('GET', '**/recaptcha/api.js*', { statusCode: 200, body: '' }).as(
+      'recaptchaScript'
+    );
+  }
+
+  it('identifier form: mints under action "signup" and the minted token is what actually gets sent', () => {
+    stubRecaptchaScriptRequest();
+    const submitted: FormData[] = [];
+    const execute = cy.stub().resolves('tok-signup-xyz');
+    mountSignup(loaderData({ recaptchaSiteKey: SITE_KEY }), (form) => submitted.push(form));
+    cy.window().then((win) => {
+      win.grecaptcha = { execute };
+    });
+    cy.contains('button', 'Email', { timeout: 6000 }).click();
+    cy.get('input[name="email"]').type('racer@example.com');
+    cy.contains('button', 'Continue').click();
+    cy.wrap(submitted, { timeout: 6000 }).should('have.length', 1);
+    cy.then(() => {
+      expect(
+        submitted[0].get('recaptchaToken'),
+        'non-empty — the exact field the race left empty before the fix'
+      ).to.equal('tok-signup-xyz');
+      expect(execute.callCount).to.equal(1);
+      expect(execute.getCall(0).args).to.deep.equal([SITE_KEY, { action: 'signup' }]);
+    });
+  });
+
+  it('code form: mints under action "signup_code" — the name Task 4\'s gate actually checks the code step against', () => {
+    stubRecaptchaScriptRequest();
+    const submitted: FormData[] = [];
+    const execute = cy.stub().resolves('tok-code-xyz');
+    mountWithActionData(
+      { sent: true, email: 'someone@acme.test' },
+      (form) => submitted.push(form),
+      { recaptchaSiteKey: SITE_KEY }
+    );
+    cy.window().then((win) => {
+      win.grecaptcha = { execute };
+    });
+    cy.get('input[name="code"]').type('78PEKH');
+    cy.contains('button', 'Continue').click();
+    cy.wrap(submitted, { timeout: 6000 }).should('have.length', 1);
+    cy.then(() => {
+      expect(submitted[0].get('recaptchaToken')).to.equal('tok-code-xyz');
+      expect(execute.callCount).to.equal(1);
+      expect(execute.getCall(0).args).to.deep.equal([SITE_KEY, { action: 'signup_code' }]);
+    });
+  });
+
+  it('submits without stalling when grecaptcha.execute() rejects — a missing token is a server-handled outcome, not a client failure', () => {
+    stubRecaptchaScriptRequest();
+    const submitted: FormData[] = [];
+    const execute = cy.stub().rejects(new Error('widget failed'));
+    mountSignup(loaderData({ recaptchaSiteKey: SITE_KEY }), (form) => submitted.push(form));
+    cy.window().then((win) => {
+      win.grecaptcha = { execute };
+    });
+    cy.contains('button', 'Email', { timeout: 6000 }).click();
+    cy.get('input[name="email"]').type('rejected@example.com');
+    cy.contains('button', 'Continue').click();
+    cy.wrap(submitted, { timeout: 6000 }).should('have.length', 1);
+    cy.then(() => {
+      // Empty, not missing and not a crash — the button is never left stuck. Submitting without
+      // a token is exactly what recaptcha.server.ts already treats as fail-open / a plain reject
+      // (never a client-side dead end).
+      expect(submitted[0].get('recaptchaToken')).to.equal('');
+      expect(submitted[0].get('email')).to.equal('rejected@example.com');
+    });
+  });
+
+  it('submits without hanging forever when grecaptcha.execute() never settles', () => {
+    stubRecaptchaScriptRequest();
+    const submitted: FormData[] = [];
+    // Never resolves or rejects — proves the bound is a real timeout race (Promise.race against
+    // a timer), not merely a try/catch around the await, which does nothing for a promise that
+    // never settles either way.
+    const execute = cy.stub().callsFake(() => new Promise<never>(() => {}));
+    mountSignup(loaderData({ recaptchaSiteKey: SITE_KEY }), (form) => submitted.push(form));
+    cy.window().then((win) => {
+      win.grecaptcha = { execute };
+    });
+    cy.contains('button', 'Email', { timeout: 6000 }).click();
+    cy.get('input[name="email"]').type('hung@example.com');
+    cy.contains('button', 'Continue').click();
+    // Comfortably past RECAPTCHA_MINT_TIMEOUT_MS (5s) — the timeout race has to have fired for
+    // this to resolve at all.
+    cy.wrap(submitted, { timeout: 8000 }).should('have.length', 1);
+    cy.then(() => {
+      expect(submitted[0].get('recaptchaToken')).to.equal('');
+    });
+  });
+
+  it('stays entirely inert when unconfigured: no field is rendered, grecaptcha is never touched, and no field is sent', () => {
+    const submitted: FormData[] = [];
+    const execute = cy.stub();
+    mountSignup(loaderData(), (form) => submitted.push(form));
+    cy.window().then((win) => {
+      win.grecaptcha = { execute };
+    });
+    cy.contains('button', 'Email', { timeout: 6000 }).click();
+    // "Unset config ⇒ feature entirely off" covers the field itself, not just the script and
+    // the verification: an unconfigured deployment must not ship this input at all.
+    cy.get('input[name="recaptchaToken"]').should('not.exist');
+    cy.get('input[name="email"]').type('noconfig@example.com');
+    cy.contains('button', 'Continue').click();
+    cy.wrap(submitted, { timeout: 6000 }).should('have.length', 1);
+    cy.then(() => {
+      expect(
+        submitted[0].get('recaptchaToken'),
+        'unconfigured never sends the field at all — absent, not merely empty'
+      ).to.equal(null);
+      expect(execute.callCount, 'grecaptcha.execute is never called when unconfigured').to.equal(0);
+    });
+  });
+
+  it('renders the recaptchaToken field when configured', () => {
+    stubRecaptchaScriptRequest();
+    mountSignup(loaderData({ recaptchaSiteKey: SITE_KEY }));
+    cy.contains('button', 'Email', { timeout: 6000 }).click();
+    cy.get('input[name="recaptchaToken"]').should('exist');
+  });
+
+  it('identifier form: Enter-key submission (never touches the Continue button) still mints under "signup" and arrives non-empty', () => {
+    stubRecaptchaScriptRequest();
+    const submitted: FormData[] = [];
+    const execute = cy.stub().resolves('tok-enter-signup');
+    mountSignup(loaderData({ recaptchaSiteKey: SITE_KEY }), (form) => submitted.push(form));
+    cy.window().then((win) => {
+      win.grecaptcha = { execute };
+    });
+    cy.contains('button', 'Email', { timeout: 6000 }).click();
+    // {enter} in the sole text field triggers HTML's implicit form submission — no button is
+    // clicked anywhere in this test.
+    cy.get('input[name="email"]').type('enter-user@example.com{enter}');
+    cy.wrap(submitted, { timeout: 6000 }).should('have.length', 1);
+    cy.then(() => {
+      expect(
+        submitted[0].get('recaptchaToken'),
+        'non-empty even though no button was ever clicked'
+      ).to.equal('tok-enter-signup');
+      expect(execute.callCount).to.equal(1);
+      expect(execute.getCall(0).args).to.deep.equal([SITE_KEY, { action: 'signup' }]);
+    });
+  });
+
+  it('code form: Enter-key submission still mints under "signup_code" and arrives non-empty', () => {
+    stubRecaptchaScriptRequest();
+    const submitted: FormData[] = [];
+    const execute = cy.stub().resolves('tok-enter-code');
+    mountWithActionData(
+      { sent: true, email: 'someone@acme.test' },
+      (form) => submitted.push(form),
+      { recaptchaSiteKey: SITE_KEY }
+    );
+    cy.window().then((win) => {
+      win.grecaptcha = { execute };
+    });
+    cy.get('input[name="code"]').type('78PEKH{enter}');
+    cy.wrap(submitted, { timeout: 6000 }).should('have.length', 1);
+    cy.then(() => {
+      expect(submitted[0].get('recaptchaToken')).to.equal('tok-enter-code');
+      expect(execute.callCount).to.equal(1);
+      expect(execute.getCall(0).args).to.deep.equal([SITE_KEY, { action: 'signup_code' }]);
+    });
+  });
+
+  it('two submit attempts inside the mint window (click, then Enter) produce exactly one submission', () => {
+    stubRecaptchaScriptRequest();
+    const submitted: FormData[] = [];
+    // Resolves only after a real delay, giving a second attempt a genuine window to land in
+    // before the first mint completes — exactly the window navigation.state can't see, since it
+    // only flips to 'submitting' once submit() is actually called (i.e. AFTER the mint resolves).
+    const execute = cy
+      .stub()
+      .callsFake(
+        () => new Promise<string>((resolve) => setTimeout(() => resolve('tok-race'), 1000))
+      );
+    mountSignup(loaderData({ recaptchaSiteKey: SITE_KEY }), (form) => submitted.push(form));
+    cy.window().then((win) => {
+      win.grecaptcha = { execute };
+    });
+    cy.contains('button', 'Email', { timeout: 6000 }).click();
+    cy.get('input[name="email"]').type('racer2@example.com');
+    cy.contains('button', 'Continue').click();
+    cy.get('input[name="email"]').type('{enter}');
+    cy.wrap(submitted, { timeout: 6000 }).should('have.length', 1);
+    cy.then(() => {
+      expect(execute.callCount, 'the in-flight guard blocks the second attempt').to.equal(1);
     });
   });
 });

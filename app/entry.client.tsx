@@ -26,6 +26,10 @@ declare global {
   interface Window {
     Cypress?: unknown;
     __CYPRESS_HYDRATE__?: boolean;
+    /** reCAPTCHA v3's client script, loaded on demand. */
+    grecaptcha?: {
+      execute: (siteKey: string, options: { action: string }) => Promise<string>;
+    };
   }
 }
 const skipHydration = typeof window.Cypress !== 'undefined' && !window.__CYPRESS_HYDRATE__;

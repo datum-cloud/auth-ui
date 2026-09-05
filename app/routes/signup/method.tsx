@@ -5,6 +5,7 @@ import { FormError } from '@/components/form-error/form-error';
 import { IdentityBadge } from '@/components/identity-badge/identity-badge';
 import { useAuthActionError } from '@/hooks/use-auth-action-error';
 import { MaxMindTracker, syncMaxMindTokenToRef } from '@/modules/fraud/maxmind-tracker';
+import { useRecaptcha } from '@/modules/fraud/recaptcha';
 import { genericCheckYourEmail } from '@/resources/schemas/check-your-email.schema';
 import { resolveOrg } from '@/resources/shared/resolve-org';
 import { registerPasskeySignup } from '@/resources/signup/passkey-signup';
@@ -16,17 +17,19 @@ import { loaderCsrf, assertCsrf } from '@/server/csrf';
 import { requireEmailVerification } from '@/server/env';
 import { trustedAppOrigin } from '@/server/infra/app-origin.server';
 import { env } from '@/server/infra/env.server';
+import { recaptchaRejects } from '@/server/infra/recaptcha.server';
 import { actionError } from '@/utils/errors/auth-error';
 import { Button } from '@datum-cloud/datum-ui/button';
 import { Icon } from '@datum-cloud/datum-ui/icons';
 import { Trans } from '@lingui/react/macro';
 import { Key } from 'lucide-react';
-import { useRef } from 'react';
+import { useRef, useState, type FormEvent } from 'react';
 import {
   data,
   useActionData,
   useLoaderData,
   useNavigation,
+  useSubmit,
   type ActionFunctionArgs,
   type LoaderFunctionArgs,
   type MetaFunction,
@@ -76,6 +79,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       // than submitting straight through from /signup) still gets device.js's capture window —
       // previously this screen had no tracker mounted at all (see maxmind-tracker.tsx).
       maxmindAccountId: env.MAXMIND_ACCOUNT_ID ?? '',
+      recaptchaSiteKey: env.RECAPTCHA_SITE_KEY ?? '',
       view,
     },
     { headers }
@@ -86,6 +90,13 @@ export async function action({ request }: ActionFunctionArgs) {
   const provider = providerForRequest(request);
   const form = await request.formData();
   await assertCsrf(request, form);
+
+  // Bot gate. This route is a second entry point into registerPasskeySignup — its loader mints
+  // a CSRF token with no session precondition, so a script could POST straight here. Action is
+  // 'signup', shared with /signup's identifier form: both perform the same registration step.
+  if (await recaptchaRejects(String(form.get('recaptchaToken') ?? ''), 'signup')) {
+    return data({ error: 'INVALID_INPUT' as const }, { status: 400 });
+  }
 
   const parsed = signupMethodSchema.safeParse(Object.fromEntries(form));
   if (!parsed.success) return data({ error: 'INVALID_INPUT' as const }, { status: 400 });
@@ -129,12 +140,14 @@ interface HiddenContextProps {
   requestId?: string;
   deviceTrackingToken?: string;
   /**
-   * Ref'd so the owning form's submit button can write a freshly-read MaxMind token into it at
-   * click time (syncMaxMindTokenToRef) — see the Button `onClick` handler below. Kept per-form
-   * rather than module-level: if this screen ever regains a second method form, a single shared
-   * ref would silently point at whichever instance mounted last.
+   * Ref'd so the owning form's submit handler can write a freshly-read MaxMind token into it at
+   * submit time (syncMaxMindTokenToRef) — see handlePasskeySubmit below. Kept per-form rather
+   * than module-level: if this screen ever regains a second method form, a single shared ref
+   * would silently point at whichever instance mounted last.
    */
   deviceTokenRef?: React.RefObject<HTMLInputElement | null>;
+  /** Empty when unconfigured, which drops the recaptchaToken field entirely. */
+  recaptchaSiteKey: string;
 }
 
 function HiddenContext({
@@ -146,6 +159,7 @@ function HiddenContext({
   requestId,
   deviceTrackingToken,
   deviceTokenRef,
+  recaptchaSiteKey,
 }: HiddenContextProps) {
   return (
     <>
@@ -167,6 +181,8 @@ function HiddenContext({
         ref={deviceTokenRef}
         defaultValue={deviceTrackingToken ?? ''}
       />
+      {/* Placeholder only — the mint is written onto a FormData snapshot, not this input. */}
+      {recaptchaSiteKey ? <input type="hidden" name="recaptchaToken" defaultValue="" /> : null}
     </>
   );
 }
@@ -183,6 +199,7 @@ export default function SignupMethod() {
     requestId,
     deviceTrackingToken,
     maxmindAccountId,
+    recaptchaSiteKey,
     view,
   } = useLoaderData<typeof loader>();
 
@@ -196,6 +213,37 @@ export default function SignupMethod() {
   // The action error surfaces INLINE through <AuthCeremony error> (this
   // replaces the per-route toast).
   const errorMessage = useAuthActionError(actionData);
+
+  const mintRecaptchaToken = useRecaptcha(recaptchaSiteKey);
+
+  const submit = useSubmit();
+
+  // Local in-flight guard, independent of `navigation.state`: that only flips to 'submitting'
+  // once `submit()` is actually called, i.e. AFTER the mint resolves. A ref (not just state)
+  // makes the check-and-set atomic and synchronous.
+  const passkeySubmitInFlight = useRef(false);
+  const [passkeyMinting, setPasskeyMinting] = useState(false);
+
+  // Intercepts the form's submit event, not the button's click. RRForm runs its own tokenless
+  // submission unless the event is prevented, so preventDefault() must run synchronously before
+  // any await or this falls through with no token.
+  async function handlePasskeySubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    if (passkeySubmitInFlight.current) return;
+    passkeySubmitInFlight.current = true;
+    setPasskeyMinting(true);
+    try {
+      syncMaxMindTokenToRef(passkeyTokenRef);
+      // Snapshot before the await — see signup/index.tsx's handleIdentifierSubmit.
+      const formData = new FormData(event.currentTarget);
+      const token = await mintRecaptchaToken('signup');
+      if (recaptchaSiteKey) formData.set('recaptchaToken', token ?? '');
+      submit(formData, { method: 'post' });
+    } finally {
+      passkeySubmitInFlight.current = false;
+      setPasskeyMinting(false);
+    }
+  }
 
   // "Not you?" returns to the signup start (mirrors signup/password.tsx one step later).
   const notYouHref = paths.signup.index({ requestId, organization });
@@ -224,6 +272,7 @@ export default function SignupMethod() {
     organization,
     requestId,
     deviceTrackingToken,
+    recaptchaSiteKey,
   };
 
   return (
@@ -254,7 +303,7 @@ export default function SignupMethod() {
               rather than the chooser's <LinkButton> — this submits an intent with CSRF and the
               carried identity fields, it does not navigate. */}
           {view.showPasskey ? (
-            <RRForm method="post">
+            <RRForm method="post" onSubmit={handlePasskeySubmit}>
               <HiddenContext {...contextProps} deviceTokenRef={passkeyTokenRef} />
               <input type="hidden" name="intent" value="passkey" />
               <Button
@@ -266,8 +315,8 @@ export default function SignupMethod() {
                 iconPosition="left"
                 icon={<Icon icon={Key} />}
                 htmlType="submit"
-                loading={submitting}
-                onClick={() => syncMaxMindTokenToRef(passkeyTokenRef)}>
+                loading={passkeyMinting || submitting}
+                disabled={passkeyMinting}>
                 <Trans>Use a passkey</Trans>
               </Button>
             </RRForm>

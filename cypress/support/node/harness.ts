@@ -149,7 +149,8 @@ import { loader as signupSuccessLoader } from '@/routes/signup/success';
 import { loader as verifyIndexLoader, action as verifyIndexAction } from '@/routes/verify/index';
 import { providerForRequest } from '@/server/composition';
 import { getCsrfToken, loaderCsrf, assertCsrf, assertCsrfWith } from '@/server/csrf';
-import { _envSchema } from '@/server/infra/env.server';
+import { _envSchema, env } from '@/server/infra/env.server';
+import { verifyRecaptcha } from '@/server/infra/recaptcha.server';
 import { sendVerificationMail } from '@/server/infra/verification-mail.server';
 import {
   loginPasswordRateLimit,
@@ -678,6 +679,34 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
       verificationMailServer?.once('error', rej2);
       verificationMailServer?.listen(port, '127.0.0.1', () => res2());
     });
+  }
+
+  // `recaptchaFetch` stubs fetch for any dispatched fn, so a route action calling the real
+  // verifyRecaptcha can be driven too. Restored in the finally block below. Captures the
+  // outbound request, so a dropped secret or wrong key would not pass outcome-only assertions.
+  const originalFetch = globalThis.fetch;
+  let recaptchaCapturedRequest:
+    | { url: string; method: string | undefined; hasSecret: boolean; hasResponse: boolean }
+    | undefined;
+  if (s.recaptchaFetch) {
+    const behavior = s.recaptchaFetch;
+    globalThis.fetch = (async (input: unknown, init?: RequestInit) => {
+      const params = new URLSearchParams(String(init?.body ?? ''));
+      recaptchaCapturedRequest = {
+        url: String(input),
+        method: init?.method,
+        hasSecret: params.has('secret'),
+        hasResponse: params.has('response'),
+      };
+      if ('reject' in behavior) throw new Error('ECONNREFUSED');
+      return new Response(JSON.stringify(behavior.body));
+    }) as typeof fetch;
+  }
+  // recaptchaSkipPublicOrigin mutates PUBLIC_ORIGIN on the booted env singleton for one call.
+  // env.server refuses that combination at boot, so this only proves the fallback branch works.
+  const originalPublicOrigin = env.PUBLIC_ORIGIN;
+  if (s.recaptchaSkipPublicOrigin) {
+    (env as { PUBLIC_ORIGIN?: string }).PUBLIC_ORIGIN = undefined;
   }
 
   // Wall clock around the dispatch only (provider seeding and the mail listener are already up),
@@ -2525,6 +2554,14 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
         break;
       }
 
+      // Drives the real verifyRecaptcha; stub setup lives above the switch.
+      case 'verifyRecaptcha': {
+        const input = s.recaptchaInput ?? { token: '', expectedAction: 'signup' };
+        const result = await verifyRecaptcha(input.token, input.expectedAction);
+        outcome = { ...result, request: recaptchaCapturedRequest };
+        break;
+      }
+
       // ── routes/login handlers (batch 13b) ──────────────────────────────────────────────────────
       // Route loaders/actions are node-bound: they read REAL signed cookies off a Request and emit
       // REAL audit. buildHandlerRequest mints a real `instanceof Request` so remix-utils' getHeaders
@@ -3246,6 +3283,10 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
     elapsedMs = Date.now() - dispatchStartedAt;
     // eslint-disable-next-line no-console -- restore the intercepted audit sink
     console.log = originalLog;
+    globalThis.fetch = originalFetch;
+    if (s.recaptchaSkipPublicOrigin) {
+      (env as { PUBLIC_ORIGIN?: string }).PUBLIC_ORIGIN = originalPublicOrigin;
+    }
     if (verificationMailServer) {
       await new Promise<void>((res2) => verificationMailServer?.close(() => res2()));
     }

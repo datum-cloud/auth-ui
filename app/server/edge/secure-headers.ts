@@ -82,8 +82,11 @@ export function cspDirectives(isDev: boolean, frameAncestors: readonly string[] 
       'https://app.rybbit.io',
       'https://device.maxmind.com',
       'https://*.mmapiws.com',
+      'https://www.google.com',
       ...(isDev ? ['ws:'] : []),
     ],
+    // reCAPTCHA v3 injects a hidden iframe; without this it inherits default-src 'self'.
+    frameSrc: ["'self'", 'https://www.google.com'],
     // Secure default 'none' (the auth UI is not embeddable). Override per-environment
     // via FRAME_ANCESTORS (parsed by resolveFrameAncestors) when an embed is required,
     // e.g. a staging portal. X-Frame-Options in appSecureHeaders is reconciled to match.
