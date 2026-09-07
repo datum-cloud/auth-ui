@@ -11,6 +11,7 @@
 // only this resolution sees that the links may all be missing, deactivated, or LDAP-only.
 import type { AuthProvider } from '@/modules/auth/auth-provider';
 import type { AuthMethod, IdProvider, LoginSettings } from '@/modules/auth/types';
+import { EMAIL_OTP_SIGNIN_ENABLED } from '@/resources/login/email-otp-signin';
 import { resolveOrg } from '@/resources/shared/resolve-org';
 import { getActiveIdPs } from '@/resources/sso/idp-providers';
 import { joinLinkedIdps, type LinkedIdpView } from '@/resources/sso/sso-management';
@@ -148,7 +149,11 @@ export async function resolveMethodOptions(
   }
 
   if (methods.includes('password') && settings.allowPassword) available.push('password');
-  if (methods.includes('otp_email') && emailDeliveryEnabled) available.push('otp_email');
+  // Gated while email OTP sign-in is hidden — see EMAIL_OTP_SIGNIN_ENABLED for why, and for the
+  // otpEmail-only accounts this strands.
+  if (EMAIL_OTP_SIGNIN_ENABLED && methods.includes('otp_email') && emailDeliveryEnabled) {
+    available.push('otp_email');
+  }
 
   return { available, idps };
 }

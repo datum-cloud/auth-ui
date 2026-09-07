@@ -1,4 +1,5 @@
 import type { IdProvider, LoginSettings } from '@/modules/auth/types';
+import { EMAIL_OTP_SIGNIN_ENABLED } from '@/resources/login/email-otp-signin';
 
 export interface LoginView {
   showIdentifierForm: boolean;
@@ -44,7 +45,9 @@ export function resolveLoginView(
   const showIdpButtons = settings.allowExternalIdp && idps.length > 0;
   const showRegisterLink = settings.allowRegister;
   const showPasskeyPrompt = settings.passkeysType === 'allowed';
-  const showEmailLink = settings.disableLoginWithEmail !== true && emailDeliveryEnabled;
+  // Gated while email OTP sign-in is hidden — see EMAIL_OTP_SIGNIN_ENABLED.
+  const showEmailLink =
+    EMAIL_OTP_SIGNIN_ENABLED && settings.disableLoginWithEmail !== true && emailDeliveryEnabled;
   // "Continue" hands off to decideAfterIdentifier — only offer it when that can resolve
   // to a real method for this org.
   const showContinue = settings.allowPassword || showPasskeyPrompt;

@@ -49,24 +49,21 @@ describe('resolveLoginView', () => {
       [settings({ passkeysAllowed: true }), [], false],
       { showIdentifierForm: true },
     ],
-    // email-link alone: delivery on, org has not disabled email login.
-    [
-      'email-link alone shows the identifier form',
-      [settings({}), [], true],
-      { showIdentifierForm: true },
-    ],
     ['nothing at all → no form', [settings({}), [], false], { showIdentifierForm: false }],
-    // ── email-link only: form without Continue ────────────────────────────────────────
-    // "Continue" routes through decideAfterIdentifier; with neither password nor passkey
-    // that resolves to NO_SUPPORTED_METHOD, so the button must not render.
+    // ── email OTP sign-in hidden (EMAIL_OTP_SIGNIN_ENABLED=false) ────────────────────
+    // These rows previously asserted the opposite: delivery alone justified the field, and an
+    // email-only org got a form without Continue. With the entry point hidden nothing sits
+    // behind it, so it contributes neither the button nor the form, and an org with no other
+    // method genuinely cannot sign in — better than a form with no submit button. They invert
+    // again when the flag is flipped, which keeps re-enabling a deliberate edit.
     [
-      'email-link only hides Continue but keeps the form',
+      'email-link alone no longer shows the identifier form',
       [settings({}), [], true],
       {
         showContinue: false,
-        showEmailLink: true,
-        showIdentifierForm: true,
-        signInUnavailable: false,
+        showEmailLink: false,
+        showIdentifierForm: false,
+        signInUnavailable: true,
       },
     ],
     // ── signInUnavailable: only when neither an identifier nor an IdP path exists ─────
@@ -86,11 +83,11 @@ describe('resolveLoginView', () => {
       [settings({ allowExternalIdp: true }), IDP, false],
       { signInUnavailable: false },
     ],
-    // Email delivery on is itself a path (reverses the 2026-07-06 assumption).
+    // Delivery on is no longer a path of its own while email OTP sign-in is hidden.
     [
-      'email delivery on clears unavailable',
+      'email delivery on no longer clears unavailable',
       [settings({}), [], true],
-      { signInUnavailable: false },
+      { signInUnavailable: true },
     ],
     // …but not when the org disabled email login.
     [
