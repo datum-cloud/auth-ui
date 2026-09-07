@@ -66,6 +66,39 @@ describe('sendVerificationMail — unreachable endpoint', () => {
   });
 });
 
+// ── contract 1b: REQUEST_TIMEOUT_MS must actually end the call ──────────────
+//
+// Every case above ends the request from the OUTSIDE — a refused connection, a real response, an
+// unreadable cert file. None lets the client's own timeout be the thing that ends it, so the
+// timeout path had no coverage and shipped inert: `request.destroy(err)` did not deliver an
+// 'error' event to postJson's `request.on('error', reject)`, so the promise never settled at all.
+// Not slow — permanently pending, which is worse than the hang the timeout exists to prevent,
+// because signup awaits this call.
+//
+// Found in local testing: the signup POST never returned, and the account was created with no
+// verification mail sent. Asserts the RESOLVED VALUE — a promise that never settles fails here as
+// a harness timeout rather than as a wrong boolean.
+describe('sendVerificationMail — routable but unresponsive endpoint', () => {
+  it('resolves false via its own request timeout when the endpoint accepts but never responds', () => {
+    callService({
+      fn: 'sendVerificationMail',
+      env: { VERIFICATION_MAIL_URL: 'http://127.0.0.1:58751/webhook' },
+      verificationMailInput: input({ userId: 'user-hang' }),
+      verificationMailListen: true,
+      verificationMailHang: true,
+    }).then((v) => {
+      expect(v.outcome.result, 'must resolve false, not hang forever').to.equal(false);
+      // The POST must have actually reached the listener, or this could pass for the trivial
+      // reason that nothing was listening — which is contract 1's scenario, not this one.
+      expect(v.outcome.received, 'the POST must have reached the endpoint').to.not.equal(undefined);
+      const audit = (v.auditLines ?? []).join('\n');
+      expect(audit, 'a timeout must be audited as a delivery failure').to.contain(
+        'signup_verification_mail_failed'
+      );
+    });
+  });
+});
+
 // ── contract 2 ──────────────────────────────────────────────────────────────
 describe('sendVerificationMail — non-2xx response', () => {
   it('resolves false when the endpoint responds 500', () => {

@@ -671,6 +671,11 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
           contentType: req.headers['content-type'],
           body: raw ? JSON.parse(raw) : undefined,
         });
+        // Deliberately never respond: the connection stays open and idle, so the ONLY thing that
+        // can end the client's call is its own request timeout. Connection-refused (the
+        // verificationMailListen:false case) errors immediately down a different path, so it
+        // cannot stand in for this one.
+        if (s.verificationMailHang) return;
         res.writeHead(s.verificationMailStatus ?? 200, { 'content-type': 'application/json' });
         res.end('{}');
       });

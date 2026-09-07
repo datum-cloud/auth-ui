@@ -756,6 +756,13 @@ export interface Scenario {
    *  calling sendVerificationMail. false/omitted exercises the "unreachable" contract — nothing
    *  is listening, so the client must resolve `false` without throwing. */
   verificationMailListen?: boolean;
+  /**
+   * Accept the connection and then NEVER respond, so the client's own request timeout is the only
+   * thing that can end the call. This is the routable-but-unresponsive case — distinct from
+   * `verificationMailListen: false`, which is connection-refused and fails fast down a completely
+   * different path. Requires `verificationMailListen: true`.
+   */
+  verificationMailHang?: boolean;
   /** Status code the local listener responds with when `verificationMailListen` is true. Default
    *  200 (also captures the received method/content-type/body as outcome.received). */
   verificationMailStatus?: number;
