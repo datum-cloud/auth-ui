@@ -280,6 +280,8 @@ export type ServiceFn =
   // load-time schema parse — loads (see run-scenario.ts). node:https is stubbed out of the Vite
   // browser bundle by virtue of the `.server.ts` suffix, so this must run node-side.
   | 'sendVerificationMail'
+  // Drives the real verifyRecaptcha node-side; env.server is stubbed out of the browser bundle.
+  | 'verifyRecaptcha'
   // ── routes/login handlers (batch 13b) ────────────────────────────────────────
   // Login route loaders/actions are node-bound: they read a signed `sessions` cookie off a real
   // Request (Cookie header blocked by Fetch spec in the browser), and some need the signed
@@ -757,6 +759,16 @@ export interface Scenario {
   /** Status code the local listener responds with when `verificationMailListen` is true. Default
    *  200 (also captures the received method/content-type/body as outcome.received). */
   verificationMailStatus?: number;
+
+  /** Input for the real verifyRecaptcha(token, expectedAction). */
+  recaptchaInput?: { token: string; expectedAction: string };
+  /** Stubs `globalThis.fetch` for this scenario's siteverify call. `{ reject: true }` simulates
+   *  Google unreachable; `{ body }` simulates a response. Omitted for the not-configured case.
+   *  The harness records the request as `outcome.request`, never the secret's value. */
+  recaptchaFetch?: { reject: true } | { body: Record<string, unknown> };
+  /** Unsets PUBLIC_ORIGIN for one call to exercise the hostname-check skip. Unreachable in a
+   *  real boot (env.server refuses it), so this only proves the fallback branch behaves. */
+  recaptchaSkipPublicOrigin?: boolean;
 }
 
 /** A parsed logAuthEvent JSON line: { event, outcome, ...fields }. */

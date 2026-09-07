@@ -11,6 +11,7 @@ import {
   readMaxMindTrackingToken,
   syncMaxMindTokenToRef,
 } from '@/modules/fraud/maxmind-tracker';
+import { useRecaptcha } from '@/modules/fraud/recaptcha';
 import { startIdpIntent } from '@/resources/login';
 import { loginIdpSchema } from '@/resources/login/login.schema';
 import { genericCheckYourEmail } from '@/resources/schemas/check-your-email.schema';
@@ -27,6 +28,7 @@ import { loaderCsrf, assertCsrf } from '@/server/csrf';
 import { requireEmailVerification } from '@/server/env';
 import { trustedAppOrigin } from '@/server/infra/app-origin.server';
 import { env } from '@/server/infra/env.server';
+import { recaptchaRejects } from '@/server/infra/recaptcha.server';
 import { waitUntilDeadline } from '@/server/timing';
 import { actionError } from '@/utils/errors/auth-error';
 import { Button } from '@datum-cloud/datum-ui/button';
@@ -42,7 +44,14 @@ import {
   type LoaderFunctionArgs,
   type MetaFunction,
 } from 'react-router';
-import { Form as RRForm, Link, useLoaderData, useActionData, useNavigation } from 'react-router';
+import {
+  Form as RRForm,
+  Link,
+  useLoaderData,
+  useActionData,
+  useNavigation,
+  useSubmit,
+} from 'react-router';
 
 export const meta: MetaFunction = () => [{ title: 'Create account' }];
 
@@ -98,6 +107,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       organization,
       requestId,
       maxmindAccountId: env.MAXMIND_ACCOUNT_ID ?? '',
+      recaptchaSiteKey: env.RECAPTCHA_SITE_KEY ?? '',
       prefill,
       idp,
     },
@@ -110,7 +120,9 @@ export async function action({ request }: ActionFunctionArgs) {
   const form = await request.formData();
   await assertCsrf(request, form);
 
-  // IdP intent branch — user clicked an IdP button.
+  // IdP branch — EXEMPT from the reCAPTCHA gate below, deliberately. It creates nothing, only
+  // redirects; the account is created at GET /id/sso/:provider/callback, behind a real OAuth
+  // round-trip a bot cannot forge. Pinned by recaptcha-gate.cy.ts.
   if (form.get('intent') === 'idp') {
     const parsed = loginIdpSchema.safeParse(Object.fromEntries(form));
     if (!parsed.success) return data({ error: 'INVALID_INPUT' as const }, { status: 400 });
@@ -134,6 +146,13 @@ export async function action({ request }: ActionFunctionArgs) {
     } catch (err) {
       return actionError(err);
     }
+  }
+
+  // Bot gate, before any Zitadel work so a rejection costs what an acceptance costs (G7).
+  // Distinct action per intent, so an identifier token cannot be replayed against code entry.
+  const recaptchaAction = form.get('intent') === 'code' ? 'signup_code' : 'signup';
+  if (await recaptchaRejects(String(form.get('recaptchaToken') ?? ''), recaptchaAction)) {
+    return data({ error: 'INVALID_INPUT' as const }, { status: 400 });
   }
 
   // Code branch — the emailed code, typed instead of clicked. Same secret as the link.
@@ -252,21 +271,29 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function Signup() {
-  const { csrfToken, branding, view, idps, organization, requestId, maxmindAccountId, prefill } =
-    useLoaderData<typeof loader>();
+  const {
+    csrfToken,
+    branding,
+    view,
+    idps,
+    organization,
+    requestId,
+    maxmindAccountId,
+    recaptchaSiteKey,
+    prefill,
+  } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
   const { t } = useLingui();
 
+  // Form.Root forwards no ref, so each form is located via an always-rendered hidden input's
+  // `.form`. Not the recaptchaToken input — that one is conditional, and a null ref on an
+  // unconfigured deployment would break every submit.
   const deviceTokenRef = useRef<HTMLInputElement>(null);
+  const codeFormRef = useRef<HTMLInputElement>(null);
 
-  // FALLBACK ONLY: keep the hidden deviceTrackingToken input populated from the token the
-  // MaxMindTracker mirrors into sessionStorage, while the user is still filling the form (and
-  // as a backstop for any submission path that bypasses the button's onClick, e.g. an
-  // implicit Enter-key submit some browsers dispatch without a synthetic button click). The
-  // AUTHORITATIVE, race-safe write happens synchronously at submit time via
-  // syncMaxMindTokenToRef on the SubmitButton's onClick below — that's what closes the fast-
-  // signup race; this interval is best-effort and may still be empty at the moment of submit.
+  // Best-effort only. The race-safe write happens at submit via syncMaxMindTokenToRef in
+  // handleIdentifierSubmit; this interval may still be empty when the user submits.
   useEffect(() => {
     if (!maxmindAccountId) return;
     const sync = () => {
@@ -283,6 +310,60 @@ export default function Signup() {
     }, 300);
     return () => window.clearInterval(handle);
   }, [maxmindAccountId]);
+
+  // Loads the reCAPTCHA script (no-op when unconfigured) and returns the submit-time minter.
+  // Each form passes its own action name — never shared between the two, see useRecaptcha.
+  const mintRecaptchaToken = useRecaptcha(recaptchaSiteKey);
+
+  // Interception happens on the form's submit EVENT, not a button onClick: each form has one
+  // blocking field and so submits natively on Enter, which runs no onClick at all.
+  const submit = useSubmit();
+
+  // Guards the mint window, which `navigation.state` does not cover — it only flips once
+  // submit() is called. Refs, not state, so check-and-set is synchronous.
+  const identifierSubmitInFlight = useRef(false);
+  const codeSubmitInFlight = useRef(false);
+  const [identifierMinting, setIdentifierMinting] = useState(false);
+  const [codeMinting, setCodeMinting] = useState(false);
+
+  async function handleIdentifierSubmit() {
+    if (identifierSubmitInFlight.current) return;
+    identifierSubmitInFlight.current = true;
+    setIdentifierMinting(true);
+    try {
+      syncMaxMindTokenToRef(deviceTokenRef);
+      const formEl = deviceTokenRef.current?.form;
+      if (!formEl) return;
+      // Snapshot BEFORE the await: the conform adapter resets the form during this same submit
+      // cycle, so a post-await DOM read can come back already cleared.
+      const formData = new FormData(formEl);
+      const token = await mintRecaptchaToken('signup');
+      // Unconfigured deployments send no field at all, not just render none.
+      if (recaptchaSiteKey) formData.set('recaptchaToken', token ?? '');
+      submit(formData, { method: 'post' });
+    } finally {
+      identifierSubmitInFlight.current = false;
+      setIdentifierMinting(false);
+    }
+  }
+
+  async function handleCodeSubmit() {
+    if (codeSubmitInFlight.current) return;
+    codeSubmitInFlight.current = true;
+    setCodeMinting(true);
+    try {
+      const formEl = codeFormRef.current?.form;
+      if (!formEl) return;
+      // Snapshot before the await — see handleIdentifierSubmit.
+      const formData = new FormData(formEl);
+      const token = await mintRecaptchaToken('signup_code');
+      if (recaptchaSiteKey) formData.set('recaptchaToken', token ?? '');
+      submit(formData, { method: 'post' });
+    } finally {
+      codeSubmitInFlight.current = false;
+      setCodeMinting(false);
+    }
+  }
 
   // The action error surfaces INLINE via <FormError> (this replaces
   // the per-route toast); useAuthActionError owns the narrow→resolve pipeline.
@@ -346,10 +427,22 @@ export default function Signup() {
             method="POST"
             defaultValues={{ code: '' }}
             isSubmitting={navigation.state === 'submitting'}
+            // Intercepts every submit trigger for this form — click, Enter, requestSubmit() —
+            // not just a button's onClick. See handleCodeSubmit's comment above.
+            onSubmit={handleCodeSubmit}
             className="flex w-full flex-col gap-2">
             <AuthFormFields csrf={csrfToken} requestId={requestId} organization={organization} />
-            <input type="hidden" name="intent" value="code" />
+            {/* Doubles as codeFormRef's anchor for locating this form from handleCodeSubmit —
+                see that ref's declaration comment for why it is not the recaptchaToken input. */}
+            <input type="hidden" name="intent" value="code" ref={codeFormRef} />
             <input type="hidden" name="email" value={sentEmail} />
+            {/* Not ref'd — the mint is set on a FormData SNAPSHOT, never written back into this
+                input's DOM value (see handleCodeSubmit's comment). Gated on recaptchaSiteKey:
+                "unset config ⇒ feature entirely off" means no field either, not just no script
+                and no verification. */}
+            {recaptchaSiteKey ? (
+              <input type="hidden" name="recaptchaToken" defaultValue="" />
+            ) : null}
             <Form.Field name="code" label={t`Or enter the code from that email`} required>
               {/* The code's case is the server's business: the client must not alter it (see
                   signupCodeSchema). A touch keyboard would autocapitalise and autocorrect the
@@ -364,7 +457,9 @@ export default function Signup() {
               />
             </Form.Field>
             <FormError>{errorMessage}</FormError>
-            <SubmitButton loading={navigation.state === 'submitting'}>
+            <SubmitButton
+              loading={codeMinting || navigation.state === 'submitting'}
+              disabled={codeMinting}>
               <Trans>Continue</Trans>
             </SubmitButton>
           </Form.Root>
@@ -456,6 +551,10 @@ export default function Signup() {
                     method="POST"
                     defaultValues={{ email: prefill.email }}
                     isSubmitting={navigation.state === 'submitting'}
+                    // Intercepts every submit trigger for this form — click, Enter,
+                    // requestSubmit() — not just a button's onClick. See handleIdentifierSubmit's
+                    // comment above.
+                    onSubmit={handleIdentifierSubmit}
                     className="flex w-full flex-col gap-4">
                     <AuthFormFields
                       csrf={csrfToken}
@@ -470,6 +569,13 @@ export default function Signup() {
                       ref={deviceTokenRef}
                       defaultValue=""
                     />
+                    {/* Not ref'd — the mint is set on a FormData snapshot, never written back
+                        into this input's DOM value (see handleIdentifierSubmit's comment).
+                        Gated on recaptchaSiteKey: "unset config ⇒ feature entirely off" means
+                        no field either, not just no script and no verification. */}
+                    {recaptchaSiteKey ? (
+                      <input type="hidden" name="recaptchaToken" defaultValue="" />
+                    ) : null}
                     <Form.Field
                       name="email"
                       label={t`Email`}
@@ -486,8 +592,8 @@ export default function Signup() {
                     </Form.Field>
                     <FormError>{errorMessage}</FormError>
                     <SubmitButton
-                      loading={identifierSubmitting}
-                      onClick={() => syncMaxMindTokenToRef(deviceTokenRef)}>
+                      loading={identifierMinting || identifierSubmitting}
+                      disabled={identifierMinting}>
                       <Trans>Continue</Trans>
                     </SubmitButton>
                   </Form.Root>

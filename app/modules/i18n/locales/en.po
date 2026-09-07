@@ -74,8 +74,8 @@ msgstr "Added {0}"
 msgid "Additional verification is required to continue."
 msgstr "Additional verification is required to continue."
 
-#: app/routes/signup/index.tsx:395
-#: app/routes/signup/index.tsx:506
+#: app/routes/signup/index.tsx:490
+#: app/routes/signup/index.tsx:612
 msgid "Already have an account?"
 msgstr "Already have an account?"
 
@@ -160,8 +160,8 @@ msgid "Change your password"
 msgstr "Change your password"
 
 #: app/routes/password/reset.tsx:109
-#: app/routes/signup/index.tsx:331
-#: app/routes/signup/method.tsx:209
+#: app/routes/signup/index.tsx:412
+#: app/routes/signup/method.tsx:257
 #: app/routes/signup/password.tsx:218
 msgid "Check your email"
 msgstr "Check your email"
@@ -214,8 +214,8 @@ msgstr "Connected accounts"
 
 #: app/routes/device/index.tsx:73
 #: app/routes/login/index.tsx:556
-#: app/routes/signup/index.tsx:368
-#: app/routes/signup/index.tsx:491
+#: app/routes/signup/index.tsx:463
+#: app/routes/signup/index.tsx:597
 msgid "Continue"
 msgstr "Continue"
 
@@ -240,7 +240,7 @@ msgstr "Couldn't sign in"
 msgid "Couldn't verify"
 msgstr "Couldn't verify"
 
-#: app/routes/signup/index.tsx:416
+#: app/routes/signup/index.tsx:511
 msgid "Create a new account"
 msgstr "Create a new account"
 
@@ -273,8 +273,8 @@ msgstr "Device denied"
 
 #: app/routes/login/index.tsx:387
 #: app/routes/login/index.tsx:402
-#: app/routes/signup/index.tsx:450
-#: app/routes/signup/index.tsx:475
+#: app/routes/signup/index.tsx:545
+#: app/routes/signup/index.tsx:581
 msgid "Email"
 msgstr "Email"
 
@@ -357,7 +357,7 @@ msgstr "Enter your password"
 msgid "Enter your SMS code"
 msgstr "Enter your SMS code"
 
-#: app/routes/signup/method.tsx:236
+#: app/routes/signup/method.tsx:285
 msgid "Finish creating your account"
 msgstr "Finish creating your account"
 
@@ -369,7 +369,7 @@ msgstr "For your security, verify one of your sign-in methods to continue."
 msgid "Forgot password?"
 msgstr "Forgot password?"
 
-#: app/routes/signup/index.tsx:413
+#: app/routes/signup/index.tsx:508
 msgid "Get started"
 msgstr "Get started"
 
@@ -474,7 +474,7 @@ msgstr "Open your authenticator app and enter the 6-digit code."
 msgid "or"
 msgstr "or"
 
-#: app/routes/signup/index.tsx:353
+#: app/routes/signup/index.tsx:446
 msgid "Or enter the code from that email"
 msgstr "Or enter the code from that email"
 
@@ -579,7 +579,7 @@ msgstr "Register a passkey using your device's biometric sensor or PIN to sign i
 msgid "Register passkey"
 msgstr "Register passkey"
 
-#: app/routes/signup/index.tsx:422
+#: app/routes/signup/index.tsx:517
 msgid "Registration is currently unavailable. Please contact your administrator."
 msgstr "Registration is currently unavailable. Please contact your administrator."
 
@@ -670,8 +670,8 @@ msgid "Set up SMS one-time code"
 msgstr "Set up SMS one-time code"
 
 #: app/routes/login/password.tsx:206
-#: app/routes/signup/index.tsx:399
-#: app/routes/signup/index.tsx:508
+#: app/routes/signup/index.tsx:494
+#: app/routes/signup/index.tsx:614
 #: app/routes/sso/ldap.tsx:85
 msgid "Sign in"
 msgstr "Sign in"
@@ -729,12 +729,12 @@ msgstr "Signing in as"
 msgid "Signing in as <0>{loginName}</0>."
 msgstr "Signing in as <0>{loginName}</0>."
 
-#: app/routes/signup/method.tsx:240
+#: app/routes/signup/method.tsx:289
 #: app/routes/signup/password.tsx:237
 msgid "Signing up as"
 msgstr "Signing up as"
 
-#: app/routes/signup/method.tsx:278
+#: app/routes/signup/method.tsx:327
 msgid "Signing up isn't available right now. Please try again later or contact support."
 msgstr "Signing up isn't available right now. Please try again later or contact support."
 
@@ -877,7 +877,7 @@ msgstr "Unlink"
 msgid "Unlink {providerLabel}?"
 msgstr "Unlink {providerLabel}?"
 
-#: app/routes/signup/method.tsx:271
+#: app/routes/signup/method.tsx:320
 msgid "Use a passkey"
 msgstr "Use a passkey"
 
@@ -956,12 +956,12 @@ msgstr "We've sent a password reset link to <0>{0}</0>"
 
 #. placeholder {0}: (actionData as { email: string }).email
 #. placeholder {0}: actionData.email
-#: app/routes/signup/method.tsx:211
+#: app/routes/signup/method.tsx:259
 #: app/routes/signup/password.tsx:220
 msgid "We've sent a verification link to <0>{0}</0>"
 msgstr "We've sent a verification link to <0>{0}</0>"
 
-#: app/routes/signup/index.tsx:334
+#: app/routes/signup/index.tsx:415
 msgid "We've sent a verification link to <0>{sentEmail}</0>. Open it on this device to finish setting up your passkey."
 msgstr "We've sent a verification link to <0>{sentEmail}</0>. Open it on this device to finish setting up your passkey."
 
@@ -973,7 +973,7 @@ msgstr "Welcome"
 msgid "While Datum is currently free of charge to use, we require a valid payment method during the signup process."
 msgstr "While Datum is currently free of charge to use, we require a valid payment method during the signup process."
 
-#: app/routes/signup/index.tsx:380
+#: app/routes/signup/index.tsx:475
 msgid "Wrong address? Start over"
 msgstr "Wrong address? Start over"
 
