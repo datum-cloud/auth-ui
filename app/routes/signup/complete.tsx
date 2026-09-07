@@ -31,18 +31,11 @@ export async function loader({ request }: LoaderFunctionArgs) {
   // never resume at /authorize after email-link signup completes.
   const requestId = url.searchParams.get('requestId') ?? undefined;
 
-  // Guard: both code and userId are required — without them the link is structurally invalid.
-  // Surface requestId/organization alongside the error so "Start over" can resume the SAME
-  // ceremony instead of dropping into an unscoped /signup.
-  //
-  // NOT the address. This route is an unauthenticated GET whose userId comes straight off the
-  // query string, and signupRateLimit does not cover it (POST only, and only /id/signup,
-  // /id/signup/password, /id/signup/method). Resolving that id to a loginName and returning it
-  // turned the route into an email-disclosure oracle: GET ?code=anything&userId=<any valid id>
-  // handed back that account's address. Presenting a code proves nothing — any string reaches the
-  // same failure path — so there is no shape of "the request has a claim to this address" to gate
-  // on here. Start over therefore drops back to /signup without a prefill; retyping an address
-  // costs one field, an enumeration oracle costs every mailbox in the instance.
+  // Surface requestId/organization so "Start over" resumes the SAME ceremony — but NOT the
+  // address. This is an unauthenticated GET taking userId from the query string, uncovered by
+  // signupRateLimit (POST only), so returning a resolved loginName made it an email-disclosure
+  // oracle: ?code=anything&userId=<any valid id> handed back that account's address. Any string
+  // reaches the same failure path, so there is nothing to gate disclosure on.
   if (!code || !userId) {
     return data({ error: 'EXPIRED' as const, requestId, organization }, { status: 400 });
   }

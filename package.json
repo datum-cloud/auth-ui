@@ -6,7 +6,7 @@
   "type": "module",
   "scripts": {
     "build": "react-router build",
-    "dev": "bunx --bun react-router dev",
+    "dev": "bun --conditions=development ./node_modules/.bin/react-router dev",
     "start": "NODE_ENV=production bun ./build/server/index.js",
     "lint": "bunx eslint \"app/**/*.{ts,tsx}\" --fix",
     "lint:ci": "bunx eslint \"app/**/*.{ts,tsx}\"",

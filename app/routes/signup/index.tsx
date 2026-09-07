@@ -157,16 +157,13 @@ export async function action({ request }: ActionFunctionArgs) {
 
   // Code branch — the emailed code, typed instead of clicked. Same secret as the link.
   if (form.get('intent') === 'code') {
-    // t0 for the constant-time deadline below. Stamped at BRANCH ENTRY so every 400 this branch
-    // can return leaves at the same mark, whichever path produced it.
+    // Stamped at BRANCH ENTRY so every 400 below leaves at the same deadline.
     const startedAt = Date.now();
     const parsed = signupCodeSchema.safeParse(Object.fromEntries(form));
 
-    // Every failure below re-renders the check-your-email TERMINAL carrying the error, not a bare
-    // error: the code field exists only on that screen, so returning `{ error }` alone dropped the
-    // user onto the empty identifier screen with their address gone and the message attached to
-    // the wrong form — one typo ended the flow. `sent` is what selects the terminal, so it has to
-    // be in the shape. The address is the one just submitted, so echoing it back reveals nothing.
+    // Failures re-render the TERMINAL, not a bare error: the code field only exists there, so
+    // `{ error }` alone drops the user on the empty identifier screen with the address gone —
+    // one typo ended the flow. `sent` is what selects the terminal, so it must be in the shape.
     const identified = signupCodeSchema.pick({ email: true }).safeParse(Object.fromEntries(form));
     const invalidCode = () =>
       identified.success
@@ -181,17 +178,12 @@ export async function action({ request }: ActionFunctionArgs) {
     if (!parsed.success) return invalidCode();
     const { email, code, organization, requestId } = parsed.data;
 
-    // Resolve the id SERVER-SIDE. The client never sends one: this screen also renders for an
-    // address that already has an account, so an id in the page would reveal that it exists.
-    // Safe to resolve here because a valid code already proves control of the inbox.
-    // Org-scoped like every other findUser call site (password.service.ts, mfa.service.ts): the
-    // org is already parsed here and threaded into completeSignupHandoff below, and an unscoped
-    // lookup cannot see a user outside the default org — who then could never finish by code.
+    // Resolved SERVER-SIDE: this screen also renders for an address that already has an account,
+    // so an id in the page would reveal it exists. Safe here because a valid code already proves
+    // control of the inbox. Org-scoped like every other findUser call site.
     const user = await provider.findUser(email, organization);
-    // An unknown address answers exactly as a wrong code does, so neither reveals the other.
-    // Both 400s wait for the SAME deadline (see waitUntilDeadline) rather than padding only the
-    // not-found branch: a fixed floor on one side alone inverts the channel whenever the other
-    // side is faster than the floor, which for a healthy provider is the common case.
+    // An unknown address answers exactly as a wrong code does. Both wait for the SAME deadline —
+    // padding only this branch inverts the channel whenever the other side beats the floor.
     if (!user) {
       await waitUntilDeadline(startedAt);
       return invalidCode();

@@ -560,32 +560,20 @@ export async function registerEmailLinkSignup(
     }
   } catch (error) {
     if (!(error instanceof ProviderError && error.code === 'ALREADY_EXISTS')) throw error;
-    // SQUATTING FIX (inherited bug): an unverified, factorless account holds this address
-    // forever — the real owner's signup lands here every time and is silently dropped, so
-    // they can never sign up. Resend verification so the address stays claimable by whoever
-    // controls the inbox.
-    //
-    // organization: registrationOrg (resolved), same fix as above — resendIfSquatted's
-    // returnTo would otherwise drop organization on the same bare-flow case.
+    // An unverified, factorless account holds this address forever, so the real owner's signup is
+    // silently dropped every time. Resend so the address stays claimable by whoever controls the
+    // inbox. organization must be the RESOLVED registrationOrg or the emailed link loses it.
     const verdict = await resendIfSquatted(provider, email, {
       origin,
       requestId,
       organization: registrationOrg,
     });
 
-    // DELIBERATE ENUMERATION DISCLOSURE, scoped to one case.
-    //
-    // This flow used to answer ALREADY_EXISTS with the same generic "check your email" a fresh
-    // address gets — no response could distinguish the two (the G7 gate). The cost in practice:
-    // a returning user was told to open a mail that was never sent, waited, and had no way to
-    // learn why. Product decision was to disclose. See the rewritten
-    // enumeration-parity-signup.cy.ts, which now asserts this boundary rather than blanket parity.
-    //
-    // ONLY 'enrolled' discloses. The squatted case MUST stay generic: that address is held by an
-    // account with no credential, nobody can sign in to it, and telling the real owner it is
-    // "already registered" would lock them out permanently — the exact bug the resend above
-    // exists to fix. 'unknown' (lookup failed) also stays generic, so a provider outage cannot
-    // manufacture a false "taken" error, and cannot become an oracle of its own.
+    // DELIBERATE enumeration disclosure, and ONLY for 'enrolled'. Squatted must stay generic:
+    // nobody can sign in to a credential-less account, so telling the real owner it is "already
+    // registered" locks them out permanently — the bug the resend above exists to fix. 'unknown'
+    // stays generic too, so a provider outage cannot manufacture a false "taken" error.
+    // Boundary asserted by enumeration-parity-signup.cy.ts.
     if (verdict === 'enrolled') {
       logAuthEvent('signup.requested', 'failure', {
         actor: hashActor(email),
@@ -605,14 +593,8 @@ export async function registerEmailLinkSignup(
 
 /**
  * What an ALREADY_EXISTS turned out to mean, so the caller can decide whether to disclose.
- *
- *  - 'squatted'  — the address is held by an unverified, FACTORLESS account. Verification was
- *                  resent (or silently skipped by the mail-bomb guard). Must stay generic: the
- *                  real owner has to be able to claim the address, and telling a stranger it is
- *                  "taken" would strand them permanently on an account nobody can sign in to.
- *  - 'enrolled'  — a real account with at least one auth method. Safe to disclose.
- *  - 'unknown'   — the lookup itself failed. Falls back to the generic response: a provider
- *                  outage must never become an oracle, and must never invent a "taken" error.
+ * 'squatted' (factorless, verification resent) and 'unknown' (lookup failed) MUST stay generic;
+ * only 'enrolled' is safe to disclose.
  */
 type SquatVerdict = 'squatted' | 'enrolled' | 'unknown';
 
@@ -626,13 +608,10 @@ async function resendIfSquatted(
   link: { origin: string; requestId?: string; organization?: string }
 ): Promise<SquatVerdict> {
   try {
-    // SCOPED to the org the register actually targeted. Unscoped, this can resolve a DIFFERENT
-    // account than the one that raised ALREADY_EXISTS, and the verdict below is then computed for
-    // the wrong user: a factorless address in this org classified 'enrolled' off a namesake
-    // elsewhere throws the permanent lockout the squatted case exists to prevent, and the reverse
-    // aims the resend at an account the submitter never touched. Every other identity lookup with
-    // an org in hand scopes it (login.service, mfa.service, password.service); this one already
-    // had `link.organization` — the resolved registrationOrg — and was dropping it.
+    // Scoped to the org the register targeted. Unscoped, this resolves a DIFFERENT account than
+    // the one that raised ALREADY_EXISTS and the verdict is computed for the wrong user — a
+    // factorless address classified 'enrolled' off a namesake elsewhere is the permanent lockout
+    // the squatted case exists to prevent.
     const user = await provider.findUser(email, link.organization);
     // No user behind an ALREADY_EXISTS is a contradiction (a race, or a provider quirk).
     // Treat it as unknown rather than asserting either way.
