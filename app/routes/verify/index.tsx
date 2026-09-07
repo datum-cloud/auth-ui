@@ -187,26 +187,34 @@ export default function Verify() {
             The action checks intent=resend before using the code value, but verifyCodeSchema
             requires code.min(1); the code='resend' sentinel makes the parse succeed and the
             resend branch ignores the code entirely. */}
-        <RRForm method="post">
-          <AuthFormFields
-            csrf={csrfToken}
-            loginName={loginName}
-            requestId={requestId}
-            organization={organization}
-          />
-          <input type="hidden" name="userId" value={userId} />
-          <input type="hidden" name="code" value="resend" />
-          <input type="hidden" name="intent" value="resend" />
-          {invite ? <input type="hidden" name="invite" value={invite} /> : null}
-          <Button
-            type="secondary"
-            theme="outline"
-            block
-            htmlType="submit"
-            loading={navigation.state === 'submitting'}>
-            <Trans>Resend code</Trans>
-          </Button>
-        </RRForm>
+        {/* Gated on userId: this page is also reachable as /verify?loginName=… with no
+            userId, and resend cannot work in that state — verifyCodeSchema requires
+            userId.min(1), so the POST is rejected before the intent branch and the user
+            gets INVALID_INPUT from a control that never had a chance. Hidden rather than
+            disabled: a disabled button still claims a resend exists. Resolving the userId
+            from loginName instead would be an enumeration oracle (G7). */}
+        {userId ? (
+          <RRForm method="post">
+            <AuthFormFields
+              csrf={csrfToken}
+              loginName={loginName}
+              requestId={requestId}
+              organization={organization}
+            />
+            <input type="hidden" name="userId" value={userId} />
+            <input type="hidden" name="code" value="resend" />
+            <input type="hidden" name="intent" value="resend" />
+            {invite ? <input type="hidden" name="invite" value={invite} /> : null}
+            <Button
+              type="secondary"
+              theme="outline"
+              block
+              htmlType="submit"
+              loading={navigation.state === 'submitting'}>
+              <Trans>Resend code</Trans>
+            </Button>
+          </RRForm>
+        ) : null}
       </div>
     </AuthCard>
   );

@@ -208,20 +208,16 @@ describe('/login — identifier-form view logic', () => {
     cy.contains('Sign-in is currently unavailable').should('not.exist');
   });
 
-  // When email-link is the ONLY path, "Continue" would hand off to decideAfterIdentifier
-  // and resolve to NO_SUPPORTED_METHOD — so it must not render. The email-link submit
-  // takes over as the form's primary (and only) action.
-  it('an email-link-only org shows the form without a dead-end Continue button', () => {
+  // This org used to sign in by email link alone, so the form rendered with that submit as its
+  // only action. Email OTP sign-in is hidden now (EMAIL_OTP_SIGNIN_ENABLED=false), leaving it no
+  // path at all — so the unavailable state is the honest answer. The alternative would be an
+  // identifier form whose only submit button no longer renders.
+  it('an email-only org reports sign-in unavailable rather than a dead form', () => {
     mountLogin({
       settings: { allowPassword: false, passkeysType: 'not_allowed' },
       emailDeliveryEnabled: true,
     });
-    cy.contains('button', 'Email').should('be.visible').click();
-    cy.contains('button', 'Email me a sign-in link').should('be.visible');
-    // Exactly one submit action — no "Continue" alongside it.
-    cy.get('form button[type="submit"]').should('have.length', 1);
-    cy.contains('form button', 'Continue').should('not.exist');
-    // The intent rides on a hidden field, so implicit submission still means email-link.
-    cy.get('form input[name="intent"]').should('have.value', 'email-link');
+    cy.contains('Sign-in is currently unavailable').should('be.visible');
+    cy.contains('button', 'Email me a sign-in link').should('not.exist');
   });
 });

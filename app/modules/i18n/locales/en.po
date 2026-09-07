@@ -599,7 +599,7 @@ msgstr "Remove this passkey?"
 
 #: app/routes/login/verify/email.tsx:88
 #: app/routes/login/verify/sms.tsx:85
-#: app/routes/verify/index.tsx:207
+#: app/routes/verify/index.tsx:214
 msgid "Resend code"
 msgstr "Resend code"
 
