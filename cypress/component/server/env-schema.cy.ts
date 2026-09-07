@@ -327,3 +327,65 @@ describe('env schema — VERIFICATION_MAIL_* (mTLS verification-mail delivery cl
     });
   });
 });
+
+describe('env schema — RECAPTCHA_SITE_KEY / RECAPTCHA_SECRET_KEY (reCAPTCHA v3 gate)', () => {
+  it('accepts both reCAPTCHA keys together (with PUBLIC_ORIGIN)', () => {
+    callService({
+      fn: 'envSchemaFull',
+      parseEnvRaw: {
+        ...BASE,
+        RECAPTCHA_SITE_KEY: 'site-key',
+        RECAPTCHA_SECRET_KEY: 'secret-key',
+        PUBLIC_ORIGIN: 'http://localhost:3000',
+      },
+    }).then((v) => {
+      expect(v.outcome.success).to.equal(true);
+      const data = v.outcome.data as Record<string, unknown>;
+      expect(data.RECAPTCHA_SITE_KEY).to.equal('site-key');
+      expect(data.RECAPTCHA_SECRET_KEY).to.equal('secret-key');
+    });
+  });
+
+  it('accepts neither — the feature is simply off', () => {
+    callService({ fn: 'envSchemaFull', parseEnvRaw: { ...BASE } }).then((v) => {
+      expect(v.outcome.success).to.equal(true);
+      const data = v.outcome.data as Record<string, unknown>;
+      expect(data.RECAPTCHA_SITE_KEY).to.equal(undefined);
+      expect(data.RECAPTCHA_SECRET_KEY).to.equal(undefined);
+    });
+  });
+
+  it('REFUSES a site key without a secret', () => {
+    callService({
+      fn: 'envSchemaFull',
+      parseEnvRaw: { ...BASE, RECAPTCHA_SITE_KEY: 'site-key' },
+    }).then((v) => {
+      expect(v.outcome.success).to.equal(false);
+      expect(
+        (v.outcome.issues as Array<{ path: unknown[]; message: string }>).some(
+          (i) => i.path[0] === 'RECAPTCHA_SITE_KEY' && /RECAPTCHA_SECRET_KEY/.test(i.message)
+        ),
+        JSON.stringify(v.outcome.issues)
+      ).to.equal(true);
+    });
+  });
+
+  it('REFUSES a secret without PUBLIC_ORIGIN — the hostname check would silently no-op', () => {
+    callService({
+      fn: 'envSchemaFull',
+      parseEnvRaw: {
+        ...BASE,
+        RECAPTCHA_SITE_KEY: 'site-key',
+        RECAPTCHA_SECRET_KEY: 'secret-key',
+      },
+    }).then((v) => {
+      expect(v.outcome.success).to.equal(false);
+      expect(
+        (v.outcome.issues as Array<{ path: unknown[]; message: string }>).some(
+          (i) => i.path[0] === 'RECAPTCHA_SECRET_KEY' && /PUBLIC_ORIGIN/.test(i.message)
+        ),
+        JSON.stringify(v.outcome.issues)
+      ).to.equal(true);
+    });
+  });
+});

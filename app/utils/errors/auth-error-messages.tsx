@@ -60,6 +60,8 @@ export function useAuthErrorMessage() {
         return t`Password sign-in isn't available for this account.`;
       case 'ALREADY_DONE':
         return t`That's already been done.`;
+      case 'INVALID_CODE':
+        return t`That code is invalid or has expired. Start over to get a new one.`;
       case undefined:
         return undefined;
       default:

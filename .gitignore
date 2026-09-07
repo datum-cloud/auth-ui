@@ -32,3 +32,6 @@ docs/superpowers/
 # Playwright run artifacts
 test-results/
 playwright-report/
+
+# graphify
+graphify-out/

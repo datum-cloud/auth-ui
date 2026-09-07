@@ -19,12 +19,34 @@ export interface NextStepInput {
   suppressMfaSetupNudge?: boolean;
 }
 
+/**
+ * Where to re-prompt a subject whose primary factor is missing or stale.
+ *
+ * NOT unconditionally '/login/password' — a dead end for anyone without one, and passwordless
+ * accounts reach here routinely (an email-link session carries only `otpEmail`, which
+ * `primaryFresh` does not count). Adding otpEmail to `primaryFresh` would close that in one line,
+ * but `secondFactorFresh` already counts it, so one email code would satisfy both factors.
+ *
+ * Unknown enrolment keeps '/login/password', so existing callers are unaffected and a GHOST
+ * subject still lands there — preserving `ignoreUnknownUsernames` indistinguishability.
+ */
+function repromptPrimaryPath(enrolledMethods: AuthMethod[] | undefined): string {
+  if (!enrolledMethods?.length) return '/login/password';
+  if (enrolledMethods.includes('password')) return '/login/password';
+  if (enrolledMethods.includes('passkey')) return '/login/passkey';
+  // Neither password nor passkey (e.g. otp_email- or idp-only): the chooser resolves what is
+  // actually usable rather than guessing a single screen from here.
+  return '/login/method';
+}
+
 export function nextStep(input: NextStepInput): string {
   const { factors, settings } = input;
   const nowMs = input.nowMs ?? 0;
 
-  // Primary factor must be present and fresh.
-  if (!primaryFresh(factors, nowMs, settings.passwordCheckLifetimeMs)) return '/login/password';
+  // Primary factor must be present and fresh; otherwise re-prompt for one the subject HAS.
+  if (!primaryFresh(factors, nowMs, settings.passwordCheckLifetimeMs)) {
+    return repromptPrimaryPath(input.enrolledMethods);
+  }
 
   // Delegate the MFA decision to the pure engine.
   const mfa = nextMfaStep({

@@ -33,11 +33,11 @@ export interface SendVerificationMailInput {
   returnTo: string;
 }
 
-// Bounded so a routable-but-unresponsive host (as opposed to an immediately-refused connection)
-// can't hang the caller indefinitely. Short (in-cluster POST, not a public internet hop) — a
-// generous timeout here widens the fresh-vs-existing-account timing gap G7 enumeration safety
-// already tolerates during a webhook outage, so this stays tight rather than defensively long.
-const REQUEST_TIMEOUT_MS = 2000;
+// Bounds a routable-but-unresponsive host. 5s because the webhook creates a milo `Email` — a
+// Kubernetes API write whose p99 under load passes 2s, and a drop costs a user their mail. No
+// longer, because this blocks the response and widens the fresh-vs-squatted timing gap during an
+// outage (the squatted path runs its resend THROUGH this send).
+const REQUEST_TIMEOUT_MS = 5000;
 
 /**
  * POSTs `{ userId, code, returnTo }` as JSON to VERIFICATION_MAIL_URL. Resolves `true` only on a
@@ -114,7 +114,12 @@ function postJson(rawUrl: string, body: SendVerificationMailInput): Promise<numb
         resolve(res.statusCode ?? 0);
       }
     );
-    request.on('timeout', () => request.destroy(new Error('verification-mail request timed out')));
+    // Reject here, not via destroy(err): under Bun that emits no 'error', so the handler below
+    // never fired and this promise stayed pending forever — signup awaits it.
+    request.on('timeout', () => {
+      request.destroy();
+      reject(new Error('verification-mail request timed out'));
+    });
     request.on('error', reject);
     request.end(payload);
   });

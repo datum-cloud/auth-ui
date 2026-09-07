@@ -40,8 +40,39 @@ import { Form as RRForm } from 'react-router';
 
 export const meta: MetaFunction = () => [{ title: 'Set a password' }];
 
+// ── Retired: signup is passkey-only ───────────────────────────────────────────
+
+/**
+ * @deprecated Retired; both handlers below fail closed.
+ *
+ * Hiding the button was not enough: this route has its own loader and action, both reading the
+ * identity straight from the request with no session gate, so a bare deep link created a password
+ * account. Typed `true`, so everything past the guards is unreachable — ~200 lines that neither
+ * tsc nor ESLint reports. Kept, not deleted, for the password-reset phase; re-enabling is
+ * deleting this block.
+ */
+const SIGNUP_PASSWORD_RETIRED = true;
+
+// Bounces to /signup (the canonical entry), carrying the address as ?email, which /signup
+// prefills. firstName/lastName are dropped deliberately: both are derived from the email.
+function retiredRedirect(url: URL): Response {
+  // Built through `paths`, not by hand: withQuery already omits absent keys, so the local
+  // URLSearchParams juggling this replaces was a second copy of that rule sitting next to the one
+  // hardcoded route string in this file. `|| undefined` maps both null and '' to absent, which is
+  // exactly what the previous falsy checks did.
+  const param = (key: string) => url.searchParams.get(key) || undefined;
+  return redirect(
+    paths.signup.index({
+      email: param('loginName'),
+      organization: param('organization'),
+      requestId: param('requestId'),
+    })
+  );
+}
+
 export async function loader({ request }: LoaderFunctionArgs) {
   const url = new URL(request.url);
+  if (SIGNUP_PASSWORD_RETIRED) return retiredRedirect(url);
   const { csrfToken, headers } = await loaderCsrf(request);
   const rawOrg = url.searchParams.get('organization') ?? undefined;
   // Fetch the org's password-complexity policy so the form renders the requirement checklist and
@@ -67,6 +98,9 @@ export async function loader({ request }: LoaderFunctionArgs) {
 }
 
 export async function action({ request }: ActionFunctionArgs) {
+  if (SIGNUP_PASSWORD_RETIRED) {
+    return data({ error: 'INVALID_INPUT' as const }, { status: 400 });
+  }
   const provider = providerForRequest(request);
   const form = await request.formData();
   await assertCsrf(request, form);

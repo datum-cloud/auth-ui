@@ -22,7 +22,9 @@
  *                         methods (password + passkey) render the real chooser
  *                         with no sole-method auto-start short-circuit
  *   /signup             — no guard, plain visit
- *   /signup/password    — no session guard; ?loginName seeds it (same as above)
+ *   /signup/method      — no session guard; ?loginName/?firstName/?lastName seed it. Replaces
+ *                         the retired /signup/password sweep: signup is passkey-only and that
+ *                         route now redirects here, so it renders no form to audit
  *   /password/reset     — no guard, plain visit
  *   /password/new       — no session guard; ?code + ?userId are read from
  *                         searchParams only (loader never redirects without them)
@@ -74,10 +76,10 @@ describe('a11y sweep — /signup', () => {
   });
 });
 
-describe('a11y sweep — /signup/password', () => {
+describe('a11y sweep — /signup/method', () => {
   it('passes axe (WCAG 2.2 AA)', () => {
-    cy.visit('/id/signup/password?loginName=new%40acme.test&firstName=New&lastName=User');
-    cy.location('pathname').should('include', '/signup/password');
+    cy.visit('/id/signup/method?loginName=new%40acme.test&firstName=New&lastName=User');
+    cy.location('pathname').should('include', '/signup/method');
     checkA11y();
   });
 });

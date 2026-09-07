@@ -32,6 +32,36 @@ describe('signup/complete — success path', () => {
       expect(v.response?.passkeyHint).to.equal('signup-fresh@acme.test');
     });
   });
+
+  // REGRESSION GUARD for the post-enrollment dead end, and for how it was finally resolved.
+  //
+  // This redirect originally carried NO returnTo and checkAfter=false, so after the passkey was
+  // registered the routing fell through to nextStep — which found no fresh primary factor (the
+  // session this loader mints holds only an otpEmail factor, and primaryFresh does not count it)
+  // and sent a brand-new passwordless user to /login/password, a password they never set.
+  //
+  // checkAfter=true was the first fix: assert the new passkey immediately to earn a primary
+  // factor. It worked in principle but demanded a second biometric prompt seconds after the
+  // first, and returned FAILED_PRECONDITION on staging. So enrollment now ends at
+  // /signup/success, which tells the user their account is ready and links to /login.
+  it('sends the user to the /signup/success terminal after enrollment, not into a second ceremony', () => {
+    callService({
+      fn: 'signupCompleteLoader',
+      provider: 'singleton',
+      request: {
+        url: 'http://localhost/id/signup/complete?next=passkey',
+        form: { registerEmail: 'terminal@acme.test', firstName: 'Term', lastName: 'Inal' },
+      },
+    }).then((v) => {
+      const url = new URL(v.response?.location ?? '', 'http://localhost');
+      expect(url.searchParams.get('force'), 'force').to.equal('false');
+      // No inline assertion: checkAfter must NOT re-arm the /login/passkey hand-off.
+      expect(url.searchParams.get('checkAfter'), 'checkAfter').to.equal('false');
+      const returnTo = url.searchParams.get('returnTo') ?? '';
+      expect(returnTo, 'returnTo').to.contain('/signup/success');
+      expect(returnTo, 'identity threaded onto the terminal').to.contain('terminal%40acme.test');
+    });
+  });
 });
 
 // ── Expired / invalid link ────────────────────────────────────────────────────
@@ -97,6 +127,30 @@ describe('signup/complete — expired/invalid link', () => {
       expect(body.error).to.equal('EXPIRED');
       expect(body.requestId).to.equal('oidc_V2_456');
       expect(body.organization).to.equal('org-2');
+    });
+  });
+
+  // SECURITY REGRESSION GUARD. This loader briefly resolved `userId` (straight off the query
+  // string, unauthenticated GET, and NOT covered by signupRateLimit — which matches POST only, and
+  // only /id/signup, /id/signup/password, /id/signup/method) to a loginName and returned it in the
+  // 400 body so "Start over" could prefill the address. That made the route an email-disclosure
+  // oracle: ?code=anything&userId=<any valid id> handed back that account's mailbox. Presenting a
+  // code is no claim to the address — any string lands on the same failure path — so the address
+  // is not surfaced here at all. Start over drops back to /signup without a prefill.
+  it('never discloses the account address for a supplied userId', () => {
+    callService({
+      fn: 'signupCompleteLoader',
+      provider: 'singleton',
+      request: {
+        url: 'http://localhost/id/signup/complete?code=bad&userId=u1&next=passkey',
+      },
+    }).then((v) => {
+      const body = v.response?.dataBody as Record<string, unknown>;
+      expect(v.response?.dataStatus).to.equal(400);
+      expect(body.error).to.equal('EXPIRED');
+      expect(body.email, 'no address in the failure body').to.equal(undefined);
+      // Belt and braces: nothing else in the body may carry the address either.
+      expect(JSON.stringify(body)).to.not.contain('@');
     });
   });
 });

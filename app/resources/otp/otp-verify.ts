@@ -173,9 +173,15 @@ export function createOtpVerifyHandlers(cfg: OtpVerifyConfig) {
     // email only: continue passkey enrollment when requested.
     const nextParam = String(formEntries.next ?? '');
     if (cfg.nextParamHandling === 'passkey-redirect' && nextParam === 'passkey') {
+      // Mirrors completeEmailLinkSignup: a magic-link session holds only an otpEmail factor,
+      // which primaryFresh does not count as primary, so post-enrollment routing has no fresh
+      // primary factor to land on. Rather than assert the just-registered passkey inline
+      // (a second biometric prompt, and FAILED_PRECONDITION on staging), finish at the signup
+      // terminal and let the user sign in normally. returnTo is re-validated on the enroll POST.
       const p = new URLSearchParams({ loginName, force: 'false', checkAfter: 'false' });
       if (organization) p.set('organization', organization);
       if (requestId) p.set('requestId', requestId);
+      p.set('returnTo', `/signup/success?${threadParams(loginName, requestId, organization)}`);
       return redirect(`/setup/passkey?${p.toString()}`, { headers });
     }
 

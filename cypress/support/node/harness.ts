@@ -145,10 +145,12 @@ import {
   loader as signupPasswordLoader,
   action as signupPasswordAction,
 } from '@/routes/signup/password';
+import { loader as signupSuccessLoader } from '@/routes/signup/success';
 import { loader as verifyIndexLoader, action as verifyIndexAction } from '@/routes/verify/index';
 import { providerForRequest } from '@/server/composition';
 import { getCsrfToken, loaderCsrf, assertCsrf, assertCsrfWith } from '@/server/csrf';
-import { _envSchema } from '@/server/infra/env.server';
+import { _envSchema, env } from '@/server/infra/env.server';
+import { verifyRecaptcha } from '@/server/infra/recaptcha.server';
 import { sendVerificationMail } from '@/server/infra/verification-mail.server';
 import {
   loginPasswordRateLimit,
@@ -497,8 +499,15 @@ async function serializeResponse(res: unknown): Promise<SerializedResponse> {
     if (sessionsCookieStr) {
       try {
         const parsed = await sessionsCookie.parse(sessionsCookieStr.split(';')[0]);
+        // loginName/organization included so a spec can assert HOW an entry is tagged, not just
+        // that one exists. byLoginName filters on the org, so an entry minted without it is
+        // invisible to an org-scoped lookup — a difference `{ id }` alone cannot express.
         cookieEntries = Array.isArray(parsed)
-          ? parsed.map((e: { id: string }) => ({ id: e.id }))
+          ? parsed.map((e: { id: string; loginName?: string; organization?: string }) => ({
+              id: e.id,
+              loginName: e.loginName,
+              organization: e.organization,
+            }))
           : null;
       } catch {
         cookieEntries = null;
@@ -662,6 +671,11 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
           contentType: req.headers['content-type'],
           body: raw ? JSON.parse(raw) : undefined,
         });
+        // Deliberately never respond: the connection stays open and idle, so the ONLY thing that
+        // can end the client's call is its own request timeout. Connection-refused (the
+        // verificationMailListen:false case) errors immediately down a different path, so it
+        // cannot stand in for this one.
+        if (s.verificationMailHang) return;
         res.writeHead(s.verificationMailStatus ?? 200, { 'content-type': 'application/json' });
         res.end('{}');
       });
@@ -671,6 +685,39 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
       verificationMailServer?.listen(port, '127.0.0.1', () => res2());
     });
   }
+
+  // `recaptchaFetch` stubs fetch for any dispatched fn, so a route action calling the real
+  // verifyRecaptcha can be driven too. Restored in the finally block below. Captures the
+  // outbound request, so a dropped secret or wrong key would not pass outcome-only assertions.
+  const originalFetch = globalThis.fetch;
+  let recaptchaCapturedRequest:
+    | { url: string; method: string | undefined; hasSecret: boolean; hasResponse: boolean }
+    | undefined;
+  if (s.recaptchaFetch) {
+    const behavior = s.recaptchaFetch;
+    globalThis.fetch = (async (input: unknown, init?: RequestInit) => {
+      const params = new URLSearchParams(String(init?.body ?? ''));
+      recaptchaCapturedRequest = {
+        url: String(input),
+        method: init?.method,
+        hasSecret: params.has('secret'),
+        hasResponse: params.has('response'),
+      };
+      if ('reject' in behavior) throw new Error('ECONNREFUSED');
+      return new Response(JSON.stringify(behavior.body));
+    }) as typeof fetch;
+  }
+  // recaptchaSkipPublicOrigin mutates PUBLIC_ORIGIN on the booted env singleton for one call.
+  // env.server refuses that combination at boot, so this only proves the fallback branch works.
+  const originalPublicOrigin = env.PUBLIC_ORIGIN;
+  if (s.recaptchaSkipPublicOrigin) {
+    (env as { PUBLIC_ORIGIN?: string }).PUBLIC_ORIGIN = undefined;
+  }
+
+  // Wall clock around the dispatch only (provider seeding and the mail listener are already up),
+  // so a spec can assert that an enumeration-safe branch waited for its constant-time deadline.
+  const dispatchStartedAt = Date.now();
+  let elapsedMs: number;
 
   try {
     switch (s.fn) {
@@ -2512,6 +2559,14 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
         break;
       }
 
+      // Drives the real verifyRecaptcha; stub setup lives above the switch.
+      case 'verifyRecaptcha': {
+        const input = s.recaptchaInput ?? { token: '', expectedAction: 'signup' };
+        const result = await verifyRecaptcha(input.token, input.expectedAction);
+        outcome = { ...result, request: recaptchaCapturedRequest };
+        break;
+      }
+
       // ── routes/login handlers (batch 13b) ──────────────────────────────────────────────────────
       // Route loaders/actions are node-bound: they read REAL signed cookies off a Request and emit
       // REAL audit. buildHandlerRequest mints a real `instanceof Request` so remix-utils' getHeaders
@@ -2610,15 +2665,26 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
       }
 
       case 'loginPasskeyLoader': {
-        const { request } = await buildHandlerRequest(
-          s.request ?? { url: 'http://localhost/id/login/passkey' }
-        );
-        const result = await loginPasskeyLoader({
-          request,
-          params: {},
-          context: {} as never,
-        } as never);
-        response = await serializeResponse(result);
+        // PROVIDER BRIDGE (see the signup cases). The loader resolves its own provider via
+        // providerForRequest, so without this the scenario's liveSessions are invisible to it:
+        // updateSession throws NOT_FOUND against the unseeded singleton, the stale-session
+        // self-heal mints a replacement, and the spec silently exercises the RECOVERY path
+        // instead of the challenge path it meant to test.
+        const originalFake = providerRegistry.fake;
+        providerRegistry.fake = () => provider;
+        try {
+          const { request } = await buildHandlerRequest(
+            s.request ?? { url: 'http://localhost/id/login/passkey' }
+          );
+          const result = await loginPasskeyLoader({
+            request,
+            params: {},
+            context: {} as never,
+          } as never);
+          response = await serializeResponse(result);
+        } finally {
+          providerRegistry.fake = originalFake;
+        }
         break;
       }
 
@@ -2826,15 +2892,27 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
       }
 
       case 'signupMethodAction': {
-        const { request } = await buildHandlerRequest(
-          s.request ?? { url: 'http://localhost/id/signup/method', csrf: true }
-        );
-        const result = await signupMethodAction({
-          request,
-          params: {},
-          context: {} as never,
-        } as never);
-        response = await serializeResponse(result);
+        // PROVIDER BRIDGE (same pattern as reauthProviderCallback above). The route resolves its
+        // own provider via providerForRequest → providerRegistry.fake(), which is INDEPENDENT of
+        // the provider buildProvider just seeded. Without this, a scenario's `seed` never reaches
+        // the code under test: every seeded account state behaved as a FRESH address, which is why
+        // enumeration-parity-signup.cy.ts could assert three-way parity and pass while exercising
+        // one path. Point the registry at the seeded provider for this call only, then restore.
+        const originalFake = providerRegistry.fake;
+        providerRegistry.fake = () => provider;
+        try {
+          const { request } = await buildHandlerRequest(
+            s.request ?? { url: 'http://localhost/id/signup/method', csrf: true }
+          );
+          const result = await signupMethodAction({
+            request,
+            params: {},
+            context: {} as never,
+          } as never);
+          response = await serializeResponse(result);
+        } finally {
+          providerRegistry.fake = originalFake;
+        }
         break;
       }
 
@@ -2928,16 +3006,50 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
         break;
       }
 
+      case 'signupSuccessLoader': {
+        // Bridged like the signup actions: the loader resolves its own provider via
+        // providerForRequest, so without this the seeded liveSessions (which decide whether the
+        // signup session gets retired) would be invisible to it.
+        const originalFake = providerRegistry.fake;
+        providerRegistry.fake = () => provider;
+        try {
+          const { request } = await buildHandlerRequest(
+            s.request ?? { url: 'http://localhost/id/signup/success' }
+          );
+          const result = await signupSuccessLoader({
+            request,
+            params: {},
+            context: {} as never,
+          } as never);
+          response = await serializeResponse(result);
+        } finally {
+          providerRegistry.fake = originalFake;
+        }
+        break;
+      }
+
       case 'signupIndexAction': {
-        const { request } = await buildHandlerRequest(
-          s.request ?? { url: 'http://localhost/id/signup', csrf: true }
-        );
-        const result = await signupIndexAction({
-          request,
-          params: {},
-          context: {} as never,
-        } as never);
-        response = await serializeResponse(result);
+        // PROVIDER BRIDGE (same pattern as reauthProviderCallback above). The route resolves its
+        // own provider via providerForRequest → providerRegistry.fake(), which is INDEPENDENT of
+        // the provider buildProvider just seeded. Without this, a scenario's `seed` never reaches
+        // the code under test: every seeded account state behaved as a FRESH address, which is why
+        // enumeration-parity-signup.cy.ts could assert three-way parity and pass while exercising
+        // one path. Point the registry at the seeded provider for this call only, then restore.
+        const originalFake = providerRegistry.fake;
+        providerRegistry.fake = () => provider;
+        try {
+          const { request } = await buildHandlerRequest(
+            s.request ?? { url: 'http://localhost/id/signup', csrf: true }
+          );
+          const result = await signupIndexAction({
+            request,
+            params: {},
+            context: {} as never,
+          } as never);
+          response = await serializeResponse(result);
+        } finally {
+          providerRegistry.fake = originalFake;
+        }
         break;
       }
 
@@ -3173,8 +3285,13 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
   } catch (err) {
     error = err instanceof Error ? (err.stack ?? err.message) : String(err);
   } finally {
+    elapsedMs = Date.now() - dispatchStartedAt;
     // eslint-disable-next-line no-console -- restore the intercepted audit sink
     console.log = originalLog;
+    globalThis.fetch = originalFetch;
+    if (s.recaptchaSkipPublicOrigin) {
+      (env as { PUBLIC_ORIGIN?: string }).PUBLIC_ORIGIN = originalPublicOrigin;
+    }
     if (verificationMailServer) {
       await new Promise<void>((res2) => verificationMailServer?.close(() => res2()));
     }
@@ -3253,6 +3370,7 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
     audit,
     auditLines,
     calls: s.recordCalls?.length ? calls : undefined,
+    elapsedMs,
     inspect: Object.keys(inspect).length ? inspect : undefined,
     verificationMailReceived: verificationMailReceived.length
       ? verificationMailReceived

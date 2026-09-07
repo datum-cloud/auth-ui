@@ -1,11 +1,19 @@
 // cypress/component/routes/signup/password.cy.ts
 //
-// cy.task port of app/routes/signup/__tests__/password.test.tsx.
-// Covers the signup/password action: enumeration-safe error handling for existing
-// accounts (security regression gate) and the real-provider happy path. Loader
-// param-threading, schema-validation permutations, and complexity-policy fan-out are
-// covered once each in password-loader-action.cy.ts / password.cy.ts siblings — not
-// duplicated here.
+// /signup/password is RETIRED — signup is passkey-only.
+//
+// This spec used to exercise the route's action (ALREADY_EXISTS enumeration safety + the
+// real-provider happy path). Both handlers now fail closed, so those assertions moved to where
+// the properties actually live: `registerWithPassword` is still covered end-to-end in
+// cypress/component/resources/signup/signup.service.cy.ts, including the enumeration-safe
+// ALREADY_EXISTS path. Nothing about that security guarantee is untested — it is simply no
+// longer reachable through this route.
+//
+// What is tested HERE is the retirement itself. Removing the "Set a password" button from
+// /signup/method is display-only; this route has its own loader and action that read identity
+// straight from the request with no session gate, so before the guard a bare deep link
+// (/id/signup/password?loginName=…&firstName=…&lastName=…) created a password account and
+// bypassed the passkey-only screen entirely.
 import { callService } from '../../../support/node/call-service';
 
 const VALID_IDENTITY = {
@@ -16,84 +24,63 @@ const VALID_IDENTITY = {
   confirm: 'sup3rsecret',
 };
 
-// ── Action: ALREADY_EXISTS enumeration safety (tamper-proof error model) ─────
-
-describe('signup/password — action: ALREADY_EXISTS enumeration safety', () => {
-  // Security regression gate (restored from password.test.tsx, adapted for cy.task).
-  //
-  // The route's actionError handler correctly maps ProviderError('ALREADY_EXISTS') → HTTP 409
-  // + { error: 'ALREADY_EXISTS' } with no raw message (verified: app/utils/errors/auth-error.ts
-  // resolveAuthError). However, that catch block is structurally unreachable via the real code
-  // path: registerWithPassword → runEnumerationSafeRegister always catches ALREADY_EXISTS first
-  // and returns { kind: 'sent' }, so the route emits 200 — not 409. This is intentional
-  // (SEC: account existence must be indistinguishable from a fresh signup to prevent enumeration).
-  //
-  // Observable security property tested here:
-  //   • Duplicate email → 200 { sent: true } (same as a fresh signup — no status divergence)
-  //   • body.error absent (no ALREADY_EXISTS code in the client response)
-  //   • Raw provider message 'already registered' never reaches the client body
-  //
-  // Harness seam: form.preRegisterEmail seeds the FakeAuthProvider with that address and
-  // shadows provider.register() to throw ALREADY_EXISTS for it, then restores the prototype
-  // method after the action runs (cypress/support/node/harness.ts signupPasswordAction case).
-  it('returns 200 with sent:true and never leaks the raw ALREADY_EXISTS provider message', () => {
+describe('signup/password — retired route: loader', () => {
+  it('redirects a deep link to /signup with the address prefilled', () => {
     callService({
-      fn: 'signupPasswordAction',
+      fn: 'signupPasswordLoader',
       provider: 'singleton',
       request: {
-        url: 'http://localhost/id/signup/password',
-        form: {
-          preRegisterEmail: 'jane@example.com',
-          loginName: 'jane@example.com',
-          firstName: 'Jane',
-          lastName: 'Doe',
-          password: 'sup3rsecret',
-          confirm: 'sup3rsecret',
-        },
-        csrf: true,
+        url: 'http://localhost/id/signup/password?loginName=jane%40example.com&firstName=Jane&lastName=Doe',
       },
     }).then((v) => {
-      // Enumeration-safe: service catches ALREADY_EXISTS → returns the same generic 200
-      // 'check your email' response as a fresh signup. The 409 path in actionError is
-      // intentionally unreachable through the normal registration flow.
-      const status = v.response?.isResponse ? v.response.status : (v.response?.dataStatus ?? 200);
-      expect(status, 'duplicate email must return 200 (enumeration-safe, not 409)').to.equal(200);
-      const body = v.response?.dataBody as Record<string, unknown> | undefined;
-      // Tamper-proof error model: no error code or raw provider message in the response.
-      expect(body?.error, 'ALREADY_EXISTS code must not appear in response body').to.be.undefined;
-      expect(body?.sent, 'response must signal sent:true (generic check-your-email)').to.equal(
-        true
-      );
-      const serialized = JSON.stringify(body ?? {});
-      // Raw provider error message must never reach the client.
-      expect(serialized, 'raw provider message must not leak').not.to.include('already registered');
-      // Error code string must not appear anywhere in the serialized body.
-      expect(serialized, 'ALREADY_EXISTS code string must not leak').not.to.include(
-        'ALREADY_EXISTS'
-      );
+      expect(v.response?.isResponse).to.equal(true);
+      expect(v.response?.status).to.equal(302);
+      const loc = v.response?.location ?? '';
+      const url = new URL(loc, 'http://localhost');
+      // /signup, NOT /signup/method: /signup registers inline and is the canonical entry, while
+      // /signup/method survives only so in-flight tabs keep working — new traffic should not be
+      // pushed into it.
+      expect(url.pathname, 'bounces to the canonical entry point').to.equal('/signup');
+      // The address rides along as ?email, which /signup prefills, so a stale link/bookmark lands
+      // somewhere finishable. firstName/lastName are deliberately NOT carried: both are DERIVED
+      // from the email (placeholder-name.ts) and never typed, so there is nothing to preserve.
+      expect(url.searchParams.get('email')).to.equal('jane@example.com');
+      expect(loc, 'derived names must not be threaded').to.not.include('firstName');
+    });
+  });
+
+  it('falls back to /signup when the deep link carries no identity at all', () => {
+    callService({
+      fn: 'signupPasswordLoader',
+      provider: 'singleton',
+      request: { url: 'http://localhost/id/signup/password' },
+    }).then((v) => {
+      expect(v.response?.status).to.equal(302);
+      expect(v.response?.location ?? '').to.match(/\/signup$/);
     });
   });
 });
 
-// ── Action: happy path (real provider) ───────────────────────────────────────
-
-describe('signup/password — action: real provider happy path', () => {
-  it('completes without throwing and returns a 2xx or 3xx response for valid inputs', () => {
+describe('signup/password — retired route: action', () => {
+  // THE security assertion of this change. A POST here is not a stale bookmark — it is a request
+  // to create a password account through a flow signup no longer offers. It must fail closed,
+  // with no account created and no redirect that could be mistaken for success.
+  it('rejects a well-formed password registration with 400 INVALID_INPUT', () => {
     callService({
       fn: 'signupPasswordAction',
       provider: 'singleton',
       env: { AUTH_EMAIL_DELIVERY_ENABLED: 'true' },
       request: {
         url: 'http://localhost/id/signup/password',
-        form: { ...VALID_IDENTITY, loginName: 'happypath@example.com' },
+        form: { ...VALID_IDENTITY, loginName: 'deeplink@example.com' },
         csrf: true,
       },
     }).then((v) => {
-      expect(v.ok).to.equal(true);
-      const status = v.response?.isResponse
-        ? (v.response.status ?? 200)
-        : (v.response?.dataStatus ?? 200);
-      expect(status).to.be.within(200, 399);
+      expect(v.response?.isResponse, 'must not redirect').to.equal(false);
+      expect(v.response?.dataStatus).to.equal(400);
+      expect(v.response?.dataBody).to.have.property('error', 'INVALID_INPUT');
+      const serialized = JSON.stringify(v.response?.dataBody ?? {});
+      expect(serialized, 'must not signal a successful signup').to.not.include('sent');
     });
   });
 });

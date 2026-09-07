@@ -23,6 +23,8 @@ export type ProviderErrorCode =
 /** The FakeAuthProvider constructor seed, narrowed to the JSON-serializable subset the ported
  *  specs actually use. Mirrors the real `Seed` shape (see fake-provider.ts). */
 export interface ScenarioSeed {
+  /** Rotate session tokens on updateSession like real Zitadel (see FakeAuthProvider Seed). */
+  rotateSessionTokens?: boolean;
   users?: Array<{ id: string; loginName: string; displayName?: string; orgId?: string }>;
   passwords?: Record<string, string>;
   authMethods?: Record<string, string[]>;
@@ -68,6 +70,18 @@ export interface LiveSessionSeed {
   id: string;
   token: string;
   user?: { id: string; loginName: string; displayName?: string };
+  /**
+   * Which authentication factors the seeded session carries, all stamped verified.
+   * Defaults to ['password'] — the historical behavior, a fully authenticated session.
+   *
+   * Exists so a scenario can express a session that is NOT primary-authenticated. The signup
+   * flow mints exactly that: otpEmail alone, which `primaryFresh` does not count as a primary
+   * factor. Without this seam a spec could only seed "authenticated" or "dead", and the case
+   * that actually matters — alive but factor-incomplete — was unreachable.
+   */
+  factorKinds?: Array<
+    'password' | 'passkey' | 'idpIntent' | 'totp' | 'otpEmail' | 'otpSms' | 'u2f'
+  >;
 }
 
 /** A cookie entry the harness signs into a real `sessions` cookie via the REAL cookie module. */
@@ -266,6 +280,8 @@ export type ServiceFn =
   // load-time schema parse — loads (see run-scenario.ts). node:https is stubbed out of the Vite
   // browser bundle by virtue of the `.server.ts` suffix, so this must run node-side.
   | 'sendVerificationMail'
+  // Drives the real verifyRecaptcha node-side; env.server is stubbed out of the browser bundle.
+  | 'verifyRecaptcha'
   // ── routes/login handlers (batch 13b) ────────────────────────────────────────
   // Login route loaders/actions are node-bound: they read a signed `sessions` cookie off a real
   // Request (Cookie header blocked by Fetch spec in the browser), and some need the signed
@@ -299,6 +315,7 @@ export type ServiceFn =
   | 'deviceCompleteLoader'
   | 'deviceIndexLoader'
   | 'signupCompleteLoader'
+  | 'signupSuccessLoader'
   | 'signupMethodLoader'
   | 'signupMethodAction'
   | 'signupPasswordLoader'
@@ -739,9 +756,26 @@ export interface Scenario {
    *  calling sendVerificationMail. false/omitted exercises the "unreachable" contract — nothing
    *  is listening, so the client must resolve `false` without throwing. */
   verificationMailListen?: boolean;
+  /**
+   * Accept the connection and then NEVER respond, so the client's own request timeout is the only
+   * thing that can end the call. This is the routable-but-unresponsive case — distinct from
+   * `verificationMailListen: false`, which is connection-refused and fails fast down a completely
+   * different path. Requires `verificationMailListen: true`.
+   */
+  verificationMailHang?: boolean;
   /** Status code the local listener responds with when `verificationMailListen` is true. Default
    *  200 (also captures the received method/content-type/body as outcome.received). */
   verificationMailStatus?: number;
+
+  /** Input for the real verifyRecaptcha(token, expectedAction). */
+  recaptchaInput?: { token: string; expectedAction: string };
+  /** Stubs `globalThis.fetch` for this scenario's siteverify call. `{ reject: true }` simulates
+   *  Google unreachable; `{ body }` simulates a response. Omitted for the not-configured case.
+   *  The harness records the request as `outcome.request`, never the secret's value. */
+  recaptchaFetch?: { reject: true } | { body: Record<string, unknown> };
+  /** Unsets PUBLIC_ORIGIN for one call to exercise the hostname-check skip. Unreachable in a
+   *  real boot (env.server refuses it), so this only proves the fallback branch behaves. */
+  recaptchaSkipPublicOrigin?: boolean;
 }
 
 /** A parsed logAuthEvent JSON line: { event, outcome, ...fields }. */
@@ -758,7 +792,7 @@ export interface SerializedResponse {
   location?: string | null;
   setCookie?: string | null;
   /** Entries parsed back out of the `sessions` Set-Cookie (node-only HMAC round-trip). */
-  cookieEntries?: Array<{ id: string }> | null;
+  cookieEntries?: Array<{ id: string; loginName?: string; organization?: string }> | null;
   /** Every Set-Cookie header value (undici getSetCookie) — for multi-cookie responses. */
   setCookies?: string[];
   /** Parsed `last-used-login` token (e.g. `idp:<idpId>`), or null when absent. */
@@ -789,6 +823,14 @@ export interface Verdict {
   auditLines: string[];
   /** Recorded provider call args, keyed by method name. */
   calls?: Record<string, unknown[][]>;
+  /**
+   * Wall-clock milliseconds the dispatched `fn` took, measured INSIDE the node runner so the
+   * cy.task IPC round-trip is not counted. Intended only as a LOWER bound for constant-time
+   * assertions ("this branch waited for the deadline"): sleeps overshoot but never undershoot, so
+   * `at.least(floor)` is stable. Comparing two runs' elapsed times to each other would be flaky —
+   * don't.
+   */
+  elapsedMs?: number;
   /** Provider state read back post-call (e.g. { isDeviceAuthorized: { 'dev-1': true } }). */
   inspect?: Record<string, unknown>;
   /**
