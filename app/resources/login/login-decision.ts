@@ -1,4 +1,5 @@
 import type { AuthMethod, FlowContext, LoginSettings } from '@/modules/auth/types';
+import { isEmailOtpSignInUsable } from '@/resources/login/email-otp-signin';
 
 // Discriminated union replaces the stringly-typed { target; error? } whose
 // 'callback'/'error' sentinels leaked as-casts into routes. Consumers `switch (d.kind)`
@@ -32,7 +33,11 @@ export function decideAfterIdentifier({
     available.push('passkey');
   if (methods.includes('idp') && settings.allowExternalIdp) available.push('idp');
   if (methods.includes('password') && settings.allowPassword) available.push('password');
-  if (methods.includes('otp_email') && emailDeliveryEnabled) available.push('otp_email');
+  // C10: agrees with the chooser (method-options.ts) — otp_email is available only while
+  // OTP sign-in is a sign-in method, not merely while mail can be delivered.
+  if (methods.includes('otp_email') && isEmailOtpSignInUsable(emailDeliveryEnabled)) {
+    available.push('otp_email');
+  }
 
   // Every account with at least one usable method goes to the chooser, which renders
   // exactly the methods it has (and auto-starts the ones that need no form). Routing

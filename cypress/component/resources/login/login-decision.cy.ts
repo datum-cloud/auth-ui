@@ -38,6 +38,22 @@ describe('decideAfterIdentifier → discriminated Decision union', () => {
     expect(d).to.deep.equal({ kind: 'redirect', path: '/login/method' });
   });
 
+  it('C10: an otp_email-only account is NO_SUPPORTED_METHOD while OTP sign-in is hidden — not a chooser redirect', () => {
+    const d = decideAfterIdentifier({
+      methods: ['otp_email'],
+      settings: {
+        allowPassword: true,
+        allowExternalIdp: true,
+        passkeysType: 'allowed',
+      } as LoginSettings,
+      emailDeliveryEnabled: true,
+      context: PRIMARY,
+    });
+    // Same page the chooser would have bounced to (#128); one hop earlier, and the decision
+    // now tells the truth about what the account can do.
+    expect(d).to.deep.equal({ kind: 'error', error: 'NO_SUPPORTED_METHOD' });
+  });
+
   // Same settings, same full-object deep.equal — only the enrolled-method list and the
   // expected destination vary.
   const ROUTING: [label: string, methods: string[], path: string][] = [
