@@ -7,6 +7,7 @@
 // delivery, after a user already enrolled that method) — callers deciding "does this user
 // still have a working backup method" need the gated view, not the raw enrolled list.
 import type { AuthMethod, LoginSettings } from '@/modules/auth/types';
+import { isEmailOtpSignInUsable } from '@/resources/login/email-otp-signin';
 
 export function usableSignInMethods(
   enrolled: AuthMethod[],
@@ -17,7 +18,10 @@ export function usableSignInMethods(
     if (m === 'passkey') return settings.passkeysType !== 'not_allowed';
     if (m === 'idp') return settings.allowExternalIdp;
     if (m === 'password') return settings.allowPassword;
-    if (m === 'otp_email') return emailDeliveryEnabled;
+    // C10: "enrolled and deliverable" is not "usable" while OTP sign-in is hidden (#128).
+    // This arm feeds the last-method guard, so counting otp_email here let a passkey-only
+    // account remove its only passkey.
+    if (m === 'otp_email') return isEmailOtpSignInUsable(emailDeliveryEnabled);
     // totp / u2f / otp_sms are second-factor methods, not gated by these primary
     // sign-in settings — pass through unchanged.
     return true;
