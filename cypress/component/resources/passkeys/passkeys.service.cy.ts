@@ -157,6 +157,27 @@ describe('passkeys.service — /id/passkeys management', () => {
     expect(await backed.fake.listPasskeys('u1')).to.deep.equal([]);
   });
 
+  it('last-method guard (C10): passkey + otp_email with email delivery ON ⇒ LAST_METHOD while OTP sign-in is hidden', async () => {
+    // Every Phase B signup enrols otpEmail alongside the passkey. With OTP sign-in hidden
+    // (#128), otp_email is not a way back in, so it must not count as the backup that lets
+    // the only passkey go.
+    const { fake, sessions } = await seeded({ authMethods: ['passkey', 'otp_email'] });
+    const refused = await removeUserPasskey(fake, sessions, {
+      passkeyId: 'pk-1',
+      nowMs: Date.now(),
+      emailDeliveryEnabled: true,
+    });
+    expect(refused).to.deep.equal({ ok: false, error: 'LAST_METHOD' });
+    // The banner's methodCount reads the same filter, so it must agree: one usable method.
+    const view = await loadPasskeysView(fake, sessions, {
+      returnTo: null,
+      nowMs: Date.now(),
+      emailDeliveryEnabled: true,
+    });
+    expect(view.kind).to.equal('view');
+    if (view.kind === 'view') expect(view.methodCount).to.equal(1);
+  });
+
   it('removal race: already-gone passkey and a NOT_FOUND adapter error are both idempotent success', async () => {
     // Fake path: the id simply is not in the list (silent no-op).
     const { fake, sessions } = await seeded({ passkeys: [] });
