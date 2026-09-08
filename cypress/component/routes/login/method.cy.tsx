@@ -50,6 +50,10 @@ function mountMethod(opts?: {
   // WITHOUT touching navigator.credentials, so a spec can exercise the failure copy without
   // depending on the browser's real WebAuthn behavior.
   challenge?: unknown;
+  // Holds the challenge loader pending forever, parking the ceremony in a non-idle phase so the
+  // busy affordance can be asserted without racing it. The ceremony is otherwise far too quick to
+  // observe mid-flight, and a timing-based assertion would be flaky rather than wrong.
+  holdChallenge?: boolean;
 }) {
   const loginContext = { ...LOGIN_CONTEXT, loginName: opts?.loginName ?? LOGIN_CONTEXT.loginName };
   const methodLoaderData = {
@@ -77,6 +81,7 @@ function mountMethod(opts?: {
             path: 'passkey',
             loader: async () => {
               challengeLoads.push(loginContext.loginName);
+              if (opts?.holdChallenge) await new Promise(() => {});
               return {
                 csrfToken: 'tok-1',
                 loginName: loginContext.loginName,
@@ -142,6 +147,17 @@ describe('/login/method — identity header + in-place passkey ceremony', () => 
       .should('have.attr', 'href')
       .and('contain', '/login/passkey')
       .and('contain', 'loginName=mia%40acme.test');
+  });
+
+  // The entry used to give no sign it was working — it only dimmed, which reads as "disabled",
+  // not "busy". /login/passkey already spins its leading icon via datum-ui's Button `loading`;
+  // this asserts the chooser shows the same thing, since LinkButton has no `loading` of its own
+  // and the swap is therefore hand-rolled and easy to lose.
+  it('swaps the Passkey icon for a spinner while the ceremony runs', () => {
+    mountMethod({ holdChallenge: true });
+    cy.contains('a', 'Passkey').click();
+    // Held at the challenge, so this is the steady busy state rather than a moment in flight.
+    cy.contains('a', 'Passkey').find('svg.animate-spin').should('exist');
   });
 
   it('Passkey fires the ceremony in place and submits the pre-baked credential', () => {

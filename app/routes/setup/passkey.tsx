@@ -9,6 +9,8 @@ import {
   type WebAuthnEnrollActionData,
 } from '@/resources/webauthn';
 import { aaguidFromAttestationObject, defaultPasskeyName } from '@/resources/webauthn/aaguid';
+import { isSignupEnrollment } from '@/resources/webauthn/signup-enrollment';
+import { Alert, AlertDescription } from '@datum-cloud/datum-ui/alert';
 import { Button } from '@datum-cloud/datum-ui/button';
 import { Input } from '@datum-cloud/datum-ui/input';
 import { Label } from '@datum-cloud/datum-ui/label';
@@ -111,7 +113,30 @@ export default function SetupPasskey() {
       recovery={held ? undefined : recovery}
       loginName={loginName}
       requestId={requestId}
-      organization={organization}>
+      organization={organization}
+      /* Signup has no step to go back TO: the predecessor was the emailed verification
+         link, and its code is spent — following it again lands on the EXPIRED state. The
+         static predecessor map (previous-step.ts) matches this route on the generic
+         `/setup/` prefix and points Back at /setup/mfa, a second-factor chooser that
+         assumes an already-established account. Hide the control for the signup leg;
+         security-settings visits (returnTo=/passkeys) keep it. */
+      showBackLink={!isSignupEnrollment(returnTo)}>
+      {/* TEMPORARY — delete when Phase C ships account recovery.
+          Leaving this page strands the account with no way back in: verification already ran
+          (enrolling otpEmail), so a retried signup answers ALREADY_EXISTS, while otpEmail is
+          not a primary factor and signs nobody in. Until recovery exists, saying so plainly is
+          the only protection the user gets. Signup leg only — a security-settings enrolment is
+          additive, and the warning would be false there. */}
+      {isSignupEnrollment(returnTo) ? (
+        <Alert variant="warning">
+          <AlertDescription>
+            <Trans>
+              Please finish setting up your passkey before leaving this page. It will be the only
+              way to sign in, and your account won't be usable without it.
+            </Trans>
+          </AlertDescription>
+        </Alert>
+      ) : null}
       {/* One form spans both steps — the hidden fields ride along on the step-2 submit. */}
       <RRForm ref={formRef} method="POST" className="flex w-full flex-col gap-4">
         <AuthFormFields

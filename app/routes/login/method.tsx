@@ -30,7 +30,7 @@ import { loaderCsrf, assertCsrf } from '@/server/csrf';
 import { trustedAppOrigin } from '@/server/infra/app-origin.server';
 import { env } from '@/server/infra/env.server';
 import { LinkButton } from '@datum-cloud/datum-ui/button';
-import { Icon } from '@datum-cloud/datum-ui/icons';
+import { Icon, SpinnerIcon } from '@datum-cloud/datum-ui/icons';
 import { cn } from '@datum-cloud/datum-ui/utils';
 import { Trans } from '@lingui/react/macro';
 import { Key, Lock, Mail } from 'lucide-react';
@@ -390,7 +390,11 @@ export default function LoginMethod() {
               beginFromClick();
             }}
             iconPosition="left"
-            icon={<Icon icon={Key} />}>
+            /* Mirrors what /login/passkey shows: datum-ui's Button swaps its leading icon for
+               SpinnerIcon while `loading` and leaves the label alone, so the same swap here reads
+               as one component across both screens. Done by hand because LinkButton has no
+               `loading` prop, and this stays a LinkButton on purpose — see the note above. */
+            icon={passkeyBusy ? <SpinnerIcon /> : <Icon icon={Key} />}>
             <Trans>Passkey</Trans>
           </LinkButton>
         ) : null}
