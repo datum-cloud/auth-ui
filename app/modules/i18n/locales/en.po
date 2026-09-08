@@ -79,7 +79,7 @@ msgstr "Additional verification is required to continue."
 msgid "Already have an account?"
 msgstr "Already have an account?"
 
-#: app/routes/login/index.tsx:434
+#: app/routes/login/index.tsx:439
 msgid "An account with this email already exists — sign in to continue."
 msgstr "An account with this email already exists — sign in to continue."
 
@@ -182,7 +182,7 @@ msgstr "Choose how to sign in"
 msgid "Choose how you want to verify your identity."
 msgstr "Choose how you want to verify your identity."
 
-#: app/routes/login/index.tsx:430
+#: app/routes/login/index.tsx:435
 msgid "Choose your login method"
 msgstr "Choose your login method"
 
@@ -213,7 +213,7 @@ msgid "Connected accounts"
 msgstr "Connected accounts"
 
 #: app/routes/device/index.tsx:73
-#: app/routes/login/index.tsx:556
+#: app/routes/login/index.tsx:561
 #: app/routes/signup/index.tsx:455
 #: app/routes/signup/index.tsx:589
 msgid "Continue"
@@ -244,7 +244,7 @@ msgstr "Couldn't verify"
 msgid "Create a new account"
 msgstr "Create a new account"
 
-#: app/routes/login/index.tsx:601
+#: app/routes/login/index.tsx:606
 #: app/routes/signup/password.tsx:271
 msgid "Create account"
 msgstr "Create account"
@@ -271,8 +271,8 @@ msgstr "Device code"
 msgid "Device denied"
 msgstr "Device denied"
 
-#: app/routes/login/index.tsx:387
-#: app/routes/login/index.tsx:402
+#: app/routes/login/index.tsx:392
+#: app/routes/login/index.tsx:407
 #: app/routes/signup/index.tsx:537
 #: app/routes/signup/index.tsx:573
 msgid "Email"
@@ -286,8 +286,8 @@ msgstr "Email code"
 msgid "Email me a code"
 msgstr "Email me a code"
 
-#: app/routes/login/index.tsx:567
-#: app/routes/login/index.tsx:577
+#: app/routes/login/index.tsx:572
+#: app/routes/login/index.tsx:582
 #: app/routes/login/method.tsx:415
 msgid "Email me a sign-in link"
 msgstr "Email me a sign-in link"
@@ -308,7 +308,7 @@ msgstr "Email OTP"
 msgid "Email sign-in isn't available — use your username."
 msgstr "Email sign-in isn't available — use your username."
 
-#: app/routes/login/index.tsx:386
+#: app/routes/login/index.tsx:391
 msgid "Email, phone, or username"
 msgstr "Email, phone, or username"
 
@@ -452,7 +452,7 @@ msgstr "No signed-in accounts."
 msgid "Not now"
 msgstr "Not now"
 
-#: app/routes/login/index.tsx:599
+#: app/routes/login/index.tsx:604
 msgid "Not registered?"
 msgstr "Not registered?"
 
@@ -482,7 +482,7 @@ msgstr "Or enter the code from that email"
 msgid "Or import this URI in your authenticator app"
 msgstr "Or import this URI in your authenticator app"
 
-#: app/routes/login/index.tsx:497
+#: app/routes/login/index.tsx:502
 #: app/routes/login/method.tsx:398
 #: app/routes/reauth.tsx:310
 #: app/routes/setup/mfa.tsx:46
@@ -553,8 +553,8 @@ msgstr "Password must contain an uppercase letter."
 msgid "Password sign-in isn't available for this account."
 msgstr "Password sign-in isn't available for this account."
 
-#: app/routes/login/index.tsx:389
-#: app/routes/login/index.tsx:404
+#: app/routes/login/index.tsx:394
+#: app/routes/login/index.tsx:409
 msgid "Phone"
 msgstr "Phone"
 
@@ -716,7 +716,7 @@ msgstr "Sign out of"
 msgid "Sign out other sessions"
 msgstr "Sign out other sessions"
 
-#: app/routes/login/index.tsx:589
+#: app/routes/login/index.tsx:594
 msgid "Sign-in is currently unavailable for this account. Please contact your administrator."
 msgstr "Sign-in is currently unavailable for this account. Please contact your administrator."
 
@@ -893,8 +893,8 @@ msgstr "Use your passkey to verify your identity."
 msgid "Use your security key to verify your identity."
 msgstr "Use your security key to verify your identity."
 
-#: app/routes/login/index.tsx:390
-#: app/routes/login/index.tsx:405
+#: app/routes/login/index.tsx:395
+#: app/routes/login/index.tsx:410
 #: app/routes/sso/ldap.tsx:76
 msgid "Username"
 msgstr "Username"
@@ -969,7 +969,7 @@ msgstr "We've sent a verification link to <0>{0}</0>"
 msgid "We've sent a verification link to <0>{sentEmail}</0>. Open it on this device to finish setting up your passkey."
 msgstr "We've sent a verification link to <0>{sentEmail}</0>. Open it on this device to finish setting up your passkey."
 
-#: app/routes/login/index.tsx:427
+#: app/routes/login/index.tsx:432
 msgid "Welcome"
 msgstr "Welcome"
 
