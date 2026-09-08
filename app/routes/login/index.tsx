@@ -20,6 +20,7 @@ import { readLastUsedLogin } from '@/modules/auth/session/last-used-login';
 import { readPasskeyHint, clearPasskeyHint } from '@/modules/auth/session/passkey-hint';
 import { readReauthIntent } from '@/modules/auth/session/reauth-intent';
 import { shouldBridgeToAuthorize, startIdpIntent, resolveIdentifier } from '@/resources/login';
+import { isEmailOtpSignInUsable } from '@/resources/login/email-otp-signin';
 import { resolveLoginView, resolveIdentifierField } from '@/resources/login/login-view';
 import {
   loginIdentifierSchema,
@@ -166,7 +167,11 @@ export async function action({ request }: ActionFunctionArgs) {
   // Email-link branch — resolve the user + create the ceremony session, then redirect
   // to /login/verify/email which dispatches the OTP email on arrival.
   if (form.get('intent') === 'email-link') {
-    if (!env.AUTH_EMAIL_DELIVERY_ENABLED) return data({ error: 'INVALID_INPUT' }, { status: 400 });
+    // C10: the UI hides this intent (#128); the server must refuse it too, or OTP login is
+    // one crafted POST away. Same 400 the delivery-off case already returns.
+    if (!isEmailOtpSignInUsable(env.AUTH_EMAIL_DELIVERY_ENABLED)) {
+      return data({ error: 'INVALID_INPUT' }, { status: 400 });
+    }
     const parsed = loginIdentifierSchema.safeParse(Object.fromEntries(form));
     if (!parsed.success) return data({ error: 'INVALID_INPUT' }, { status: 400 });
     const { loginName, requestId, organization } = parsed.data;
