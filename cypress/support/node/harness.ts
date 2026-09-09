@@ -64,6 +64,14 @@ import {
   type OtpSessionEntry,
 } from '@/resources/otp';
 import {
+  RECOVERY_TICKET_TTL_MS,
+  fillerTicket,
+  openCeremonyTicket,
+  openRequestTicket,
+  sealCeremonyTicket,
+  sealRequestTicket,
+} from '@/resources/recovery/recovery-ticket.server';
+import {
   resolveSignedIn,
   listAccounts,
   switchAccount,
@@ -151,14 +159,7 @@ import { providerForRequest } from '@/server/composition';
 import { getCsrfToken, loaderCsrf, assertCsrf, assertCsrfWith } from '@/server/csrf';
 import { _envSchema, env } from '@/server/infra/env.server';
 import { verifyRecaptcha } from '@/server/infra/recaptcha.server';
-import {
-  RECOVERY_TICKET_TTL_MS,
-  fillerTicket,
-  openCeremonyTicket,
-  openRequestTicket,
-  sealCeremonyTicket,
-  sealRequestTicket,
-} from '@/resources/recovery/recovery-ticket.server';
+import { resendVerification } from '@/resources/signup/verification-resend';
 import { sendRecoveryMail } from '@/server/infra/recovery-mail.server';
 import { sendVerificationMail } from '@/server/infra/verification-mail.server';
 import {
@@ -337,6 +338,9 @@ function buildProvider(s: Scenario): FakeAuthProvider {
       ? (getAuthProvider({ AUTH_PROVIDER: 'fake' }) as FakeAuthProvider)
       : new FakeAuthProvider((s.seed ?? {}) as ConstructorParameters<typeof FakeAuthProvider>[0]);
 
+  // Applied through the REAL markEmailVerified, so the fake's ALREADY_DONE guard on
+  // resendEmailCode fires exactly as Zitadel's would for a verified address.
+  for (const id of s.seed?.emailVerified ?? []) void provider.markEmailVerified(id);
   for (const ls of s.liveSessions ?? []) provider.seedLiveSession(ls);
   // The scenario uses an OPEN ProviderErrorCode union (string & {}) so future codes don't break the
   // serializable contract; cast to the fake's strict union at the call boundary.
@@ -2656,6 +2660,20 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
           }
         }
         outcome = results;
+        break;
+      }
+
+      // ── shared verification resend (Phase C Lane D Task 5) ──────────────────────────────────
+      // Drives the REAL resendVerification against the REAL sendVerificationMail, so the spec can
+      // assert the destination the mail actually carries rather than a stubbed one.
+      case 'resendVerification': {
+        const u = s.resendUser ?? { id: '', loginName: '' };
+        const link = s.resendLink ?? { origin: 'http://localhost' };
+        const result = await resendVerification(provider, u, link);
+        outcome = {
+          result,
+          second: s.resendTwice ? await resendVerification(provider, u, link) : undefined,
+        };
         break;
       }
 

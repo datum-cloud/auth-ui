@@ -28,6 +28,10 @@ export interface ScenarioSeed {
   users?: Array<{ id: string; loginName: string; displayName?: string; orgId?: string }>;
   passwords?: Record<string, string>;
   authMethods?: Record<string, string[]>;
+  /** userIds whose address is already verified (applied via provider.markEmailVerified). The
+   *  verified-but-methodless edge — verification succeeded, addOtpEmail did not — is what makes
+   *  Zitadel refuse a resend, which is the signal /recover falls through on. */
+  emailVerified?: string[];
   authRequests?: Record<
     string,
     { id: string; clientId?: string; scopes: string[]; prompt: string[]; loginHint?: string }
@@ -282,6 +286,7 @@ export type ServiceFn =
   | 'sendVerificationMail'
   | 'sendRecoveryMail'
   | 'recoveryTicketCheck'
+  | 'resendVerification'
   // Drives the real verifyRecaptcha node-side; env.server is stubbed out of the browser bundle.
   | 'verifyRecaptcha'
   // ── routes/login handlers (batch 13b) ────────────────────────────────────────
@@ -784,6 +789,15 @@ export interface Scenario {
   // ── recovery tickets (fn: 'recoveryTicketCheck'; Phase C Lane D Task 4) ─────
   /** Which sealed-ticket properties to exercise. Each name becomes a key on `outcome` carrying
    *  that check's result, so one node round-trip covers the whole format. */
+  // ── shared verification resend (fn: 'resendVerification'; Task 5) ──────────
+  /** The user resendVerification is called for. */
+  resendUser?: { id: string; loginName: string };
+  /** The link context it builds `returnTo` from. */
+  resendLink?: { origin: string; requestId?: string; organization?: string };
+  /** Call it twice, exposing the second result as `outcome.second` — proves the helper does not
+   *  rate-limit on its own (the callers own the shared budget). */
+  resendTwice?: boolean;
+
   ticketOps?: Array<
     | 'roundTrip'
     | 'fillerLength'
