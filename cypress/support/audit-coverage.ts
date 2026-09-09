@@ -268,6 +268,11 @@ const DELEGATED_TO_SHARED: Record<string, string[]> = {
   // Pass 2: the verify route is thin — its action logic (and the email.verified /
   // invite.verified logAuthEvent calls) lives in resources/verify/verify.service.ts.
   'verify/index.tsx': ['verify.service.ts'],
+  // Phase C Lane D: both recover routes are thin translators. /recover's request intent delegates
+  // to recovery.service.ts (recovery_request) and its code intent to recovery-ceremony.ts
+  // (recovery_complete); /recover/complete only ever drives the ceremony.
+  'recover/index.tsx': ['recovery.service.ts', 'recovery-ceremony.ts'],
+  'recover/complete.tsx': ['recovery-ceremony.ts'],
   // Pass 2: the OTP verify routes are thin — their action logic (and the mfa_otp /
   // mfa_otp_challenge / mfa_totp logAuthEvent calls) lives in resources/otp/otp.service.ts.
   'login/verify/email.tsx': ['otp.service.ts'],
