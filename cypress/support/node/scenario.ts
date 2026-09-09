@@ -280,6 +280,7 @@ export type ServiceFn =
   // load-time schema parse — loads (see run-scenario.ts). node:https is stubbed out of the Vite
   // browser bundle by virtue of the `.server.ts` suffix, so this must run node-side.
   | 'sendVerificationMail'
+  | 'sendRecoveryMail'
   // Drives the real verifyRecaptcha node-side; env.server is stubbed out of the browser bundle.
   | 'verifyRecaptcha'
   // ── routes/login handlers (batch 13b) ────────────────────────────────────────
@@ -767,6 +768,18 @@ export interface Scenario {
    *  200 (also captures the received method/content-type/body as outcome.received). */
   verificationMailStatus?: number;
 
+  // ── recovery-mail client (fn: 'sendRecoveryMail'; Phase C Lane D Task 3) ────
+  /** Input for the REAL sendRecoveryMail. Shares the verificationMailListen listener: set BOTH
+   *  mail URLs to the same port with different paths and the listener captures either POST, with
+   *  `received.path` telling them apart. */
+  recoveryMailInput?: {
+    userId: string;
+    codeId: string;
+    code: string;
+    returnTo: string;
+    requestedBy: 'self';
+  };
+
   /** Input for the real verifyRecaptcha(token, expectedAction). */
   recaptchaInput?: { token: string; expectedAction: string };
   /** Stubs `globalThis.fetch` for this scenario's siteverify call. `{ reject: true }` simulates
@@ -840,5 +853,10 @@ export interface Verdict {
    * indirectly from inside a signup service (registerEmailLinkSignup, registerWithPassword,
    * resendIfSquatted). undefined when verificationMailListen was not set or nothing was posted.
    */
-  verificationMailReceived?: Array<{ method?: string; contentType?: string; body?: unknown }>;
+  verificationMailReceived?: Array<{
+    method?: string;
+    contentType?: string;
+    path?: string;
+    body?: unknown;
+  }>;
 }

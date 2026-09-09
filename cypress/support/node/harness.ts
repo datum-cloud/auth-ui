@@ -151,6 +151,7 @@ import { providerForRequest } from '@/server/composition';
 import { getCsrfToken, loaderCsrf, assertCsrf, assertCsrfWith } from '@/server/csrf';
 import { _envSchema, env } from '@/server/infra/env.server';
 import { verifyRecaptcha } from '@/server/infra/recaptcha.server';
+import { sendRecoveryMail } from '@/server/infra/recovery-mail.server';
 import { sendVerificationMail } from '@/server/infra/verification-mail.server';
 import {
   loginPasswordRateLimit,
@@ -656,6 +657,7 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
   const verificationMailReceived: Array<{
     method?: string;
     contentType?: string;
+    path?: string;
     body?: unknown;
   }> = [];
   if (s.verificationMailListen) {
@@ -669,6 +671,9 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
         verificationMailReceived.push({
           method: req.method,
           contentType: req.headers['content-type'],
+          // Recovery and verification share this listener on one port; the path is the only
+          // thing that says which webhook the client aimed at.
+          path: req.url,
           body: raw ? JSON.parse(raw) : undefined,
         });
         // Deliberately never respond: the connection stays open and idle, so the ONLY thing that
@@ -2554,6 +2559,22 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
       case 'sendVerificationMail': {
         const result = await sendVerificationMail(
           s.verificationMailInput ?? { userId: '', code: '', returnTo: '' }
+        );
+        outcome = { result, received: verificationMailReceived[0] };
+        break;
+      }
+
+      // Drives the REAL sendRecoveryMail over the same shared listener — the recovery URL points
+      // at the same port with the /v1/email/recovery path, so `received.path` distinguishes it.
+      case 'sendRecoveryMail': {
+        const result = await sendRecoveryMail(
+          s.recoveryMailInput ?? {
+            userId: '',
+            codeId: '',
+            code: '',
+            returnTo: '',
+            requestedBy: 'self',
+          }
         );
         outcome = { result, received: verificationMailReceived[0] };
         break;

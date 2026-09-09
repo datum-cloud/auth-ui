@@ -22,10 +22,8 @@
 // `.server.ts` suffix: this module imports node:http/node:https and reads env.server — it must
 // never reach the browser bundle. The framework enforces that boundary from the filename alone.
 import { env } from '@/server/infra/env.server';
+import { postMailWebhook } from '@/server/infra/mail-webhook.server';
 import { logAuthEvent } from '@/server/observability';
-import * as fs from 'node:fs';
-import * as http from 'node:http';
-import * as https from 'node:https';
 
 export interface SendVerificationMailInput {
   userId: string;
@@ -33,23 +31,19 @@ export interface SendVerificationMailInput {
   returnTo: string;
 }
 
-// Bounds a routable-but-unresponsive host. 5s because the webhook creates a milo `Email` — a
-// Kubernetes API write whose p99 under load passes 2s, and a drop costs a user their mail. No
-// longer, because this blocks the response and widens the fresh-vs-squatted timing gap during an
-// outage (the squatted path runs its resend THROUGH this send).
-const REQUEST_TIMEOUT_MS = 5000;
-
 /**
- * POSTs `{ userId, code, returnTo }` as JSON to VERIFICATION_MAIL_URL. Resolves `true` only on a
- * 2xx response. Resolves `false` — NEVER throws — for every other outcome, including delivery
- * being disabled in this environment (VERIFICATION_MAIL_URL unset).
+ * POSTs `{ userId, code, returnTo }` as JSON to VERIFICATION_MAIL_URL via the shared mTLS
+ * transport. Resolves `true` only on a 2xx response. Resolves `false` — NEVER throws — for every
+ * other outcome, including delivery being disabled in this environment (URL unset), a transport
+ * error, a timeout and an unreadable client-cert file: postMailWebhook rejects on all of those
+ * and the catch below absorbs it.
  */
 export async function sendVerificationMail(input: SendVerificationMailInput): Promise<boolean> {
   const url = env.VERIFICATION_MAIL_URL;
   if (!url) return false; // delivery disabled in this environment — silent, not an error
 
   try {
-    const status = await postJson(url, input);
+    const status = await postMailWebhook(url, input);
     const ok = status >= 200 && status < 300;
     logAuthEvent(
       ok ? 'signup_verification_mail_sent' : 'signup_verification_mail_failed',
@@ -67,60 +61,4 @@ export async function sendVerificationMail(input: SendVerificationMailInput): Pr
     });
     return false;
   }
-}
-
-/**
- * Low-level POST. mTLS is applied via a `https.Agent` carrying the client cert/key/CA read from
- * the files at VERIFICATION_MAIL_CLIENT_CERT_FILE / _CLIENT_KEY_FILE / _CA_CERT_FILE — relevant
- * only for `https:` targets, which is every real deployment (VERIFICATION_MAIL_URL is always
- * deployed as an https URL). A plain `http:` target — used only by the node-spec test harness,
- * never in production — skips the Agent entirely, which keeps the local test listener free of
- * self-signed certificate plumbing without weakening the real mTLS path in any way.
- *
- * The files are read fresh on EVERY call, never cached — that is the point of the mounted-Secret-
- * volume approach this replaces env-PEM with: a cached read would reintroduce the same
- * expires-in-place bug (env from secretKeyRef is set once at pod creation and never refreshes) that
- * the volume mount exists to fix. A missing/unreadable file throws synchronously inside this
- * executor, which the Promise constructor turns into a rejection; `sendVerificationMail`'s outer
- * try/catch catches that rejection and resolves `false`, same as every other failure — see the
- * CONTRACT note at the top of this file.
- */
-function postJson(rawUrl: string, body: SendVerificationMailInput): Promise<number> {
-  return new Promise((resolve, reject) => {
-    const target = new URL(rawUrl);
-    const payload = JSON.stringify(body);
-    const isHttps = target.protocol === 'https:';
-    const agent = isHttps
-      ? new https.Agent({
-          cert: fs.readFileSync(env.VERIFICATION_MAIL_CLIENT_CERT_FILE ?? '', 'utf-8'),
-          key: fs.readFileSync(env.VERIFICATION_MAIL_CLIENT_KEY_FILE ?? '', 'utf-8'),
-          ca: fs.readFileSync(env.VERIFICATION_MAIL_CA_CERT_FILE ?? '', 'utf-8'),
-        })
-      : undefined;
-
-    const request = (isHttps ? https : http).request(
-      target,
-      {
-        method: 'POST',
-        agent,
-        timeout: REQUEST_TIMEOUT_MS,
-        headers: {
-          'content-type': 'application/json',
-          'content-length': Buffer.byteLength(payload),
-        },
-      },
-      (res) => {
-        res.resume(); // drain — the response body is irrelevant to the boolean contract
-        resolve(res.statusCode ?? 0);
-      }
-    );
-    // Reject here, not via destroy(err): under Bun that emits no 'error', so the handler below
-    // never fired and this promise stayed pending forever — signup awaits it.
-    request.on('timeout', () => {
-      request.destroy();
-      reject(new Error('verification-mail request timed out'));
-    });
-    request.on('error', reject);
-    request.end(payload);
-  });
 }
