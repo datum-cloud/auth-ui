@@ -177,6 +177,20 @@ export async function action({ request }: ActionFunctionArgs) {
   }
 
   // ── request: the address form ──────────────────────────────────────────────────────────────
+  // t0 for the constant-time deadline every exit below leaves at. The seven responses that MUST
+  // stay indistinguishable cost very different work: a suppressed exit stops at the limiter or at
+  // findUser, while the sent path adds listAuthMethods, getLoginSettings, passkeyRegisterLink and
+  // a mail POST. Without a shared deadline that gap is an account-existence oracle, which is the
+  // one thing the generic response exists to deny.
+  //
+  // Bounded, like every deadline: it equalises only while the real work finishes inside the floor.
+  // The sent path AWAITS the webhook POST inside that floor, so a slow or degraded mail webhook
+  // leaves a measurable tail that the suppressed exits do not have. ACCEPTED by the owner
+  // (2026-09-10): it is the same residual signup's squatted branch has always carried — see the
+  // matching note in routes/signup/index.tsx — and the send is what makes the ticket meaningful.
+  // Recorded here rather than quietly dropped. FOLLOW-UP: if staging measurements show the tail is
+  // actually separable, move the send off the request path (fire-and-forget or a queue) so the
+  // response no longer waits on it; nothing else about this branch would change.
   const startedAt = Date.now();
   const parsed = recoveryRequestSchema.safeParse(Object.fromEntries(form));
   if (!parsed.success) {
