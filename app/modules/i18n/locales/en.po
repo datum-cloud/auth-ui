@@ -164,7 +164,7 @@ msgid "Change your password"
 msgstr "Change your password"
 
 #: app/routes/password/reset.tsx:109
-#: app/routes/recover/index.tsx:283
+#: app/routes/recover/index.tsx:297
 #: app/routes/signup/index.tsx:406
 #: app/routes/signup/method.tsx:257
 #: app/routes/signup/password.tsx:218
@@ -191,7 +191,7 @@ msgstr "Choose how you want to verify your identity."
 msgid "Choose your login method"
 msgstr "Choose your login method"
 
-#: app/routes/recover/index.tsx:307
+#: app/routes/recover/index.tsx:321
 msgid "Code"
 msgstr "Code"
 
@@ -224,7 +224,7 @@ msgstr "Connected accounts"
 #: app/routes/device/index.tsx:73
 #: app/routes/login/index.tsx:571
 #: app/routes/recover/complete.tsx:157
-#: app/routes/recover/index.tsx:322
+#: app/routes/recover/index.tsx:336
 #: app/routes/signup/index.tsx:457
 #: app/routes/signup/index.tsx:603
 msgid "Continue"
@@ -293,7 +293,7 @@ msgstr "Didn't get the email?"
 
 #: app/routes/login/index.tsx:394
 #: app/routes/login/index.tsx:409
-#: app/routes/recover/index.tsx:358
+#: app/routes/recover/index.tsx:372
 #: app/routes/signup/index.tsx:539
 #: app/routes/signup/index.tsx:575
 msgid "Email"
@@ -345,7 +345,7 @@ msgstr "Enable SMS one-time code"
 msgid "Enter a new code"
 msgstr "Enter a new code"
 
-#: app/routes/recover/index.tsx:353
+#: app/routes/recover/index.tsx:367
 msgid "Enter a valid email address."
 msgstr "Enter a valid email address."
 
@@ -369,7 +369,7 @@ msgstr "Enter the verification code sent to your email address."
 msgid "Enter your authenticator code"
 msgstr "Enter your authenticator code"
 
-#: app/routes/recover/index.tsx:340
+#: app/routes/recover/index.tsx:354
 msgid "Enter your email address and we'll send you a link to set up a new passkey."
 msgstr "Enter your email address and we'll send you a link to set up a new passkey."
 
@@ -606,8 +606,8 @@ msgstr "Please check your input and try again."
 msgid "Please finish setting up your passkey before leaving this page. It will be the only way to sign in, and your account won't be usable without it."
 msgstr "Please finish setting up your passkey before leaving this page. It will be the only way to sign in, and your account won't be usable without it."
 
-#: app/routes/error.tsx:48
-#: app/routes/recover/index.tsx:338
+#: app/routes/error.tsx:52
+#: app/routes/recover/index.tsx:352
 #: app/routes/signup/index.tsx:596
 #: app/routes/verify/index.tsx:234
 msgid "Recover your account"
@@ -684,7 +684,7 @@ msgstr "Security key"
 msgid "Select an account to continue or add a new one."
 msgstr "Select an account to continue or add a new one."
 
-#: app/routes/recover/index.tsx:372
+#: app/routes/recover/index.tsx:386
 msgid "Send recovery link"
 msgstr "Send recovery link"
 
@@ -845,7 +845,7 @@ msgstr "Thanks,"
 msgid "That action isn't available right now."
 msgstr "That action isn't available right now."
 
-#: app/routes/recover/index.tsx:302
+#: app/routes/recover/index.tsx:316
 msgid "That code is invalid or has expired. Check the email, or start over."
 msgstr "That code is invalid or has expired. Check the email, or start over."
 
@@ -1031,7 +1031,7 @@ msgid "We sent a verification code to your email address."
 msgstr "We sent a verification code to your email address."
 
 #. placeholder {0}: sent.email
-#: app/routes/recover/index.tsx:285
+#: app/routes/recover/index.tsx:299
 msgid "We've sent a link to <0>{0}</0>. Open it on the device you want to sign in with, or enter the code from that email here."
 msgstr "We've sent a link to <0>{0}</0>. Open it on the device you want to sign in with, or enter the code from that email here."
 
@@ -1059,7 +1059,7 @@ msgstr "Welcome"
 msgid "While Datum is currently free of charge to use, we require a valid payment method during the signup process."
 msgstr "While Datum is currently free of charge to use, we require a valid payment method during the signup process."
 
-#: app/routes/recover/index.tsx:328
+#: app/routes/recover/index.tsx:342
 #: app/routes/signup/index.tsx:469
 msgid "Wrong address? Start over"
 msgstr "Wrong address? Start over"
@@ -1112,7 +1112,7 @@ msgstr "You'll be asked to sign in before authorizing."
 msgid "You've been signed out"
 msgstr "You've been signed out"
 
-#: app/routes/recover/index.tsx:367
+#: app/routes/recover/index.tsx:381
 msgid "you@example.com"
 msgstr "you@example.com"
 

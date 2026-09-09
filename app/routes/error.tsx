@@ -26,7 +26,11 @@ export function loader() {
 
 export default function ErrorScreen() {
   const [params] = useSearchParams();
-  const { recoveryEnabled } = useLoaderData<typeof loader>();
+  // Defaulted, NOT destructured directly: this component is also the catch-all's default export
+  // (routes/catchall.tsx), and that route has no loader — so useLoaderData is undefined there and
+  // a bare destructure crashes the 404 page, the worst possible place to crash. The fallback is
+  // the safe direction anyway: no loader means no proof the flag is on, so no CTA.
+  const { recoveryEnabled } = useLoaderData<typeof loader>() ?? { recoveryEnabled: false };
   const code = params.get('code');
   const { title, body } = authErrorMessage(code);
 
