@@ -388,6 +388,13 @@ export async function resolveIdentifier(
       return { ok: true, target: decision.path, params, sessions };
     }
     case 'error':
+      // The code drives /error's fixed message table AND its recovery CTA — a methodless account
+      // is exactly who /recover exists for, so the page has to be able to tell the two policy
+      // dead-ends apart rather than showing one generic screen.
+      params.set(
+        'code',
+        decision.error === 'PASSWORD_NOT_ALLOWED' ? 'password_not_allowed' : 'no_supported_method'
+      );
       return { ok: true, target: paths.error(), params, sessions };
   }
 }

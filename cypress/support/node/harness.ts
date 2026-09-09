@@ -83,11 +83,6 @@ import {
 } from '@/resources/recovery/recovery-ticket.server';
 import { requestRecovery } from '@/resources/recovery/recovery.service';
 import {
-  action as recoverCompleteAction,
-  loader as recoverCompleteLoader,
-} from '@/routes/recover/complete';
-import { action as recoverAction, loader as recoverLoader } from '@/routes/recover/index';
-import {
   resolveSignedIn,
   listAccounts,
   switchAccount,
@@ -162,6 +157,11 @@ import {
 } from '@/routes/password/reset';
 import { action as reauthAction } from '@/routes/reauth';
 import { loader as reauthProviderCallbackLoader } from '@/routes/reauth/provider/callback';
+import {
+  action as recoverCompleteAction,
+  loader as recoverCompleteLoader,
+} from '@/routes/recover/complete';
+import { action as recoverAction, loader as recoverLoader } from '@/routes/recover/index';
 import { loader as setupAuthenticatorLoader } from '@/routes/setup/authenticator';
 import { loader as signupCompleteLoader } from '@/routes/signup/complete';
 import { loader as signupIndexLoader, action as signupIndexAction } from '@/routes/signup/index';

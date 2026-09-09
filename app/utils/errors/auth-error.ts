@@ -18,7 +18,9 @@ export type AuthErrorCode =
   | 'signin_failed'
   | 'no_request'
   | 'no_session'
-  | 'saml_failed';
+  | 'saml_failed'
+  | 'no_supported_method'
+  | 'password_not_allowed';
 
 interface AuthErrorMessage {
   title: string;
@@ -55,6 +57,16 @@ export const AUTH_ERRORS: Record<AuthErrorCode, AuthErrorMessage> = {
   saml_failed: {
     title: 'Sign-in error',
     body: 'Could not complete SAML sign-in. Return to your application and try again.',
+  },
+  // The two post-identifier policy dead-ends. Copy matches auth-error-messages.tsx's wording for
+  // the same provider codes, so the same situation reads the same wherever it surfaces.
+  no_supported_method: {
+    title: 'No sign-in method available',
+    body: 'No sign-in method is available for this account.',
+  },
+  password_not_allowed: {
+    title: 'Password sign-in not available',
+    body: "Password sign-in isn't available for this account.",
   },
 };
 

@@ -1,6 +1,10 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
+import { paths } from '@/routes/paths';
+import { env } from '@/server/infra/env.server';
 import { authErrorMessage } from '@/utils/errors/auth-error';
-import { useSearchParams } from 'react-router';
+import { Button } from '@datum-cloud/datum-ui/button';
+import { Trans } from '@lingui/react/macro';
+import { Link, useLoaderData, useSearchParams } from 'react-router';
 
 // MERGE DECISION (Phase 0 review authoritative):
 // 1. export function meta() — keeps document-title axe rule satisfied (static string fine).
@@ -14,8 +18,37 @@ export function meta() {
   return [{ title: 'Something went wrong' }];
 }
 
+// The CTA below is keyed on the CODE, never on the rendered text — the table strings stay
+// untranslated by design, and matching on them would break the moment copy changed.
+export function loader() {
+  return { recoveryEnabled: env.AUTH_ACCOUNT_RECOVERY_ENABLED };
+}
+
 export default function ErrorScreen() {
   const [params] = useSearchParams();
-  const { title, body } = authErrorMessage(params.get('code'));
-  return <AuthCard title={title} description={body} />;
+  const { recoveryEnabled } = useLoaderData<typeof loader>();
+  const code = params.get('code');
+  const { title, body } = authErrorMessage(code);
+
+  // A methodless account is precisely who recovery exists for — this is the dead end /login sends
+  // them to, so it is the one error code that gets a way out.
+  const showRecovery = code === 'no_supported_method' && recoveryEnabled;
+
+  return (
+    <AuthCard title={title} description={body}>
+      {showRecovery ? (
+        <Link
+          to={paths.recover.index({
+            email: params.get('loginName') ?? undefined,
+            requestId: params.get('requestId') ?? undefined,
+            organization: params.get('organization') ?? undefined,
+          })}
+          className="w-full">
+          <Button type="primary" theme="solid" block>
+            <Trans>Recover your account</Trans>
+          </Button>
+        </Link>
+      ) : null}
+    </AuthCard>
+  );
 }

@@ -20,14 +20,17 @@ import { FormError } from '@/components/form-error/form-error';
 import { RecoveryCeremonyForm } from '@/components/recovery-ceremony/recovery-ceremony';
 import { useRecaptcha } from '@/modules/fraud/recaptcha';
 import { requestRecovery } from '@/resources/recovery';
-import { finishRecoveryCeremony, startRecoveryCeremony } from '@/resources/recovery/recovery-ceremony';
-import { recoveryCodeSchema, recoveryRequestSchema } from '@/resources/recovery/recovery.schema';
+import {
+  finishRecoveryCeremony,
+  startRecoveryCeremony,
+} from '@/resources/recovery/recovery-ceremony';
 import {
   fillerTicket,
   openRequestTicket,
   recoveryCeremonyCookie,
   recoveryTicketCookie,
 } from '@/resources/recovery/recovery-ticket.server';
+import { recoveryCodeSchema, recoveryRequestSchema } from '@/resources/recovery/recovery.schema';
 import { resolveOrg } from '@/resources/shared/resolve-org';
 import { paths } from '@/routes/paths';
 import { providerForRequest } from '@/server/auth-context.server';
@@ -334,9 +337,7 @@ export default function Recover() {
       branding={branding}
       title={<Trans>Recover your account</Trans>}
       description={
-        <Trans>
-          Enter your email address and we'll send you a link to set up a new passkey.
-        </Trans>
+        <Trans>Enter your email address and we'll send you a link to set up a new passkey.</Trans>
       }>
       <RRForm
         method="POST"

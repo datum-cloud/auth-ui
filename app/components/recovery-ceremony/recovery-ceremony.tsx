@@ -12,8 +12,8 @@
 import { AuthCeremony } from '@/components/auth-ceremony/auth-ceremony';
 import { FormError } from '@/components/form-error/form-error';
 import { WebAuthnButton } from '@/components/webauthn-button/webauthn-button';
-import { paths } from '@/routes/paths';
 import { aaguidFromAttestationObject, defaultPasskeyName } from '@/resources/webauthn/aaguid';
+import { paths } from '@/routes/paths';
 import { Button } from '@datum-cloud/datum-ui/button';
 import { Input } from '@datum-cloud/datum-ui/input';
 import { Label } from '@datum-cloud/datum-ui/label';
@@ -91,8 +91,8 @@ export function RecoveryCeremonyForm({
           <Trans>Your passkey is ready — give it a name so you can recognize it later.</Trans>
         ) : (
           <Trans>
-            Register a passkey using your device's biometric sensor or PIN. You'll use it to sign
-            in from now on.
+            Register a passkey using your device's biometric sensor or PIN. You'll use it to sign in
+            from now on.
           </Trans>
         )
       }>

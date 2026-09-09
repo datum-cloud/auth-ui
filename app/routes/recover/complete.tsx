@@ -13,7 +13,10 @@
 // Session-less like /recover: no sessions cookie, no sudo gate.
 import { AuthCeremony } from '@/components/auth-ceremony/auth-ceremony';
 import { RecoveryCeremonyForm } from '@/components/recovery-ceremony/recovery-ceremony';
-import { finishRecoveryCeremony, startRecoveryCeremony } from '@/resources/recovery/recovery-ceremony';
+import {
+  finishRecoveryCeremony,
+  startRecoveryCeremony,
+} from '@/resources/recovery/recovery-ceremony';
 import {
   recoveryCeremonyCookie,
   recoveryTicketCookie,
@@ -107,8 +110,7 @@ async function clearRecoveryCookies(): Promise<Headers> {
 }
 
 type ActionData =
-  | { ceremony: true; passkeyId: string; publicKey: unknown }
-  | { error: 'RECOVERY_EXPIRED' };
+  { ceremony: true; passkeyId: string; publicKey: unknown } | { error: 'RECOVERY_EXPIRED' };
 
 export default function RecoverComplete() {
   const { csrfToken, userId, codeId, code, requestId, organization } =

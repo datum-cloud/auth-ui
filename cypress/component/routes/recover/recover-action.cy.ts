@@ -53,36 +53,46 @@ function request(seed: Record<string, unknown>, extra: Record<string, unknown> =
 }
 
 // The six states from the spec's G7 row, each with a different side effect.
-const STATES: Array<[name: string, seed: Record<string, unknown>, extra?: Record<string, unknown>]> =
+const STATES: Array<
+  [name: string, seed: Record<string, unknown>, extra?: Record<string, unknown>]
+> = [
   [
-    [
-      'a verified account with a passkey',
-      { users: [{ id: 'u-1', loginName: EMAIL, orgId: 'org-1' }], authMethods: { 'u-1': ['passkey'] } },
-    ],
-    ['an address with no account at all', { users: [] }],
-    [
-      'an unverified signup (class d)',
-      { users: [{ id: 'u-1', loginName: EMAIL, orgId: 'org-1' }], authMethods: { 'u-1': [] } },
-    ],
-    [
-      'an org that forbids passkeys',
-      {
-        users: [{ id: 'u-1', loginName: EMAIL, orgId: 'org-1' }],
-        authMethods: { 'u-1': ['passkey'] },
-        settingsByOrg: { 'org-1': { passkeysType: 'not_allowed' } },
-      },
-    ],
-    [
-      'a rate-limited address',
-      { users: [{ id: 'u-1', loginName: EMAIL, orgId: 'org-1' }], authMethods: { 'u-1': ['passkey'] } },
-      { recoverActionTwice: true },
-    ],
-    [
-      'a request the bot gate rejected',
-      { users: [{ id: 'u-1', loginName: EMAIL, orgId: 'org-1' }], authMethods: { 'u-1': ['passkey'] } },
-      { recaptchaFetch: { body: { success: false } }, env: { ...ENV, RECAPTCHA_SECRET_KEY: 's' } },
-    ],
-  ];
+    'a verified account with a passkey',
+    {
+      users: [{ id: 'u-1', loginName: EMAIL, orgId: 'org-1' }],
+      authMethods: { 'u-1': ['passkey'] },
+    },
+  ],
+  ['an address with no account at all', { users: [] }],
+  [
+    'an unverified signup (class d)',
+    { users: [{ id: 'u-1', loginName: EMAIL, orgId: 'org-1' }], authMethods: { 'u-1': [] } },
+  ],
+  [
+    'an org that forbids passkeys',
+    {
+      users: [{ id: 'u-1', loginName: EMAIL, orgId: 'org-1' }],
+      authMethods: { 'u-1': ['passkey'] },
+      settingsByOrg: { 'org-1': { passkeysType: 'not_allowed' } },
+    },
+  ],
+  [
+    'a rate-limited address',
+    {
+      users: [{ id: 'u-1', loginName: EMAIL, orgId: 'org-1' }],
+      authMethods: { 'u-1': ['passkey'] },
+    },
+    { recoverActionTwice: true },
+  ],
+  [
+    'a request the bot gate rejected',
+    {
+      users: [{ id: 'u-1', loginName: EMAIL, orgId: 'org-1' }],
+      authMethods: { 'u-1': ['passkey'] },
+    },
+    { recaptchaFetch: { body: { success: false } }, env: { ...ENV, RECAPTCHA_SECRET_KEY: 's' } },
+  ],
+];
 
 describe('/recover action — G7: every request exit is indistinguishable', () => {
   it('returns the same response and the same Set-Cookie length for all six states', () => {
@@ -114,7 +124,10 @@ describe('/recover action — G7: every request exit is indistinguishable', () =
 
   it('ignores a userId the client tries to post', () => {
     request(
-      { users: [{ id: 'u-1', loginName: EMAIL, orgId: 'org-1' }], authMethods: { 'u-1': ['passkey'] } },
+      {
+        users: [{ id: 'u-1', loginName: EMAIL, orgId: 'org-1' }],
+        authMethods: { 'u-1': ['passkey'] },
+      },
       { form: { userId: 'u-SOMEONE-ELSE' } }
     ).then((v) => {
       // The schema has no userId field, so it is stripped — the account acted on is the one the
@@ -170,7 +183,7 @@ describe('/recover action — the typed-code path', () => {
   const badRows: Array<[string, Record<string, unknown>]> = [
     ['a wrong code', { ticket: { userId: 'u-1', codeId: 'MINTED', email: EMAIL }, code: 'WRONG' }],
     [
-      "a ticket issued for another address",
+      'a ticket issued for another address',
       { ticket: { userId: 'u-1', codeId: 'MINTED', email: 'other@acme.test' }, code: 'MINTED' },
     ],
     ['a filler ticket', { ticket: 'filler', code: 'MINTED' }],
@@ -254,7 +267,11 @@ describe('/recover — the flag is the kill switch', () => {
     callService({
       fn: 'recoverCompleteAction',
       env: off,
-      request: { url: 'http://localhost/id/recover/complete', csrf: true, form: { intent: 'start' } },
+      request: {
+        url: 'http://localhost/id/recover/complete',
+        csrf: true,
+        form: { intent: 'start' },
+      },
     }).then((v) => {
       expect(v.response?.status ?? v.response?.dataStatus).to.equal(404);
     });
