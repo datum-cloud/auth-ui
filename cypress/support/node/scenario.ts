@@ -281,6 +281,7 @@ export type ServiceFn =
   // browser bundle by virtue of the `.server.ts` suffix, so this must run node-side.
   | 'sendVerificationMail'
   | 'sendRecoveryMail'
+  | 'recoveryTicketCheck'
   // Drives the real verifyRecaptcha node-side; env.server is stubbed out of the browser bundle.
   | 'verifyRecaptcha'
   // ── routes/login handlers (batch 13b) ────────────────────────────────────────
@@ -779,6 +780,21 @@ export interface Scenario {
     returnTo: string;
     requestedBy: 'self';
   };
+
+  // ── recovery tickets (fn: 'recoveryTicketCheck'; Phase C Lane D Task 4) ─────
+  /** Which sealed-ticket properties to exercise. Each name becomes a key on `outcome` carrying
+   *  that check's result, so one node round-trip covers the whole format. */
+  ticketOps?: Array<
+    | 'roundTrip'
+    | 'fillerLength'
+    | 'wrongEmail'
+    | 'tampered'
+    | 'expired'
+    | 'ceremonyRoundTrip'
+    | 'fillerOpensNull'
+    | 'kindConfusion'
+    | 'idTooLong'
+  >;
 
   /** Input for the real verifyRecaptcha(token, expectedAction). */
   recaptchaInput?: { token: string; expectedAction: string };

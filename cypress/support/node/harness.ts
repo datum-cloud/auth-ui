@@ -151,6 +151,14 @@ import { providerForRequest } from '@/server/composition';
 import { getCsrfToken, loaderCsrf, assertCsrf, assertCsrfWith } from '@/server/csrf';
 import { _envSchema, env } from '@/server/infra/env.server';
 import { verifyRecaptcha } from '@/server/infra/recaptcha.server';
+import {
+  RECOVERY_TICKET_TTL_MS,
+  fillerTicket,
+  openCeremonyTicket,
+  openRequestTicket,
+  sealCeremonyTicket,
+  sealRequestTicket,
+} from '@/resources/recovery/recovery-ticket.server';
 import { sendRecoveryMail } from '@/server/infra/recovery-mail.server';
 import { sendVerificationMail } from '@/server/infra/verification-mail.server';
 import {
@@ -2577,6 +2585,77 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
           }
         );
         outcome = { result, received: verificationMailReceived[0] };
+        break;
+      }
+
+      // ── recovery tickets (Phase C Lane D Task 4) ────────────────────────────────────────────
+      // Drives the REAL seal/open functions: node:crypto and env.SESSION_SECRET are both
+      // unavailable in the browser bundle. One call runs every requested check so the whole
+      // format — including the fixed-length invariant G7 rests on — is asserted together.
+      case 'recoveryTicketCheck': {
+        const now = 1_700_000_000_000;
+        const EMAIL = 'owner@acme.test';
+        const real = sealRequestTicket({ userId: 'u-1', codeId: 'code-id-1', email: EMAIL }, now);
+        const results: Record<string, unknown> = {};
+        for (const op of s.ticketOps ?? []) {
+          switch (op) {
+            case 'roundTrip':
+              results.roundTrip = openRequestTicket(real, EMAIL, now + 1000);
+              break;
+            case 'fillerLength': {
+              const f1 = fillerTicket(now);
+              const f2 = fillerTicket(now);
+              results.fillerLength = {
+                sameLength: f1.length === real.length && f2.length === real.length,
+                fillersDiffer: f1 !== f2,
+              };
+              break;
+            }
+            case 'wrongEmail':
+              results.wrongEmail = openRequestTicket(real, 'someone-else@acme.test', now + 1000);
+              break;
+            case 'tampered': {
+              // Flip one character of the ciphertext body (past the IV) — the GCM tag must reject.
+              const at = 20;
+              const swap = real[at] === 'A' ? 'B' : 'A';
+              const bad = real.slice(0, at) + swap + real.slice(at + 1);
+              results.tampered = openRequestTicket(bad, EMAIL, now + 1000);
+              break;
+            }
+            case 'expired':
+              results.expired = openRequestTicket(real, EMAIL, now + RECOVERY_TICKET_TTL_MS + 1);
+              break;
+            case 'ceremonyRoundTrip': {
+              const c = sealCeremonyTicket({ userId: 'u-1', passkeyId: 'pk-1' }, now);
+              results.ceremonyRoundTrip = openCeremonyTicket(c, now + 1000);
+              break;
+            }
+            case 'fillerOpensNull':
+              results.fillerOpensNull = openRequestTicket(fillerTicket(now), EMAIL, now + 1000);
+              break;
+            case 'kindConfusion': {
+              const c = sealCeremonyTicket({ userId: 'u-1', passkeyId: 'pk-1' }, now);
+              results.kindConfusion = {
+                requestAsCeremony: openCeremonyTicket(real, now + 1000),
+                ceremonyAsRequest: openRequestTicket(c, EMAIL, now + 1000),
+              };
+              break;
+            }
+            case 'idTooLong': {
+              const long = 'x'.repeat(41);
+              const degraded = sealRequestTicket(
+                { userId: long, codeId: 'code-id-1', email: EMAIL },
+                now
+              );
+              results.idTooLong = {
+                sameLength: degraded.length === real.length,
+                opens: openRequestTicket(degraded, EMAIL, now + 1000),
+              };
+              break;
+            }
+          }
+        }
+        outcome = results;
         break;
       }
 
