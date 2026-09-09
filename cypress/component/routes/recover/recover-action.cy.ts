@@ -20,6 +20,11 @@ const ENV = {
 
 const EMAIL = 'owner@acme.test';
 
+// The same environment with delivery simply not configured. Built by OMITTING the key rather
+// than setting it undefined: the scenario crosses a JSON boundary to the node runner, which would
+// drop an undefined value silently — correct today, but for a reason no reader could see.
+const { RECOVERY_MAIL_URL: _unusedRecoveryMailUrl, ...ENV_NO_DELIVERY } = ENV;
+
 function observable(v: Verdict) {
   return {
     isResponse: v.response?.isResponse ?? null,
@@ -46,13 +51,17 @@ function request(seed: Record<string, unknown>, extra: Record<string, unknown> =
     request: {
       url: 'http://localhost/id/recover',
       csrf: true,
-      form: { intent: 'request', email: EMAIL, ...(extra.form as object) },
+      // `organization` is posted by EVERY row on purpose. The action resolves the policy org from
+      // the form, so a row that omits it falls back to the instance default org and never reads
+      // its own settingsByOrg seed — which is how the org-refused row below silently exercised
+      // the ordinary 'sent' path instead. One input shape, one varying thing: the seeded account.
+      form: { intent: 'request', email: EMAIL, organization: 'org-1', ...(extra.form as object) },
     },
     ...extra,
   });
 }
 
-// The six states from the spec's G7 row, each with a different side effect.
+// The seven states from the spec's G7 row, each with a different side effect.
 const STATES: Array<
   [name: string, seed: Record<string, unknown>, extra?: Record<string, unknown>]
 > = [
@@ -92,15 +101,37 @@ const STATES: Array<
     },
     { recaptchaFetch: { body: { success: false } }, env: { ...ENV, RECAPTCHA_SECRET_KEY: 's' } },
   ],
+  [
+    // A live, recoverable account in an environment where delivery is simply not configured.
+    // It is the row most likely to drift: requestRecovery returns before minting anything, so a
+    // future refactor that forgot the filler here would set NO cookie at all — and an environment
+    // with recovery half-wired would then answer differently from one with it off entirely.
+    'a live account with delivery disabled',
+    {
+      users: [{ id: 'u-1', loginName: EMAIL, orgId: 'org-1' }],
+      authMethods: { 'u-1': ['passkey'] },
+    },
+    { env: ENV_NO_DELIVERY },
+  ],
 ];
 
 describe('/recover action — G7: every request exit is indistinguishable', () => {
-  it('returns the same response and the same Set-Cookie length for all six states', () => {
-    const seen: Array<{ name: string; obs: ReturnType<typeof observable>; lens: number[] }> = [];
+  it('returns the same response and the same Set-Cookie length for all seven states', () => {
+    const seen: Array<{
+      name: string;
+      obs: ReturnType<typeof observable>;
+      lens: number[];
+      audit: string;
+    }> = [];
 
     for (const [name, seed, extra] of STATES) {
       request(seed, extra ?? {}).then((v) => {
-        seen.push({ name, obs: observable(v), lens: cookieLengths(v) });
+        seen.push({
+          name,
+          obs: observable(v),
+          lens: cookieLengths(v),
+          audit: (v.auditLines ?? []).join('\n'),
+        });
       });
     }
 
@@ -119,6 +150,17 @@ describe('/recover action — G7: every request exit is indistinguishable', () =
       // Positive half: the shared shape must be the real terminal, not a shared failure.
       expect(first.obs.dataStatus).to.equal(200);
       expect(first.obs.dataBody).to.deep.equal({ sent: true, email: EMAIL });
+
+      // Each row must have taken the branch it names. Without this the matrix could pass
+      // vacuously — seven copies of the same state look exactly like seven different ones when
+      // the only assertion is that they match.
+      const audits = Object.fromEntries(seen.map((r) => [r.name, r.audit]));
+      expect(audits['a live account with delivery disabled']).to.contain('delivery_disabled');
+      expect(audits['an address with no account at all']).to.contain('unknown_address');
+      expect(audits['an org that forbids passkeys']).to.contain('org_policy');
+      expect(audits['a rate-limited address']).to.contain('rate_limited');
+      expect(audits['an unverified signup (class d)']).to.contain('resumed_signup');
+      expect(audits['a verified account with a passkey']).to.contain('"outcome":"sent"');
     });
   });
 
