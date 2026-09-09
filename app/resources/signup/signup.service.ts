@@ -18,11 +18,12 @@ import {
   type SessionEntry,
 } from '@/modules/auth/session/cookie';
 import { ProviderError } from '@/modules/auth/types';
-import { APP_BASENAME } from '@/resources/shared/app-basename';
+import { mailReturnTo } from '@/resources/shared/mail-return-to';
 import { authorizeHandbackTarget, threadParams } from '@/resources/shared/next-step-params';
 import { resolveOrg } from '@/resources/shared/resolve-org';
 import { postRegisterStep } from '@/resources/signup/post-register';
 import { allowResend } from '@/resources/signup/signup-resend-limit';
+import { resendVerification } from '@/resources/signup/verification-resend';
 import {
   signupCompleteUrlTemplate,
   verifyUrlTemplate,
@@ -31,25 +32,6 @@ import { env } from '@/server/infra/env.server';
 import { sendVerificationMail } from '@/server/infra/verification-mail.server';
 import { logAuthEvent, hashActor } from '@/server/observability';
 import { realSleep, type Sleep } from '@/server/timing';
-
-// The webhook behind sendVerificationMail (buildActionURL, Task 1) appends its OWN
-// `?code=...&userId=...` onto whatever `returnTo` it's given — unlike verifyUrlTemplate /
-// signupCompleteUrlTemplate, which hand Zitadel a template carrying literal {{.Code}}/
-// {{.UserID}}/{{.OrgID}} placeholders for ZITADEL to substitute. There is no such
-// substitution pass here, so this builds `returnTo` with REAL values (no placeholders) —
-// the caller supplies whatever it already resolved (organization, requestId).
-function verificationReturnTo(
-  origin: string,
-  path: string,
-  params: { requestId?: string; organization?: string; next?: string }
-): string {
-  const qs = new URLSearchParams();
-  if (params.requestId) qs.set('requestId', params.requestId);
-  if (params.organization) qs.set('organization', params.organization);
-  if (params.next) qs.set('next', params.next);
-  const query = qs.toString();
-  return `${origin}${APP_BASENAME}${path}${query ? `?${query}` : ''}`;
-}
 
 /**
  * Zitadel session-metadata key for the MaxMind device-tracking token. This string is a
@@ -451,7 +433,7 @@ export async function registerWithPassword(
           code: user.emailCode,
           // Origin comes from trusted config (PUBLIC_ORIGIN), NOT the Host header, to
           // block injection — the same rule verifyUrlTemplate already followed.
-          returnTo: verificationReturnTo(origin, '/verify', {
+          returnTo: mailReturnTo(origin, '/verify', {
             requestId,
             organization: registrationOrg,
           }),
@@ -550,7 +532,7 @@ export async function registerEmailLinkSignup(
           // has no such substitution pass: it emits exactly what it's handed. Passing the raw
           // value here silently dropped `organization` from the link on a bare (no ?organization=)
           // signup, which made completeEmailLinkSignup's createSession lose org scoping.
-          returnTo: verificationReturnTo(origin, '/signup/complete', {
+          returnTo: mailReturnTo(origin, '/signup/complete', {
             requestId,
             organization: registrationOrg,
             next: 'passkey',
@@ -619,33 +601,11 @@ async function resendIfSquatted(
     const methods = await provider.listAuthMethods(user.id);
     if (methods.length > 0) return 'enrolled'; // a real account — caller may disclose
     if (!(await allowResend(email))) return 'squatted'; // mail-bombing guard — silent skip
-    // Same CRITICAL fallback as registerEmailLinkSignup above (final-findings.md CRITICAL 1):
-    // unset VERIFICATION_MAIL_URL means the milo pipeline isn't configured in this environment,
-    // so fall back to Zitadel's own resend-with-url-template path instead of requesting a
-    // returnCode we have no way to deliver.
-    if (!env.VERIFICATION_MAIL_URL) {
-      await provider.resendEmailCodeWithUrl(user.id, signupCompleteUrlTemplate(link));
-    } else {
-      // returnCode delivery: the code comes back in-band instead of Zitadel emailing it, and
-      // sendVerificationMail (never throws — see verification-mail.server.ts) delivers it through
-      // OUR pipeline, landing on the SAME /signup/complete?next=passkey destination
-      // signupCompleteUrlTemplate used to build for Zitadel's own sendCode path.
-      const code = await provider.resendEmailCode(user.id);
-      await sendVerificationMail({
-        userId: user.id,
-        code,
-        returnTo: verificationReturnTo(link.origin, '/signup/complete', {
-          requestId: link.requestId,
-          organization: link.organization,
-          next: 'passkey',
-        }),
-      });
-    }
-    // Audited under its OWN event, not the shared signup.requested. This dispatches mail to an
-    // address the submitter has not proven they own — a security-relevant outbound action that
-    // has to be attributable on its own. Safe for enumeration: the audit log is server-side
-    // only and never reaches the caller. Parity is a property of the RESPONSE, not the log.
-    logAuthEvent('signup_verification_resent', 'success', { actor: hashActor(email) });
+    // The send itself lives in resendVerification, shared with /recover's class-(d) branch so the
+    // two doors cannot drift. The limiter stays HERE (above): one per-address budget across both.
+    // 'already_verified' is the rare verified-but-methodless account; it keeps today's behaviour
+    // of staying generic rather than disclosing anything about it.
+    if ((await resendVerification(provider, user, link)) === 'already_verified') return 'unknown';
     return 'squatted';
   } catch (error) {
     // The RESULT is swallowed on purpose: a lookup/resend fault must not decide what the caller

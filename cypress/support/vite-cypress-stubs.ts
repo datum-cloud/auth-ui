@@ -133,6 +133,27 @@ export function stubServerModulesForCypress(root: string): Plugin {
         return { csrfToken: 'stub-token', headers: {} };
       }
     `,
+    // Phase C Lane D: recovery-ticket.server.ts binds node:crypto (AES-256-GCM + HKDF), which
+    // Vite externalizes to a browser shim with no named exports — importing it crashes any mount
+    // spec that reaches routes/recover/*. The REAL seal/open round-trip, the fixed-length
+    // invariant and the tamper/expiry/kind rejections all run in Bun via cy.task
+    // (cypress/component/resources/recovery/recovery-ticket.cy.ts), so nothing security-relevant
+    // rests on this stub: it exists only so the routes' JSX can be rendered.
+    [resolve(root, './app/resources/recovery/recovery-ticket.server.ts')]: `
+      export const RECOVERY_TICKET_TTL_MS = 3600000;
+      export const RECOVERY_CEREMONY_TTL_MS = 600000;
+      export function sealRequestTicket(_p, _now) { return 'stub-request-ticket'; }
+      export function fillerTicket(_now) { return 'stub-filler-ticket'; }
+      export function openRequestTicket(_raw, _email, _now) { return null; }
+      export function sealCeremonyTicket(_p, _now) { return 'stub-ceremony-ticket'; }
+      export function openCeremonyTicket(_raw, _now) { return null; }
+      const cookie = (name) => ({
+        serialize: async (_v, _o) => name + '=stub; Path=/id/recover; HttpOnly',
+        parse: async (_v) => null,
+      });
+      export const recoveryTicketCookie = cookie('recovery_ticket');
+      export const recoveryCeremonyCookie = cookie('recovery_ceremony');
+    `,
     // Task 9a (fidelity fix): transport.ts imports node:crypto + @zitadel/client/node — both
     // node-only. The stub no longer reimplements resolveServiceUrl or the LRU cache; those are
     // now exercised via the REAL code:

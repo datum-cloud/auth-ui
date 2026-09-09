@@ -28,6 +28,10 @@ export interface ScenarioSeed {
   users?: Array<{ id: string; loginName: string; displayName?: string; orgId?: string }>;
   passwords?: Record<string, string>;
   authMethods?: Record<string, string[]>;
+  /** userIds whose address is already verified (applied via provider.markEmailVerified). The
+   *  verified-but-methodless edge — verification succeeded, addOtpEmail did not — is what makes
+   *  Zitadel refuse a resend, which is the signal /recover falls through on. */
+  emailVerified?: string[];
   authRequests?: Record<
     string,
     { id: string; clientId?: string; scopes: string[]; prompt: string[]; loginHint?: string }
@@ -111,6 +115,12 @@ export interface RequestSpec {
   /** A loginName signed into a REAL `reauth-intent` cookie (readReauthIntent/checkReauthIntent
    *  read it). Merged into the Cookie header alongside `sessions`. */
   reauthIntent?: string;
+  /** Sealed with the REAL recovery-ticket module into a `recovery_ceremony` cookie, so
+   *  finishRecoveryCeremony opens an authentic ticket rather than a stub. */
+  ceremonyTicket?: { userId: string; passkeyId: string };
+  /** Sealed with the REAL module into a `recovery_ticket` cookie. `'filler'` sets a filler ticket
+   *  instead; a `codeId` of 'MINTED' is substituted with the code the harness just minted. */
+  recoveryTicket?: { userId: string; codeId: string; email: string } | 'filler';
   /** Mint a REAL CSRF token+cookie (getCsrfToken): the cookie is merged into the Cookie header and
    *  the token is injected into `form` under the `csrf` key so an action's assertCsrf passes. The
    *  whole reason the otp-verify ACTION specs are node-bound is this signed CSRF round-trip. */
@@ -280,6 +290,18 @@ export type ServiceFn =
   // load-time schema parse — loads (see run-scenario.ts). node:https is stubbed out of the Vite
   // browser bundle by virtue of the `.server.ts` suffix, so this must run node-side.
   | 'sendVerificationMail'
+  | 'sendRecoveryMail'
+  | 'recoveryTicketCheck'
+  | 'resendVerification'
+  | 'requestRecovery'
+  | 'requestRecoveryThenAllowResend'
+  | 'startRecoveryCeremony'
+  | 'finishRecoveryCeremony'
+  | 'recoverLoader'
+  | 'recoverAction'
+  | 'recoverCodeAction'
+  | 'recoverCompleteLoader'
+  | 'recoverCompleteAction'
   // Drives the real verifyRecaptcha node-side; env.server is stubbed out of the browser bundle.
   | 'verifyRecaptcha'
   // ── routes/login handlers (batch 13b) ────────────────────────────────────────
@@ -767,6 +789,62 @@ export interface Scenario {
    *  200 (also captures the received method/content-type/body as outcome.received). */
   verificationMailStatus?: number;
 
+  // ── recovery-mail client (fn: 'sendRecoveryMail'; Phase C Lane D Task 3) ────
+  /** Input for the REAL sendRecoveryMail. Shares the verificationMailListen listener: set BOTH
+   *  mail URLs to the same port with different paths and the listener captures either POST, with
+   *  `received.path` telling them apart. */
+  recoveryMailInput?: {
+    userId: string;
+    codeId: string;
+    code: string;
+    returnTo: string;
+    requestedBy: 'self';
+  };
+
+  // ── recovery tickets (fn: 'recoveryTicketCheck'; Phase C Lane D Task 4) ─────
+  /** Which sealed-ticket properties to exercise. Each name becomes a key on `outcome` carrying
+   *  that check's result, so one node round-trip covers the whole format. */
+  // ── recovery request decision (fn: 'requestRecovery'; Task 6) ──────────────
+  /** Input for the REAL requestRecovery. `origin` defaults to http://localhost. */
+  recoveryInput?: { email: string; organization?: string; requestId?: string; origin?: string };
+
+  // ── recovery ceremony (fn: 'start|finishRecoveryCeremony'; Task 7) ─────────
+  /** Input for startRecoveryCeremony. Pass the literal 'MINTED' for `codeId`/`code` together with
+   *  `mintPasskeyCode` to have the harness substitute the REAL envelope the fake just minted —
+   *  a spec cannot know the code otherwise, and hard-coding one would test nothing. */
+  recoveryStart?: { userId: string; codeId: string; code: string; domain: string };
+  /** Ask the harness to call passkeyRegisterLink for this userId first, exposing the raw code as
+   *  `outcome.minted`. */
+  mintPasskeyCode?: string;
+  /** Which door to audit the ceremony under. Default 'link'. */
+  recoveryPath?: 'link' | 'code';
+  /** Post the /recover request action TWICE, returning the SECOND response — the rate-limited
+   *  row of the G7 matrix, which must be indistinguishable from the first. */
+  recoverActionTwice?: boolean;
+  /** Consume the minted code before the scenario runs, so the route sees an already-spent one. */
+  consumeMintedCode?: boolean;
+
+  // ── shared verification resend (fn: 'resendVerification'; Task 5) ──────────
+  /** The user resendVerification is called for. */
+  resendUser?: { id: string; loginName: string };
+  /** The link context it builds `returnTo` from. */
+  resendLink?: { origin: string; requestId?: string; organization?: string };
+  /** Call it twice, exposing the second result as `outcome.second` — proves the helper does not
+   *  rate-limit on its own (the callers own the shared budget). */
+  resendTwice?: boolean;
+
+  ticketOps?: Array<
+    | 'roundTrip'
+    | 'fillerLength'
+    | 'wrongEmail'
+    | 'tampered'
+    | 'expired'
+    | 'ceremonyRoundTrip'
+    | 'fillerOpensNull'
+    | 'kindConfusion'
+    | 'idTooLong'
+  >;
+
   /** Input for the real verifyRecaptcha(token, expectedAction). */
   recaptchaInput?: { token: string; expectedAction: string };
   /** Stubs `globalThis.fetch` for this scenario's siteverify call. `{ reject: true }` simulates
@@ -840,5 +918,10 @@ export interface Verdict {
    * indirectly from inside a signup service (registerEmailLinkSignup, registerWithPassword,
    * resendIfSquatted). undefined when verificationMailListen was not set or nothing was posted.
    */
-  verificationMailReceived?: Array<{ method?: string; contentType?: string; body?: unknown }>;
+  verificationMailReceived?: Array<{
+    method?: string;
+    contentType?: string;
+    path?: string;
+    body?: unknown;
+  }>;
 }

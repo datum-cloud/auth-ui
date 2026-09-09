@@ -176,7 +176,12 @@ export const signupRateLimit: MiddlewareHandler = createRateLimit({
     c.req.method === 'POST' &&
     (pathname === '/id/signup' ||
       pathname === '/id/signup/password' ||
-      pathname === '/id/signup/method'),
+      pathname === '/id/signup/method' ||
+      // Recovery sends mail too, and draws on the same per-address budget as the resend above —
+      // but the address is in the POST body (body-stream hazard), so this per-IP key degrades to
+      // ip-only exactly as /id/signup does. The per-address bound is allowResend, not this.
+      pathname === '/id/recover' ||
+      pathname === '/id/recover/complete'),
   key: (c, ip) => {
     const loginName = normalizedLoginName(c);
     return loginName ? `${ip}|${loginName}` : ip;

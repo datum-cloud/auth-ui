@@ -76,6 +76,13 @@ const SHARED_FACTORY_PATHS: Record<string, string | string[]> = {
   // logAuthEvent) to the signup domain service. Registered here so the delegation +
   // registry checks resolve the signup.* events at their new call site.
   'signup.service.ts': join(RESOURCES_DIR, 'signup/signup.service.ts'),
+  // Phase C Lane D: the two-step ceremony's recovery_complete events are emitted here, not in
+  // the routes that call it.
+  'recovery-ceremony.ts': join(RESOURCES_DIR, 'recovery/recovery-ceremony.ts'),
+  // Phase C Lane D: the /recover routes delegate their whole decision (incl. the
+  // recovery_request logAuthEvent calls) to the recovery domain service. Registered here so the
+  // delegation + registry checks resolve those events at their call site.
+  'recovery.service.ts': join(RESOURCES_DIR, 'recovery/recovery.service.ts'),
   // Pass 2: the verify route (verify/index.tsx) delegates its action logic (incl.
   // logAuthEvent for email.verified / invite.verified) to the verify domain service.
   // Registered here so the delegation + registry checks resolve those events at their
@@ -261,6 +268,11 @@ const DELEGATED_TO_SHARED: Record<string, string[]> = {
   // Pass 2: the verify route is thin — its action logic (and the email.verified /
   // invite.verified logAuthEvent calls) lives in resources/verify/verify.service.ts.
   'verify/index.tsx': ['verify.service.ts'],
+  // Phase C Lane D: both recover routes are thin translators. /recover's request intent delegates
+  // to recovery.service.ts (recovery_request) and its code intent to recovery-ceremony.ts
+  // (recovery_complete); /recover/complete only ever drives the ceremony.
+  'recover/index.tsx': ['recovery.service.ts', 'recovery-ceremony.ts'],
+  'recover/complete.tsx': ['recovery-ceremony.ts'],
   // Pass 2: the OTP verify routes are thin — their action logic (and the mfa_otp /
   // mfa_otp_challenge / mfa_totp logAuthEvent calls) lives in resources/otp/otp.service.ts.
   'login/verify/email.tsx': ['otp.service.ts'],
@@ -395,6 +407,20 @@ export const REQUIRED_EVENTS = [
   // Emitted success AND failure from resendIfSquatted; the HTTP response is identical either
   // way, so this log is the only place the side effect is observable.
   'signup_verification_resent',
+  // --- Phase C account recovery (/recover) ---
+  // recovery_request: the whole enumeration-safe request decision. success carries the outcome
+  //   (sent / resumed_signup); failure carries a bounded suppress reason. The HTTP response is
+  //   byte-identical across all of them (G7), so this log is the ONLY place the side effect is
+  //   observable — which is exactly why every branch must emit one.
+  // recovery_mail_sent / _failed: the mTLS webhook POST that mails the registration code.
+  // recovery_complete: both ceremony stages (start / finish) on both paths (link / code).
+  // recovery_ticket: the sealed ticket degrading to a filler rather than throwing.
+  // The code itself is a bearer credential and appears in NONE of them.
+  'recovery_request',
+  'recovery_mail_sent',
+  'recovery_mail_failed',
+  'recovery_complete',
+  'recovery_ticket',
   'email.verified',
   'invite.verified',
   // --- Rate limiting (emitted by middleware, not routes — present in observability layer) ---

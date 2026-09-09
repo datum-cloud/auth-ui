@@ -1,6 +1,10 @@
 // mfa capability — passkey / u2f / totp / otp registration + verification, plus setMfaInitSkipped (P5).
 import type { ZitadelCtx } from './context';
 import { normalizeError, timestampToIso } from './mappers';
+import {
+  decodePasskeyRegistrationCode,
+  encodePasskeyRegistrationCode,
+} from '@/modules/auth/passkey-registration-code';
 import type { U2FCreationOptions, WebAuthnCreationOptions } from '@/modules/auth/types';
 import type { JsonObject } from '@bufbuild/protobuf';
 import { create } from '@zitadel/client';
@@ -59,9 +63,9 @@ export function passkeyRegisterLink(ctx: ZitadelCtx, userId: string): Promise<{ 
       medium: { case: 'returnCode', value: {} },
     });
     const resp = await users.createPasskeyRegistrationLink(req, {});
-    // PasskeyRegistrationCode { id: string; code: string } — round-trip both as JSON
+    // PasskeyRegistrationCode { id: string; code: string } — round-trip both through the codec
     const c = resp.code;
-    return { code: c ? JSON.stringify({ id: c.id, code: c.code }) : '' };
+    return { code: c ? encodePasskeyRegistrationCode({ id: c.id, code: c.code }) : '' };
   });
 }
 
@@ -76,10 +80,8 @@ export function registerPasskey(
   const users = ctx.svc(UserService);
   return ctx.call(async () => {
     // Decode the opaque code string produced by passkeyRegisterLink.
-    let parsed: { id?: string; code?: string };
-    try {
-      parsed = JSON.parse(code) as { id?: string; code?: string };
-    } catch {
+    const parsed = decodePasskeyRegistrationCode(code);
+    if (!parsed) {
       throw normalizeError({
         message:
           'malformed passkey registration code (expected JSON envelope from passkeyRegisterLink)',
@@ -88,7 +90,7 @@ export function registerPasskey(
     const req = create(RegisterPasskeyRequestSchema, {
       userId,
       domain,
-      ...(parsed.id && parsed.code ? { code: { id: parsed.id, code: parsed.code } } : {}),
+      code: { id: parsed.id, code: parsed.code },
     });
     const resp = await users.registerPasskey(req, {});
     return {

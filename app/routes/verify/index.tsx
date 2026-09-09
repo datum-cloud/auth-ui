@@ -6,9 +6,11 @@ import { useAuthActionError } from '@/hooks/use-auth-action-error';
 import { readSessions, mostRecent } from '@/modules/auth/session/cookie';
 import { dispatchEmailCode, resendEmailCode, submitEmailCode } from '@/resources/verify';
 import { verifyCodeSchema, verifyCodeClientSchema } from '@/resources/verify/verify.schema';
+import { paths } from '@/routes/paths';
 import { providerForRequest } from '@/server/auth-context.server';
 import { loaderCsrf, assertCsrf } from '@/server/csrf';
 import { trustedAppOrigin } from '@/server/infra/app-origin.server';
+import { env } from '@/server/infra/env.server';
 import { Button } from '@datum-cloud/datum-ui/button';
 import { Form } from '@datum-cloud/datum-ui/form';
 import { Trans, useLingui } from '@lingui/react/macro';
@@ -22,7 +24,7 @@ import {
   type LoaderFunctionArgs,
   type MetaFunction,
 } from 'react-router';
-import { Form as RRForm } from 'react-router';
+import { Link, Form as RRForm } from 'react-router';
 
 export const meta: MetaFunction = () => [{ title: 'Verify your email' }];
 
@@ -68,6 +70,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       organization,
       requestId,
       code,
+      recoveryEnabled: env.AUTH_ACCOUNT_RECOVERY_ENABLED,
     },
     { headers }
   );
@@ -124,7 +127,7 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function Verify() {
-  const { csrfToken, userId, invite, loginName, organization, requestId, code } =
+  const { csrfToken, userId, invite, loginName, organization, requestId, code, recoveryEnabled } =
     useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
@@ -214,6 +217,23 @@ export default function Verify() {
               <Trans>Resend code</Trans>
             </Button>
           </RRForm>
+        ) : null}
+        {/* /login sends a methodless account here, and a class-(d) user whose mail never arrived
+            has nowhere else to go — recovery re-sends the same verification link from the other
+            door, under the same shared per-address budget. */}
+        {recoveryEnabled ? (
+          <p className="text-foreground/60 text-center text-sm">
+            <Trans>Didn't get the email?</Trans>{' '}
+            <Link
+              to={paths.recover.index({
+                email: loginName || undefined,
+                requestId,
+                organization,
+              })}
+              className="underline">
+              <Trans>Recover your account</Trans>
+            </Link>
+          </p>
         ) : null}
       </div>
     </AuthCard>
