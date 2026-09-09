@@ -115,6 +115,9 @@ export interface RequestSpec {
   /** A loginName signed into a REAL `reauth-intent` cookie (readReauthIntent/checkReauthIntent
    *  read it). Merged into the Cookie header alongside `sessions`. */
   reauthIntent?: string;
+  /** Sealed with the REAL recovery-ticket module into a `recovery_ceremony` cookie, so
+   *  finishRecoveryCeremony opens an authentic ticket rather than a stub. */
+  ceremonyTicket?: { userId: string; passkeyId: string };
   /** Mint a REAL CSRF token+cookie (getCsrfToken): the cookie is merged into the Cookie header and
    *  the token is injected into `form` under the `csrf` key so an action's assertCsrf passes. The
    *  whole reason the otp-verify ACTION specs are node-bound is this signed CSRF round-trip. */
@@ -289,6 +292,8 @@ export type ServiceFn =
   | 'resendVerification'
   | 'requestRecovery'
   | 'requestRecoveryThenAllowResend'
+  | 'startRecoveryCeremony'
+  | 'finishRecoveryCeremony'
   // Drives the real verifyRecaptcha node-side; env.server is stubbed out of the browser bundle.
   | 'verifyRecaptcha'
   // ── routes/login handlers (batch 13b) ────────────────────────────────────────
@@ -794,6 +799,17 @@ export interface Scenario {
   // ── recovery request decision (fn: 'requestRecovery'; Task 6) ──────────────
   /** Input for the REAL requestRecovery. `origin` defaults to http://localhost. */
   recoveryInput?: { email: string; organization?: string; requestId?: string; origin?: string };
+
+  // ── recovery ceremony (fn: 'start|finishRecoveryCeremony'; Task 7) ─────────
+  /** Input for startRecoveryCeremony. Pass the literal 'MINTED' for `codeId`/`code` together with
+   *  `mintPasskeyCode` to have the harness substitute the REAL envelope the fake just minted —
+   *  a spec cannot know the code otherwise, and hard-coding one would test nothing. */
+  recoveryStart?: { userId: string; codeId: string; code: string; domain: string };
+  /** Ask the harness to call passkeyRegisterLink for this userId first, exposing the raw code as
+   *  `outcome.minted`. */
+  mintPasskeyCode?: string;
+  /** Which door to audit the ceremony under. Default 'link'. */
+  recoveryPath?: 'link' | 'code';
 
   // ── shared verification resend (fn: 'resendVerification'; Task 5) ──────────
   /** The user resendVerification is called for. */

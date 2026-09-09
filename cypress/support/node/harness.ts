@@ -66,11 +66,18 @@ import {
 import {
   RECOVERY_TICKET_TTL_MS,
   fillerTicket,
+  recoveryCeremonyCookie,
   openCeremonyTicket,
   openRequestTicket,
   sealCeremonyTicket,
   sealRequestTicket,
 } from '@/resources/recovery/recovery-ticket.server';
+import { decodePasskeyRegistrationCode } from '@/modules/auth/passkey-registration-code';
+import {
+  finishRecoveryCeremony,
+  startRecoveryCeremony,
+} from '@/resources/recovery/recovery-ceremony';
+import { requestRecovery } from '@/resources/recovery/recovery.service';
 import {
   resolveSignedIn,
   listAccounts,
@@ -90,7 +97,6 @@ import {
   completeEmailLinkSignup,
 } from '@/resources/signup';
 import { allowResend, _resetResendLimiterForTests } from '@/resources/signup/signup-resend-limit';
-import { requestRecovery } from '@/resources/recovery/recovery.service';
 import { resendVerification } from '@/resources/signup/verification-resend';
 import {
   processIdpCallback,
@@ -232,6 +238,10 @@ async function buildCookieHeader(req: RequestSpec): Promise<string | undefined> 
   if (sessionsPart) parts.push(sessionsPart);
   if (req.fingerprintId) parts.push(`fingerprintId=${encodeURIComponent(req.fingerprintId)}`);
   if (req.reauthIntent) parts.push((await serializeReauthIntent(req.reauthIntent)).split(';')[0]);
+  if (req.ceremonyTicket)
+    parts.push(
+      (await recoveryCeremonyCookie.serialize(sealCeremonyTicket(req.ceremonyTicket))).split(';')[0]
+    );
   if (req.lastUsedLogin)
     parts.push((await serializeLastUsedLogin(req.lastUsedLogin)).split(';')[0]);
   if (req.passkeyHint) parts.push((await serializePasskeyHint(req.passkeyHint)).split(';')[0]);
@@ -2683,7 +2693,10 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
       // The ticket is returned verbatim so specs can compare LENGTHS across the G7 matrix.
       case 'requestRecovery': {
         const ri = s.recoveryInput ?? { email: '' };
-        const result = await requestRecovery(provider, { ...ri, origin: ri.origin ?? 'http://localhost' });
+        const result = await requestRecovery(provider, {
+          ...ri,
+          origin: ri.origin ?? 'http://localhost',
+        });
         outcome = { outcome: result.outcome, ticket: result.ticket };
         break;
       }
@@ -2701,6 +2714,49 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
           firstTicket: first.ticket,
           secondTicket: second.ticket,
           allowResendAfter: await allowResend(input.email),
+        };
+        break;
+      }
+
+      // ── recovery ceremony (Phase C Lane D Task 7) ───────────────────────────────────────────
+      // The code the fake mints is unknowable to a spec, so 'MINTED' is substituted with the real
+      // envelope here — that is what makes the wrong-code row meaningful rather than tautological.
+      case 'startRecoveryCeremony': {
+        const rs = s.recoveryStart ?? { userId: '', codeId: '', code: '', domain: 'localhost' };
+        let minted: { id: string; code: string } | null = null;
+        if (s.mintPasskeyCode) {
+          minted = decodePasskeyRegistrationCode(
+            (await provider.passkeyRegisterLink(s.mintPasskeyCode)).code
+          );
+        }
+        const result = await startRecoveryCeremony(provider, {
+          userId: rs.userId,
+          codeId: rs.codeId === 'MINTED' && minted ? minted.id : rs.codeId,
+          code: rs.code === 'MINTED' && minted ? minted.code : rs.code,
+          domain: rs.domain,
+          path: s.recoveryPath ?? 'link',
+        });
+        outcome = result.ok
+          ? { ...result, minted: minted?.code }
+          : { ...result, minted: minted?.code };
+        break;
+      }
+
+      // The ceremony ticket arrives as a REAL sealed cookie (see buildCookieHeader), so the
+      // "ticket decides, not the form" rule is exercised end to end rather than against a stub.
+      case 'finishRecoveryCeremony': {
+        const { request, form } = await buildHandlerRequest(
+          s.request ?? { url: 'http://localhost/id/recover' }
+        );
+        const result = await finishRecoveryCeremony(
+          provider,
+          request,
+          form,
+          s.recoveryPath ?? 'link'
+        );
+        outcome = {
+          ...result,
+          passkeys: (await provider.listPasskeys('u-1')).map((p) => ({ id: p.id, name: p.name })),
         };
         break;
       }
