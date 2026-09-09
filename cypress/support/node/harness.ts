@@ -14,6 +14,10 @@ import type {
   SerializedResponse,
   Verdict,
 } from './scenario';
+import {
+  decodePasskeyRegistrationCode,
+  encodePasskeyRegistrationCode,
+} from '@/modules/auth/passkey-registration-code';
 import { FakeAuthProvider } from '@/modules/auth/providers/fake/fake-provider';
 import {
   createServerTransport,
@@ -64,20 +68,25 @@ import {
   type OtpSessionEntry,
 } from '@/resources/otp';
 import {
+  finishRecoveryCeremony,
+  startRecoveryCeremony,
+} from '@/resources/recovery/recovery-ceremony';
+import {
   RECOVERY_TICKET_TTL_MS,
   fillerTicket,
   recoveryCeremonyCookie,
+  recoveryTicketCookie,
   openCeremonyTicket,
   openRequestTicket,
   sealCeremonyTicket,
   sealRequestTicket,
 } from '@/resources/recovery/recovery-ticket.server';
-import { decodePasskeyRegistrationCode } from '@/modules/auth/passkey-registration-code';
-import {
-  finishRecoveryCeremony,
-  startRecoveryCeremony,
-} from '@/resources/recovery/recovery-ceremony';
 import { requestRecovery } from '@/resources/recovery/recovery.service';
+import {
+  action as recoverCompleteAction,
+  loader as recoverCompleteLoader,
+} from '@/routes/recover/complete';
+import { action as recoverAction, loader as recoverLoader } from '@/routes/recover/index';
 import {
   resolveSignedIn,
   listAccounts,
@@ -241,6 +250,14 @@ async function buildCookieHeader(req: RequestSpec): Promise<string | undefined> 
   if (req.ceremonyTicket)
     parts.push(
       (await recoveryCeremonyCookie.serialize(sealCeremonyTicket(req.ceremonyTicket))).split(';')[0]
+    );
+  if (req.recoveryTicket)
+    parts.push(
+      (
+        await recoveryTicketCookie.serialize(
+          req.recoveryTicket === 'filler' ? fillerTicket() : sealRequestTicket(req.recoveryTicket)
+        )
+      ).split(';')[0]
     );
   if (req.lastUsedLogin)
     parts.push((await serializeLastUsedLogin(req.lastUsedLogin)).split(';')[0]);
@@ -2758,6 +2775,103 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
           ...result,
           passkeys: (await provider.listPasskeys('u-1')).map((p) => ({ id: p.id, name: p.name })),
         };
+        break;
+      }
+
+      // ── /recover routes (Phase C Lane D Task 8) ─────────────────────────────────────────────
+      // PROVIDER BRIDGE, same as signupIndexAction: these routes resolve their own provider via
+      // providerForRequest, independent of the one buildProvider seeded — without the bridge a
+      // scenario's seed never reaches the code under test and every account state would behave
+      // as a fresh address, which is exactly what the G7 matrix must not do.
+      case 'recoverLoader':
+      case 'recoverAction':
+      case 'recoverCodeAction':
+      case 'recoverCompleteLoader':
+      case 'recoverCompleteAction': {
+        const originalFake = providerRegistry.fake;
+        providerRegistry.fake = () => provider;
+        try {
+          // A spec cannot know the code the fake mints, so 'MINTED' in the form or the ticket is
+          // substituted with the real envelope here — that is what makes the wrong-code and
+          // consumed-code rows meaningful rather than tautological.
+          let spec = s.request ?? { url: 'http://localhost/id/recover' };
+          if (s.mintPasskeyCode) {
+            const minted = decodePasskeyRegistrationCode(
+              (await provider.passkeyRegisterLink(s.mintPasskeyCode)).code
+            );
+            if (minted) {
+              if (s.consumeMintedCode) {
+                await provider.registerPasskey(
+                  s.mintPasskeyCode,
+                  encodePasskeyRegistrationCode(minted),
+                  'localhost'
+                );
+              }
+              const subst = (v: unknown) =>
+                typeof v === 'string' && v.trim() === 'MINTED'
+                  ? v.replace('MINTED', minted.code)
+                  : v;
+              spec = {
+                ...spec,
+                form: spec.form
+                  ? Object.fromEntries(
+                      Object.entries(spec.form).map(([k, v]) => [
+                        k,
+                        k === 'codeId' ? minted.id : subst(v),
+                      ])
+                    )
+                  : spec.form,
+                recoveryTicket:
+                  spec.recoveryTicket && spec.recoveryTicket !== 'filler'
+                    ? {
+                        ...spec.recoveryTicket,
+                        codeId:
+                          spec.recoveryTicket.codeId === 'MINTED'
+                            ? minted.id
+                            : spec.recoveryTicket.codeId,
+                      }
+                    : spec.recoveryTicket,
+              } as typeof spec;
+            }
+          }
+          const { request } = await buildHandlerRequest(spec);
+          const args = { request, params: {}, context: {} as never } as never;
+          const isComplete = s.fn.startsWith('recoverComplete');
+          const isLoader = s.fn.endsWith('Loader');
+          const handler = isComplete
+            ? isLoader
+              ? recoverCompleteLoader
+              : recoverCompleteAction
+            : isLoader
+              ? recoverLoader
+              : recoverAction;
+          try {
+            let result = await handler(args);
+            // The rate-limited row: the SECOND response is the one under test, and it has to be
+            // indistinguishable from the first.
+            if (s.recoverActionTwice) {
+              const { request: second } = await buildHandlerRequest(spec);
+              result = await handler({
+                request: second,
+                params: {},
+                context: {} as never,
+              } as never);
+            }
+            response = await serializeResponse(result);
+          } catch (thrown) {
+            // The flag-off 404 is `throw data(...)`: a Response, or react-router's data()
+            // envelope. Anything else is a genuine fault and must not be disguised as a response.
+            const isDataEnvelope =
+              typeof thrown === 'object' && thrown !== null && 'init' in thrown;
+            if (thrown instanceof Response || isDataEnvelope) {
+              response = await serializeResponse(thrown);
+            } else {
+              throw thrown;
+            }
+          }
+        } finally {
+          providerRegistry.fake = originalFake;
+        }
         break;
       }
 

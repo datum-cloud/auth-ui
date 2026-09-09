@@ -439,6 +439,14 @@ export default function Login() {
             <Trans>An account with this email already exists — sign in to continue.</Trans>
           </p>
         ) : null}
+        {notice === 'passkey-recovered' ? (
+          <p role="status" className="text-foreground/80 mb-4 text-sm">
+            <Trans>
+              New passkey added. Sign in with it below — your old passkey is still listed and can
+              be removed from your passkeys page after you sign in.
+            </Trans>
+          </p>
+        ) : null}
         {/* Inline action-error surface (role="alert" + aria-live) — replaces the
             per-route toast. Renders nothing when there is no error. */}
         <FormError>{errorMessage}</FormError>

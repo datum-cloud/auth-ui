@@ -160,6 +160,7 @@ msgid "Change your password"
 msgstr "Change your password"
 
 #: app/routes/password/reset.tsx:109
+#: app/routes/recover/index.tsx:280
 #: app/routes/signup/index.tsx:404
 #: app/routes/signup/method.tsx:257
 #: app/routes/signup/password.tsx:218
@@ -185,6 +186,10 @@ msgstr "Choose how you want to verify your identity."
 #: app/routes/login/index.tsx:435
 msgid "Choose your login method"
 msgstr "Choose your login method"
+
+#: app/routes/recover/index.tsx:304
+msgid "Code"
+msgstr "Code"
 
 #: app/routes/device/authorize.tsx:84
 msgid "Code expired"
@@ -213,11 +218,17 @@ msgid "Connected accounts"
 msgstr "Connected accounts"
 
 #: app/routes/device/index.tsx:73
-#: app/routes/login/index.tsx:561
+#: app/routes/login/index.tsx:569
+#: app/routes/recover/complete.tsx:155
+#: app/routes/recover/index.tsx:319
 #: app/routes/signup/index.tsx:455
 #: app/routes/signup/index.tsx:589
 msgid "Continue"
 msgstr "Continue"
+
+#: app/routes/recover/complete.tsx:136
+msgid "Continue to register a passkey on this device. This link works only once, so finish here before closing the page."
+msgstr "Continue to register a passkey on this device. This link works only once, so finish here before closing the page."
 
 #. placeholder {0}: idp.name ?? idp.idpId
 #: app/routes/reauth.tsx:330
@@ -244,12 +255,13 @@ msgstr "Couldn't verify"
 msgid "Create a new account"
 msgstr "Create a new account"
 
-#: app/routes/login/index.tsx:606
+#: app/routes/login/index.tsx:614
 #: app/routes/signup/password.tsx:271
 msgid "Create account"
 msgstr "Create account"
 
 #. placeholder {0}: held.uaName
+#: app/components/recovery-ceremony/recovery-ceremony.tsx:134
 #: app/routes/setup/passkey.tsx:179
 msgid "Created using {0}"
 msgstr "Created using {0}"
@@ -273,6 +285,7 @@ msgstr "Device denied"
 
 #: app/routes/login/index.tsx:392
 #: app/routes/login/index.tsx:407
+#: app/routes/recover/index.tsx:357
 #: app/routes/signup/index.tsx:537
 #: app/routes/signup/index.tsx:573
 msgid "Email"
@@ -286,8 +299,8 @@ msgstr "Email code"
 msgid "Email me a code"
 msgstr "Email me a code"
 
-#: app/routes/login/index.tsx:572
-#: app/routes/login/index.tsx:582
+#: app/routes/login/index.tsx:580
+#: app/routes/login/index.tsx:590
 #: app/routes/login/method.tsx:415
 msgid "Email me a sign-in link"
 msgstr "Email me a sign-in link"
@@ -324,6 +337,10 @@ msgstr "Enable SMS one-time code"
 msgid "Enter a new code"
 msgstr "Enter a new code"
 
+#: app/routes/recover/index.tsx:352
+msgid "Enter a valid email address."
+msgstr "Enter a valid email address."
+
 #: app/routes/device/index.tsx:59
 msgid "Enter the code shown on your device to authorize it."
 msgstr "Enter the code shown on your device to authorize it."
@@ -343,6 +360,10 @@ msgstr "Enter the verification code sent to your email address."
 #: app/routes/login/verify/authenticator.tsx:50
 msgid "Enter your authenticator code"
 msgstr "Enter your authenticator code"
+
+#: app/routes/recover/index.tsx:337
+msgid "Enter your email address and we'll send you a link to set up a new passkey."
+msgstr "Enter your email address and we'll send you a link to set up a new passkey."
 
 #: app/routes/login/verify/email.tsx:51
 msgid "Enter your email code"
@@ -415,6 +436,7 @@ msgstr "Logged in as"
 msgid "Manual setup key"
 msgstr "Manual setup key"
 
+#: app/components/recovery-ceremony/recovery-ceremony.tsx:88
 #: app/routes/setup/passkey.tsx:99
 msgid "Name your passkey"
 msgstr "Name your passkey"
@@ -422,6 +444,10 @@ msgstr "Name your passkey"
 #: app/routes/accounts.tsx:226
 msgid "Needs re-authentication"
 msgstr "Needs re-authentication"
+
+#: app/routes/login/index.tsx:444
+msgid "New passkey added. Sign in with it below — your old passkey is still listed and can be removed from your passkeys page after you sign in."
+msgstr "New passkey added. Sign in with it below — your old passkey is still listed and can be removed from your passkeys page after you sign in."
 
 #: app/routes/password/change.tsx:116
 #: app/routes/password/new.tsx:102
@@ -452,7 +478,7 @@ msgstr "No signed-in accounts."
 msgid "Not now"
 msgstr "Not now"
 
-#: app/routes/login/index.tsx:604
+#: app/routes/login/index.tsx:612
 msgid "Not registered?"
 msgstr "Not registered?"
 
@@ -482,13 +508,14 @@ msgstr "Or enter the code from that email"
 msgid "Or import this URI in your authenticator app"
 msgstr "Or import this URI in your authenticator app"
 
-#: app/routes/login/index.tsx:502
+#: app/routes/login/index.tsx:510
 #: app/routes/login/method.tsx:398
 #: app/routes/reauth.tsx:310
 #: app/routes/setup/mfa.tsx:46
 msgid "Passkey"
 msgstr "Passkey"
 
+#: app/components/recovery-ceremony/recovery-ceremony.tsx:123
 #: app/routes/setup/passkey.tsx:168
 msgid "Passkey name"
 msgstr "Passkey name"
@@ -571,6 +598,14 @@ msgstr "Please check your input and try again."
 msgid "Please finish setting up your passkey before leaving this page. It will be the only way to sign in, and your account won't be usable without it."
 msgstr "Please finish setting up your passkey before leaving this page. It will be the only way to sign in, and your account won't be usable without it."
 
+#: app/routes/recover/index.tsx:335
+msgid "Recover your account"
+msgstr "Recover your account"
+
+#: app/components/recovery-ceremony/recovery-ceremony.tsx:62
+msgid "Recovery links can only be used once, and they expire. Request a new one to continue."
+msgstr "Recovery links can only be used once, and they expire. Request a new one to continue."
+
 #: app/routes/setup/security-key.tsx:48
 msgid "Register a hardware security key (e.g. YubiKey) as a second factor for your account."
 msgstr "Register a hardware security key (e.g. YubiKey) as a second factor for your account."
@@ -579,6 +614,11 @@ msgstr "Register a hardware security key (e.g. YubiKey) as a second factor for y
 msgid "Register a passkey using your device's biometric sensor or PIN to sign in securely without a password."
 msgstr "Register a passkey using your device's biometric sensor or PIN to sign in securely without a password."
 
+#: app/components/recovery-ceremony/recovery-ceremony.tsx:93
+msgid "Register a passkey using your device's biometric sensor or PIN. You'll use it to sign in from now on."
+msgstr "Register a passkey using your device's biometric sensor or PIN. You'll use it to sign in from now on."
+
+#: app/components/recovery-ceremony/recovery-ceremony.tsx:151
 #: app/routes/setup/passkey.tsx:222
 msgid "Register passkey"
 msgstr "Register passkey"
@@ -601,6 +641,10 @@ msgstr "Remove passkey"
 msgid "Remove this passkey?"
 msgstr "Remove this passkey?"
 
+#: app/components/recovery-ceremony/recovery-ceremony.tsx:68
+msgid "Request a new link"
+msgstr "Request a new link"
+
 #: app/routes/login/verify/email.tsx:88
 #: app/routes/login/verify/sms.tsx:85
 #: app/routes/verify/index.tsx:214
@@ -611,6 +655,7 @@ msgstr "Resend code"
 msgid "Reset your password"
 msgstr "Reset your password"
 
+#: app/components/recovery-ceremony/recovery-ceremony.tsx:143
 #: app/routes/setup/passkey.tsx:195
 msgid "Save"
 msgstr "Save"
@@ -627,6 +672,10 @@ msgstr "Security key"
 #: app/routes/accounts.tsx:150
 msgid "Select an account to continue or add a new one."
 msgstr "Select an account to continue or add a new one."
+
+#: app/routes/recover/index.tsx:371
+msgid "Send recovery link"
+msgstr "Send recovery link"
 
 #: app/routes/password/reset.tsx:140
 msgid "Send reset link"
@@ -647,6 +696,11 @@ msgstr "Set a password"
 #: app/routes/password/new.tsx:111
 msgid "Set password"
 msgstr "Set password"
+
+#: app/components/recovery-ceremony/recovery-ceremony.tsx:88
+#: app/routes/recover/complete.tsx:134
+msgid "Set up a new passkey"
+msgstr "Set up a new passkey"
 
 #: app/routes/setup/authenticator.tsx:107
 msgid "Set up authenticator app"
@@ -716,7 +770,7 @@ msgstr "Sign out of"
 msgid "Sign out other sessions"
 msgstr "Sign out other sessions"
 
-#: app/routes/login/index.tsx:594
+#: app/routes/login/index.tsx:602
 msgid "Sign-in is currently unavailable for this account. Please contact your administrator."
 msgstr "Sign-in is currently unavailable for this account. Please contact your administrator."
 
@@ -780,6 +834,10 @@ msgstr "Thanks,"
 msgid "That action isn't available right now."
 msgstr "That action isn't available right now."
 
+#: app/routes/recover/index.tsx:299
+msgid "That code is invalid or has expired. Check the email, or start over."
+msgstr "That code is invalid or has expired. Check the email, or start over."
+
 #: app/utils/errors/auth-error-messages.tsx:64
 msgid "That code is invalid or has expired. Start over to get a new one."
 msgstr "That code is invalid or has expired. Start over to get a new one."
@@ -842,6 +900,10 @@ msgstr "This helps us keep our platform stable by heading off fraud and abusive 
 #: app/routes/sso/index.tsx:188
 msgid "This is your only sign-in method"
 msgstr "This is your only sign-in method"
+
+#: app/components/recovery-ceremony/recovery-ceremony.tsx:60
+msgid "This link is invalid or has expired"
+msgstr "This link is invalid or has expired"
 
 #: app/routes/setup/passkey.tsx:183
 msgid "This name is for your Datum passkey list — your password manager labels it separately. Names can't be changed later."
@@ -941,6 +1003,10 @@ msgstr "We could not find an account for that identifier."
 msgid "We couldn't find what you were looking for. Please try again."
 msgstr "We couldn't find what you were looking for. Please try again."
 
+#: app/components/recovery-ceremony/recovery-ceremony.tsx:101
+msgid "We couldn't finish setting up your passkey. Please try again."
+msgstr "We couldn't finish setting up your passkey. Please try again."
+
 #: app/components/webauthn-button/webauthn-button.tsx:115
 msgid "We couldn't set up your passkey. Please try again."
 msgstr "We couldn't set up your passkey. Please try again."
@@ -952,6 +1018,11 @@ msgstr "We couldn't start passkey setup. Please try again."
 #: app/routes/reauth.tsx:397
 msgid "We sent a verification code to your email address."
 msgstr "We sent a verification code to your email address."
+
+#. placeholder {0}: sent.email
+#: app/routes/recover/index.tsx:282
+msgid "We've sent a link to <0>{0}</0>. Open it on the device you want to sign in with, or enter the code from that email here."
+msgstr "We've sent a link to <0>{0}</0>. Open it on the device you want to sign in with, or enter the code from that email here."
 
 #. placeholder {0}: actionData.email
 #: app/routes/password/reset.tsx:111
@@ -977,6 +1048,7 @@ msgstr "Welcome"
 msgid "While Datum is currently free of charge to use, we require a valid payment method during the signup process."
 msgstr "While Datum is currently free of charge to use, we require a valid payment method during the signup process."
 
+#: app/routes/recover/index.tsx:325
 #: app/routes/signup/index.tsx:467
 msgid "Wrong address? Start over"
 msgstr "Wrong address? Start over"
@@ -1029,6 +1101,10 @@ msgstr "You'll be asked to sign in before authorizing."
 msgid "You've been signed out"
 msgstr "You've been signed out"
 
+#: app/routes/recover/index.tsx:366
+msgid "you@example.com"
+msgstr "you@example.com"
+
 #: app/routes/signup/success.tsx:84
 msgid "Your account is ready"
 msgstr "Your account is ready"
@@ -1049,6 +1125,7 @@ msgstr "Your email is already verified. You can sign in."
 msgid "Your email is verified"
 msgstr "Your email is verified"
 
+#: app/components/recovery-ceremony/recovery-ceremony.tsx:91
 #: app/routes/setup/passkey.tsx:102
 msgid "Your passkey is ready — give it a name so you can recognize it later."
 msgstr "Your passkey is ready — give it a name so you can recognize it later."

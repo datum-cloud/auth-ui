@@ -118,6 +118,9 @@ export interface RequestSpec {
   /** Sealed with the REAL recovery-ticket module into a `recovery_ceremony` cookie, so
    *  finishRecoveryCeremony opens an authentic ticket rather than a stub. */
   ceremonyTicket?: { userId: string; passkeyId: string };
+  /** Sealed with the REAL module into a `recovery_ticket` cookie. `'filler'` sets a filler ticket
+   *  instead; a `codeId` of 'MINTED' is substituted with the code the harness just minted. */
+  recoveryTicket?: { userId: string; codeId: string; email: string } | 'filler';
   /** Mint a REAL CSRF token+cookie (getCsrfToken): the cookie is merged into the Cookie header and
    *  the token is injected into `form` under the `csrf` key so an action's assertCsrf passes. The
    *  whole reason the otp-verify ACTION specs are node-bound is this signed CSRF round-trip. */
@@ -294,6 +297,11 @@ export type ServiceFn =
   | 'requestRecoveryThenAllowResend'
   | 'startRecoveryCeremony'
   | 'finishRecoveryCeremony'
+  | 'recoverLoader'
+  | 'recoverAction'
+  | 'recoverCodeAction'
+  | 'recoverCompleteLoader'
+  | 'recoverCompleteAction'
   // Drives the real verifyRecaptcha node-side; env.server is stubbed out of the browser bundle.
   | 'verifyRecaptcha'
   // ── routes/login handlers (batch 13b) ────────────────────────────────────────
@@ -810,6 +818,11 @@ export interface Scenario {
   mintPasskeyCode?: string;
   /** Which door to audit the ceremony under. Default 'link'. */
   recoveryPath?: 'link' | 'code';
+  /** Post the /recover request action TWICE, returning the SECOND response — the rate-limited
+   *  row of the G7 matrix, which must be indistinguishable from the first. */
+  recoverActionTwice?: boolean;
+  /** Consume the minted code before the scenario runs, so the route sees an already-spent one. */
+  consumeMintedCode?: boolean;
 
   // ── shared verification resend (fn: 'resendVerification'; Task 5) ──────────
   /** The user resendVerification is called for. */
