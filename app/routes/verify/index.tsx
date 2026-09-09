@@ -6,12 +6,12 @@ import { useAuthActionError } from '@/hooks/use-auth-action-error';
 import { readSessions, mostRecent } from '@/modules/auth/session/cookie';
 import { dispatchEmailCode, resendEmailCode, submitEmailCode } from '@/resources/verify';
 import { verifyCodeSchema, verifyCodeClientSchema } from '@/resources/verify/verify.schema';
+import { paths } from '@/routes/paths';
 import { providerForRequest } from '@/server/auth-context.server';
 import { loaderCsrf, assertCsrf } from '@/server/csrf';
 import { trustedAppOrigin } from '@/server/infra/app-origin.server';
 import { env } from '@/server/infra/env.server';
 import { Button } from '@datum-cloud/datum-ui/button';
-import { paths } from '@/routes/paths';
 import { Form } from '@datum-cloud/datum-ui/form';
 import { Trans, useLingui } from '@lingui/react/macro';
 import {

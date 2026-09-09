@@ -6,8 +6,8 @@
 // Offering recovery to an org whose settings say `passkeysType: not_allowed` would send the user
 // down a flow requestRecovery refuses at the end, and the refusal is silent by design (G7) — so
 // they would sit at "check your email" waiting for mail that is never coming.
-import { resolveLoginView } from '@/resources/login/login-view';
 import type { LoginSettings } from '@/modules/auth/types';
+import { resolveLoginView } from '@/resources/login/login-view';
 
 const settings = (over: Partial<LoginSettings> = {}) =>
   ({

@@ -76,6 +76,9 @@ const SHARED_FACTORY_PATHS: Record<string, string | string[]> = {
   // logAuthEvent) to the signup domain service. Registered here so the delegation +
   // registry checks resolve the signup.* events at their new call site.
   'signup.service.ts': join(RESOURCES_DIR, 'signup/signup.service.ts'),
+  // Phase C Lane D: the two-step ceremony's recovery_complete events are emitted here, not in
+  // the routes that call it.
+  'recovery-ceremony.ts': join(RESOURCES_DIR, 'recovery/recovery-ceremony.ts'),
   // Phase C Lane D: the /recover routes delegate their whole decision (incl. the
   // recovery_request logAuthEvent calls) to the recovery domain service. Registered here so the
   // delegation + registry checks resolve those events at their call site.
@@ -399,6 +402,20 @@ export const REQUIRED_EVENTS = [
   // Emitted success AND failure from resendIfSquatted; the HTTP response is identical either
   // way, so this log is the only place the side effect is observable.
   'signup_verification_resent',
+  // --- Phase C account recovery (/recover) ---
+  // recovery_request: the whole enumeration-safe request decision. success carries the outcome
+  //   (sent / resumed_signup); failure carries a bounded suppress reason. The HTTP response is
+  //   byte-identical across all of them (G7), so this log is the ONLY place the side effect is
+  //   observable — which is exactly why every branch must emit one.
+  // recovery_mail_sent / _failed: the mTLS webhook POST that mails the registration code.
+  // recovery_complete: both ceremony stages (start / finish) on both paths (link / code).
+  // recovery_ticket: the sealed ticket degrading to a filler rather than throwing.
+  // The code itself is a bearer credential and appears in NONE of them.
+  'recovery_request',
+  'recovery_mail_sent',
+  'recovery_mail_failed',
+  'recovery_complete',
+  'recovery_ticket',
   'email.verified',
   'invite.verified',
   // --- Rate limiting (emitted by middleware, not routes — present in observability layer) ---
