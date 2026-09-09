@@ -90,6 +90,8 @@ import {
   completeEmailLinkSignup,
 } from '@/resources/signup';
 import { allowResend, _resetResendLimiterForTests } from '@/resources/signup/signup-resend-limit';
+import { requestRecovery } from '@/resources/recovery/recovery.service';
+import { resendVerification } from '@/resources/signup/verification-resend';
 import {
   processIdpCallback,
   submitLdapCredentials,
@@ -159,7 +161,6 @@ import { providerForRequest } from '@/server/composition';
 import { getCsrfToken, loaderCsrf, assertCsrf, assertCsrfWith } from '@/server/csrf';
 import { _envSchema, env } from '@/server/infra/env.server';
 import { verifyRecaptcha } from '@/server/infra/recaptcha.server';
-import { resendVerification } from '@/resources/signup/verification-resend';
 import { sendRecoveryMail } from '@/server/infra/recovery-mail.server';
 import { sendVerificationMail } from '@/server/infra/verification-mail.server';
 import {
@@ -2673,6 +2674,33 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
         outcome = {
           result,
           second: s.resendTwice ? await resendVerification(provider, u, link) : undefined,
+        };
+        break;
+      }
+
+      // ── recovery request decision (Phase C Lane D Task 6) ───────────────────────────────────
+      // Drives the REAL requestRecovery: real limiter, real mail clients, real sealed tickets.
+      // The ticket is returned verbatim so specs can compare LENGTHS across the G7 matrix.
+      case 'requestRecovery': {
+        const ri = s.recoveryInput ?? { email: '' };
+        const result = await requestRecovery(provider, { ...ri, origin: ri.origin ?? 'http://localhost' });
+        outcome = { outcome: result.outcome, ticket: result.ticket };
+        break;
+      }
+
+      // Two requests in a row, then asks signup's own limiter whether it would still send.
+      // Proves the budget is SHARED: a recovery request spends signup's resend slot too.
+      case 'requestRecoveryThenAllowResend': {
+        const ri = s.recoveryInput ?? { email: '' };
+        const input = { ...ri, origin: ri.origin ?? 'http://localhost' };
+        const first = await requestRecovery(provider, input);
+        const second = await requestRecovery(provider, input);
+        outcome = {
+          first: first.outcome,
+          second: second.outcome,
+          firstTicket: first.ticket,
+          secondTicket: second.ticket,
+          allowResendAfter: await allowResend(input.email),
         };
         break;
       }

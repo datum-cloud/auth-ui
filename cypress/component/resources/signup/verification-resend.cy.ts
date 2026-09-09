@@ -17,7 +17,7 @@ const seed = {
 const PORT = 58770;
 
 describe('resendVerification — the one resend both doors use', () => {
-  it("sends the signup verification mail to /signup/complete with next=passkey, and audits it", () => {
+  it('sends the signup verification mail to /signup/complete with next=passkey, and audits it', () => {
     callService({
       fn: 'resendVerification',
       seed,

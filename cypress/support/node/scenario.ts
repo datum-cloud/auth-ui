@@ -287,6 +287,8 @@ export type ServiceFn =
   | 'sendRecoveryMail'
   | 'recoveryTicketCheck'
   | 'resendVerification'
+  | 'requestRecovery'
+  | 'requestRecoveryThenAllowResend'
   // Drives the real verifyRecaptcha node-side; env.server is stubbed out of the browser bundle.
   | 'verifyRecaptcha'
   // ── routes/login handlers (batch 13b) ────────────────────────────────────────
@@ -789,6 +791,10 @@ export interface Scenario {
   // ── recovery tickets (fn: 'recoveryTicketCheck'; Phase C Lane D Task 4) ─────
   /** Which sealed-ticket properties to exercise. Each name becomes a key on `outcome` carrying
    *  that check's result, so one node round-trip covers the whole format. */
+  // ── recovery request decision (fn: 'requestRecovery'; Task 6) ──────────────
+  /** Input for the REAL requestRecovery. `origin` defaults to http://localhost. */
+  recoveryInput?: { email: string; organization?: string; requestId?: string; origin?: string };
+
   // ── shared verification resend (fn: 'resendVerification'; Task 5) ──────────
   /** The user resendVerification is called for. */
   resendUser?: { id: string; loginName: string };

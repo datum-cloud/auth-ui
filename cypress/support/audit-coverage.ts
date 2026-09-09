@@ -76,6 +76,10 @@ const SHARED_FACTORY_PATHS: Record<string, string | string[]> = {
   // logAuthEvent) to the signup domain service. Registered here so the delegation +
   // registry checks resolve the signup.* events at their new call site.
   'signup.service.ts': join(RESOURCES_DIR, 'signup/signup.service.ts'),
+  // Phase C Lane D: the /recover routes delegate their whole decision (incl. the
+  // recovery_request logAuthEvent calls) to the recovery domain service. Registered here so the
+  // delegation + registry checks resolve those events at their call site.
+  'recovery.service.ts': join(RESOURCES_DIR, 'recovery/recovery.service.ts'),
   // Pass 2: the verify route (verify/index.tsx) delegates its action logic (incl.
   // logAuthEvent for email.verified / invite.verified) to the verify domain service.
   // Registered here so the delegation + registry checks resolve those events at their
