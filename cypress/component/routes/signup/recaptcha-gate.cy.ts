@@ -40,7 +40,7 @@ describe('signup reCAPTCHA gate', () => {
       },
     }).then((v) => {
       expect(v.response?.dataStatus).to.equal(400);
-      expect(v.response?.dataBody).to.have.property('error', 'INVALID_INPUT');
+      expect(v.response?.dataBody).to.have.property('error', 'RECAPTCHA_FAILED');
       expect(v.calls?.register ?? [], 'no Zitadel register call on a scripted POST').to.have.length(
         0
       );
@@ -86,10 +86,10 @@ describe('signup reCAPTCHA gate', () => {
       expect(scored?.verdict).to.equal('invalid');
       expect(scored?.reason).to.equal('action-mismatch');
 
-      // INVALID_INPUT (the gate's rejection), not INVALID_CODE (the code branch's own rejection
+      // RECAPTCHA_FAILED (the gate's rejection), not INVALID_CODE (the code branch's own rejection
       // shape) — proves the request never reached the code-entry logic at all.
       expect(v.response?.dataStatus).to.equal(400);
-      expect(v.response?.dataBody).to.have.property('error', 'INVALID_INPUT');
+      expect(v.response?.dataBody).to.have.property('error', 'RECAPTCHA_FAILED');
       expect(v.calls?.findUser ?? [], 'gate runs before any Zitadel call (G7)').to.have.length(0);
     });
   });

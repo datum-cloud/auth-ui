@@ -152,7 +152,9 @@ export async function action({ request }: ActionFunctionArgs) {
   // Distinct action per intent, so an identifier token cannot be replayed against code entry.
   const recaptchaAction = form.get('intent') === 'code' ? 'signup_code' : 'signup';
   if (await recaptchaRejects(String(form.get('recaptchaToken') ?? ''), recaptchaAction)) {
-    return data({ error: 'INVALID_INPUT' as const }, { status: 400 });
+    // Distinct from INVALID_INPUT, whose message tells the user to check their input —
+    // misleading here, since the input was fine and the only fix is to resubmit.
+    return data({ error: 'RECAPTCHA_FAILED' as const }, { status: 400 });
   }
 
   // Code branch — the emailed code, typed instead of clicked. Same secret as the link.
