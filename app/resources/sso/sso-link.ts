@@ -10,6 +10,7 @@ import { readSessions, mostRecent } from '@/modules/auth/session/cookie';
 import { ProviderError, type IdProvider } from '@/modules/auth/types';
 import { getActiveIdPs } from '@/resources/sso/idp-providers';
 import { idpReturnUrls } from '@/resources/sso/idp-return-urls';
+import { paths } from '@/routes/paths';
 import { trustedAppOrigin } from '@/server/infra/app-origin.server';
 import { logAuthEvent } from '@/server/observability';
 
@@ -107,9 +108,11 @@ export async function resolveSsoLink(
     };
   }
 
-  // (b) Session, no provider → redirect to /sso management screen
+  // (b) Session, no provider → redirect to /sso management screen, keeping the org scope so the
+  // screen lists the same org's IdPs this link was entered with (the legacy /ui/v2/login/idp/link
+  // 301 lands here; a bare `/sso` here silently dropped the caller's org).
   if (!wantedSlug) {
-    return { kind: 'redirect', location: '/sso' };
+    return { kind: 'redirect', location: paths.sso.index({ organization }) };
   }
 
   // (a) Session + specific provider → start link intent and redirect

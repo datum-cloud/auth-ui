@@ -273,6 +273,7 @@ async function healIfSessionDead(
   requestId: string,
   rawId: string,
   nowMs: number,
+  organization: string | undefined,
   sleep: Sleep = realSleep
 ): Promise<AuthorizeOutcome | { session: Session }> {
   let probe = await probeSession(provider, entry);
@@ -296,7 +297,7 @@ async function healIfSessionDead(
       return { session: probe.session }; // caller proceeds to the freshness gate / createCallback
     case 'confirmed-dead':
     case 'dead-code':
-      return healStaleEntry(list, entry, requestId, rawId);
+      return healStaleEntry(list, entry, requestId, rawId, organization);
     case 'transient':
       // Transient/unknown: surface the friendly error path; NEVER self-heal, NEVER swallow.
       logAuthEvent('oidc_callback', 'failure', {
@@ -309,20 +310,65 @@ async function healIfSessionDead(
   }
 }
 
+/**
+ * The /login re-prompt for THIS auth request. Threads the explicit org (OIDC org-id scope) the
+ * same way decideAuthorize's bootstrap does: an org-pinned request (the staff portal) must land on
+ * the pinned org's login page, not the default org's. Rebuilding the URL from `requestId` alone
+ * silently dropped the org on every self-heal, which rendered the wrong org's IdPs for a request
+ * Zitadel would only ever finalize on the pinned org (auth-ui#140 thread).
+ */
+function loginRedirect(requestId: string, organization?: string): string {
+  const params = new URLSearchParams({ requestId });
+  if (organization) params.set('organization', organization);
+  return `/login?${params}`;
+}
+
 /** Drop the stale entry, re-prompt /login, and emit a traceable session_stale event. */
 async function healStaleEntry(
   list: SessionEntry[],
   entry: SessionEntry,
   requestId: string,
-  rawId: string
+  rawId: string,
+  organization?: string
 ): Promise<AuthorizeOutcome> {
   logAuthEvent('session_stale', 'success', { requestId: rawId, sessionId: entry.id });
   const pruned = removeSession(list, entry.id);
   return {
     kind: 'redirect',
-    location: `/login?requestId=${encodeURIComponent(requestId)}`,
+    location: loginRedirect(requestId, organization),
     setCookie: await serializeSessions(pruned),
   };
+}
+
+/**
+ * An org-pinned auth request (`urn:zitadel:iam:org:id:<id>` scope) can only be finalized by a
+ * session whose user belongs to that org: Zitadel's LinkSessionToAuthRequest rejects any other
+ * with FAILED_PRECONDITION (Errors.User.NotAllowedOrg) — the SAME code as the stale post-logout
+ * grant, so runCallback would prune a perfectly valid session as "stale" and heal-loop. Decide it
+ * here, before createCallback: a known, different user org means the session is fine for other
+ * clients (the un-pinned cloud portal) but not for this request. An unknown user org (session
+ * without a user factor yet) is left to Zitadel.
+ */
+function isOrgMismatch(session: Session, organization: string | undefined): boolean {
+  const userOrg = session.user?.orgId;
+  return organization !== undefined && userOrg !== undefined && userOrg !== organization;
+}
+
+/** Re-prompt /login on the pinned org, leaving the (valid) session untouched; traceable event. */
+function rejectCrossOrgSession(
+  session: Session,
+  entry: SessionEntry,
+  requestId: string,
+  rawId: string,
+  organization: string
+): AuthorizeOutcome {
+  logAuthEvent('session_org_mismatch', 'success', {
+    requestId: rawId,
+    sessionId: entry.id,
+    organization,
+    userOrg: session.user?.orgId,
+  });
+  return { kind: 'redirect', location: loginRedirect(requestId, organization) };
 }
 
 /** Run createCallback for a resolved live session and map success/failure to an outcome. */
@@ -331,7 +377,8 @@ async function runCallback(
   rawId: string,
   entry: SessionEntry,
   list: SessionEntry[],
-  requestId: string
+  requestId: string,
+  organization?: string
 ): Promise<AuthorizeOutcome> {
   try {
     const { callbackUrl } = await provider.createCallback(rawId, {
@@ -353,7 +400,7 @@ async function runCallback(
     // other code (transient/unknown) keeps the conservative existing behavior — surface the error
     // page rather than guessing that a re-login will help.
     if (code && DEAD_CALLBACK_CODES.has(code)) {
-      return healStaleEntry(list, entry, requestId, rawId);
+      return healStaleEntry(list, entry, requestId, rawId, organization);
     }
     return { kind: 'error-redirect', code: 'signin_failed' };
   }
@@ -457,6 +504,11 @@ async function resolveOidc(
 
   const list = await readSessions(request);
   const sessionId = url.searchParams.get('sessionId') ?? undefined;
+  // Explicit-only org threading: pass the org derived from the OIDC scope verbatim. The
+  // default-org fallback (env pin → provider default) is a /login display concern; threading
+  // it here caused users outside the default org to be hidden by the scoped findUser call.
+  // Derived up front so BOTH session-reuse paths below (and their self-heals) see it.
+  const organization = deriveOrganizationFromScopes(authRequest.scopes);
 
   // explicit sessionId hand-back from /login/password → finish the callback
   if (sessionId) {
@@ -464,8 +516,19 @@ async function resolveOidc(
     if (entry) {
       // Validate liveness BEFORE reuse: a stale post-logout cookie self-heals to /login here
       // instead of reaching createCallback on a terminated session (→ ALREADY_DONE → /error).
-      const gate = await healIfSessionDead(provider, list, entry, requestId, rawId, nowMs);
+      const gate = await healIfSessionDead(
+        provider,
+        list,
+        entry,
+        requestId,
+        rawId,
+        nowMs,
+        organization
+      );
       if ('kind' in gate) return gate; // dead/transient → outcome already decided
+      if (organization && isOrgMismatch(gate.session, organization)) {
+        return rejectCrossOrgSession(gate.session, entry, requestId, rawId, organization);
+      }
 
       // ANTI-FORGERY FRESHNESS GATE (prompt=login only). The sessionId is query-supplied, so a
       // caller can forge `&sessionId=<their_own_STALE_live_session>` onto a prompt=login request
@@ -477,16 +540,12 @@ async function resolveOidc(
       const mustReauth =
         authRequest.prompt.includes('login') &&
         !primaryFresh(gate.session.factors, nowMs, await freshLoginWindowMs(provider, entry));
-      if (!mustReauth) return runCallback(provider, rawId, entry, list, requestId);
+      if (!mustReauth) return runCallback(provider, rawId, entry, list, requestId, organization);
       // else: stale prompt=login → do NOT finalize; fall through to decideAuthorize below.
     }
   }
 
   const recent = mostRecent(list);
-  // Explicit-only org threading: pass the org derived from the OIDC scope verbatim. The
-  // default-org fallback (env pin → provider default) is a /login display concern; threading
-  // it here caused users outside the default org to be hidden by the scoped findUser call.
-  const organization = deriveOrganizationFromScopes(authRequest.scopes);
   const decision = decideAuthorize({
     authRequest,
     hasSessions: list.length > 0,
@@ -501,9 +560,20 @@ async function resolveOidc(
     // Validate liveness BEFORE reuse (same self-heal as the explicit-sessionId path above). No
     // freshness gate here: for prompt=login decideAuthorize returns target '/login', never
     // 'callback', so this branch is unreachable under prompt=login (only none/default reuse).
-    const healed = await healIfSessionDead(provider, list, entry, requestId, rawId, nowMs);
+    const healed = await healIfSessionDead(
+      provider,
+      list,
+      entry,
+      requestId,
+      rawId,
+      nowMs,
+      organization
+    );
     if ('kind' in healed) return healed;
-    return runCallback(provider, rawId, entry, list, requestId);
+    if (organization && isOrgMismatch(healed.session, organization)) {
+      return rejectCrossOrgSession(healed.session, entry, requestId, rawId, organization);
+    }
+    return runCallback(provider, rawId, entry, list, requestId, organization);
   }
   if (decision.target === 'error') {
     if (decision.error === 'NO_ACTIVE_SESSION') {

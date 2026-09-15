@@ -127,7 +127,7 @@ msgstr "Authorize device"
 msgid "Authorizing as"
 msgstr "Authorizing as"
 
-#: app/routes/sso/index.tsx:224
+#: app/routes/sso/index.tsx:225
 msgid "Available accounts to link"
 msgstr "Available accounts to link"
 
@@ -208,7 +208,7 @@ msgstr "Confirm new password"
 msgid "Confirm password"
 msgstr "Confirm password"
 
-#: app/routes/sso/index.tsx:149
+#: app/routes/sso/index.tsx:150
 msgid "Connected accounts"
 msgstr "Connected accounts"
 
@@ -401,13 +401,13 @@ msgstr "Link expired"
 msgid "Link your account"
 msgstr "Link your account"
 
-#: app/routes/sso/index.tsx:130
+#: app/routes/sso/index.tsx:131
 msgid "Linked accounts"
 msgstr "Linked accounts"
 
 #: app/routes/passkeys.tsx:248
 #: app/routes/reauth.tsx:279
-#: app/routes/sso/index.tsx:137
+#: app/routes/sso/index.tsx:138
 msgid "Logged in as"
 msgstr "Logged in as"
 
@@ -462,7 +462,7 @@ msgstr "Not registered?"
 #: app/routes/passkeys.tsx:249
 #: app/routes/reauth.tsx:280
 #: app/routes/signed-in.tsx:49
-#: app/routes/sso/index.tsx:138
+#: app/routes/sso/index.tsx:139
 msgid "Not you?"
 msgstr "Not you?"
 
@@ -843,7 +843,7 @@ msgstr "This directory account can't be linked here yet. Sign in with your passw
 msgid "This helps us keep our platform stable by heading off fraud and abusive behavior."
 msgstr "This helps us keep our platform stable by heading off fraud and abusive behavior."
 
-#: app/routes/sso/index.tsx:188
+#: app/routes/sso/index.tsx:189
 msgid "This is your only sign-in method"
 msgstr "This is your only sign-in method"
 
@@ -877,7 +877,7 @@ msgstr "Two-factor verification"
 
 #: app/routes/sso/index.tsx:97
 #: app/routes/sso/index.tsx:116
-#: app/routes/sso/index.tsx:197
+#: app/routes/sso/index.tsx:198
 msgid "Unlink"
 msgstr "Unlink"
 
@@ -997,7 +997,7 @@ msgstr "You are signed in"
 msgid "You are signed in as"
 msgstr "You are signed in as"
 
-#: app/routes/sso/index.tsx:133
+#: app/routes/sso/index.tsx:134
 msgid "You can link multiple accounts to your Datum account."
 msgstr "You can link multiple accounts to your Datum account."
 

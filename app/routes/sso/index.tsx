@@ -123,7 +123,8 @@ function UnlinkConfirmDialog({
 }
 
 export default function SsoPage() {
-  const { csrfToken, loginName, linked, linkable, allowUnlink } = useLoaderData<typeof loader>();
+  const { csrfToken, loginName, linked, linkable, allowUnlink, organization } =
+    useLoaderData<typeof loader>();
 
   return (
     <AuthCard
@@ -228,7 +229,10 @@ export default function SsoPage() {
                 <li key={idp.id}>
                   {/* RRForm: auto-adds ?index → posts to the sso index action. */}
                   <RRForm method="post">
-                    <AuthFormFields csrf={csrfToken} />
+                    {/* organization: the org the loader listed these IdPs under (URL param, else
+                        the session's org) — the action re-resolves the provider against the same
+                        list, so it must post back. Omitted when the default-org fallback applied. */}
+                    <AuthFormFields csrf={csrfToken} organization={organization} />
                     <input type="hidden" name="intent" value="start" />
                     <input type="hidden" name="provider" value={slugify(idp.name)} />
                     <input type="hidden" name="linkOnly" value="true" />
