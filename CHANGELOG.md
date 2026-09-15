@@ -14,6 +14,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Adding a sign-in method (passkey, security key, authenticator app, email or SMS
   code) now identifies the account from the active session rather than by name, so
   sessions created before this fix recover without signing in again.
+- The Linked accounts page now keeps the organization it was opened for (URL
+  parameter, else the organization the session was signed in under) when listing
+  providers and starting a link, so users signed in under a non-default
+  organization link the right Google or GitHub provider instead of the default
+  organization's.
 
 ## [0.1.0] — 2026-06-23
 

@@ -12,6 +12,7 @@ import { ssoErrorRedirect } from '@/resources/shared/next-step-params';
 import { getActiveIdPs } from '@/resources/sso/idp-providers';
 import { idpReturnUrls } from '@/resources/sso/idp-return-urls';
 import { canUnlinkIdp } from '@/resources/sso/sso-management';
+import { resolveSsoOrg } from '@/resources/sso/sso-org';
 import type { SsoOutcome } from '@/resources/sso/sso-outcome';
 import { trustedAppOrigin } from '@/server/infra/app-origin.server';
 import { env } from '@/server/infra/env.server';
@@ -133,9 +134,11 @@ export async function runSsoAction(
   }
 
   // intent === 'start'
-  // Org-first / default-org fallback via the shared choke point: an explicit form `organization`
-  // wins; an empty one falls back to the default org (was undefined → the INSTANCE/default IdPs).
-  const activeIdPs = await getActiveIdPs(provider, payload.organization || undefined);
+  // Form org first, then the session entry's org, then the shared default-org fallback inside
+  // getActiveIdPs — the same precedence the /sso loader used to render this form (sso-org.ts), so
+  // the provider the user clicked resolves against the same IdP list it was listed from.
+  const organization = resolveSsoOrg(payload.organization, mostRecent(await readSessions(request)));
+  const activeIdPs = await getActiveIdPs(provider, organization);
   const target = activeIdPs.find(
     (p) => p.id === payload.provider || slugify(p.name) === payload.provider
   );
@@ -153,7 +156,7 @@ export async function runSsoAction(
     }
 
     const qs = new URLSearchParams({ idpId: target.id });
-    if (payload.organization) qs.set('organization', payload.organization);
+    if (organization) qs.set('organization', organization);
     return { kind: 'redirect', location: `/sso/ldap?${qs.toString()}` };
   }
 
@@ -161,7 +164,7 @@ export async function runSsoAction(
   const slug = payload.provider;
   const { success, failure } = idpReturnUrls(origin, slug, {
     link: payload.linkOnly === 'true',
-    organization: payload.organization || undefined,
+    organization,
     deviceTrackingToken: payload.deviceTrackingToken,
   });
 
@@ -181,16 +184,11 @@ export async function runSsoAction(
       deps.onAuthEvent?.('idp_start', 'failure');
       logAuthEvent('idp_start', 'failure', { reason: err.code });
       // NOTE: this action's 'start' schema carries no requestId (the /sso management page's
-      // "start link" forms don't post one — see sso/index.tsx), so only organization threads
-      // here. organization is what's in scope (payload.organization); requestId stays absent.
+      // "start link" forms don't post one — see sso/index.tsx), so only the resolved organization
+      // threads here; requestId stays absent.
       return {
         kind: 'redirect',
-        location: ssoErrorRedirect(
-          slug,
-          providerErrorCode(err.code),
-          undefined,
-          payload.organization
-        ),
+        location: ssoErrorRedirect(slug, providerErrorCode(err.code), undefined, organization),
       };
     }
     throw err; // unknown → root ErrorBoundary
