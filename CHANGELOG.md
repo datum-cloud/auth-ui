@@ -19,6 +19,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   providers and starting a link, so users signed in under a non-default
   organization link the right Google or GitHub provider instead of the default
   organization's.
+- A client pinned to one organization (the staff portal) no longer lands on the
+  default organization's login page after its own sign-out: the stale session is
+  cleared and the login page reopens on the pinned organization. A live session
+  from another organization is now turned away before the callback instead of
+  being discarded as stale.
 
 ## [0.1.0] — 2026-06-23
 
