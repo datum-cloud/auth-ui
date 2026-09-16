@@ -120,6 +120,8 @@ export const auditSink: LogSink = (line) => console.log(line);
 //     post_login_redirect  post_login_settings  post_login_admin_check
 //     post_login_identity_fetch
 //     rybbit_server_track
+//     recovery_request  recovery_mail_sent  recovery_mail_failed
+//     recovery_complete  recovery_ticket
 //
 // NEW events must use snake_case.
 export function logAuthEvent(

@@ -121,6 +121,17 @@ const schema = z
     VERIFICATION_MAIL_CLIENT_CERT_FILE: z.string().optional(),
     VERIFICATION_MAIL_CLIENT_KEY_FILE: z.string().optional(),
     VERIFICATION_MAIL_CA_CERT_FILE: z.string().optional(),
+    // Phase C self-serve recovery (/recover). Fail-safe OFF: only 'true'/'1' enables it; while
+    // off the routes 404 from loader and action and every entry-point link is hidden. Merging is
+    // not activating.
+    AUTH_ACCOUNT_RECOVERY_ENABLED: z
+      .string()
+      .optional()
+      .transform((v) => v === 'true' || v === '1'),
+    // zitadel-provider authn-webhook endpoint that mails a passkey registration code (same host
+    // as VERIFICATION_MAIL_URL, path /v1/email/recovery). Shares the VERIFICATION_MAIL_* mTLS
+    // files. Unset => recovery requests are silently suppressed, the same posture as verification.
+    RECOVERY_MAIL_URL: z.url().optional(),
     // Operational kill switch for the usernameless discovery entry points (the /login
     // loader's identity-challenge arm and the /login/passkey-discover action). Default ON
     // — unset keeps the feature live; ONLY the explicit strings 'false'/'0' disable it.
@@ -227,6 +238,22 @@ const schema = z
           '_CLIENT_KEY_FILE / _CA_CERT_FILE are not all set — mTLS to the webhook would fail on ' +
           'every call, and that failure is silent at runtime. Set all three, or unset ' +
           'VERIFICATION_MAIL_URL to disable delivery in this environment.',
+      });
+    }
+    // Same half-configured-mTLS trap for the recovery webhook: sendRecoveryMail copies
+    // sendVerificationMail's never-throws contract, so a bad handshake fails silently on every
+    // recovery request. Shares the VERIFICATION_MAIL_* client material by design (one host).
+    if (
+      v.RECOVERY_MAIL_URL?.startsWith('https://') &&
+      (!v.VERIFICATION_MAIL_CLIENT_CERT_FILE ||
+        !v.VERIFICATION_MAIL_CLIENT_KEY_FILE ||
+        !v.VERIFICATION_MAIL_CA_CERT_FILE)
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['RECOVERY_MAIL_URL'],
+        message:
+          'RECOVERY_MAIL_URL is set to an https URL but the VERIFICATION_MAIL_* client cert files are not.',
       });
     }
     // A site key without a secret renders the widget and fails every verification.

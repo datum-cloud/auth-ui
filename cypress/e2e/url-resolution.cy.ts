@@ -30,6 +30,7 @@
  *     success                                    → /id/verify/success
  *   logout layout                                → /id/logout (index)
  *     success                                    → /id/logout/success
+ *   route('recover' | 'recover/complete')        → /id/recover, /id/recover/complete
  *   route('accounts' | 'signed-in' | 'error')    → /id/{accounts,signed-in,error}
  *   route('*', catchall)                         → exercised by the catch-all spec below
  *
@@ -65,6 +66,16 @@ interface NamespaceScreen {
 // Deep-link query a few loaders need to render their 200 form instead of bouncing.
 // Kept minimal; screens that still choose to 302 on a bare GET are tolerated below.
 const LOGIN_NAME = 'loginName=user%40example.com';
+
+// Which recovery environment this run is pointed at. Tell the spec with
+// CYPRESS_AUTH_ACCOUNT_RECOVERY_ENABLED=true when the dev server was started with the flag on;
+// the default matches the SHIPPED default (off), so a plain `bun run test:e2e` asserts the dark
+// behaviour. Caveat worth stating: over HTTP a dark route's 404 is indistinguishable from a route
+// that does not exist, so the dark direction is a flag guard, not a resolution proof — the
+// resolution proof is this same row run with the flag on, plus the loader/action 404 rows in
+// cypress/component/routes/recover/recover-action.cy.ts.
+const RECOVERY_ENABLED = String(Cypress.env('AUTH_ACCOUNT_RECOVERY_ENABLED')) === 'true';
+const RECOVER_STATUSES: ReadonlyArray<number> = RECOVERY_ENABLED ? [200, 302] : [404];
 
 const NAMESPACE_SCREENS: ReadonlyArray<NamespaceScreen> = [
   // ── index ───────────────────────────────────────────────────────────────────
@@ -140,6 +151,20 @@ const NAMESPACE_SCREENS: ReadonlyArray<NamespaceScreen> = [
   { namespace: 'verify', path: '/id/verify', anchor: 'body' },
   { namespace: 'verify', path: '/id/verify/success', anchor: 'body' },
 
+  // ── recover (Phase C, flagged dark) ─────────────────────────────────────────
+  // The ONLY screens here whose expected status is not a constant. Recovery ships dark:
+  // AUTH_ACCOUNT_RECOVERY_ENABLED defaults off and both routes answer 404 from loader AND action
+  // until infra flips it, so "resolves" means something different in each environment — and both
+  // directions are real assertions rather than a widened tolerance. Dark: 404, which is this
+  // suite's proof that merging is not activating. Lit: renders like any other screen.
+  { namespace: 'recover', path: '/id/recover', anchor: 'body', okStatuses: RECOVER_STATUSES },
+  {
+    namespace: 'recover',
+    path: '/id/recover/complete',
+    anchor: 'body',
+    okStatuses: RECOVER_STATUSES,
+  },
+
   // ── logout ──────────────────────────────────────────────────────────────────
   { namespace: 'logout', path: '/id/logout', anchor: 'body' },
   { namespace: 'logout', path: '/id/logout/success', anchor: 'body' },
@@ -163,6 +188,7 @@ const EXPECTED_NAMESPACES: ReadonlyArray<string> = [
   'sso',
   'device',
   'verify',
+  'recover',
   'logout',
   'accounts',
   'signed-in',

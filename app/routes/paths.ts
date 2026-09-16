@@ -65,6 +65,12 @@ export const paths = {
     index: (q?: Query) => withQuery('/verify', q),
     success: (q?: Query) => withQuery('/verify/success', q),
   },
+  // Phase C self-serve recovery. Behind AUTH_ACCOUNT_RECOVERY_ENABLED: both routes 404 while the
+  // flag is off, and every link to them renders only when it is on.
+  recover: {
+    index: (q?: Query) => withQuery('/recover', q),
+    complete: (q?: Query) => withQuery('/recover/complete', q),
+  },
   logout: {
     index: (q?: Query) => withQuery('/logout', q),
     success: (q?: Query) => withQuery('/logout/success', q),

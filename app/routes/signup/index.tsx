@@ -108,6 +108,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       requestId,
       maxmindAccountId: env.MAXMIND_ACCOUNT_ID ?? '',
       recaptchaSiteKey: env.RECAPTCHA_SITE_KEY ?? '',
+      recoveryEnabled: env.AUTH_ACCOUNT_RECOVERY_ENABLED,
       prefill,
       idp,
     },
@@ -272,6 +273,7 @@ export default function Signup() {
     requestId,
     maxmindAccountId,
     recaptchaSiteKey,
+    recoveryEnabled,
     prefill,
   } = useLoaderData<typeof loader>();
   const actionData = useActionData<typeof action>();
@@ -583,6 +585,18 @@ export default function Signup() {
                       />
                     </Form.Field>
                     <FormError>{errorMessage}</FormError>
+                    {/* Class (b) lands here: an address that already has an account, told so
+                        explicitly. Recovery is the way out for the owner who cannot use their
+                        passkey, so the door is offered right where the wall is. */}
+                    {actionData?.error === 'ALREADY_EXISTS' && recoveryEnabled ? (
+                      <p className="text-foreground/80 text-sm">
+                        <Link
+                          to={paths.recover.index({ requestId, organization })}
+                          className="underline">
+                          <Trans>Recover your account</Trans>
+                        </Link>
+                      </p>
+                    ) : null}
                     <SubmitButton
                       loading={identifierMinting || identifierSubmitting}
                       disabled={identifierMinting}>

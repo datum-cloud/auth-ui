@@ -5,6 +5,10 @@ import type {
   SessionChecks,
   SessionOpts,
 } from '@/modules/auth/auth-provider';
+import {
+  decodePasskeyRegistrationCode,
+  encodePasskeyRegistrationCode,
+} from '@/modules/auth/passkey-registration-code';
 import type {
   AuthMethod,
   AuthRequest,
@@ -172,6 +176,13 @@ export class FakeAuthProvider implements AuthProvider {
   private orgDomains: Record<string, string>; // P2 domain discovery: email domain → orgId
   private defaultOrgId: string | null; // instance Default Organization (org-first fallback)
   private enrolled = new Map<string, Set<AuthMethod>>(); // P5: dynamically enrolled methods (merged with seeded authMethods)
+  // Fake-only: userId -> the raw code last minted by passkeyRegisterLink, or null once it has
+  // been consumed. The KEY's presence — not its value — is what puts a user in validating mode,
+  // which is how legacy direct callers (they never mint) keep passing an opaque string. The
+  // consumed entry is tombstoned rather than deleted: deleting it would drop the user back into
+  // the unvalidated legacy path and let the same code work twice, which is the opposite of
+  // Zitadel's single-use code.
+  private passkeyCodes = new Map<string, string | null>();
   private passkeys = new Map<
     string,
     Array<{ id: string; state: 'active' | 'inactive'; name: string; createdAt?: string }>
@@ -676,15 +687,29 @@ export class FakeAuthProvider implements AuthProvider {
   }
 
   async passkeyRegisterLink(userId: string): Promise<{ code: string }> {
-    return { code: `pkcode-${userId}` };
+    const code = `pkcode-${userId}-${++this.seq}`;
+    this.passkeyCodes.set(userId, code);
+    return { code: encodePasskeyRegistrationCode({ id: `pkid-${this.seq}`, code }) };
   }
 
   async registerPasskey(
-    _userId: string,
-    _code: string,
+    userId: string,
+    code: string,
     _domain: string
   ): Promise<WebAuthnCreationOptions> {
-    // code not validated in fake; real adapter enforces it
+    // Validates only when a code was minted for this user: legacy direct callers pass an opaque
+    // string and never minted one. Single-use, like Zitadel: a consumed code is gone. Recovery
+    // depends on both properties, so the fake has to hold them or its specs prove nothing.
+    const minted = this.passkeyCodes.get(userId);
+    if (minted !== undefined) {
+      const decoded = decodePasskeyRegistrationCode(code);
+      // minted === null (already consumed) can never equal a decoded string, so a replay is
+      // refused with the same generic error as a wrong code.
+      if (!decoded || minted === null || decoded.code !== minted) {
+        throw new ProviderError('INVALID_CREDENTIALS', 'invalid passkey registration code');
+      }
+      this.passkeyCodes.set(userId, null);
+    }
     return {
       passkeyId: `pk-${++this.seq}`,
       publicKeyCredentialCreationOptions: { publicKey: {} },
