@@ -1,12 +1,19 @@
 // app/routes/recover/complete.tsx
 //
-// The mailed-link landing. `/recover/complete?userId&codeId&code[&requestId&organization]` — the
-// triple in that query IS the bearer credential, which is why this is the only route that accepts
-// it from a URL.
+// The mailed-link landing. `/recover/complete?userId&codeId#code=<code>` — the code is the bearer
+// credential, and it arrives in the URL FRAGMENT, not the query (contract v2, zitadel-provider
+// #138).
+//
+// THE FRAGMENT NEVER GOES ON THE WIRE. It is not part of the request line, so the code cannot
+// reach an access log, a reverse proxy, an APM trace or a Referer header — which is exactly what
+// a query parameter could not promise. The consequence for this route is that THE SERVER NEVER
+// SEES THE CODE: the loader does not read it and must never need it. The browser lifts it out of
+// `location.hash` into a hidden field and then strips it from the address bar. `userId` and
+// `codeId` stay in the query, because neither is usable as a credential on its own.
 //
 // THE LOADER MAKES NO PROVIDER CALL. The code is single-use, so consuming it on the GET would let
 // any mail-security scanner or link prefetcher burn it before the user ever clicks — they would
-// arrive at a dead link every time. The loader only echoes the triple into the page; the ceremony
+// arrive at a dead link every time. The loader only echoes the query into the page; the ceremony
 // starts on the button POST. (Spec §4.1 draws the consume on the GET; this is the recorded
 // deviation, and it costs the user one extra click.)
 //
@@ -27,7 +34,10 @@ import { assertCsrf, loaderCsrf } from '@/server/csrf';
 import { trustedAppOrigin } from '@/server/infra/app-origin.server';
 import { env } from '@/server/infra/env.server';
 import { Button } from '@datum-cloud/datum-ui/button';
+import { Input } from '@datum-cloud/datum-ui/input';
+import { Label } from '@datum-cloud/datum-ui/label';
 import { Trans } from '@lingui/react/macro';
+import { useEffect, useState } from 'react';
 import {
   Form as RRForm,
   data,
@@ -54,11 +64,14 @@ export async function loader({ request }: LoaderFunctionArgs) {
   return data(
     {
       csrfToken,
-      // Echoed straight back into the form. Nothing is validated here — an invalid triple is
+      // Echoed straight back into the form. Nothing is validated here — an invalid pair is
       // indistinguishable from a consumed one, and both are answered by the POST below.
+      //
+      // `code` is deliberately absent: it lives in the fragment, which never reaches this
+      // function. Reading one from the query here would quietly reopen the leak the fragment
+      // exists to close, by making a `?code=` link work again.
       userId: url.searchParams.get('userId') ?? '',
       codeId: url.searchParams.get('codeId') ?? '',
-      code: url.searchParams.get('code') ?? '',
       requestId: url.searchParams.get('requestId') ?? undefined,
       organization: url.searchParams.get('organization') ?? undefined,
     },
@@ -112,11 +125,39 @@ async function clearRecoveryCookies(): Promise<Headers> {
 type ActionData =
   { ceremony: true; passkeyId: string; publicKey: unknown } | { error: 'RECOVERY_EXPIRED' };
 
+/**
+ * Lifts the code out of `#code=<value>`. Returns null when there is no fragment, when it names no
+ * `code`, or when it is empty — every one of which means "ask the user to type it".
+ *
+ * URLSearchParams rather than a hand-rolled split: it percent-decodes and tolerates the fragment
+ * carrying more than one parameter. Its one quirk — `+` decodes to a space — cannot bite here,
+ * because the link is built by the webhook and Zitadel's registration codes are alphanumeric.
+ */
+function codeFromHash(hash: string): string | null {
+  if (!hash) return null;
+  return new URLSearchParams(hash.replace(/^#/, '')).get('code') || null;
+}
+
 export default function RecoverComplete() {
-  const { csrfToken, userId, codeId, code, requestId, organization } =
-    useLoaderData<typeof loader>();
+  const { csrfToken, userId, codeId, requestId, organization } = useLoaderData<typeof loader>();
   const actionData = useActionData() as ActionData | undefined;
   const navigation = useNavigation();
+
+  // null until — and unless — a code is found in the fragment. The initial null is not just a
+  // starting value: the server renders with it too (it cannot see a fragment), so the typed-code
+  // field below is what ships in the HTML and what a reader with JS off is left holding. Flipping
+  // the default would hand that reader a form that posts an empty code with nothing to type into.
+  const [hashCode, setHashCode] = useState<string | null>(null);
+
+  useEffect(() => {
+    const found = codeFromHash(window.location.hash);
+    if (!found) return;
+    setHashCode(found);
+    // Take the credential back out of the URL now that the form holds it. replaceState, not
+    // pushState: this is the same navigation with the code removed, not a new one — so it leaves
+    // nothing behind in the back/forward entry, in the address bar, or in a screen-share.
+    window.history.replaceState(null, '', window.location.pathname + window.location.search);
+  }, []);
 
   if (actionData && ('ceremony' in actionData || actionData.error === 'RECOVERY_EXPIRED')) {
     return (
@@ -145,7 +186,33 @@ export default function RecoverComplete() {
         <input type="hidden" name="intent" value="start" />
         <input type="hidden" name="userId" value={userId} />
         <input type="hidden" name="codeId" value={codeId} />
-        <input type="hidden" name="code" value={code} />
+        {hashCode === null ? (
+          // No fragment, or no JS to read one — the mail prints the code too, so the user can
+          // key it in. The sentence is not decoration: without it this is an unlabelled secret
+          // asked for out of nowhere, and the reader has no way to know the mail already has it.
+          // Deliberately not autoFocused: with a fragment present this field is replaced a tick
+          // later, and pulling focus onto a control that is about to disappear is worse than
+          // leaving it where it is.
+          <div className="flex flex-col gap-2">
+            <p className="text-foreground/70 text-sm">
+              <Trans>Enter the code from that email to continue.</Trans>
+            </p>
+            <Label htmlFor="code">
+              <Trans>Code</Trans>
+            </Label>
+            <Input
+              id="code"
+              name="code"
+              // The format is Zitadel configuration we do not own, so there is no shape rule —
+              // only the browser affordances that make a mailed code easy to paste.
+              autoComplete="one-time-code"
+              autoCapitalize="none"
+              autoCorrect="off"
+            />
+          </div>
+        ) : (
+          <input type="hidden" name="code" value={hashCode} />
+        )}
         {requestId ? <input type="hidden" name="requestId" value={requestId} /> : null}
         {organization ? <input type="hidden" name="organization" value={organization} /> : null}
         <Button

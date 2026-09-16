@@ -795,8 +795,6 @@ export interface Scenario {
    *  `received.path` telling them apart. */
   recoveryMailInput?: {
     userId: string;
-    codeId: string;
-    code: string;
     returnTo: string;
     requestedBy: 'self';
   };
@@ -807,6 +805,11 @@ export interface Scenario {
   // ── recovery request decision (fn: 'requestRecovery'; Task 6) ──────────────
   /** Input for the REAL requestRecovery. `origin` defaults to http://localhost. */
   recoveryInput?: { email: string; organization?: string; requestId?: string; origin?: string };
+  /** What the shared mail listener answers with (JSON-serialized). The recovery webhook MINTS the
+   *  code and returns `{ codeId }` — the client parses it, so a spec that needs a REAL sealed
+   *  ticket has to hand back a real codeId here. Default `{}`, which is the malformed-body case
+   *  for recovery and irrelevant to verification (that client reads the status only). */
+  verificationMailResponseBody?: unknown;
 
   // ── recovery ceremony (fn: 'start|finishRecoveryCeremony'; Task 7) ─────────
   /** Input for startRecoveryCeremony. Pass the literal 'MINTED' for `codeId`/`code` together with

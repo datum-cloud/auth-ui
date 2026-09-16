@@ -722,7 +722,10 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
         // cannot stand in for this one.
         if (s.verificationMailHang) return;
         res.writeHead(s.verificationMailStatus ?? 200, { 'content-type': 'application/json' });
-        res.end('{}');
+        // The recovery webhook MINTS the code and answers `{ codeId }`; sendRecoveryMail PARSES
+        // that body, so the response is no longer inert. Default '{}' keeps every pre-existing
+        // scenario byte-identical and doubles as the malformed-body row.
+        res.end(JSON.stringify(s.verificationMailResponseBody ?? {}));
       });
     });
     await new Promise<void>((res2, rej2) => {
@@ -2608,13 +2611,7 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
       // at the same port with the /v1/email/recovery path, so `received.path` distinguishes it.
       case 'sendRecoveryMail': {
         const result = await sendRecoveryMail(
-          s.recoveryMailInput ?? {
-            userId: '',
-            codeId: '',
-            code: '',
-            returnTo: '',
-            requestedBy: 'self',
-          }
+          s.recoveryMailInput ?? { userId: '', returnTo: '', requestedBy: 'self' }
         );
         outcome = { result, received: verificationMailReceived[0] };
         break;
@@ -2714,7 +2711,14 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
           ...ri,
           origin: ri.origin ?? 'http://localhost',
         });
-        outcome = { outcome: result.outcome, ticket: result.ticket };
+        // `opened` is what the ticket actually SEALS. Without it a spec can only compare ticket
+        // lengths, which every filler also satisfies — it could not tell a ticket sealed from the
+        // webhook's codeId apart from one sealed from nothing.
+        outcome = {
+          outcome: result.outcome,
+          ticket: result.ticket,
+          opened: openRequestTicket(result.ticket, ri.email),
+        };
         break;
       }
 

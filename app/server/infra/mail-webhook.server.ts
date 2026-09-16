@@ -7,7 +7,11 @@
 //
 // This module is transport ONLY. It has no never-throws contract of its own: it REJECTS on a
 // transport error, a timeout, or an unreadable cert file, and each caller's outer try/catch is
-// what turns that into the `false` its own contract promises.
+// what turns that into the failure value its own contract promises.
+//
+// It resolves the status AND the raw response body, because the recovery webhook now mints the
+// registration code itself and hands back `{ "codeId": "<id>" }` (contract v2, zitadel-provider
+// #138). Interpreting that body is the CALLER's job: this module neither parses it nor logs it.
 //
 // SECURITY: `body` may carry a bearer credential (a verification code, a passkey registration
 // code). It is serialized into the request and nothing else — never logged here, never attached
@@ -27,8 +31,15 @@ import * as https from 'node:https';
 // outage (the squatted path runs its resend THROUGH this send).
 const REQUEST_TIMEOUT_MS = 5000;
 
+// A webhook answering this call sends a few dozen bytes (`{"codeId":"..."}`) or nothing at all.
+// The cap stops a misbehaving or compromised endpoint from streaming until the timeout with an
+// unbounded string growing behind it; the excess is dropped, which leaves the body unparseable
+// and so fails closed at the caller.
+const MAX_RESPONSE_CHARS = 8 * 1024;
+
 /**
- * POSTs `body` as JSON to `rawUrl` and resolves the response status. mTLS is applied via a
+ * POSTs `body` as JSON to `rawUrl` and resolves `{ status, body }` — the response status and its
+ * raw (unparsed, length-capped) text. mTLS is applied via a
  * `https.Agent` carrying the client cert/key/CA read from the files at
  * VERIFICATION_MAIL_CLIENT_CERT_FILE / _CLIENT_KEY_FILE / _CA_CERT_FILE — relevant only for
  * `https:` targets, which is every real deployment. Both webhook paths live on the same host and
@@ -42,7 +53,10 @@ const REQUEST_TIMEOUT_MS = 5000;
  * that the volume mount exists to fix. A missing/unreadable file throws synchronously inside this
  * executor, which the Promise constructor turns into a rejection for the caller to absorb.
  */
-export function postMailWebhook(rawUrl: string, body: unknown): Promise<number> {
+export function postMailWebhook(
+  rawUrl: string,
+  body: unknown
+): Promise<{ status: number; body: string }> {
   return new Promise((resolve, reject) => {
     const target = new URL(rawUrl);
     const payload = JSON.stringify(body);
@@ -67,8 +81,16 @@ export function postMailWebhook(rawUrl: string, body: unknown): Promise<number> 
         },
       },
       (res) => {
-        res.resume(); // drain — the response body is irrelevant to the status contract
-        resolve(res.statusCode ?? 0);
+        // Collecting the body also drains the stream, which `res.resume()` used to do on its own.
+        let text = '';
+        res.setEncoding('utf-8');
+        res.on('data', (chunk: string) => {
+          if (text.length < MAX_RESPONSE_CHARS) text += chunk;
+        });
+        // A mid-stream error resolves with whatever arrived rather than rejecting: the caller
+        // validates the body anyway, so a truncated one fails there like any other malformed one.
+        res.on('error', () => resolve({ status: res.statusCode ?? 0, body: '' }));
+        res.on('end', () => resolve({ status: res.statusCode ?? 0, body: text }));
       }
     );
     // Reject here, not via destroy(err): under Bun that emits no 'error', so the handler below

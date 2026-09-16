@@ -43,7 +43,9 @@ export async function sendVerificationMail(input: SendVerificationMailInput): Pr
   if (!url) return false; // delivery disabled in this environment — silent, not an error
 
   try {
-    const status = await postMailWebhook(url, input);
+    // The shared transport also resolves the response body (recovery reads a minted codeId out
+    // of it); verification's contract is the STATUS alone, so the body is discarded here.
+    const { status } = await postMailWebhook(url, input);
     const ok = status >= 200 && status < 300;
     logAuthEvent(
       ok ? 'signup_verification_mail_sent' : 'signup_verification_mail_failed',

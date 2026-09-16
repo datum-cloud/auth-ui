@@ -179,9 +179,9 @@ export async function action({ request }: ActionFunctionArgs) {
   // ── request: the address form ──────────────────────────────────────────────────────────────
   // t0 for the constant-time deadline every exit below leaves at. The seven responses that MUST
   // stay indistinguishable cost very different work: a suppressed exit stops at the limiter or at
-  // findUser, while the sent path adds listAuthMethods, getLoginSettings, passkeyRegisterLink and
-  // a mail POST. Without a shared deadline that gap is an account-existence oracle, which is the
-  // one thing the generic response exists to deny.
+  // findUser, while the sent path adds listAuthMethods, getLoginSettings and a mail POST (which
+  // is also where the code gets minted now — the webhook does it). Without a shared deadline that
+  // gap is an account-existence oracle, which is the one thing the generic response exists to deny.
   //
   // Bounded, like every deadline: it equalises only while the real work finishes inside the floor.
   // The sent path AWAITS the webhook POST inside that floor, so a slow or degraded mail webhook

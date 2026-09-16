@@ -19,6 +19,10 @@ const envFor = (port: number, opts: { recovery?: boolean } = { recovery: true })
 });
 
 const EMAIL = 'owner@acme.test';
+// What the stub webhook answers with on the sent path. The client parses this out of the 200 and
+// the service seals it into the ticket, so it is the one value that proves auth-ui took the id
+// from the WEBHOOK rather than minting one of its own.
+const MINTED_CODE_ID = 'webhook-minted-code-id';
 const seedWithPasskey = {
   users: [{ id: 'u-1', loginName: EMAIL, orgId: 'org-1' }],
   authMethods: { 'u-1': ['passkey'] },
@@ -37,37 +41,72 @@ const recordLength = (t: string) => {
 };
 
 describe('requestRecovery — the account that can be recovered', () => {
-  it('mails a passkey registration code and returns a REAL sealed ticket', () => {
+  it('asks the webhook to mint, and seals the codeId it gets back', () => {
     callService({
       fn: 'requestRecovery',
       seed: seedWithPasskey,
       env: envFor(PORT),
       recoveryInput: { email: EMAIL, organization: 'org-1', requestId: 'req-7' },
       verificationMailListen: true,
+      verificationMailResponseBody: { codeId: MINTED_CODE_ID },
+      // The inverted contract in one assertion: auth-ui must no longer mint a registration code
+      // of its own. Without this the spec would pass on an implementation that minted one and
+      // then threw it away.
+      recordCalls: ['passkeyRegisterLink'],
     }).then((v) => {
       expect(v.outcome.outcome).to.equal('sent');
       recordLength(v.outcome.ticket as string);
+      expect(v.calls?.passkeyRegisterLink ?? [], 'auth-ui must not mint the code').to.have.length(
+        0
+      );
 
       const posts = v.verificationMailReceived ?? [];
       expect(posts.length, 'exactly one mail').to.equal(1);
       expect(posts[0].path).to.equal('/v1/email/recovery');
+      // deep.equal: `codeId`/`code` in the request is a 400 by contract v2, so their ABSENCE is
+      // the assertion, not a side effect of only checking the fields we happen to name.
+      expect(posts[0].body).to.deep.equal({
+        userId: 'u-1',
+        requestedBy: 'self',
+        returnTo: (posts[0].body as Record<string, string>).returnTo,
+      });
       const body = posts[0].body as Record<string, string>;
-      expect(body.userId).to.equal('u-1');
-      expect(body.codeId, 'the codeId identifies which code').to.be.a('string').and.not.equal('');
-      expect(body.code, 'the code itself travels only in the mail body')
-        .to.be.a('string')
-        .and.not.equal('');
-      expect(body.requestedBy).to.equal('self');
       expect(body.returnTo).to.contain('/id/recover/complete');
       expect(body.returnTo).to.contain('organization=org-1');
       expect(body.returnTo).to.contain('requestId=req-7');
 
+      // The ticket is sealed from the WEBHOOK's codeId — the whole point of the inversion.
+      expect(v.outcome.opened, 'the ticket must open to the minted codeId').to.deep.equal({
+        userId: 'u-1',
+        codeId: MINTED_CODE_ID,
+      });
+
       const audit = (v.auditLines ?? []).join('\n');
       expect(audit).to.contain('recovery_request');
       expect(audit).to.contain('"outcome":"sent"');
-      // Bearer credential: never in a log line, and the address is hashed.
-      expect(audit).to.not.contain(body.code);
+      // The address is hashed; the mail the webhook sent is the only place a code ever appears.
       expect(audit).to.not.contain(EMAIL);
+    });
+  });
+
+  it('still answers identically when the webhook refuses — a filler, not a different response', () => {
+    callService({
+      fn: 'requestRecovery',
+      seed: seedWithPasskey,
+      env: envFor(PORT + 7),
+      recoveryInput: { email: EMAIL, organization: 'org-1' },
+      verificationMailListen: true,
+      // The webhook's per-user cooldown (contract v2 §4). A live, recoverable account whose mail
+      // was refused must not become distinguishable from one whose mail went out.
+      verificationMailStatus: 429,
+    }).then((v) => {
+      expect(v.outcome.outcome).to.equal('sent');
+      // G7: the same fixed width as every sealed ticket and every other filler.
+      recordLength(v.outcome.ticket as string);
+      // There is no code to type, so the ticket seals nothing — and an unopenable ticket is
+      // already what the typed-code path answers for a wrong code.
+      expect(v.outcome.opened, 'a refused send seals no codeId').to.equal(null);
+      expect((v.auditLines ?? []).join('\n')).to.contain('recovery_mail_failed');
     });
   });
 });
@@ -125,6 +164,7 @@ describe('requestRecovery — the exits that must be silent (G7)', () => {
       env: envFor(PORT + 4),
       recoveryInput: { email: EMAIL, organization: 'org-1' },
       verificationMailListen: true,
+      verificationMailResponseBody: { codeId: MINTED_CODE_ID },
     }).then((v) => {
       expect(v.outcome.first).to.equal('sent');
       expect(v.outcome.second).to.equal('suppressed');
@@ -174,12 +214,14 @@ describe('requestRecovery — class (d), the unverified signup', () => {
       env: envFor(PORT + 6),
       recoveryInput: { email: EMAIL, organization: 'org-1' },
       verificationMailListen: true,
+      verificationMailResponseBody: { codeId: MINTED_CODE_ID },
     }).then((v) => {
       expect(v.outcome.outcome).to.equal('sent');
       recordLength(v.outcome.ticket as string);
       const posts = v.verificationMailReceived ?? [];
       expect(posts.length).to.equal(1);
       expect(posts[0].path).to.equal('/v1/email/recovery');
+      expect(v.outcome.opened).to.deep.equal({ userId: 'u-1', codeId: MINTED_CODE_ID });
     });
   });
 });

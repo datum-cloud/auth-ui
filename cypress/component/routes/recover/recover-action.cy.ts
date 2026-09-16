@@ -333,12 +333,18 @@ describe('/recover/complete — the mailed link', () => {
       env: ENV,
       mintPasskeyCode: 'u-1',
       recordCalls: ['registerPasskey'],
+      // A `?code=` is posted deliberately: the fragment replaced it, and the loader must not have
+      // kept a query-string reader that would quietly make the leaky link shape work again.
       request: { url: 'http://localhost/id/recover/complete?userId=u-1&codeId=c1&code=abc' },
     }).then((v) => {
       expect(v.calls?.registerPasskey ?? [], 'the loader must consume nothing').to.have.length(0);
       const body = v.response?.dataBody as Record<string, string>;
       expect(body.userId).to.equal('u-1');
-      expect(body.code).to.equal('abc');
+      expect(body.codeId).to.equal('c1');
+      expect(
+        body,
+        'the code lives in the fragment — the server must never see it'
+      ).to.not.have.property('code');
     });
   });
 

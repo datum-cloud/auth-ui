@@ -12,15 +12,18 @@
 //   - the limiter runs FIRST and is SHARED with signup's resend (one per-address budget: two
 //     limiters would let the two forms be combined to double the real mail rate);
 //   - every refusal goes through `suppress`, which always issues a filler ticket;
-//   - `sendRecoveryMail` never throws and its result is NOT branched on — a user whose mail
-//     failed must be indistinguishable from one whose mail arrived;
+//   - `sendRecoveryMail` never throws, and a failed send does NOT change the RESPONSE — a user
+//     whose mail failed must be indistinguishable from one whose mail arrived;
 //   - the outer catch swallows provider faults into the same suppressed shape.
 //
-// SECURITY: the code is a bearer credential. It is read out of the envelope, handed to the mail
-// client, and never logged, never returned, and never put in the ticket (which carries `codeId`).
-// The audit lines carry a HASHED actor and a bounded reason vocabulary.
+// AUTH-UI NO LONGER MINTS THE CODE (contract v2, zitadel-provider #138). The webhook mints it and
+// answers with the `codeId`, so the order here inverted: send FIRST, then seal the ticket from
+// what came back. The raw code never enters this process at all — it reaches the user only
+// through the Email body and the mail link's URL fragment.
+//
+// SECURITY: the ticket carries `codeId`, which is not usable as a credential on its own. The
+// audit lines carry a HASHED actor and a bounded reason vocabulary.
 import type { AuthProvider } from '@/modules/auth/auth-provider';
-import { decodePasskeyRegistrationCode } from '@/modules/auth/passkey-registration-code';
 import { ProviderError } from '@/modules/auth/types';
 import { fillerTicket, sealRequestTicket } from '@/resources/recovery/recovery-ticket.server';
 import { mailReturnTo } from '@/resources/shared/mail-return-to';
@@ -97,26 +100,24 @@ export async function requestRecovery(
 
     if (!env.RECOVERY_MAIL_URL) return suppress('delivery_disabled');
 
-    const envelope = decodePasskeyRegistrationCode(
-      (await provider.passkeyRegisterLink(user.id)).code
-    );
-    if (!envelope) return suppress('provider_error');
-
-    // Never throws, and the result is deliberately NOT branched on: the ticket is issued either
-    // way, because a delivery failure must not be visible to the requester. The client audits the
-    // failure itself.
-    await sendRecoveryMail({
+    // Never throws. The webhook mints the code and returns its id; `null` means the mail did not
+    // go out (unreachable, non-2xx — its 429 cooldown included — or an unusable body), and the
+    // client has already audited that itself.
+    const codeId = await sendRecoveryMail({
       userId: user.id,
-      codeId: envelope.id,
-      code: envelope.code,
       requestedBy: 'self',
       returnTo: mailReturnTo(origin, '/recover/complete', { requestId, organization }),
     });
 
+    // The ONE place a delivery failure shows, and it is invisible from outside: a filler is the
+    // same fixed width as a sealed ticket, so the response — status, body, Set-Cookie length —
+    // is byte-identical either way. The branch is on DELIVERY, never on account state, which is
+    // what G7 forbids. A filler simply has no code to open, and the typed-code path already
+    // answers an unopenable ticket exactly as it answers a wrong code.
     logAuthEvent('recovery_request', 'success', { actor, outcome: 'sent', userId: user.id });
     return {
       outcome: 'sent',
-      ticket: sealRequestTicket({ userId: user.id, codeId: envelope.id, email }),
+      ticket: codeId ? sealRequestTicket({ userId: user.id, codeId, email }) : fillerTicket(),
     };
   } catch (error) {
     // A provider fault must not change the response — it degrades to the same suppressed shape
