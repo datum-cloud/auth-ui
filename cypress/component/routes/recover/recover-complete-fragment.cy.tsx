@@ -13,7 +13,7 @@
 // fragment is present, so the no-JS/no-fragment form is what ships in the HTML and the effect
 // swaps in a hidden input once it finds a code. Rendering the hidden input first would leave a
 // JS-off user with a form that posts an empty code and no way to type one.
-import RecoverComplete from '@/routes/recover/complete';
+import RecoverComplete, { headers } from '@/routes/recover/complete';
 import { ConformAdapter } from '@datum-cloud/datum-ui/form/adapters/conform';
 import { setupI18n } from '@lingui/core';
 import { I18nProvider } from '@lingui/react';
@@ -119,5 +119,22 @@ describe('/recover/complete — no fragment', () => {
     setHash('#state=xyz');
     mountComplete();
     cy.get('input[name="code"]').should('not.have.attr', 'type', 'hidden');
+  });
+});
+
+describe('/recover/complete — Referrer-Policy', () => {
+  // React Router only carries Set-Cookie off a loader's headers onto a document response; every
+  // other header needs this export (see getDocumentHeaders). So the export EXISTING is the
+  // load-bearing fact here — a Referrer-Policy set on the loader's `data()` would silently vanish.
+  it('sends no-referrer, so the query string cannot leak to a third party', () => {
+    const sent = new Headers(
+      headers({
+        loaderHeaders: new Headers(),
+        parentHeaders: new Headers(),
+        actionHeaders: new Headers(),
+        errorHeaders: undefined,
+      })
+    );
+    expect(sent.get('referrer-policy')).to.equal('no-referrer');
   });
 });

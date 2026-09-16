@@ -11,6 +11,11 @@
 // `location.hash` into a hidden field and then strips it from the address bar. `userId` and
 // `codeId` stay in the query, because neither is usable as a credential on its own.
 //
+// Belt and braces, `Referrer-Policy: no-referrer` below keeps even that query off any request
+// this page originates. It has to be a `headers` export: React Router carries only Set-Cookie off
+// a loader's own headers onto a document response, so a header set in the loader's `data()` would
+// be silently dropped.
+//
 // THE LOADER MAKES NO PROVIDER CALL. The code is single-use, so consuming it on the GET would let
 // any mail-security scanner or link prefetcher burn it before the user ever clicks — they would
 // arrive at a dead link every time. The loader only echoes the query into the page; the ceremony
@@ -46,11 +51,22 @@ import {
   useLoaderData,
   useNavigation,
   type ActionFunctionArgs,
+  type HeadersFunction,
   type LoaderFunctionArgs,
   type MetaFunction,
 } from 'react-router';
 
 export const meta: MetaFunction = () => [{ title: 'Set up a new passkey' }];
+
+/**
+ * No Referer from this page, to anywhere. The URL carries `userId` and `codeId`, and while the
+ * code itself is in the fragment (which a Referer never includes anyway), the rest of it should
+ * not travel either — not to an image host, not to a link the user follows out.
+ *
+ * This must be an export: getDocumentHeaders only carries Set-Cookie off `loaderHeaders`, so the
+ * same header returned from the loader's `data()` would never reach the browser.
+ */
+export const headers: HeadersFunction = () => ({ 'Referrer-Policy': 'no-referrer' });
 
 /** Merging is not activating: while the flag is off this route does not exist, from either verb. */
 function assertEnabled() {

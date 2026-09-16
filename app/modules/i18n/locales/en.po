@@ -191,7 +191,7 @@ msgstr "Choose how you want to verify your identity."
 msgid "Choose your login method"
 msgstr "Choose your login method"
 
-#: app/routes/recover/complete.tsx:201
+#: app/routes/recover/complete.tsx:217
 #: app/routes/recover/index.tsx:321
 msgid "Code"
 msgstr "Code"
@@ -224,14 +224,14 @@ msgstr "Connected accounts"
 
 #: app/routes/device/index.tsx:73
 #: app/routes/login/index.tsx:571
-#: app/routes/recover/complete.tsx:224
+#: app/routes/recover/complete.tsx:240
 #: app/routes/recover/index.tsx:336
 #: app/routes/signup/index.tsx:457
 #: app/routes/signup/index.tsx:603
 msgid "Continue"
 msgstr "Continue"
 
-#: app/routes/recover/complete.tsx:179
+#: app/routes/recover/complete.tsx:195
 msgid "Continue to register a passkey on this device. This link works only once, so finish here before closing the page."
 msgstr "Continue to register a passkey on this device. This link works only once, so finish here before closing the page."
 
@@ -350,7 +350,7 @@ msgstr "Enter a new code"
 msgid "Enter a valid email address."
 msgstr "Enter a valid email address."
 
-#: app/routes/recover/complete.tsx:198
+#: app/routes/recover/complete.tsx:214
 msgid "Enter the code from that email to continue."
 msgstr "Enter the code from that email to continue."
 
@@ -714,7 +714,7 @@ msgid "Set password"
 msgstr "Set password"
 
 #: app/components/recovery-ceremony/recovery-ceremony.tsx:88
-#: app/routes/recover/complete.tsx:177
+#: app/routes/recover/complete.tsx:193
 msgid "Set up a new passkey"
 msgstr "Set up a new passkey"
 
