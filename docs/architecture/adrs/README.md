@@ -36,6 +36,7 @@ Do **not** write one for library bumps, refactors with no behavioural consequenc
 | [004](./004-idp-linking-flags.md)             | IdP linking flags             | Accepted | 2026-07-01 |
 | [005](./005-login-org-scoping.md)             | Login org scoping             | Accepted | 2026-07-01 |
 | [006](./006-signup-provisioning-invariant.md) | Signup provisioning invariant | Accepted | 2026-07-02 |
+| [007](./007-staging-idp-auto-create-allowlist.md) | IdP auto-create allow-list    | Accepted | 2026-09-22 |
 
 ## Template
 

@@ -22,6 +22,10 @@ import { resolveOrg } from '@/resources/shared/resolve-org';
 import { registerAndLinkIdp } from '@/resources/signup';
 import { MAXMIND_TRACKING_TOKEN_METADATA_KEY } from '@/resources/signup/signup.service';
 import { deriveIdpProfileName } from '@/resources/sso/derive-idp-name';
+import {
+  isAllowlistedIdpEmail,
+  resolveAllowlistedRegistration,
+} from '@/resources/sso/idp-auto-create-allowlist';
 import { decideIdpCallback } from '@/resources/sso/idp-callback';
 import { POLICY_ORG_PURPOSE } from '@/resources/sso/idp-return-urls';
 import { signInWithIdpIntent, requestScopedProviderReads } from '@/resources/sso/idp-session';
@@ -151,6 +155,10 @@ export async function processIdpCallback(
   let intent: IdpIntentResult;
   let entries: Awaited<ReturnType<typeof readSessions>>;
   let decision: ReturnType<typeof decideIdpCallback>;
+  // TEMPORARY (ADR 007) allow-list state, read again by the auto-create branch below.
+  let allowlisted: boolean | undefined;
+  let registerEmail: string | undefined;
+  let aliased = false;
   // Resolve the effective org for this callback ceremony — policy-org-first (the org the START
   // side decided the intent under, see idp-return-urls.ts), then the URL `?organization=`, then
   // the ZITADEL_DEFAULT_ORG_ID env pin, then the provider's instance Default Organization.
@@ -196,18 +204,42 @@ export async function processIdpCallback(
 
     const [sessionUserId, settings] = await Promise.all([sessionUserIdP, settingsP]);
 
+    // TEMPORARY (staging dual-org interim, ADR 007 — see idp-auto-create-allowlist.ts): an
+    // IdP-verified email from an allow-listed domain may register into an org whose policy
+    // disallows registration. Off (production) whenever IDP_AUTO_CREATE_EMAIL_DOMAINS is unset.
+    allowlisted =
+      link !== 'true' &&
+      !intent.userId &&
+      !settings.allowRegister &&
+      // Pinned to the listed org(s): callbackOrg can fall back to the raw ?organization= param.
+      callbackOrg !== undefined &&
+      env.IDP_AUTO_CREATE_ORGS.includes(callbackOrg) &&
+      isAllowlistedIdpEmail(intent.draft, env.IDP_AUTO_CREATE_EMAIL_DOMAINS);
+    const creationAllowed = settings.allowRegister || allowlisted;
+
     // Resolve a same-email account ONLY on the register path (not linked, not a link ceremony,
     // creation allowed, draft present) — keeps the lookup off the sign-in path.
     let existingAccount: { userId: string; hasPassword: boolean } | null = null;
-    if (link !== 'true' && !intent.userId && settings.allowRegister && intent.draft?.email) {
-      const existing = await provider.findUser(intent.draft.email, organization);
-      if (existing) {
+    if (link !== 'true' && !intent.userId && creationAllowed && intent.draft?.email) {
+      let existingId: string | undefined;
+      if (allowlisted) {
+        const plan = await resolveAllowlistedRegistration(provider, {
+          email: intent.draft.email,
+          targetOrg: callbackOrg,
+          aliasTag: env.IDP_AUTO_CREATE_ALIAS_TAG,
+        });
+        if (plan.kind === 'existing') existingId = plan.userId;
+        else ({ email: registerEmail, aliased } = plan);
+      } else {
+        existingId = (await provider.findUser(intent.draft.email, organization))?.id;
+      }
+      if (existingId) {
         // hasPassword only changes the decision when auto-link is enabled; skip the extra RPC
         // when ALLOW_IDP_AUTO_LINK is off (existence alone yields the account-exists hard error).
         const hasPassword = allowAutoLink
-          ? (await provider.listAuthMethods(existing.id)).includes('password')
+          ? (await provider.listAuthMethods(existingId)).includes('password')
           : false;
-        existingAccount = { userId: existing.id, hasPassword };
+        existingAccount = { userId: existingId, hasPassword };
       }
     }
 
@@ -230,7 +262,7 @@ export async function processIdpCallback(
       intent,
       link: link === 'true',
       sessionUserId,
-      creationAllowed: settings.allowRegister,
+      creationAllowed,
       existingAccount,
       linkEmailOwnerUserId,
       allowAutoLink,
@@ -474,7 +506,8 @@ export async function processIdpCallback(
         // so addHumanUser always receives a concrete org. Raw organization is undefined on a
         // bare (no ?organization=) flow, which causes Zitadel's FAILED_PRECONDITION.
         const result = await registerAndLinkIdp(provider, entries, {
-          email: decision.draft.email ?? '',
+          // registerEmail is the `+<tag>` alias on the allow-list path (ADR 007), else the IdP email.
+          email: registerEmail ?? decision.draft.email ?? '',
           firstName,
           lastName,
           organization: callbackOrg,
@@ -487,6 +520,14 @@ export async function processIdpCallback(
           emailVerified: intent.draft?.emailVerified ?? false,
           userAgent: userAgentFromRequest(request, fingerprintId),
           deviceTrackingToken,
+        });
+        // Audit the created account (no email — PII guard). viaDomainAllowlist/aliased are the
+        // TEMPORARY ADR 007 fields; they read false everywhere the flag is unset.
+        logAuthEvent('idp.register', 'success', {
+          requestId,
+          idpId: decision.link.idpId,
+          viaDomainAllowlist: allowlisted === true,
+          aliased,
         });
         const lastUsedCookie = await serializeLastUsedLogin(`idp:${decision.link.idpId}`);
         const passkeyHintCookie = result.loginName

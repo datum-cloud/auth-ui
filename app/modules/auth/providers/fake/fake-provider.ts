@@ -291,8 +291,13 @@ export class FakeAuthProvider implements AuthProvider {
 
   // ─── users ────────────────────────────────────────────────────────────────────
 
-  async findUser(identifier: string, _orgId?: string): Promise<User | null> {
-    const u = this.users.find((u) => u.loginName === identifier) ?? null;
+  async findUser(identifier: string, orgId?: string): Promise<User | null> {
+    // Honour the org filter like the Zitadel adapter does, but only when BOTH sides carry an org:
+    // seeds without orgId keep matching regardless of the filter (pre-existing specs rely on it).
+    const u =
+      this.users.find(
+        (u) => u.loginName === identifier && (!orgId || !u.orgId || u.orgId === orgId)
+      ) ?? null;
     if (!u) return null;
     const skippedAt = this.mfaSkippedAt.get(u.id) ?? null;
     return skippedAt !== null ? { ...u, mfaInitSkippedAt: skippedAt } : u;
