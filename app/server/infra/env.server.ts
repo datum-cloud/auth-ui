@@ -157,6 +157,24 @@ const schema = z
       .string()
       .optional()
       .transform((v) => v === 'true'),
+    // TEMPORARY (staging dual-org interim) — see app/resources/sso/idp-auto-create-allowlist.ts
+    // and ADR 007. Comma-separated email domains whose IdP-VERIFIED identities may auto-create a
+    // user in an org whose login policy disallows registration. Unset/empty (the default, and
+    // production) ⇒ fully off: the SSO callback runs its pre-existing logic untouched.
+    IDP_AUTO_CREATE_EMAIL_DOMAINS: z.string().optional(),
+    // TEMPORARY — the org id(s) the door applies to (comma-separated). REQUIRED alongside the
+    // domain list: the callback's target org can fall back to the raw ?organization= query param,
+    // so without this pin any registration-off org on the instance would become a valid
+    // self-provisioning target. Unset ⇒ the feature is off even if the domain list is set.
+    IDP_AUTO_CREATE_ORGS: z.string().optional(),
+    // TEMPORARY — companion to the above: the `+<tag>` inserted into the local part when the
+    // email already owns a user in ANOTHER org (Zitadel usernames are instance-unique).
+    // Defaults to 'staff'. Restricted to local-part-safe characters so a misconfigured value
+    // fails at boot instead of as an opaque registration error.
+    IDP_AUTO_CREATE_ALIAS_TAG: z
+      .string()
+      .regex(/^[A-Za-z0-9._-]*$/, 'IDP_AUTO_CREATE_ALIAS_TAG: use letters, digits, . _ - only')
+      .optional(),
     // CSP `frame-ancestors` override. Unset ⇒ 'none' (secure default — the auth UI is
     // not embeddable; X-Frame-Options: DENY is kept in lock-step). Set to a space/comma-
     // separated allowlist of full origins (e.g. "https://staging.portal.example.com") in
@@ -284,6 +302,16 @@ const schema = z
             .filter(Boolean)
         : [],
       AUTH_EMAIL_VERIFICATION_REQUIRED: requireEmailVerification,
+      // TEMPORARY (ADR 007): parsed allow-list (lower-cased, empty = off) and alias tag.
+      IDP_AUTO_CREATE_EMAIL_DOMAINS: (v.IDP_AUTO_CREATE_EMAIL_DOMAINS ?? '')
+        .split(/[,\s]+/)
+        .map((d) => d.trim().toLowerCase())
+        .filter(Boolean),
+      IDP_AUTO_CREATE_ORGS: (v.IDP_AUTO_CREATE_ORGS ?? '')
+        .split(/[,\s]+/)
+        .map((o) => o.trim())
+        .filter(Boolean),
+      IDP_AUTO_CREATE_ALIAS_TAG: (v.IDP_AUTO_CREATE_ALIAS_TAG ?? '').trim() || 'staff',
       // SENTRY_TRACES_SAMPLE_RATE was already transformed to a number by the .pipe() above;
       // preserve the already-parsed value (spread covers it from `v`).
       // PUBLIC_ORIGIN: no default — carried through by `...v`. It is `undefined` only in

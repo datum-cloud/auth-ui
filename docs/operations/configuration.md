@@ -40,6 +40,9 @@ All five default to **false** (fail-closed). Only the exact string `true` enable
 | `ALLOW_IDP_AUTO_LINK` | No | `false` | Auto-links an external IdP identity into an existing same-email account during login/register. Off means a same-email collision is a hard `account-exists` error and the owner must link the IdP from the signed-in `/sso` screen. |
 | `ALLOW_IDP_LINK_ANY_EMAIL` | No | `false` | Lets the explicit SSO link ceremony attach a fresh external identity regardless of its email address. Off applies the strict gate: the IdP-verified email must already be owned by the session user. |
 | `ALLOW_IDP_UNLINK` | No | `false` | Permits unlinking an identity provider from an account. |
+| `IDP_AUTO_CREATE_EMAIL_DOMAINS` | No | unset | **Temporary, [ADR 007](../architecture/adrs/007-staging-idp-auto-create-allowlist.md).** Comma-separated email domains whose IdP-verified identities may auto-create a user in an org whose login policy disallows registration. Unset means the feature is off. |
+| `IDP_AUTO_CREATE_ORGS` | No | unset | **Temporary, ADR 007.** Comma-separated Zitadel org ids the door applies to. Required together with the domain list; unset means the feature is off. |
+| `IDP_AUTO_CREATE_ALIAS_TAG` | No | `staff` | **Temporary, ADR 007.** The `+<tag>` inserted into the email's local part when that email already owns a user in another org. Only read when the domain list is set. |
 
 ## Routing
 
