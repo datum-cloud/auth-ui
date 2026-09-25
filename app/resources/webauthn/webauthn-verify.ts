@@ -22,6 +22,7 @@ import { readSessions, serializeSessions } from '@/modules/auth/session/cookie';
 import { checkReauthIntent } from '@/modules/auth/session/reauth-intent';
 import { paths } from '@/routes/paths';
 import { providerForRequest } from '@/server/auth-context.server';
+import { env } from '@/server/infra/env.server';
 import { getCsrfToken, assertCsrf } from '@/server/csrf';
 import { data, redirect, type ActionFunctionArgs, type LoaderFunctionArgs } from 'react-router';
 import { z } from 'zod';
@@ -58,6 +59,8 @@ export interface WebAuthnVerifyLoaderData {
   requestId: string | undefined;
   organization: string | undefined;
   publicKeyCredentialRequestOptions: unknown;
+  /** Lets the screen offer recovery once an attempt has actually failed. */
+  recoveryEnabled: boolean;
 }
 
 // ── Action data shape ────────────────────────────────────────────────────────
@@ -131,6 +134,7 @@ export function createWebAuthnVerifyHandlers(cfg: WebAuthnVerifyConfig) {
         requestId,
         organization,
         publicKeyCredentialRequestOptions: result.publicKeyCredentialRequestOptions,
+        recoveryEnabled: env.AUTH_ACCOUNT_RECOVERY_ENABLED,
       },
       { headers }
     );

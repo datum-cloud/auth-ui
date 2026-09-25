@@ -116,7 +116,6 @@ export async function loader({ request }: LoaderFunctionArgs) {
       csrfToken,
       idps,
       emailDeliveryEnabled: env.AUTH_EMAIL_DELIVERY_ENABLED,
-      accountRecoveryEnabled: env.AUTH_ACCOUNT_RECOVERY_ENABLED,
       notice,
       lastUsedLogin,
       conditionalPasskey,
@@ -313,7 +312,6 @@ export default function Login() {
     settings,
     branding,
     emailDeliveryEnabled,
-    accountRecoveryEnabled,
     notice,
     lastUsedLogin,
     conditionalPasskey,
@@ -385,7 +383,7 @@ export default function Login() {
   // the same way.
   const ceremonyServerError = useAuthActionError(ceremony.actionData);
 
-  const view = resolveLoginView(settings, idps, emailDeliveryEnabled, accountRecoveryEnabled);
+  const view = resolveLoginView(settings, idps, emailDeliveryEnabled);
 
   const field = resolveIdentifierField(settings);
   const identifierLabel = field.allowEmail
@@ -606,13 +604,11 @@ export default function Login() {
           </p>
         ) : null}
 
-        {view.showRecoveryLink ? (
-          <p className="text-foreground/60 mt-4 text-center text-sm">
-            <Link to={paths.recover.index({ requestId, organization })} className="underline">
-              <Trans>Can't use your passkey?</Trans>
-            </Link>
-          </p>
-        ) : null}
+        {/* No recovery link here. On first paint it advertises an account-recovery door to
+            every visitor, including someone probing addresses, and it is noise for the
+            majority who sign in fine. It is offered where it is actually needed: on the
+            passkey screen once an attempt has failed, and on the no_supported_method error
+            page, which is the dead end /login sends a methodless account to. */}
         {view.showRegisterLink ? (
           <>
             <div className="border-border my-8 flex-grow border-t" />

@@ -9,6 +9,7 @@ import {
   type WebAuthnVerifyActionData,
   type WebAuthnVerifyLoaderData,
 } from '@/resources/webauthn/webauthn-verify';
+import { paths } from '@/routes/paths';
 import { Trans } from '@lingui/react/macro';
 import { useRef } from 'react';
 import {
@@ -17,7 +18,7 @@ import {
   type MetaFunction,
   type ActionFunctionArgs,
 } from 'react-router';
-import { Form as RRForm } from 'react-router';
+import { Form as RRForm, Link } from 'react-router';
 
 export const meta: MetaFunction = () => [{ title: 'Verify with passkey' }];
 
@@ -74,7 +75,9 @@ export async function action(args: ActionFunctionArgs) {
 export default function LoginPasskey() {
   // React Router 7 cannot infer `typeof loader` through the factory return value,
   // so we use the exported concrete type instead of `useLoaderData<typeof loader>()`.
-  const { csrfToken, loginName, requestId, organization, publicKeyCredentialRequestOptions } =
+  const { csrfToken, loginName, requestId, organization, publicKeyCredentialRequestOptions,
+    recoveryEnabled,
+  } =
     useLoaderData() as WebAuthnVerifyLoaderData;
   // React Router 7 cannot infer `typeof action` through a factory return — resolves to `never`.
   // Use the exported concrete type instead.
@@ -120,6 +123,19 @@ export default function LoginPasskey() {
           label={<Trans>Sign in with your passkey</Trans>}
         />
       </RRForm>
+
+      {/* Offered only once an attempt has actually failed. Before that it is noise for the
+          majority who sign in fine, and it advertises a recovery door to anyone who loads
+          the page. This is the moment the user is looking for a way out. */}
+      {errorMessage && recoveryEnabled ? (
+        <p className="text-foreground/60 mt-4 text-center text-sm">
+          <Link
+            to={paths.recover.index({ email: loginName, requestId, organization })}
+            className="underline">
+            <Trans>Can't use your passkey?</Trans>
+          </Link>
+        </p>
+      ) : null}
     </AuthCeremony>
   );
 }
