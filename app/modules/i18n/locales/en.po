@@ -146,7 +146,7 @@ msgstr "Back to sign in"
 msgid "By continuing, you agree to Datum's <0>Terms of Service</0> and <1>Privacy Policy</1>, and to receive periodic emails with updates."
 msgstr "By continuing, you agree to Datum's <0>Terms of Service</0> and <1>Privacy Policy</1>, and to receive periodic emails with updates."
 
-#: app/routes/login/passkey.tsx:135
+#: app/routes/login/passkey.tsx:139
 msgid "Can't use your passkey?"
 msgstr "Can't use your passkey?"
 
@@ -768,7 +768,7 @@ msgstr "Sign in with"
 msgid "Sign in with LDAP"
 msgstr "Sign in with LDAP"
 
-#: app/routes/login/passkey.tsx:123
+#: app/routes/login/passkey.tsx:127
 msgid "Sign in with your passkey"
 msgstr "Sign in with your passkey"
 
@@ -967,7 +967,7 @@ msgstr "Unlink {providerLabel}?"
 msgid "Use a passkey"
 msgstr "Use a passkey"
 
-#: app/routes/login/passkey.tsx:101
+#: app/routes/login/passkey.tsx:105
 msgid "Use your passkey to verify your identity."
 msgstr "Use your passkey to verify your identity."
 
@@ -998,7 +998,7 @@ msgid "Verify and enable"
 msgstr "Verify and enable"
 
 #: app/components/webauthn-button/webauthn-button.tsx:280
-#: app/routes/login/passkey.tsx:100
+#: app/routes/login/passkey.tsx:104
 msgid "Verify with passkey"
 msgstr "Verify with passkey"
 

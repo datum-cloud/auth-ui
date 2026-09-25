@@ -75,10 +75,14 @@ export async function action(args: ActionFunctionArgs) {
 export default function LoginPasskey() {
   // React Router 7 cannot infer `typeof loader` through the factory return value,
   // so we use the exported concrete type instead of `useLoaderData<typeof loader>()`.
-  const { csrfToken, loginName, requestId, organization, publicKeyCredentialRequestOptions,
+  const {
+    csrfToken,
+    loginName,
+    requestId,
+    organization,
+    publicKeyCredentialRequestOptions,
     recoveryEnabled,
-  } =
-    useLoaderData() as WebAuthnVerifyLoaderData;
+  } = useLoaderData() as WebAuthnVerifyLoaderData;
   // React Router 7 cannot infer `typeof action` through a factory return — resolves to `never`.
   // Use the exported concrete type instead.
   const actionData = useActionData() as WebAuthnVerifyActionData | undefined;
