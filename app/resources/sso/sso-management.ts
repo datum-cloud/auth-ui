@@ -9,6 +9,7 @@ import { readSessions, mostRecent } from '@/modules/auth/session/cookie';
 import { ProviderError } from '@/modules/auth/types';
 import type { AuthMethod, IdpLink, IdProvider } from '@/modules/auth/types';
 import { getActiveIdPs } from '@/resources/sso/idp-providers';
+import { resolveSsoOrg } from '@/resources/sso/sso-org';
 import { env } from '@/server/infra/env.server';
 
 // ── /sso loader ─────────────────────────────────────────────────────────────────
@@ -34,6 +35,9 @@ export interface SsoManagementData {
   linked: LinkedIdpView[];
   linkable: IdProvider[];
   allowUnlink: boolean;
+  /** Org the IdP list was resolved under (URL param, else session org); absent on the default-org
+   *  fallback. The route posts it back on every start-link form. */
+  organization?: string;
 }
 
 /**
@@ -135,14 +139,14 @@ export async function resolveSsoManagement(
   csrf: { token: string; setCookie: string | null }
 ): Promise<SsoManagementResult> {
   const url = new URL(request.url);
-  const organization = url.searchParams.get('organization') ?? undefined;
-
-  // Org-first / default-org fallback via the shared choke point: the /sso management screen must
-  // list + join against the org's IdPs (default org when no `?organization=`), not the INSTANCE set.
-  const active = await getActiveIdPs(provider, organization);
-
   const entries = await readSessions(request);
   const recent = mostRecent(entries);
+
+  // URL org first, then the org the session was minted under (see sso-org.ts), then the shared
+  // default-org fallback inside getActiveIdPs — the screen must list + join against THAT org's
+  // IdPs, not the INSTANCE set. Echoed in the data so the start-link forms post the same org.
+  const organization = resolveSsoOrg(url.searchParams.get('organization') ?? undefined, recent);
+  const active = await getActiveIdPs(provider, organization);
 
   // Guard getSession so a transient ProviderError doesn't produce a raw 500.
   // On any provider failure redirect to /login — the user must re-authenticate.
@@ -183,6 +187,7 @@ export async function resolveSsoManagement(
       // Multi on → offer every provider (add another); off → only providers with no link yet.
       linkable: linkableProviders(active, linked, allowMulti),
       allowUnlink: env.ALLOW_IDP_UNLINK,
+      organization,
     },
     setCookie: csrf.setCookie,
   };

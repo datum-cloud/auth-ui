@@ -114,7 +114,7 @@ export const auditSink: LogSink = (line) => console.log(line);
 //     mfa_enroll  mfa_enroll_challenge  mfa_skip
 //     mfa_passkey  mfa_passkey_challenge  mfa_u2f  mfa_u2f_challenge
 //     account_switch  account_remove
-//     authrequest_resolve  oidc_callback  saml_response
+//     authrequest_resolve  oidc_callback  session_stale  session_org_mismatch  saml_response
 //     device_code_lookup  device_authorize
 //     logout  rate_limit
 //     post_login_redirect  post_login_settings  post_login_admin_check

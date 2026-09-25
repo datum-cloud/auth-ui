@@ -47,7 +47,7 @@ describe('signup/method reCAPTCHA gate', () => {
       },
     }).then((v) => {
       expect(v.response?.dataStatus).to.equal(400);
-      expect(v.response?.dataBody).to.have.property('error', 'INVALID_INPUT');
+      expect(v.response?.dataBody).to.have.property('error', 'RECAPTCHA_FAILED');
       expect(v.calls?.register ?? [], 'no Zitadel register call on a scripted POST').to.have.length(
         0
       );

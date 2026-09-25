@@ -73,7 +73,7 @@ export interface ScenarioSeed {
 export interface LiveSessionSeed {
   id: string;
   token: string;
-  user?: { id: string; loginName: string; displayName?: string };
+  user?: { id: string; loginName: string; displayName?: string; orgId?: string };
   /**
    * Which authentication factors the seeded session carries, all stamped verified.
    * Defaults to ['password'] — the historical behavior, a fully authenticated session.

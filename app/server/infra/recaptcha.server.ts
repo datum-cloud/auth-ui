@@ -15,10 +15,41 @@ export type RecaptchaReason =
   | 'hostname-mismatch'
   | 'transport';
 
+/**
+ * Google's documented siteverify error codes. Anything outside this set collapses to
+ * 'unknown': these reach a log line, and echoing arbitrary upstream text there would let a
+ * hostile or malfunctioning response forge log entries. Same reasoning that makes
+ * RecaptchaReason a closed union rather than a free string.
+ */
+const KNOWN_ERROR_CODES = [
+  'missing-input-secret',
+  'invalid-input-secret',
+  'missing-input-response',
+  'invalid-input-response',
+  'invalid-keys',
+  'bad-request',
+  'timeout-or-duplicate',
+] as const;
+
+export type RecaptchaErrorCode = (typeof KNOWN_ERROR_CODES)[number] | 'unknown';
+
+function normaliseErrorCodes(raw: unknown): RecaptchaErrorCode[] | undefined {
+  if (!Array.isArray(raw) || raw.length === 0) return undefined;
+  // Bounded: a response claiming hundreds of codes must not become a hundred-field log entry.
+  return raw
+    .slice(0, 5)
+    .map((c) =>
+      (KNOWN_ERROR_CODES as readonly unknown[]).includes(c) ? (c as RecaptchaErrorCode) : 'unknown'
+    );
+}
+
 export type RecaptchaVerdict = {
   outcome: 'valid' | 'invalid' | 'unavailable';
   score: number | null;
   reason: RecaptchaReason;
+  /** Google's own codes, allowlisted. Absent when the response carried none. `rejected`
+   *  collapses several distinct causes; this is what tells them apart in a log. */
+  errorCodes?: RecaptchaErrorCode[];
 };
 
 export function recaptchaConfigured(): boolean {
@@ -46,6 +77,7 @@ export async function verifyRecaptcha(
     action?: string;
     hostname?: string;
     challenge_ts?: string;
+    'error-codes'?: unknown;
   };
 
   try {
@@ -63,11 +95,13 @@ export async function verifyRecaptcha(
     return { outcome: 'unavailable', score: null, reason: 'transport' };
   }
 
-  if (!token) return { outcome: 'invalid', score: null, reason: 'no-token' };
+  const errorCodes = normaliseErrorCodes(body['error-codes']);
+
+  if (!token) return { outcome: 'invalid', score: null, reason: 'no-token', errorCodes };
 
   const score = typeof body.score === 'number' ? body.score : null;
 
-  if (!body.success) return { outcome: 'invalid', score, reason: 'rejected' };
+  if (!body.success) return { outcome: 'invalid', score, reason: 'rejected', errorCodes };
   if (body.action !== expectedAction) {
     return { outcome: 'invalid', score, reason: 'action-mismatch' };
   }
@@ -113,6 +147,7 @@ export async function recaptchaRejects(token: string, expectedAction: string): P
         reason: verdict.reason,
         score: verdict.score,
         action: expectedAction,
+        ...(verdict.errorCodes ? { errorCodes: verdict.errorCodes } : {}),
       }
     );
   }

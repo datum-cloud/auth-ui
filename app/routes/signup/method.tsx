@@ -95,7 +95,9 @@ export async function action({ request }: ActionFunctionArgs) {
   // a CSRF token with no session precondition, so a script could POST straight here. Action is
   // 'signup', shared with /signup's identifier form: both perform the same registration step.
   if (await recaptchaRejects(String(form.get('recaptchaToken') ?? ''), 'signup')) {
-    return data({ error: 'INVALID_INPUT' as const }, { status: 400 });
+    // Distinct from INVALID_INPUT, whose message tells the user to check their input —
+    // misleading here, since the input was fine and the only fix is to resubmit.
+    return data({ error: 'RECAPTCHA_FAILED' as const }, { status: 400 });
   }
 
   const parsed = signupMethodSchema.safeParse(Object.fromEntries(form));

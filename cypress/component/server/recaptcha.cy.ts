@@ -165,3 +165,48 @@ describe('verifyRecaptcha', () => {
     });
   });
 });
+
+describe('verifyRecaptcha — Google error codes', () => {
+  // `rejected` collapses several distinct causes (consumed token, wrong site, bad secret).
+  // Twice on staging that ambiguity forced a manual siteverify call to work out which had
+  // happened. Carrying Google's own codes makes the log self-explanatory.
+  it('carries Google error codes through on a rejection', () => {
+    callService({
+      fn: 'verifyRecaptcha',
+      env: RECAPTCHA_ENV,
+      recaptchaInput: { token: 'tok', expectedAction: 'signup' },
+      recaptchaFetch: { body: { success: false, 'error-codes': ['timeout-or-duplicate'] } },
+    }).then((v) => {
+      expect(v.outcome.reason).to.equal('rejected');
+      expect(v.outcome.errorCodes).to.deep.equal(['timeout-or-duplicate']);
+    });
+  });
+
+  // SECURITY: error-codes is external input that lands in a log line. `reason` is a closed
+  // literal union for exactly this purpose — anything unrecognised must be collapsed, never
+  // echoed, or a hostile response could forge log entries.
+  it('never echoes an unrecognised code verbatim', () => {
+    callService({
+      fn: 'verifyRecaptcha',
+      env: RECAPTCHA_ENV,
+      recaptchaInput: { token: 'tok', expectedAction: 'signup' },
+      recaptchaFetch: {
+        body: { success: false, 'error-codes': ['not-a-real-code\n{"level":"error"}'] },
+      },
+    }).then((v) => {
+      expect(v.outcome.errorCodes).to.deep.equal(['unknown']);
+    });
+  });
+
+  it('omits the field entirely when Google reports no codes', () => {
+    callService({
+      fn: 'verifyRecaptcha',
+      env: RECAPTCHA_ENV,
+      recaptchaInput: { token: 'tok', expectedAction: 'signup' },
+      recaptchaFetch: { body: ok() },
+    }).then((v) => {
+      expect(v.outcome.reason).to.equal('ok');
+      expect(v.outcome.errorCodes).to.equal(undefined);
+    });
+  });
+});

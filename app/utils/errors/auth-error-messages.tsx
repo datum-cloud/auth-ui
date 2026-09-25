@@ -25,6 +25,12 @@ export function useAuthErrorMessage() {
         return t`An account with this email already exists. Try signing in instead.`;
       case 'INVALID_INPUT':
         return t`Please check your input and try again.`;
+      // One code for every reCAPTCHA rejection (stale / no-token / rejected /
+      // action-mismatch): they share a single user action, and naming which one fired
+      // would tell a bot which wall it hit for no human benefit. Deliberately avoids
+      // "verify" — that word means email verification everywhere else in this flow.
+      case 'RECAPTCHA_FAILED':
+        return t`That didn't go through. Please try again.`;
       case 'USER_NOT_FOUND':
         return t`We could not find an account for that identifier.`;
       case 'PHONE_LOGIN_DISABLED':

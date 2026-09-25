@@ -62,3 +62,20 @@ describe('useAuthErrorMessage — baseline behavior', () => {
     }
   });
 });
+
+describe('useAuthErrorMessage — reCAPTCHA rejection', () => {
+  // The gate used to return INVALID_INPUT, whose message is "Please check your input and
+  // try again." — actively misleading, since the input was fine and the only fix is to
+  // resubmit. One code covers every rejection reason (stale / no-token / rejected /
+  // action-mismatch): they share a single user action, and splitting them would tell a
+  // bot which wall it hit for no human benefit.
+  it('maps RECAPTCHA_FAILED to a retry message that does not blame the input', () => {
+    cy.mount(<MessageHarness code="RECAPTCHA_FAILED" />);
+    cy.get('[data-testid="msg"]').should('have.text', "That didn't go through. Please try again.");
+    cy.get('[data-testid="msg"]').should('not.have.text', GENERIC);
+    cy.get('[data-testid="msg"]').should('not.contain.text', 'check your input');
+    // "verify" is reserved for email verification in this flow — a rejection message using
+    // it reads as the email check failing.
+    cy.get('[data-testid="msg"]').should('not.contain.text', 'verif');
+  });
+});

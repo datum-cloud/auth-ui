@@ -120,6 +120,34 @@ describe('SsoIndex — unlink guard: dialog confirm + disabled sole sign-in meth
     cy.get('button[type="submit"]').contains('Unlink').should('exist').and('not.be.disabled');
   });
 });
+
+// ── sso/index — start-link forms carry the resolved org ───────────────────────
+
+describe('SsoIndex — start-link forms thread the resolved organization', () => {
+  const linkable = [{ id: 'idp-g', name: 'Google', type: 'GOOGLE' }];
+  const base = {
+    csrfToken: 'csrf-mgmt',
+    userId: 'u1',
+    loginName: 'you@acme.test',
+    linked: [],
+    linkable,
+    allowUnlink: false,
+  };
+
+  it('emits a hidden organization input on the start-link form when the loader resolved one', () => {
+    mountRoute(SsoIndex, 'sso-index', '/sso', '/sso', { ...base, organization: 'acme' });
+    cy.get('input[name="intent"][value="start"]')
+      .closest('form')
+      .find('input[name="organization"]')
+      .should('have.value', 'acme');
+  });
+
+  it('omits the organization input when the loader resolved none (default-org fallback)', () => {
+    mountRoute(SsoIndex, 'sso-index', '/sso', '/sso', { ...base, organization: undefined });
+    cy.get('input[name="intent"][value="start"]').should('exist');
+    cy.get('input[name="organization"]').should('not.exist');
+  });
+});
 // sso/provider/error's "Back to sign in" → bare /login assertion lived here too, but it was a
 // literal duplicate of provider-error-render.cy.tsx's "degrades to a bare /login when no
 // ceremony context is present" (same component, same expected href; only an unused `reason`
