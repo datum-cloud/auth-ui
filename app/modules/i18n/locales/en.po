@@ -146,7 +146,7 @@ msgstr "Back to sign in"
 msgid "By continuing, you agree to Datum's <0>Terms of Service</0> and <1>Privacy Policy</1>, and to receive periodic emails with updates."
 msgstr "By continuing, you agree to Datum's <0>Terms of Service</0> and <1>Privacy Policy</1>, and to receive periodic emails with updates."
 
-#: app/routes/login/index.tsx:613
+#: app/routes/login/index.tsx:612
 msgid "Can't use your passkey?"
 msgstr "Can't use your passkey?"
 
@@ -164,7 +164,7 @@ msgid "Change your password"
 msgstr "Change your password"
 
 #: app/routes/password/reset.tsx:109
-#: app/routes/recover/index.tsx:297
+#: app/routes/recover/index.tsx:308
 #: app/routes/signup/index.tsx:406
 #: app/routes/signup/method.tsx:257
 #: app/routes/signup/password.tsx:218
@@ -191,8 +191,8 @@ msgstr "Choose how you want to verify your identity."
 msgid "Choose your login method"
 msgstr "Choose your login method"
 
-#: app/routes/recover/complete.tsx:217
-#: app/routes/recover/index.tsx:321
+#: app/routes/recover/complete.tsx:226
+#: app/routes/recover/index.tsx:332
 msgid "Code"
 msgstr "Code"
 
@@ -223,15 +223,15 @@ msgid "Connected accounts"
 msgstr "Connected accounts"
 
 #: app/routes/device/index.tsx:73
-#: app/routes/login/index.tsx:571
-#: app/routes/recover/complete.tsx:240
-#: app/routes/recover/index.tsx:336
+#: app/routes/login/index.tsx:570
+#: app/routes/recover/complete.tsx:249
+#: app/routes/recover/index.tsx:347
 #: app/routes/signup/index.tsx:457
 #: app/routes/signup/index.tsx:603
 msgid "Continue"
 msgstr "Continue"
 
-#: app/routes/recover/complete.tsx:195
+#: app/routes/recover/complete.tsx:204
 msgid "Continue to register a passkey on this device. This link works only once, so finish here before closing the page."
 msgstr "Continue to register a passkey on this device. This link works only once, so finish here before closing the page."
 
@@ -260,7 +260,7 @@ msgstr "Couldn't verify"
 msgid "Create a new account"
 msgstr "Create a new account"
 
-#: app/routes/login/index.tsx:623
+#: app/routes/login/index.tsx:622
 #: app/routes/signup/password.tsx:271
 msgid "Create account"
 msgstr "Create account"
@@ -294,7 +294,7 @@ msgstr "Didn't get the email?"
 
 #: app/routes/login/index.tsx:394
 #: app/routes/login/index.tsx:409
-#: app/routes/recover/index.tsx:372
+#: app/routes/recover/index.tsx:383
 #: app/routes/signup/index.tsx:539
 #: app/routes/signup/index.tsx:575
 msgid "Email"
@@ -308,8 +308,8 @@ msgstr "Email code"
 msgid "Email me a code"
 msgstr "Email me a code"
 
-#: app/routes/login/index.tsx:582
-#: app/routes/login/index.tsx:592
+#: app/routes/login/index.tsx:581
+#: app/routes/login/index.tsx:591
 #: app/routes/login/method.tsx:415
 msgid "Email me a sign-in link"
 msgstr "Email me a sign-in link"
@@ -346,11 +346,11 @@ msgstr "Enable SMS one-time code"
 msgid "Enter a new code"
 msgstr "Enter a new code"
 
-#: app/routes/recover/index.tsx:367
+#: app/routes/recover/index.tsx:378
 msgid "Enter a valid email address."
 msgstr "Enter a valid email address."
 
-#: app/routes/recover/complete.tsx:214
+#: app/routes/recover/complete.tsx:223
 msgid "Enter the code from that email to continue."
 msgstr "Enter the code from that email to continue."
 
@@ -374,7 +374,7 @@ msgstr "Enter the verification code sent to your email address."
 msgid "Enter your authenticator code"
 msgstr "Enter your authenticator code"
 
-#: app/routes/recover/index.tsx:354
+#: app/routes/recover/index.tsx:365
 msgid "Enter your email address and we'll send you a link to set up a new passkey."
 msgstr "Enter your email address and we'll send you a link to set up a new passkey."
 
@@ -458,9 +458,9 @@ msgstr "Name your passkey"
 msgid "Needs re-authentication"
 msgstr "Needs re-authentication"
 
-#: app/routes/login/index.tsx:446
-msgid "New passkey added. Sign in with it below — your old passkey is still listed and can be removed from your passkeys page after you sign in."
-msgstr "New passkey added. Sign in with it below — your old passkey is still listed and can be removed from your passkeys page after you sign in."
+#: app/routes/login/index.tsx:448
+msgid "New passkey added. Sign in with it below."
+msgstr "New passkey added. Sign in with it below."
 
 #: app/routes/password/change.tsx:116
 #: app/routes/password/new.tsx:102
@@ -491,7 +491,7 @@ msgstr "No signed-in accounts."
 msgid "Not now"
 msgstr "Not now"
 
-#: app/routes/login/index.tsx:621
+#: app/routes/login/index.tsx:620
 msgid "Not registered?"
 msgstr "Not registered?"
 
@@ -521,7 +521,7 @@ msgstr "Or enter the code from that email"
 msgid "Or import this URI in your authenticator app"
 msgstr "Or import this URI in your authenticator app"
 
-#: app/routes/login/index.tsx:512
+#: app/routes/login/index.tsx:511
 #: app/routes/login/method.tsx:398
 #: app/routes/reauth.tsx:310
 #: app/routes/setup/mfa.tsx:46
@@ -612,7 +612,7 @@ msgid "Please finish setting up your passkey before leaving this page. It will b
 msgstr "Please finish setting up your passkey before leaving this page. It will be the only way to sign in, and your account won't be usable without it."
 
 #: app/routes/error.tsx:52
-#: app/routes/recover/index.tsx:352
+#: app/routes/recover/index.tsx:363
 #: app/routes/signup/index.tsx:596
 #: app/routes/verify/index.tsx:234
 msgid "Recover your account"
@@ -689,7 +689,7 @@ msgstr "Security key"
 msgid "Select an account to continue or add a new one."
 msgstr "Select an account to continue or add a new one."
 
-#: app/routes/recover/index.tsx:386
+#: app/routes/recover/index.tsx:397
 msgid "Send recovery link"
 msgstr "Send recovery link"
 
@@ -714,7 +714,7 @@ msgid "Set password"
 msgstr "Set password"
 
 #: app/components/recovery-ceremony/recovery-ceremony.tsx:88
-#: app/routes/recover/complete.tsx:193
+#: app/routes/recover/complete.tsx:202
 msgid "Set up a new passkey"
 msgstr "Set up a new passkey"
 
@@ -786,7 +786,7 @@ msgstr "Sign out of"
 msgid "Sign out other sessions"
 msgstr "Sign out other sessions"
 
-#: app/routes/login/index.tsx:604
+#: app/routes/login/index.tsx:603
 msgid "Sign-in is currently unavailable for this account. Please contact your administrator."
 msgstr "Sign-in is currently unavailable for this account. Please contact your administrator."
 
@@ -850,7 +850,7 @@ msgstr "Thanks,"
 msgid "That action isn't available right now."
 msgstr "That action isn't available right now."
 
-#: app/routes/recover/index.tsx:316
+#: app/routes/recover/index.tsx:327
 msgid "That code is invalid or has expired. Check the email, or start over."
 msgstr "That code is invalid or has expired. Check the email, or start over."
 
@@ -1036,7 +1036,7 @@ msgid "We sent a verification code to your email address."
 msgstr "We sent a verification code to your email address."
 
 #. placeholder {0}: sent.email
-#: app/routes/recover/index.tsx:299
+#: app/routes/recover/index.tsx:310
 msgid "We've sent a link to <0>{0}</0>. Open it on the device you want to sign in with, or enter the code from that email here."
 msgstr "We've sent a link to <0>{0}</0>. Open it on the device you want to sign in with, or enter the code from that email here."
 
@@ -1064,7 +1064,7 @@ msgstr "Welcome"
 msgid "While Datum is currently free of charge to use, we require a valid payment method during the signup process."
 msgstr "While Datum is currently free of charge to use, we require a valid payment method during the signup process."
 
-#: app/routes/recover/index.tsx:342
+#: app/routes/recover/index.tsx:352
 #: app/routes/signup/index.tsx:469
 msgid "Wrong address? Start over"
 msgstr "Wrong address? Start over"
@@ -1117,7 +1117,7 @@ msgstr "You'll be asked to sign in before authorizing."
 msgid "You've been signed out"
 msgstr "You've been signed out"
 
-#: app/routes/recover/index.tsx:381
+#: app/routes/recover/index.tsx:392
 msgid "you@example.com"
 msgstr "you@example.com"
 

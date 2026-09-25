@@ -390,10 +390,14 @@ describe('/recover/complete — the mailed link', () => {
       expect(location).to.contain('requestId=req-3');
       expect(location).to.contain('notice=passkey-recovered');
       // Both tickets are spent — a back-button replay must not re-post a dead ceremony.
+      // The passkey hint goes with them: it names an account this browser holds no session
+      // for, and a survivor makes /login arm a challenge that never prompts (the button
+      // spins forever). Same reason routes/signup/success.tsx clears it.
       const cookies = allSetCookies(v).join('\n');
       expect(cookies).to.contain('recovery_ticket=');
       expect(cookies).to.contain('recovery_ceremony=');
-      expect(cookies.match(/Max-Age=0/g) ?? []).to.have.length(2);
+      expect(cookies).to.contain('passkey-hint=');
+      expect(cookies.match(/Max-Age=0/g) ?? []).to.have.length(3);
     });
   });
 });

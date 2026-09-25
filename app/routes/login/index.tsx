@@ -442,11 +442,10 @@ export default function Login() {
           </p>
         ) : null}
         {notice === 'passkey-recovered' ? (
-          <p role="status" className="text-foreground/80 mb-4 text-sm">
-            <Trans>
-              New passkey added. Sign in with it below — your old passkey is still listed and can be
-              removed from your passkeys page after you sign in.
-            </Trans>
+          <p
+            role="status"
+            className="bg-muted/50 text-muted-foreground mb-4 rounded-lg px-3 py-2 text-center text-sm">
+            <Trans>New passkey added. Sign in with it below.</Trans>
           </p>
         ) : null}
         {/* Inline action-error surface (role="alert" + aria-live) — replaces the

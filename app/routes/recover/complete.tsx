@@ -38,6 +38,7 @@ import { providerForRequest } from '@/server/auth-context.server';
 import { assertCsrf, loaderCsrf } from '@/server/csrf';
 import { trustedAppOrigin } from '@/server/infra/app-origin.server';
 import { env } from '@/server/infra/env.server';
+import { clearPasskeyHint } from '@/modules/auth/session/passkey-hint';
 import { Button } from '@datum-cloud/datum-ui/button';
 import { Input } from '@datum-cloud/datum-ui/input';
 import { Label } from '@datum-cloud/datum-ui/label';
@@ -135,6 +136,14 @@ async function clearRecoveryCookies(): Promise<Headers> {
   const headers = new Headers();
   headers.append('set-cookie', await recoveryTicketCookie.serialize('', { maxAge: 0 }));
   headers.append('set-cookie', await recoveryCeremonyCookie.serialize('', { maxAge: 0 }));
+  // Clear the passkey hint too, for the same reason signup/success.tsx does. Recovery ends by
+  // sending the user to /login to sign in with the passkey they just enrolled, so the browser
+  // holds no usable session. A surviving hint breaks both passkey paths there: the /login
+  // shortcut bounces with no session to arm a challenge, and conditional-UI autofill arms a
+  // discoverable request whose arming MINTS a session, so the next discover returns 409
+  // already_signed_in — the button spins and no prompt ever appears. The redirect carries
+  // loginName, so nothing is lost by dropping the hint.
+  headers.append('set-cookie', await clearPasskeyHint());
   return headers;
 }
 
