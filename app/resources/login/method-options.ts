@@ -11,7 +11,7 @@
 // only this resolution sees that the links may all be missing, deactivated, or LDAP-only.
 import type { AuthProvider } from '@/modules/auth/auth-provider';
 import type { AuthMethod, IdProvider, LoginSettings } from '@/modules/auth/types';
-import { EMAIL_OTP_SIGNIN_ENABLED } from '@/resources/login/email-otp-signin';
+import { isEmailOtpSignInUsable } from '@/resources/login/email-otp-signin';
 import { resolveOrg } from '@/resources/shared/resolve-org';
 import { getActiveIdPs } from '@/resources/sso/idp-providers';
 import { joinLinkedIdps, type LinkedIdpView } from '@/resources/sso/sso-management';
@@ -149,9 +149,9 @@ export async function resolveMethodOptions(
   }
 
   if (methods.includes('password') && settings.allowPassword) available.push('password');
-  // Gated while email OTP sign-in is hidden — see EMAIL_OTP_SIGNIN_ENABLED for why, and for the
-  // otpEmail-only accounts this strands.
-  if (EMAIL_OTP_SIGNIN_ENABLED && methods.includes('otp_email') && emailDeliveryEnabled) {
+  // Gated while email OTP sign-in is hidden — see email-otp-signin.ts for why, and for the
+  // otpEmail-only accounts this strands (C3 gives them /recover).
+  if (methods.includes('otp_email') && isEmailOtpSignInUsable(emailDeliveryEnabled)) {
     available.push('otp_email');
   }
 

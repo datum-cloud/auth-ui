@@ -23,7 +23,11 @@ const SOLE_IDP_SEED = {
 // ── (A) intent=email-link ──────────────────────────────────────────────────────
 
 describe('login action — intent=email-link', () => {
-  it('known user → 302 to /login/verify/email with set-cookie', () => {
+  // C10: this case used to assert the 302 to /login/verify/email. That was asserting the hole
+  // #128 left open — the UI hid the intent while the action still honoured a crafted POST.
+  // The branch now refuses through isEmailOtpSignInUsable, so the ceremony never starts.
+  // When EMAIL_OTP_SIGNIN_ENABLED flips back to true, this case flips back to the 302.
+  it('known user → 400, no redirect and no ceremony cookie while OTP sign-in is hidden', () => {
     callService({
       fn: 'loginAction',
       provider: 'singleton',
@@ -34,11 +38,10 @@ describe('login action — intent=email-link', () => {
         csrf: true,
       },
     }).then((v) => {
-      expect(v.response?.status).to.equal(302);
-      const loc = v.response?.location ?? '';
-      expect(loc).to.match(/\/login\/verify\/email(\?|$)/);
-      expect(loc).to.contain('loginName=email-otp-user%40acme.test');
-      expect(v.response?.setCookie).to.be.a('string');
+      // A react-router data() refusal, so the status rides on dataStatus, not status.
+      expect(v.response?.dataStatus).to.equal(400);
+      expect(v.response?.location ?? null, 'no redirect to the OTP ceremony').to.equal(null);
+      expect(v.response?.setCookie ?? null, 'no ceremony cookie').to.equal(null);
     });
   });
 });
