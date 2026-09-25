@@ -66,6 +66,10 @@ export default [
   route('verify', 'routes/verify/index.tsx'),
   route('verify/success', 'routes/verify/success.tsx'),
 
+  // recover group — layout collapsed; prefix inlined per child, flat like verify.
+  route('recover', 'routes/recover/index.tsx'),
+  route('recover/complete', 'routes/recover/complete.tsx'),
+
   // logout group — layout collapsed; prefix inlined per child.
   route('logout', 'routes/logout/index.tsx'),
   route('logout/success', 'routes/logout/success.tsx'),

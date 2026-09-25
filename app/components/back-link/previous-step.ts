@@ -18,6 +18,9 @@ const PREVIOUS_STEP: Array<[match: (p: string) => boolean, target: string]> = [
   [(p) => p === '/login/security-key', '/login'],
   [(p) => p === '/signup/password', '/signup'],
   [(p) => p === '/signup/method', '/signup'],
+  // Recovery is entered from /login ("Can't use your passkey?"), so Back returns there.
+  // /recover/complete is a mail landing with no in-app predecessor — deliberately absent.
+  [(p) => p === '/recover', '/login'],
   [(p) => p === '/password/reset', '/login/password'],
   // Password-management screens previously had no Back control.
   [(p) => p === '/password/new', '/login/password'],

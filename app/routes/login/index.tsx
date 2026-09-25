@@ -116,6 +116,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       csrfToken,
       idps,
       emailDeliveryEnabled: env.AUTH_EMAIL_DELIVERY_ENABLED,
+      accountRecoveryEnabled: env.AUTH_ACCOUNT_RECOVERY_ENABLED,
       notice,
       lastUsedLogin,
       conditionalPasskey,
@@ -312,6 +313,7 @@ export default function Login() {
     settings,
     branding,
     emailDeliveryEnabled,
+    accountRecoveryEnabled,
     notice,
     lastUsedLogin,
     conditionalPasskey,
@@ -383,7 +385,7 @@ export default function Login() {
   // the same way.
   const ceremonyServerError = useAuthActionError(ceremony.actionData);
 
-  const view = resolveLoginView(settings, idps, emailDeliveryEnabled);
+  const view = resolveLoginView(settings, idps, emailDeliveryEnabled, accountRecoveryEnabled);
 
   const field = resolveIdentifierField(settings);
   const identifierLabel = field.allowEmail
@@ -437,6 +439,13 @@ export default function Login() {
         {notice === 'link-existing' ? (
           <p role="status" className="text-destructive mb-4 text-sm">
             <Trans>An account with this email already exists — sign in to continue.</Trans>
+          </p>
+        ) : null}
+        {notice === 'passkey-recovered' ? (
+          <p
+            role="status"
+            className="bg-muted/50 text-muted-foreground mb-4 rounded-lg px-3 py-2 text-center text-sm">
+            <Trans>New passkey added. Sign in with it below.</Trans>
           </p>
         ) : null}
         {/* Inline action-error surface (role="alert" + aria-live) — replaces the
@@ -597,6 +606,13 @@ export default function Login() {
           </p>
         ) : null}
 
+        {view.showRecoveryLink ? (
+          <p className="text-foreground/60 mt-4 text-center text-sm">
+            <Link to={paths.recover.index({ requestId, organization })} className="underline">
+              <Trans>Can't use your passkey?</Trans>
+            </Link>
+          </p>
+        ) : null}
         {view.showRegisterLink ? (
           <>
             <div className="border-border my-8 flex-grow border-t" />

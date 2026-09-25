@@ -8,6 +8,7 @@ export interface LoginView {
   showRegisterLink: boolean;
   showPasskeyPrompt: boolean;
   showEmailLink: boolean;
+  showRecoveryLink: boolean;
   signInUnavailable: boolean;
 }
 
@@ -29,6 +30,7 @@ export interface LoginView {
  *   allowRegister            → render "Create account" link
  *   passkeysType==='allowed' → also surfaces the known-user passkey shortcut
  *   neither identifier nor IdP → render a "sign-in unavailable" state
+ *   flag + passkeysType==='allowed' → render the "Can't use your passkey?" recovery link
  */
 export function resolveLoginView(
   settings: Pick<
@@ -40,7 +42,8 @@ export function resolveLoginView(
     | 'disableLoginWithEmail'
   >,
   idps: IdProvider[],
-  emailDeliveryEnabled: boolean
+  emailDeliveryEnabled: boolean,
+  accountRecoveryEnabled = false
 ): LoginView {
   const showIdpButtons = settings.allowExternalIdp && idps.length > 0;
   const showRegisterLink = settings.allowRegister;
@@ -48,6 +51,10 @@ export function resolveLoginView(
   // Gated while email OTP sign-in is hidden — see EMAIL_OTP_SIGNIN_ENABLED.
   const showEmailLink =
     EMAIL_OTP_SIGNIN_ENABLED && settings.disableLoginWithEmail !== true && emailDeliveryEnabled;
+  // Gated on the flag AND the org: offering recovery where passkeys are not allowed would send
+  // the user into a flow requestRecovery refuses at the end, and that refusal is silent by design
+  // (G7) — they would wait at "check your email" for mail that is never coming.
+  const showRecoveryLink = accountRecoveryEnabled && settings.passkeysType === 'allowed';
   // "Continue" hands off to decideAfterIdentifier — only offer it when that can resolve
   // to a real method for this org.
   const showContinue = settings.allowPassword || showPasskeyPrompt;
@@ -61,6 +68,7 @@ export function resolveLoginView(
     showRegisterLink,
     showPasskeyPrompt,
     showEmailLink,
+    showRecoveryLink,
     // You can sign in iff you can enter an identifier or click an IdP. Passkey no longer
     // clears this on its own: without an identifier the ceremony cannot start, and the
     // old formula suppressed the message on the strength of an unreachable path.
