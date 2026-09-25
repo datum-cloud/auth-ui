@@ -25,7 +25,7 @@
 // Session-less like /recover: no sessions cookie, no sudo gate.
 import { AuthCeremony } from '@/components/auth-ceremony/auth-ceremony';
 import { RecoveryCeremonyForm } from '@/components/recovery-ceremony/recovery-ceremony';
-import { clearPasskeyHint } from '@/modules/auth/session/passkey-hint';
+import { serializePasskeyHint } from '@/modules/auth/session/passkey-hint';
 import {
   finishRecoveryCeremony,
   startRecoveryCeremony,
@@ -112,7 +112,7 @@ export async function action({ request }: ActionFunctionArgs) {
         organization: String(form.get('organization') ?? '') || undefined,
         notice: 'passkey-recovered',
       }),
-      { headers: await clearRecoveryCookies() }
+      { headers: await recoveryExitCookies(result.loginName) }
     );
   }
 
@@ -132,18 +132,17 @@ export async function action({ request }: ActionFunctionArgs) {
   );
 }
 
-async function clearRecoveryCookies(): Promise<Headers> {
+async function recoveryExitCookies(loginName: string): Promise<Headers> {
   const headers = new Headers();
   headers.append('set-cookie', await recoveryTicketCookie.serialize('', { maxAge: 0 }));
   headers.append('set-cookie', await recoveryCeremonyCookie.serialize('', { maxAge: 0 }));
-  // Clear the passkey hint too, for the same reason signup/success.tsx does. Recovery ends by
-  // sending the user to /login to sign in with the passkey they just enrolled, so the browser
-  // holds no usable session. A surviving hint breaks both passkey paths there: the /login
-  // shortcut bounces with no session to arm a challenge, and conditional-UI autofill arms a
-  // discoverable request whose arming MINTS a session, so the next discover returns 409
-  // already_signed_in — the button spins and no prompt ever appears. The redirect carries
-  // loginName, so nothing is lost by dropping the hint.
-  headers.append('set-cookie', await clearPasskeyHint());
+  // POINT the hint at the recovered account rather than clearing it. armLoginPasskey's
+  // user-bound arm fires only when there is a hint, no live session, and the user has a
+  // passkey — which is exactly the state recovery leaves behind. With no hint that arm is
+  // skipped, discovery does not auto-prompt, and the user sees a spinner until they reload
+  // and sign in by hand. Unlike signup/success.tsx, which clears it, the account here has a
+  // real passkey and no half-built session to pollute.
+  headers.append('set-cookie', await serializePasskeyHint(loginName));
   return headers;
 }
 
