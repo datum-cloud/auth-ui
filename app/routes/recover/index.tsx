@@ -143,15 +143,7 @@ export async function action({ request }: ActionFunctionArgs) {
 
     // Bot gate before any provider work, so a rejection costs what an acceptance costs.
     // A distinct action name per intent: a request token cannot be replayed against code entry.
-    // The sealed recovery ticket already gates this step, and the request step that issued
-    // it passed a fresh reCAPTCHA. A user who left to fetch the code from their mail comes
-    // back with an aged token and a clean score; rejecting that told them their code was
-    // invalid, which is both wrong and the normal path.
-    if (
-      await recaptchaRejects(String(form.get('recaptchaToken') ?? ''), 'recovery_code', {
-        tolerateStale: true,
-      })
-    ) {
+    if (await recaptchaRejects(String(form.get('recaptchaToken') ?? ''), 'recovery_code')) {
       return invalidCode();
     }
     if (!parsed.success) return invalidCode();
