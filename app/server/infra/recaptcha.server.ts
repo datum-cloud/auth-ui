@@ -133,7 +133,19 @@ export async function verifyRecaptcha(
  * the gated set stays enumerable. Callers must still run it before any account lookup, or
  * the fast reject path becomes an enumeration timing oracle (G7).
  */
-export async function recaptchaRejects(token: string, expectedAction: string): Promise<boolean> {
+/**
+ * `tolerateStale` is for a step the user reaches minutes after the page rendered — the
+ * recovery code screen, where they leave to fetch the code from their mail. grecaptcha
+ * hands back a challenge aged from page load rather than from the execute() call, so an
+ * ordinary user returning after two minutes fails the age check with a perfect score.
+ * Staleness alone is then not evidence of a bot, and every other verdict still rejects.
+ * Only pass it where a separate credential already gates the step.
+ */
+export async function recaptchaRejects(
+  token: string,
+  expectedAction: string,
+  { tolerateStale = false }: { tolerateStale?: boolean } = {}
+): Promise<boolean> {
   const verdict = await verifyRecaptcha(token, expectedAction);
 
   // Unconfigured deployments stay dark, audit trail included — otherwise the metric reads
@@ -153,5 +165,6 @@ export async function recaptchaRejects(token: string, expectedAction: string): P
   }
 
   // 'unavailable' is Google failing us, not the caller — fail open.
+  if (tolerateStale && verdict.reason === 'stale') return false;
   return verdict.outcome === 'invalid';
 }

@@ -18,7 +18,7 @@ import { AuthCard } from '@/components/auth-card/auth-card';
 import { AuthFormFields } from '@/components/auth-form/auth-form-fields';
 import { FormError } from '@/components/form-error/form-error';
 import { RecoveryCeremonyForm } from '@/components/recovery-ceremony/recovery-ceremony';
-import { clearPasskeyHint } from '@/modules/auth/session/passkey-hint';
+import { serializePasskeyHint } from '@/modules/auth/session/passkey-hint';
 import { useRecaptcha } from '@/modules/fraud/recaptcha';
 import { requestRecovery } from '@/resources/recovery';
 import {
@@ -115,7 +115,7 @@ export async function action({ request }: ActionFunctionArgs) {
       }),
       // Both tickets are spent. Clearing them keeps a back-button replay from re-posting a
       // ceremony whose code is already gone.
-      { headers: await clearRecoveryCookies() }
+      { headers: await recoveryExitCookies(result.loginName) }
     );
   }
 
@@ -143,7 +143,15 @@ export async function action({ request }: ActionFunctionArgs) {
 
     // Bot gate before any provider work, so a rejection costs what an acceptance costs.
     // A distinct action name per intent: a request token cannot be replayed against code entry.
-    if (await recaptchaRejects(String(form.get('recaptchaToken') ?? ''), 'recovery_code')) {
+    // The sealed recovery ticket already gates this step, and the request step that issued
+    // it passed a fresh reCAPTCHA. A user who left to fetch the code from their mail comes
+    // back with an aged token and a clean score; rejecting that told them their code was
+    // invalid, which is both wrong and the normal path.
+    if (
+      await recaptchaRejects(String(form.get('recaptchaToken') ?? ''), 'recovery_code', {
+        tolerateStale: true,
+      })
+    ) {
       return invalidCode();
     }
     if (!parsed.success) return invalidCode();
@@ -225,18 +233,17 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 /** Both recovery cookies, expired. Serialized with a null value so the browser drops them. */
-async function clearRecoveryCookies(): Promise<Headers> {
+async function recoveryExitCookies(loginName: string): Promise<Headers> {
   const headers = new Headers();
   headers.append('set-cookie', await recoveryTicketCookie.serialize('', { maxAge: 0 }));
   headers.append('set-cookie', await recoveryCeremonyCookie.serialize('', { maxAge: 0 }));
-  // Clear the passkey hint too, for the same reason signup/success.tsx does. Recovery ends by
-  // sending the user to /login to sign in with the passkey they just enrolled, so the browser
-  // holds no usable session. A surviving hint breaks both passkey paths there: the /login
-  // shortcut bounces with no session to arm a challenge, and conditional-UI autofill arms a
-  // discoverable request whose arming MINTS a session, so the next discover returns 409
-  // already_signed_in — the button spins and no prompt ever appears. The redirect carries
-  // loginName, so nothing is lost by dropping the hint.
-  headers.append('set-cookie', await clearPasskeyHint());
+  // POINT the hint at the recovered account rather than clearing it. armLoginPasskey's
+  // user-bound arm fires only when there is a hint, no live session, and the user has a
+  // passkey — which is exactly the state recovery leaves behind. With no hint that arm is
+  // skipped, discovery does not auto-prompt, and the user sees a spinner until they reload
+  // and sign in by hand. Unlike signup/success.tsx, which clears it, the account here has a
+  // real passkey and no half-built session to pollute.
+  headers.append('set-cookie', await serializePasskeyHint(loginName));
   return headers;
 }
 
