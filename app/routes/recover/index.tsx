@@ -18,6 +18,7 @@ import { AuthCard } from '@/components/auth-card/auth-card';
 import { AuthFormFields } from '@/components/auth-form/auth-form-fields';
 import { FormError } from '@/components/form-error/form-error';
 import { RecoveryCeremonyForm } from '@/components/recovery-ceremony/recovery-ceremony';
+import { clearPasskeyHint } from '@/modules/auth/session/passkey-hint';
 import { useRecaptcha } from '@/modules/fraud/recaptcha';
 import { requestRecovery } from '@/resources/recovery';
 import {
@@ -39,7 +40,6 @@ import { trustedAppOrigin } from '@/server/infra/app-origin.server';
 import { env } from '@/server/infra/env.server';
 import { recaptchaRejects } from '@/server/infra/recaptcha.server';
 import { waitUntilDeadline } from '@/server/timing';
-import { clearPasskeyHint } from '@/modules/auth/session/passkey-hint';
 import { Button } from '@datum-cloud/datum-ui/button';
 import { Input } from '@datum-cloud/datum-ui/input';
 import { Label } from '@datum-cloud/datum-ui/label';

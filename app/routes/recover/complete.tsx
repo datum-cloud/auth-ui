@@ -25,6 +25,7 @@
 // Session-less like /recover: no sessions cookie, no sudo gate.
 import { AuthCeremony } from '@/components/auth-ceremony/auth-ceremony';
 import { RecoveryCeremonyForm } from '@/components/recovery-ceremony/recovery-ceremony';
+import { clearPasskeyHint } from '@/modules/auth/session/passkey-hint';
 import {
   finishRecoveryCeremony,
   startRecoveryCeremony,
@@ -38,7 +39,6 @@ import { providerForRequest } from '@/server/auth-context.server';
 import { assertCsrf, loaderCsrf } from '@/server/csrf';
 import { trustedAppOrigin } from '@/server/infra/app-origin.server';
 import { env } from '@/server/infra/env.server';
-import { clearPasskeyHint } from '@/modules/auth/session/passkey-hint';
 import { Button } from '@datum-cloud/datum-ui/button';
 import { Input } from '@datum-cloud/datum-ui/input';
 import { Label } from '@datum-cloud/datum-ui/label';
