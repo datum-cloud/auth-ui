@@ -3,7 +3,6 @@ import { logAuthEvent } from '@/server/observability';
 
 const SITEVERIFY_URL = 'https://www.google.com/recaptcha/api/siteverify';
 const REQUEST_TIMEOUT_MS = 2000;
-const MAX_TOKEN_AGE_MS = 2 * 60_000;
 
 export type RecaptchaReason =
   | 'ok'
@@ -11,7 +10,6 @@ export type RecaptchaReason =
   | 'no-token'
   | 'rejected'
   | 'action-mismatch'
-  | 'stale'
   | 'hostname-mismatch'
   | 'transport';
 
@@ -76,7 +74,6 @@ export async function verifyRecaptcha(
     score?: number;
     action?: string;
     hostname?: string;
-    challenge_ts?: string;
     'error-codes'?: unknown;
   };
 
@@ -101,15 +98,12 @@ export async function verifyRecaptcha(
 
   const score = typeof body.score === 'number' ? body.score : null;
 
+  // No local age check: Google enforces expiry and single use itself, answering
+  // success=false with timeout-or-duplicate. challenge_ts is when the page's challenge was
+  // created, not when execute() minted the token, so aging from it rejects real users.
   if (!body.success) return { outcome: 'invalid', score, reason: 'rejected', errorCodes };
   if (body.action !== expectedAction) {
     return { outcome: 'invalid', score, reason: 'action-mismatch' };
-  }
-
-  // Math.abs so a backward-skewed clock cannot silently disable this check.
-  const issued = body.challenge_ts ? Date.parse(body.challenge_ts) : NaN;
-  if (Number.isNaN(issued) || Math.abs(Date.now() - issued) > MAX_TOKEN_AGE_MS) {
-    return { outcome: 'invalid', score, reason: 'stale' };
   }
 
   // The only control against someone farming tokens with our public site key on their own
@@ -133,19 +127,7 @@ export async function verifyRecaptcha(
  * the gated set stays enumerable. Callers must still run it before any account lookup, or
  * the fast reject path becomes an enumeration timing oracle (G7).
  */
-/**
- * `tolerateStale` is for a step the user reaches minutes after the page rendered — the
- * recovery code screen, where they leave to fetch the code from their mail. grecaptcha
- * hands back a challenge aged from page load rather than from the execute() call, so an
- * ordinary user returning after two minutes fails the age check with a perfect score.
- * Staleness alone is then not evidence of a bot, and every other verdict still rejects.
- * Only pass it where a separate credential already gates the step.
- */
-export async function recaptchaRejects(
-  token: string,
-  expectedAction: string,
-  { tolerateStale = false }: { tolerateStale?: boolean } = {}
-): Promise<boolean> {
+export async function recaptchaRejects(token: string, expectedAction: string): Promise<boolean> {
   const verdict = await verifyRecaptcha(token, expectedAction);
 
   // Unconfigured deployments stay dark, audit trail included — otherwise the metric reads
@@ -165,6 +147,5 @@ export async function recaptchaRejects(
   }
 
   // 'unavailable' is Google failing us, not the caller — fail open.
-  if (tolerateStale && verdict.reason === 'stale') return false;
   return verdict.outcome === 'invalid';
 }

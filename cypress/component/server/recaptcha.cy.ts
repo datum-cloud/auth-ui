@@ -101,16 +101,32 @@ describe('verifyRecaptcha', () => {
     });
   });
 
-  it('rejects a stale token', () => {
-    const old = new Date(Date.now() - 5 * 60_000).toISOString();
+  // challenge_ts is when the page's challenge was created, not when execute() minted the
+  // token. A user who submits hours after page load still holds a token Google accepts.
+  it('accepts a Google-verified token whose challenge_ts is hours old', () => {
+    const old = new Date(Date.now() - 5 * 60 * 60_000).toISOString();
     callService({
       fn: 'verifyRecaptcha',
       env: RECAPTCHA_ENV,
       recaptchaInput: { token: 'tok', expectedAction: 'signup' },
       recaptchaFetch: { body: ok({ challenge_ts: old }) },
     }).then((v) => {
+      expect(v.outcome.outcome).to.equal('valid');
+      expect(v.outcome.reason).to.equal('ok');
+    });
+  });
+
+  // Genuine expiry and replay are Google's call, reported as timeout-or-duplicate.
+  it('rejects an expired or replayed token Google reports as timeout-or-duplicate', () => {
+    callService({
+      fn: 'verifyRecaptcha',
+      env: RECAPTCHA_ENV,
+      recaptchaInput: { token: 'tok', expectedAction: 'signup' },
+      recaptchaFetch: { body: { success: false, 'error-codes': ['timeout-or-duplicate'] } },
+    }).then((v) => {
       expect(v.outcome.outcome).to.equal('invalid');
-      expect(v.outcome.reason).to.equal('stale');
+      expect(v.outcome.reason).to.equal('rejected');
+      expect(v.outcome.errorCodes).to.include('timeout-or-duplicate');
     });
   });
 
