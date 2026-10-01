@@ -7,7 +7,7 @@ The login experience for Datum Cloud, served at `/id`. This documentation covers
 | Document | Description |
 | --- | --- |
 | [Prerequisites](./getting-started/01-prerequisites.md) | Tools, versions, and access you need before starting |
-| [Environment Setup](./getting-started/02-environment-setup.md) | Configure `.env` — the four required variables |
+| [Environment Setup](./getting-started/02-environment-setup.md) | Configure `.env`: the four required variables |
 | [Running Locally](./getting-started/03-running-locally.md) | Dev server, the fake provider, and a local Zitadel |
 | [First Steps](./getting-started/04-first-steps.md) | Sign in, run the suites, make your first change |
 
@@ -16,11 +16,12 @@ The login experience for Datum Cloud, served at `/id`. This documentation covers
 | Document | Description |
 | --- | --- |
 | [Overview](./architecture/overview.md) | Stack, request path, and design principles |
-| [Auth Flows](./architecture/auth-flows.md) | Login, signup, MFA, passkeys, SSO, device, logout |
+| [Auth Flows](./architecture/auth-flows.md) | Login, passkey sign-in and discovery, signup, passkey management, MFA, SSO, device, logout |
+| [Account Recovery](./architecture/account-recovery.md) | Passkey recovery by emailed registration link, self-serve and support |
 | [Provider Seam](./architecture/provider-seam.md) | Why routes never import Zitadel directly |
 | [Session & Security](./architecture/session-and-security.md) | Sessions, CSRF, rate limiting, CSP, fraud signals |
 | [User Provisioning](./architecture/user-provisioning.md) | How a Zitadel user becomes a Datum user |
-| [Decision Records](./architecture/adrs/README.md) | ADRs — why the app is built this way |
+| [Decision Records](./architecture/adrs/README.md) | ADRs: why the app is built this way |
 
 ## 💻 Development
 
@@ -64,6 +65,6 @@ The login experience for Datum Cloud, served at `/id`. This documentation covers
 
 ## Getting Help
 
-- **Bugs and features** — open an issue on [GitHub](https://github.com/datum-cloud/auth-ui/issues)
-- **Security** — see the [Datum security policy](https://github.com/datum-cloud/.github/blob/main/SECURITY.md); do not open a public issue
-- **Contributing** — see the [Datum contributing guide](https://github.com/datum-cloud/.github/blob/main/CONTRIBUTING.md)
+- **Bugs and features**: open an issue on [GitHub](https://github.com/datum-cloud/auth-ui/issues)
+- **Security**: see the [Datum security policy](https://github.com/datum-cloud/.github/blob/main/SECURITY.md); do not open a public issue
+- **Contributing**: see the [Datum contributing guide](https://github.com/datum-cloud/.github/blob/main/CONTRIBUTING.md)
