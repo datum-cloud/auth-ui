@@ -6,8 +6,6 @@
 @theme {
   --text-xs: 12px;
   --text-xs--line-height: 1rem;
-  --text-2xs: 0.625rem; /* 10px — remove if unused */
-  --text-2xs--line-height: 0.875rem;
 }
 
 /* Self-hosted woff2 font overrides — converted from @datum-cloud/datum-ui v1.2.0 TTFs.

@@ -28,8 +28,12 @@ interface AuthCardProps {
 export function AuthCard({ title, description, children, branding, className }: AuthCardProps) {
   return (
     <BlankLayout branding={branding}>
-      <Card className={cn('w-full max-w-[410px] gap-3 p-8 md:p-11', className)}>
-        <CardHeader className="items-center gap-3 p-0">
+      {/* `shadow`: datum-ui 2.9 dropped Card's default drop shadow; keep the raised look. */}
+      <Card className={cn('w-full max-w-[410px] gap-3 p-8 shadow md:p-11', className)}>
+        {/* No `gap-3` here: since datum-ui 2.9 CardHeader is a two-row grid and already
+            applies gap-3 only when a description is present. An unconditional gap
+            would add an empty 12px row under title-only headers. */}
+        <CardHeader className="items-center p-0">
           {/* Use <h1> directly: datum-ui CardTitle renders as <div>, which would fail
               axe's page-has-heading-one rule. The h1 carries CardTitle's visual styling. */}
           <h1 className="text-center text-2xl font-semibold">{title}</h1>
