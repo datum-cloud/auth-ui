@@ -45,7 +45,7 @@ The mail call logs separately: `recovery_mail_sent` or `recovery_mail_failed`, w
 
 ## Finishing: Link or Code
 
-The mail offers two ways to finish.
+The self-serve mail offers two ways to finish; the mail support sends carries only the link.
 
 **The link.** `/recover/complete?userId=…&codeId=…#code=…`. The code sits in the URL fragment, which browsers never send to a server, so it cannot land in an access log or a proxy. The page reads it from `location.hash` into a hidden field and strips it from the address bar with `history.replaceState`. The route also sends `Referrer-Policy: no-referrer`, so the `userId` and `codeId` in the query do not leak through a Referer. The loader makes no Zitadel call: the code is single use, and consuming it on GET would let a mail scanner or link prefetcher burn it. The user presses Continue to start. With no fragment (or no JavaScript), the page asks for the code from the mail.
 
