@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Upgraded `@datum-cloud/datum-ui` from 1.7 to 3.4. Buttons now give a little
+  feedback when pressed, overlays open with datum-ui's new easing, and the
+  24px page headings shrink to 20px on screens narrower than 768px, following
+  datum-ui's responsive type scale.
+
 ### Fixed
 - Signing in with an external identity provider (e.g. GitHub) stored the provider's
   own username in the session instead of the Datum login name, so "Add passkey"
