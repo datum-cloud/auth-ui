@@ -23,7 +23,7 @@ SESSION_SECRET must be at least 32 characters (HMAC-SHA256 key)
 
 The session _state_ itself (who is signed in, which factors are satisfied) is held by the identity provider. The cookie carries the session handles, not the credentials.
 
-Account recovery runs without a session and keeps its state in two cookies of its own, defined in `app/resources/recovery/recovery-ticket.server.ts` and scoped to `/id/recover`. They are not HMAC-signed: each value is sealed with AES-256-GCM under a key derived from `SESSION_SECRET` (HKDF), and padded to a fixed length so a real ticket and a filler cannot be told apart. See [Account Recovery](./account-recovery.md).
+Account recovery runs without a session and keeps its state in two cookies of its own, defined in `app/resources/recovery/recovery-ticket.server.ts` and scoped to `/id/recover`. They are not HMAC-signed: each value is sealed with AES-256-GCM under a key derived from `SESSION_SECRET` (HKDF), and padded to a fixed length so no one can tell a real ticket from a filler. See [Account Recovery](./account-recovery.md).
 
 | Cookie              | Purpose                                                                                                                  |
 | ------------------- | ------------------------------------------------------------------------------------------------------------------------ |

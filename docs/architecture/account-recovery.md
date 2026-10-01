@@ -1,6 +1,6 @@
 # Account Recovery
 
-A user who cannot use their passkey gets a one-time passkey registration link by email. Opening it, or typing the code from the same mail, lets them register a new passkey on the account. Recovery needs no session, by design: the mailed code is the authorisation. Neither recovery route reads the `sessions` cookie or applies the sudo gate (`app/resources/recovery/recovery-ceremony.ts`).
+A user who cannot use their passkey gets a one-time passkey registration link by email. Opening it (or, after a self-serve request, typing the code from the same mail) lets them register a new passkey on the account. Recovery needs no session, by design: the mailed code is the authorisation. Neither recovery route reads the `sessions` cookie or applies the sudo gate (`app/resources/recovery/recovery-ceremony.ts`).
 
 Routes: `app/routes/recover/index.tsx` (`/recover`) and `app/routes/recover/complete.tsx` (`/recover/complete`). Services: `app/resources/recovery/`.
 
@@ -29,7 +29,7 @@ The `/login/passkey` link reads the action's error, so a ceremony the user cance
 4. **Org policy.** If the org's login policy has `passkeysType` set to `not_allowed`, nothing is sent.
 5. **Delivery.** With `RECOVERY_MAIL_URL` unset, nothing is sent. Otherwise `sendRecoveryMail` (`app/server/infra/recovery-mail.server.ts`) POSTs `{ userId, returnTo, requestedBy: "self" }` over mTLS to `RECOVERY_MAIL_URL`, the `/v1/email/recovery` endpoint on the zitadel-provider authn webhook. The webhook mints the registration code, sends the mail, and answers with the `codeId` only. This app never sees the code.
 
-Every outcome renders the same "Check your email" screen and sets a `recovery_ticket` cookie of the same length. A real ticket seals `{ userId, codeId }`; every other exit sets a filler that opens to nothing (`app/resources/recovery/recovery-ticket.server.ts`). A request the reCAPTCHA gate rejects gets the same screen and a filler. Every exit waits for a shared deadline (`waitUntilDeadline`) so timing does not separate the cases either. Together these keep the response from revealing whether an account exists.
+Every outcome renders the same "Check your email" screen, sets a `recovery_ticket` cookie of the same length, and waits for a shared deadline (`waitUntilDeadline`), so neither the page nor its timing reveals whether an account exists. A real ticket seals `{ userId, codeId }`; every other exit, including a request the reCAPTCHA gate rejects, sets a filler that opens to nothing (`app/resources/recovery/recovery-ticket.server.ts`).
 
 What happened is in the server log instead. Each request writes a `recovery_request` event with `outcome` (`sent`, `resumed_signup`, `suppressed`) and, when suppressed, a `reason`:
 
@@ -45,7 +45,7 @@ The mail call logs separately: `recovery_mail_sent` or `recovery_mail_failed`, w
 
 ## Finishing: Link or Code
 
-The self-serve mail offers two ways to finish; the mail support sends carries only the link.
+A self-serve mail carries both the link and the code. A mail sent by support carries only the link.
 
 **The link.** `/recover/complete?userId=…&codeId=…#code=…`. The code sits in the URL fragment, which browsers never send to a server, so it cannot land in an access log or a proxy. The page reads it from `location.hash` into a hidden field and strips it from the address bar with `history.replaceState`. The route also sends `Referrer-Policy: no-referrer`, so the `userId` and `codeId` in the query do not leak through a Referer. The loader makes no Zitadel call: the code is single use, and consuming it on GET would let a mail scanner or link prefetcher burn it. The user presses Continue to start. With no fragment (or no JavaScript), the page asks for the code from the mail.
 
@@ -53,7 +53,7 @@ The self-serve mail offers two ways to finish; the mail support sends carries on
 
 ## What Is Validated
 
-Both doors call `startRecoveryCeremony` (`app/resources/recovery/recovery-ceremony.ts`), which calls Zitadel `RegisterPasskey(userId, { codeId, code })`:
+Both paths call `startRecoveryCeremony` (`app/resources/recovery/recovery-ceremony.ts`), which calls Zitadel `RegisterPasskey(userId, { codeId, code })`:
 
 - The code belongs to that user and that `codeId`. Changing `userId` or `codeId` in the link fails the call.
 - It is single use. A second attempt with the same code fails.
@@ -61,7 +61,7 @@ Both doors call `startRecoveryCeremony` (`app/resources/recovery/recovery-ceremo
 
 Every one of those failures returns the same generic screen, "This link is invalid or has expired", with a "Request a new link" button (`app/components/recovery-ceremony/recovery-ceremony.tsx`).
 
-On success the route sets a `recovery_ceremony` cookie sealing `{ userId, passkeyId }` (10 minutes) and returns the WebAuthn creation options. `finishRecoveryCeremony` reads identity only from that cookie: the form has no `userId` field, and its `passkeyId` must match the sealed one. That stops a session-less verify endpoint from being pointed at another account.
+On success the route sets a `recovery_ceremony` cookie sealing `{ userId, passkeyId }` (10 minutes) and returns the WebAuthn creation options. `finishRecoveryCeremony` reads identity only from that cookie: the form has no `userId` field, and its `passkeyId` must match the sealed one. That stops anyone from pointing the session-less verify endpoint at another account.
 
 ## After
 
@@ -84,7 +84,7 @@ browser            auth-ui                   authn webhook          Zitadel     
    |                  |                            |                    |             |
    | open link (#code) or type the code            |                    |             |
    | POST start/code  |                            |                    |             |
-   |----------------->| RegisterPasskey(userId, codeId, code) -------->|             |
+   |----------------->| RegisterPasskey(userId, codeId, code) --------->|             |
    |<-- creation options + recovery_ceremony       |                    |             |
    | WebAuthn create  |                            |                    |             |
    | POST verify      |                            |                    |             |

@@ -11,18 +11,18 @@ deliberate: the alternative is mailing users verification links pointing at a pl
 
 The usual culprits, in order:
 
-| Message | Fix |
-| --- | --- |
-| `SESSION_SECRET must be at least 32 characters` | Longer secret. `openssl rand -base64 32`. |
-| `ZITADEL_API_URL must be set in production` | Set it, or set `AUTH_PROVIDER=fake` if this is a fake-provider run. |
-| `ZITADEL_SERVICE_USER_TOKEN must be set in production` | Provision the service-user PAT in the `auth-ui` Secret. |
-| `PUBLIC_ORIGIN must be set in production` | Set the real public origin. |
-| `PUBLIC_ORIGIN is still the deployment placeholder` | `config/base/deployment.yaml` ships `https://REPLACE_ME.example`. Someone skipped the cutover step. |
-| `SENTRY_DSN must be an https:// URL` | Fix or unset the DSN. Unset is a valid state: Sentry is a no-op. |
-| `VERIFICATION_MAIL_URL is set to an https URL but` … | Mount the client cert, key and CA and set all three `VERIFICATION_MAIL_*_FILE` paths, or unset the URL. |
-| `RECOVERY_MAIL_URL is set to an https URL but the VERIFICATION_MAIL_* client cert files are not.` | Same three files; recovery shares them. |
-| `RECAPTCHA_SITE_KEY is set but RECAPTCHA_SECRET_KEY is not` | Set the secret, or unset the site key. |
-| `RECAPTCHA_SECRET_KEY is set but PUBLIC_ORIGIN is not` | Set `PUBLIC_ORIGIN`. |
+| Message                                                                                           | Fix                                                                                                     |
+| ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
+| `SESSION_SECRET must be at least 32 characters`                                                   | Longer secret. `openssl rand -base64 32`.                                                               |
+| `ZITADEL_API_URL must be set in production`                                                       | Set it, or set `AUTH_PROVIDER=fake` if this is a fake-provider run.                                     |
+| `ZITADEL_SERVICE_USER_TOKEN must be set in production`                                            | Provision the service-user PAT in the `auth-ui` Secret.                                                 |
+| `PUBLIC_ORIGIN must be set in production`                                                         | Set the real public origin.                                                                             |
+| `PUBLIC_ORIGIN is still the deployment placeholder`                                               | `config/base/deployment.yaml` ships `https://REPLACE_ME.example`. Someone skipped the cutover step.     |
+| `SENTRY_DSN must be an https:// URL`                                                              | Fix or unset the DSN. Unset is a valid state: Sentry is a no-op.                                        |
+| `VERIFICATION_MAIL_URL is set to an https URL but VERIFICATION_MAIL_CLIENT_CERT_FILE / ...`       | Mount the client cert, key and CA and set all three `VERIFICATION_MAIL_*_FILE` paths, or unset the URL. |
+| `RECOVERY_MAIL_URL is set to an https URL but the VERIFICATION_MAIL_* client cert files are not.` | Same three files; recovery shares them.                                                                 |
+| `RECAPTCHA_SITE_KEY is set but RECAPTCHA_SECRET_KEY is not`                                       | Set the secret, or unset the site key.                                                                  |
+| `RECAPTCHA_SECRET_KEY is set but PUBLIC_ORIGIN is not`                                            | Set `PUBLIC_ORIGIN`.                                                                                    |
 
 ```bash
 kubectl -n auth-ui logs -l app.kubernetes.io/name=auth-ui --tail=100
@@ -75,8 +75,8 @@ problem.
 ## A recovery request says "Check your email" but no mail arrives
 
 **Expected screen, by design.** `/recover` answers every request with the same "Check your email"
-screen, whether or not a mail went out, so the screen tells you nothing. The server log does.
-Every request writes one `recovery_request` auth event, and a suppressed one carries a `reason`
+screen, whether or not a mail went out, so only the server log tells you what happened. Every
+request writes one `recovery_request` auth event, and a suppressed one carries a `reason`
 (`app/resources/recovery/recovery.service.ts`):
 
 ```bash
@@ -84,16 +84,16 @@ kubectl -n auth-ui logs -l app.kubernetes.io/name=auth-ui --since=1h \
   | grep '"event":"recovery_'
 ```
 
-| You see | Cause | Fix |
-| --- | --- | --- |
-| `reason: delivery_disabled` | `RECOVERY_MAIL_URL` is unset | Set it to the webhook's `/v1/email/recovery` endpoint. |
-| `reason: rate_limited` | the address used its budget: one mail per 5 minutes, 5 per day, shared with signup's verification resend (`app/resources/signup/signup-resend-limit.ts`) | Wait. The counters are in memory, per replica. |
-| `reason: unknown_address` | no user for that address in the resolved org | Check the address and the `?organization=` the user came in with. |
-| `reason: org_policy` | the org's login policy does not allow passkeys | Fix the policy in Zitadel. |
-| `reason: provider_error` | a Zitadel call failed; `code` names it | Look for the Zitadel fault. |
-| `outcome: resumed_signup` | the account has no auth methods, so it got its signup verification mail instead | Expected. The user finishes signup from that mail. |
-| `outcome: sent`, then `recovery_mail_failed` | the webhook call failed: `status` is the HTTP status, `reason` the error name when there was no response | See below. |
-| `outcome: sent`, then `recovery_mail_sent` | the webhook accepted it | The problem is downstream of auth-ui: the webhook's Email resource or the mail provider. |
+| You see                                      | Cause                                                                                                                                                    | Fix                                                                                      |
+| -------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------- |
+| `reason: delivery_disabled`                  | `RECOVERY_MAIL_URL` is unset                                                                                                                             | Set it to the webhook's `/v1/email/recovery` endpoint.                                   |
+| `reason: rate_limited`                       | the address used its budget: one mail per 5 minutes, 5 per day, shared with signup's verification resend (`app/resources/signup/signup-resend-limit.ts`) | Wait. The counters are in memory, per replica.                                           |
+| `reason: unknown_address`                    | no user for that address in the resolved org                                                                                                             | Check the address and the `?organization=` the user came in with.                        |
+| `reason: org_policy`                         | the org's login policy does not allow passkeys                                                                                                           | Fix the policy in Zitadel.                                                               |
+| `reason: provider_error`                     | a Zitadel call failed; `code` names it                                                                                                                   | Look for the Zitadel fault.                                                              |
+| `outcome: resumed_signup`                    | the account has no auth methods, so it got its signup verification mail instead                                                                          | Expected. The user finishes signup from that mail.                                       |
+| `outcome: sent`, then `recovery_mail_failed` | the webhook call failed: `status` is the HTTP status, `reason` the error name when there was no response                                                 | See below.                                                                               |
+| `outcome: sent`, then `recovery_mail_sent`   | the webhook accepted it                                                                                                                                  | The problem is downstream of auth-ui: the webhook's Email resource or the mail provider. |
 
 When the webhook call fails:
 
@@ -148,7 +148,7 @@ forwarding a signed-out user to an attacker-supplied URL.
 
 ## Nothing appears in Sentry
 
-Expected when `SENTRY_DSN` is unset: Sentry is a true no-op at boot. If the DSN *is* set and
+Expected when `SENTRY_DSN` is unset: Sentry is a true no-op at boot. If the DSN _is_ set and
 events still look empty, remember the scrubber is an allowlist
 (`app/server/sentry-scrub.ts`): events arrive stripped of provider detail and PII by design. Pivot
 to the server log using the `traceId` tag, which survives scrubbing. See
