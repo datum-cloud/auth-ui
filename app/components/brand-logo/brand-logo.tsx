@@ -1,7 +1,8 @@
 // import { ThemedImage } from '@/components/themed-image/themed-image';
 import type { BrandingTheme } from '@/modules/auth/types';
 import { ThemedLogo } from '@datum-cloud/datum-ui/logo/themed';
-import { Link, useSearchParams } from 'react-router';
+
+const DATUM_SITE_URL = 'https://www.datum.net';
 
 // TEMP — hardcoded to the datum-ui Datum mark, ignoring org branding.
 // The original per-org branding-logo swap is preserved (commented) below; restore it
@@ -9,27 +10,14 @@ import { Link, useSearchParams } from 'react-router';
 //
 // The Datum mark is theme-aware: <ThemedLogo.Flat> resolves `brand` on light /
 // `mono-light` on dark via useTheme (SSR-safe, brand fallback before hydration), and
-// names the home link itself via aria-label="Datum".
+// names the link itself via aria-label="Datum".
 export function BrandLogo(_props: { branding?: BrandingTheme | null }): React.JSX.Element {
-  // BrandLogo renders across many ceremony routes (/, /login, /signup, /setup/*, ...). A bare
-  // `to="/"` drops the in-flight requestId/organization, dead-ending the OIDC/SAML/device
-  // ceremony if the user clicks the logo. Read them off the CURRENT URL and carry them through
-  // — _index.tsx's loader forwards them straight back into /login, so this resolves to the
-  // live ceremony entry rather than a bare unauthenticated /login. On a page with neither param
-  // (e.g. a bare /login), `to` degrades to the plain "/" it was before.
-  const [searchParams] = useSearchParams();
-  const requestId = searchParams.get('requestId') ?? undefined;
-  const organization = searchParams.get('organization') ?? undefined;
-  const params = new URLSearchParams();
-  if (requestId) params.set('requestId', requestId);
-  if (organization) params.set('organization', organization);
-  const qs = params.toString();
-  const to = qs ? `/?${qs}` : '/';
-
+  // The way back to the marketing site from any auth page, so it navigates in the same tab
+  // (clicking it mid-ceremony intentionally leaves the OIDC/SAML/device flow).
   return (
-    <Link to={to}>
+    <a href={DATUM_SITE_URL}>
       <ThemedLogo.Flat aria-label="Datum" className="h-6 w-auto" />
-    </Link>
+    </a>
   );
 
   // ── Original: org branding logo when present, else the Datum mark ──

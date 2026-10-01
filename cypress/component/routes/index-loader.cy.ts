@@ -5,7 +5,7 @@
 // browser bundle — no signed cookies, no provider, no CSRF.
 //
 // Regression: the loader used to unconditionally redirect('/login'), dropping any incoming
-// requestId/organization (e.g. a relying party or BrandLogo's home link pointing at the bare
+// requestId/organization (e.g. a relying party pointing at the bare
 // app root mid-ceremony).
 import { loader } from '@/routes/_index';
 

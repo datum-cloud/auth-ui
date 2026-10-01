@@ -48,7 +48,7 @@ describe('Logout confirm form — index-route POST disambiguation', () => {
     mount(withProviders(<RouterProvider router={router} />));
     cy.contains('Sign out of').should('be.visible');
     cy.contains('mia@acme.test').should('be.visible');
-    // Scoped, not a blanket "no <a> on the page": BrandLogo always renders a home link.
+    // Scoped, not a blanket "no <a> on the page": BrandLogo always renders a datum.net link.
     // What IdentityBadge's showLink=false must suppress is its OWN "Not you?" switch-account
     // link (which targets /login). This assertion catches if showLink={false} is accidentally removed.
     cy.contains(/not you\?/i).should('not.exist');
