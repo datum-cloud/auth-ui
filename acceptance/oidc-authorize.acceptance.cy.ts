@@ -9,15 +9,15 @@
 // without it) against the local stack; the cypress process needs NODE_EXTRA_CA_CERTS=./dev-ca.crt
 // so cy.request can reach Zitadel over the self-signed dev CA. See the INDEX log (2026-06-13).
 
-const RUN = String(Cypress.env('ACCEPTANCE') ?? '') === '1';
+const RUN = String(Cypress.expose('ACCEPTANCE') ?? '') === '1';
 
-const ZITADEL = String(Cypress.env('ZITADEL_API_URL') ?? 'https://auth.localtest.me:30000');
-const CLIENT_ID = String(Cypress.env('OIDC_CLIENT_ID') ?? '377158963730317363');
+const ZITADEL = String(Cypress.expose('ZITADEL_API_URL') ?? 'https://auth.localtest.me:30000');
+const CLIENT_ID = String(Cypress.expose('OIDC_CLIENT_ID') ?? '377158963730317363');
 const REDIRECT_URI = String(
-  Cypress.env('OIDC_REDIRECT_URI') ?? 'http://localhost:3000/auth/callback'
+  Cypress.expose('OIDC_REDIRECT_URI') ?? 'http://localhost:3000/auth/callback'
 );
-const LOGIN_NAME = String(Cypress.env('ACCEPTANCE_LOGIN_NAME') ?? 'zitadel-e2e-user3');
-const PASSWORD = String(Cypress.env('ACCEPTANCE_PASSWORD') ?? 'LocalDev-Passw0rd!');
+const LOGIN_NAME = String(Cypress.expose('ACCEPTANCE_LOGIN_NAME') ?? 'zitadel-e2e-user3');
+const PASSWORD = String(Cypress.expose('ACCEPTANCE_PASSWORD') ?? 'LocalDev-Passw0rd!');
 
 // Fixed PKCE challenge — we only assert a code is issued, never exchange it.
 const CODE_CHALLENGE = 'E9Melhoa2OwvFrEMTJguCHaoeK1t8URWbuGJSstw-cM';

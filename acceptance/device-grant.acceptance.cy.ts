@@ -8,14 +8,14 @@
 // against the local stack; the cypress process needs NODE_EXTRA_CA_CERTS=./dev-ca.crt so
 // cy.request can reach Zitadel over the self-signed dev CA. See the INDEX log (2026-06-13).
 
-const RUN = String(Cypress.env('ACCEPTANCE') ?? '') === '1';
+const RUN = String(Cypress.expose('ACCEPTANCE') ?? '') === '1';
 
-const ZITADEL = String(Cypress.env('ZITADEL_API_URL') ?? 'https://auth.localtest.me:30000');
+const ZITADEL = String(Cypress.expose('ZITADEL_API_URL') ?? 'https://auth.localtest.me:30000');
 // Device client `auth-ui-e2e-device` (device grant enabled; codes are throwaway).
-const CLIENT_ID = String(Cypress.env('DEVICE_CLIENT_ID') ?? '377158965391327283');
+const CLIENT_ID = String(Cypress.expose('DEVICE_CLIENT_ID') ?? '377158965391327283');
 // user2 is the CLEAN password-only ceremony user (user3 has live TOTP enrolled).
-const LOGIN_NAME = String(Cypress.env('ACCEPTANCE_LOGIN_NAME') ?? 'zitadel-e2e-user2');
-const PASSWORD = String(Cypress.env('ACCEPTANCE_PASSWORD') ?? 'LocalDev-Passw0rd!');
+const LOGIN_NAME = String(Cypress.expose('ACCEPTANCE_LOGIN_NAME') ?? 'zitadel-e2e-user2');
+const PASSWORD = String(Cypress.expose('ACCEPTANCE_PASSWORD') ?? 'LocalDev-Passw0rd!');
 
 const TOKEN_GRANT = 'urn:ietf:params:oauth:grant-type:device_code';
 // RFC 8628 §3.5 recommends a 5 s poll interval; we use 1 s against the local

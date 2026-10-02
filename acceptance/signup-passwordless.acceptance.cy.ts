@@ -14,7 +14,7 @@
 // NOTE: signup mutates real state — each run creates a brand-new Zitadel user, so the
 // email MUST be unique per run.
 
-const RUN = String(Cypress.env('ACCEPTANCE') ?? '') === '1';
+const RUN = String(Cypress.expose('ACCEPTANCE') ?? '') === '1';
 
 // Unique recipient per run — signup creates a real user keyed on this email.
 const LINK_EMAIL = `e2e-emaillink-${Date.now()}@example.test`;
