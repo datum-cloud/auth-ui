@@ -17,7 +17,9 @@
  * (`sentry.client.ts`) Sentry inits via `beforeSend`.
  */
 import type { AppErrorCode } from '@/shared/errors/app-error';
-import type { ErrorEvent, Event } from '@sentry/react-router';
+import type { BrowserOptions, ErrorEvent, Event } from '@sentry/react-router';
+
+type DataCollection = NonNullable<BrowserOptions['dataCollection']>;
 
 // @sentry/react-router re-exports Event/ErrorEvent but not TransactionEvent;
 // a transaction event is just an Event with the discriminating type tag.
@@ -166,6 +168,34 @@ export function scrubEvent<E extends Event>(event: E): E | null {
 
   return safe as E;
 }
+
+/**
+ * Init options both Sentry inits spread in. Sentry 11 defaults would bypass the
+ * scrubber: span streaming turns `beforeSendTransaction` into a no-op, and
+ * `dataCollection` left unset collects cookies, headers and request bodies.
+ * `traceLifecycle: 'static'` keeps transactions flowing through the scrubber
+ * (Sentry plans to remove it; moving to `beforeSendSpan` is the follow-up), and
+ * every collection category is off so nothing sensitive is captured to begin with.
+ */
+export const SENTRY_PRIVACY_OPTIONS: {
+  traceLifecycle: 'static';
+  dataCollection: DataCollection;
+} = {
+  traceLifecycle: 'static',
+  dataCollection: {
+    userInfo: false,
+    cookies: false,
+    httpHeaders: false,
+    httpBodies: [],
+    urlQueryParams: false,
+    graphQL: { document: false, variables: false },
+    genAI: { inputs: false, outputs: false },
+    databaseQueryData: false,
+    queues: false,
+    stackFrameVariables: false,
+    frameContextLines: 0,
+  },
+};
 
 /** `beforeSend` hook: scrubs error events (and feedback/other non-txn events). */
 export function beforeSend(event: ErrorEvent): ErrorEvent | null {

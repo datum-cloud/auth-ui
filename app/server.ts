@@ -34,7 +34,7 @@ import { createHonoServer } from 'react-router-hono-server/bun';
 
 export default await createHonoServer<RequestContextEnv>({
   // Supplying onGracefulShutdown activates react-router-hono-server/bun's built-in
-  // SIGTERM + SIGINT handler (bun.js adapter lines 96-124): it calls
+  // SIGTERM + SIGINT handler (see gracefulShutdown in its bun adapter): it calls
   // serverInstance.stop(false) — draining all in-flight requests — then runs this
   // callback, then exits 0.  The preStop sleep in the k8s Deployment (10 s) gives
   // kube-proxy time to deregister the endpoint before SIGTERM arrives, so no new
@@ -45,7 +45,12 @@ export default await createHonoServer<RequestContextEnv>({
     // future resources (e.g. a DB pool) can be closed here without changing the
     // activation plumbing.
   },
-  configure(app) {
+  // beforeAll runs ahead of the adapter's built-in static serving. Since v4 the
+  // adapter serves /id/assets/* itself (it honours vite base='/id/'), and the
+  // HTTPRoute forwards /id unchanged, so anything registered in `configure` never
+  // sees an asset request. Cross-cutting middleware lives here so assets keep their
+  // metrics, request context, security headers, compression and immutable caching.
+  beforeAll(app) {
     const isDev = env.NODE_ENV !== 'production';
     // x-zitadel-forward-host directs where the service-user token is sent.
     // External callers must never control it — strip it at the edge; only the
@@ -66,28 +71,20 @@ export default await createHonoServer<RequestContextEnv>({
     // mix is a BREACH-class oracle. JS/CSS carry no secrets and are where the
     // bytes are anyway, so compression is scoped to the asset path.
     app.use('/id/assets/*', compress());
-    // Perf fix: react-router-hono-server mounts static assets at /assets/* but vite
-    // base='/id/' makes the browser request them as /id/assets/*.  In production the
-    // ingress strips the /id prefix before hitting this server; in local `bun run start`
-    // (used by lhci) the prefix is preserved and the RR7 catch-all returns error HTML for
-    // every JS/CSS file.  Serve the built client assets under the prefixed path so local
-    // perf measurements (lhci, Lighthouse, manual `bun run start`) work correctly.
     if (!isDev) {
-      app.use(
-        '/id/assets/*',
-        async (c, next) => {
-          await next();
-          // content-hashed filenames are immutable by construction
-          if (c.res.ok) c.res.headers.set('cache-control', 'public, max-age=31536000, immutable');
-        },
-        serveStatic({
-          root: 'build/client',
-          rewriteRequestPath: (path) => path.replace('/id/assets/', '/assets/'),
-        })
-      );
-      // Public assets (vite copies public/ → build/client root) also carry the /id base.
-      // Same gateway situation as /id/assets/*: serve them under the prefix so a local
-      // `bun run start` (prefix preserved) doesn't fall through to the RR catch-all error.
+      app.use('/id/assets/*', async (c, next) => {
+        await next();
+        // content-hashed filenames are immutable by construction
+        if (c.res.ok) c.res.headers.set('cache-control', 'public, max-age=31536000, immutable');
+      });
+    }
+  },
+  configure(app) {
+    const isDev = env.NODE_ENV !== 'production';
+    if (!isDev) {
+      // Public assets (vite copies public/ → build/client root) also carry the /id base,
+      // which the adapter's public-file handler doesn't strip. Serve them under the prefix
+      // so they don't fall through to the RR catch-all error page.
       // Not content-hashed, so no immutable cache header here.
       for (const prefix of ['/id/images/*', '/id/favicons/*']) {
         app.use(

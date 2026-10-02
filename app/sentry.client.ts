@@ -15,7 +15,7 @@
  * Import this once at the top of entry.client.tsx so the SDK is active before
  * hydration runs.
  */
-import { beforeSend, beforeSendTransaction } from '@/server/sentry-scrub';
+import { SENTRY_PRIVACY_OPTIONS, beforeSend, beforeSendTransaction } from '@/server/sentry-scrub';
 import * as Sentry from '@sentry/react-router';
 
 const dsn: string | undefined = import.meta.env.VITE_SENTRY_DSN;
@@ -25,6 +25,7 @@ export const isClientSentryEnabled: boolean = Boolean(dsn);
 export function initClientSentry(): void {
   if (!isClientSentryEnabled) return;
   Sentry.init({
+    ...SENTRY_PRIVACY_OPTIONS,
     dsn,
     environment: import.meta.env.MODE,
     // No tracing on the client by default (no tracesSampleRate) — error capture
