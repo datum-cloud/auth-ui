@@ -6,20 +6,29 @@ Every control below defaults to the safe answer. Where a value is unset or unpar
 
 Sessions live in signed cookies under `app/modules/auth/session/`:
 
-| File                                          | Cookie     | Purpose                                                       |
-| --------------------------------------------- | ---------- | ------------------------------------------------------------- |
-| `app/modules/auth/session/cookie.ts`          | `sessions` | the multi-session list backing `/accounts`                    |
-| `app/modules/auth/session/session.ts`         | —          | pure list operations (add, remove, cap, most-recent, lookup)  |
-| `app/modules/auth/session/last-used-login.ts` | —          | remembers the last identifier used, to prefill the login form |
-| `app/modules/auth/session/reauth-intent.ts`   | —          | short-lived (10 min) intent for a re-auth round trip          |
+| File                                          | Cookie            | Purpose                                                                              |
+| --------------------------------------------- | ----------------- | ------------------------------------------------------------------------------------ |
+| `app/modules/auth/session/cookie.ts`          | `sessions`        | the multi-session list backing `/accounts`                                           |
+| `app/modules/auth/session/session.ts`         | none              | pure list operations (add, remove, cap, most-recent, lookup)                         |
+| `app/modules/auth/session/last-used-login.ts` | `last-used-login` | remembers the last sign-in method used (`passkey`, `email`, `idp:<id>`)              |
+| `app/modules/auth/session/reauth-intent.ts`   | `reauth-intent`   | short-lived (10 min) intent for a re-auth round trip                                 |
+| `app/modules/auth/session/idp-autostart.ts`   | `idp-autostart`   | one-shot (10 min) marker so Back from an IdP does not auto-start it again            |
+| `app/modules/auth/session/passkey-hint.ts`    | `passkey-hint`    | loginName of the last account signed in (7 days); lets `/login` arm a passkey prompt |
 
-All of them are signed with `SESSION_SECRET` (HMAC-SHA256). `app/server/infra/env.server.ts` requires it to be at least 32 characters and refuses to boot otherwise:
+All of these cookies are signed with `SESSION_SECRET` (HMAC-SHA256). `app/server/infra/env.server.ts` requires it to be at least 32 characters and refuses to boot otherwise:
 
 ```
 SESSION_SECRET must be at least 32 characters (HMAC-SHA256 key)
 ```
 
-The session _state_ itself — who is signed in, which factors are satisfied — is held by the identity provider. The cookie carries the session handles, not the credentials.
+The session _state_ itself (who is signed in, which factors are satisfied) is held by the identity provider. The cookie carries the session handles, not the credentials.
+
+Account recovery runs without a session and keeps its state in two cookies of its own, defined in `app/resources/recovery/recovery-ticket.server.ts` and scoped to `/id/recover`. They are not HMAC-signed: each value is sealed with AES-256-GCM under a key derived from `SESSION_SECRET` (HKDF), and padded to a fixed length so no one can tell a real ticket from a filler. See [Account Recovery](./account-recovery.md).
+
+| Cookie              | Purpose                                                                                                                  |
+| ------------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| `recovery_ticket`   | request ticket (1 hour): seals the `userId` and `codeId` behind a typed code, bound to a hash of the address             |
+| `recovery_ceremony` | ceremony ticket (10 min): seals `{ userId, passkeyId }` so the WebAuthn verify step cannot be pointed at another account |
 
 ## CSRF
 
@@ -30,16 +39,16 @@ The session _state_ itself — who is signed in, which factors are satisfied —
 
 ## Rate Limiting
 
-`app/server/middleware/rate-limit.ts` defines one limiter per sensitive endpoint — login password, signup, password reset, MFA verify, MFA enrol, LDAP, WebAuthn verify, accounts, and verification-email send — all mounted on `*` in `app/server.ts`. They are mounted on the catch-all rather than on path prefixes because Hono matches paths case-sensitively while React Router does not; each middleware self-guards on a lowercased, normalized pathname instead.
+`app/server/middleware/rate-limit.ts` defines one limiter per sensitive endpoint (login password, signup and account recovery, password reset, MFA verify, MFA enrol, LDAP, WebAuthn verify, accounts, and verification-email send), all mounted on `*` in `app/server.ts`. They are mounted on the catch-all rather than on path prefixes because Hono matches paths case-sensitively while React Router does not; each middleware self-guards on a lowercased, normalized pathname instead.
 
-The store is pluggable (`app/server/middleware/rate-limit-store.ts`):
+The store is pluggable (`app/server/middleware/rate-limit-store.ts`), but only one adapter is wired:
 
-- **Default** — `InMemoryRateLimitStore`, a per-process Map. Counters are **per replica**, so the deployment must run `replicas: 1` (or sticky sessions) in this mode.
-- **Shared** — set `RATE_LIMIT_REDIS_URL` to a `redis://` / `rediss://` endpoint to select `RedisRateLimitStore`, a sliding-window adapter that lifts the single-replica constraint.
+- **In use**: `InMemoryRateLimitStore`, a per-process Map. Counters are **per replica**, so the deployment must run `replicas: 1` (or sticky sessions).
+- **Not wired**: `RedisRateLimitStore` and `selectRateLimitStore`, which would pick it when `RATE_LIMIT_REDIS_URL` is a valid `redis://` / `rediss://` URL, exist and are unit-tested, but nothing in the app calls them. `RateLimiter.check` is synchronous and the Redis adapter is async, so setting `RATE_LIMIT_REDIS_URL` today changes nothing.
 
 ## Secure Headers and CSP
 
-`app/server/edge/secure-headers.ts` (re-exported by `app/server/middleware/secure-headers.ts`) builds the CSP and installs Hono's `secureHeaders`. A per-request nonce is generated there and threaded into the load context in `app/server.ts` so `<Scripts nonce>` and the SSR stream can use it — no `unsafe-inline` in production.
+`app/server/edge/secure-headers.ts` (re-exported by `app/server/middleware/secure-headers.ts`) builds the CSP and installs Hono's `secureHeaders`. A per-request nonce is generated there and threaded into the load context in `app/server.ts` so `<Scripts nonce>` and the SSR stream can use it. No `unsafe-inline` in production.
 
 `FRAME_ANCESTORS` drives clickjacking protection, and it drives CSP and the legacy header **in lock-step**:
 
@@ -48,11 +57,11 @@ The store is pluggable (`app/server/middleware/rate-limit-store.ts`):
 | unset / empty / `*` / `none` / unparseable | `'none'`          | `DENY`                         |
 | an explicit origin allowlist               | those origins     | omitted (CSP is authoritative) |
 
-A bare `*` is rejected outright — a wildcard `frame-ancestors` defeats the protection entirely. The default is `'none'`: the auth UI is not embeddable unless an environment explicitly opts in.
+A bare `*` is rejected outright: a wildcard `frame-ancestors` defeats the protection entirely. The default is `'none'`: the auth UI is not embeddable unless an environment explicitly opts in.
 
 ## Trusted Forwarding
 
-`x-zitadel-forward-host` decides where the service-user token is sent, so an external caller controlling it is an SSRF. The header is honoured **only** when its value appears in `ZITADEL_TRUSTED_FORWARD_HOSTS` — a fail-closed, comma-separated allowlist parsed in `app/server/infra/env.server.ts` and enforced in `app/server/composition.ts` before the value ever reaches the Zitadel transport. Unset means no forward host is trusted.
+`x-zitadel-forward-host` decides where the service-user token is sent, so an external caller controlling it is an SSRF. The header is honoured **only** when its value appears in `ZITADEL_TRUSTED_FORWARD_HOSTS`, a fail-closed, comma-separated allowlist parsed in `app/server/infra/env.server.ts` and enforced in `app/server/composition.ts` before the value ever reaches the Zitadel transport. Unset means no forward host is trusted.
 
 ## Post-Logout Redirects
 
@@ -60,7 +69,7 @@ A bare `*` is rejected outright — a wildcard `frame-ancestors` defeats the pro
 
 ## Fraud Signals
 
-`app/modules/fraud/maxmind-tracker.tsx` loads MaxMind's `device.js` on the signup screens and mirrors the resulting minFraud device-tracking token so it can travel with the signup. It is gated on `MAXMIND_ACCOUNT_ID`; with the variable unset the tracker is a true no-op — no script loaded, no token captured.
+`app/modules/fraud/maxmind-tracker.tsx` loads MaxMind's `device.js` on the signup screens and mirrors the resulting minFraud device-tracking token so it can travel with the signup. It is gated on `MAXMIND_ACCOUNT_ID`; with the variable unset the tracker is a true no-op: no script loaded, no token captured.
 
 This is **Datum-specific**. Fraud screening happens downstream, against the provisioned User resource (see [User Provisioning](./user-provisioning.md)); an external deployment would drop this module or swap in its own signal.
 
@@ -68,4 +77,4 @@ This is **Datum-specific**. Fraud screening happens downstream, against the prov
 
 `app/server/sentry-scrub.ts` is the egress boundary. It is an **allowlist**: a fresh Sentry event is constructed from only the fields known to be safe, and everything else is dropped. No provider or proto type, no login name or identifier, no token, cookie, or request body leaves the process. A denylist would silently leak whatever field the SDK adds next.
 
-Nothing is lost operationally — the raw provider detail stays in the server log keyed by `traceId` (set in `app/server/middleware/request-context.ts`, logged via `app/server/observability.ts`). The `traceId` tag survives scrubbing, so an on-call engineer can pivot from a neutral Sentry event to the full server log line.
+Nothing is lost operationally: the raw provider detail stays in the server log keyed by `traceId` (set in `app/server/middleware/request-context.ts`, logged via `app/server/observability.ts`). The `traceId` tag survives scrubbing, so an on-call engineer can pivot from a neutral Sentry event to the full server log line.
