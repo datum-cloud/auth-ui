@@ -1,7 +1,7 @@
 // cypress/component/server/sentry-scrub.cy.ts
 // COMPONENT port of app/server/__tests__/sentry-scrub.test.ts
 // Pure allowlist scrubber — no node deps.
-import { scrubEvent } from '@/server/sentry-scrub';
+import { SENTRY_PRIVACY_OPTIONS, scrubEvent } from '@/server/sentry-scrub';
 import type { ErrorEvent, Event } from '@sentry/react-router';
 
 const LOGIN_NAME = 'alice@victim.example.com';
@@ -126,5 +126,30 @@ describe('scrubEvent — allowlist (egress neutrality)', () => {
     for (const secret of FORBIDDEN) {
       expect(raw).to.include(secret);
     }
+  });
+});
+
+// Sentry 11 flipped two defaults that would bypass the scrubber above: span
+// streaming (beforeSendTransaction no-ops) and broad data collection (cookies,
+// bodies, headers). Pin both so an SDK bump or a config edit can't loosen them.
+describe('SENTRY_PRIVACY_OPTIONS — Sentry 11 egress defaults', () => {
+  it('keeps the static trace lifecycle so beforeSendTransaction still runs', () => {
+    expect(SENTRY_PRIVACY_OPTIONS.traceLifecycle).to.equal('static');
+  });
+
+  it('turns off every data-collection category', () => {
+    expect(SENTRY_PRIVACY_OPTIONS.dataCollection).to.deep.equal({
+      userInfo: false,
+      cookies: false,
+      httpHeaders: false,
+      httpBodies: [],
+      urlQueryParams: false,
+      graphQL: { document: false, variables: false },
+      genAI: { inputs: false, outputs: false },
+      databaseQueryData: false,
+      queues: false,
+      stackFrameVariables: false,
+      frameContextLines: 0,
+    });
   });
 });

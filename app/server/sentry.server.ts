@@ -27,13 +27,14 @@
  * before any application code runs in the module graph.
  */
 import { env } from '@/server/infra/env.server';
-import { beforeSend, beforeSendTransaction } from '@/server/sentry-scrub';
+import { SENTRY_PRIVACY_OPTIONS, beforeSend, beforeSendTransaction } from '@/server/sentry-scrub';
 import * as Sentry from '@sentry/react-router';
 
 export const isSentryEnabled: boolean = Boolean(env.SENTRY_DSN);
 
 if (isSentryEnabled) {
   Sentry.init({
+    ...SENTRY_PRIVACY_OPTIONS,
     dsn: env.SENTRY_DSN,
     tracesSampleRate: env.SENTRY_TRACES_SAMPLE_RATE,
     // Keep integrations minimal — no source-map upload here (that belongs in the
