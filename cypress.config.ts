@@ -9,7 +9,7 @@ process.env.CYPRESS = 'true';
 
 export default defineConfig({
   e2e: {
-    setupNodeEvents(on) {
+    setupNodeEvents(on, config) {
       on('task', {
         // Governance: static-analysis scanner for logAuthEvent coverage, registry, and PII guard.
         auditCoverage: () => runAuditCoverage(),
@@ -75,7 +75,7 @@ export default defineConfig({
         // (Zitadel's SMTP sink). The signup acceptance spec polls this after
         // registering a fresh user. Returns { id, code, userId, link } or null when
         // no message has arrived yet, so the spec can bound its own retry loop.
-        // Override the Mailpit base url with Cypress.env('MAILPIT_URL').
+        // Override the Mailpit base url with the MAILPIT_URL env var.
         fetchEmailCode: async ({ to }: { to: string }) => {
           const base = String(process.env.MAILPIT_URL ?? 'http://localhost:8025');
           const listRes = await fetch(`${base}/api/v1/messages`);
@@ -108,6 +108,10 @@ export default defineConfig({
         launchOptions.args.push('--force-prefers-color-scheme=light');
         return launchOptions;
       });
+      // Cypress 16 removed the synchronous Cypress.env(). Acceptance specs read their
+      // settings at module load via Cypress.expose(), so mirror --env / CYPRESS_* values
+      // into `expose` to keep the documented `--env ACCEPTANCE=1` invocation working.
+      return { ...config, expose: { ...config.env, ...config.expose } };
     },
     baseUrl: 'http://localhost:3000',
     // Cypress's HTML/JS rewriting (anti-framebusting) injects a stray text node

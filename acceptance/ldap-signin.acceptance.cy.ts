@@ -13,7 +13,7 @@
 // session is exercised via the REAL adapter — a wrong password yields a different
 // (INVALID_CREDENTIALS) outcome, and an unhandled error would surface as a 500 error page.
 //
-// To assert the signed-in green path instead, set Cypress.env('LDAP_EXPECT_SIGNED_IN','1')
+// To assert the signed-in green path instead, set Cypress.expose('LDAP_EXPECT_SIGNED_IN','1')
 // AND point LDAP_USERNAME/LDAP_PASSWORD at a glauth user that IS linked to a Zitadel
 // account; the spec then asserts the /id/signed-in landing.
 //
@@ -21,12 +21,12 @@
 // against the local stack; the cypress process needs NODE_EXTRA_CA_CERTS=./dev-ca.crt so
 // requests can reach Zitadel over the self-signed dev CA. See the INDEX log (2026-06-13).
 
-const RUN = String(Cypress.env('ACCEPTANCE') ?? '') === '1';
+const RUN = String(Cypress.expose('ACCEPTANCE') ?? '') === '1';
 
-const IDP_ID = String(Cypress.env('LDAP_IDP_ID') ?? '377159167858704435');
-const USERNAME = String(Cypress.env('LDAP_USERNAME') ?? 'ldap-e2e-user');
-const PASSWORD = String(Cypress.env('LDAP_PASSWORD') ?? 'LocalDev-Passw0rd!');
-const EXPECT_SIGNED_IN = String(Cypress.env('LDAP_EXPECT_SIGNED_IN') ?? '') === '1';
+const IDP_ID = String(Cypress.expose('LDAP_IDP_ID') ?? '377159167858704435');
+const USERNAME = String(Cypress.expose('LDAP_USERNAME') ?? 'ldap-e2e-user');
+const PASSWORD = String(Cypress.expose('LDAP_PASSWORD') ?? 'LocalDev-Passw0rd!');
+const EXPECT_SIGNED_IN = String(Cypress.expose('LDAP_EXPECT_SIGNED_IN') ?? '') === '1';
 
 (RUN ? describe : describe.skip)('LDAP credential sign-in (real Zitadel + glauth IdP)', () => {
   it('credentials → real startLdapIntent → graceful linked-account outcome (no 500)', () => {

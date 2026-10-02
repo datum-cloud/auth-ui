@@ -18,15 +18,15 @@
 // skippable /setup/mfa prompt the FIRST time (30-day skip policy) and directly on
 // /signed-in while a prior skip is fresh — both are correct; the spec handles both.
 
-const RUN = String(Cypress.env('ACCEPTANCE') ?? '') === '1';
+const RUN = String(Cypress.expose('ACCEPTANCE') ?? '') === '1';
 
-const LOGIN_NAME = String(Cypress.env('ACCEPTANCE_LOGIN_NAME') ?? 'zitadel-e2e-user2');
-const PASSWORD = String(Cypress.env('ACCEPTANCE_PASSWORD') ?? 'LocalDev-Passw0rd!');
+const LOGIN_NAME = String(Cypress.expose('ACCEPTANCE_LOGIN_NAME') ?? 'zitadel-e2e-user2');
+const PASSWORD = String(Cypress.expose('ACCEPTANCE_PASSWORD') ?? 'LocalDev-Passw0rd!');
 // A standalone (no-authRequest) login now routes to the DEFAULT APP: /id/signed-in
 // 302-redirects a non-admin to Zitadel's login-settings defaultRedirectUri (locally the
 // cloud-portal) and an admin to /ui/console. That target is CROSS-ORIGIN from this spec's
 // baseUrl, so the journey no longer terminates on the /id/signed-in page.
-const DEFAULT_APP = String(Cypress.env('ACCEPTANCE_DEFAULT_APP') ?? 'localhost:3001');
+const DEFAULT_APP = String(Cypress.expose('ACCEPTANCE_DEFAULT_APP') ?? 'localhost:3001');
 
 (RUN ? describe : describe.skip)('core sign-in (real Zitadel)', () => {
   it('identifier → password → (skippable MFA prompt) → routed to the default app', () => {

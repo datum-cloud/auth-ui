@@ -15,12 +15,12 @@
 // NOTE (live-validated 2026-06-13): the registerTotp→verifyTotp adapter round-trip was
 // proven live with a computed code; this spec exercises the same path through the routes.
 
-const RUN = String(Cypress.env('ACCEPTANCE') ?? '') === '1';
+const RUN = String(Cypress.expose('ACCEPTANCE') ?? '') === '1';
 // CODE-MIN-36: default to the seeded TOTP-free fixtures user so the gated acceptance lane
 // actually runs this spec. Override with CYPRESS_ACCEPTANCE_TOTP_USER for a different instance.
 // PRECONDITION still applies: the user must NOT already have TOTP enrolled (registerTOTP rejects).
-const USER = String(Cypress.env('ACCEPTANCE_TOTP_USER') ?? 'zitadel-e2e-totp');
-const PASSWORD = String(Cypress.env('ACCEPTANCE_PASSWORD') ?? 'LocalDev-Passw0rd!');
+const USER = String(Cypress.expose('ACCEPTANCE_TOTP_USER') ?? 'zitadel-e2e-totp');
+const PASSWORD = String(Cypress.expose('ACCEPTANCE_PASSWORD') ?? 'LocalDev-Passw0rd!');
 
 (RUN && USER ? describe : describe.skip)('TOTP enroll → verify (real Zitadel)', () => {
   it('enrolls an authenticator and verifies a live code', () => {

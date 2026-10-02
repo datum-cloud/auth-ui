@@ -23,10 +23,10 @@
 // /id/setup/mfa prompt the FIRST time (30-day skip policy) and directly on /id/signed-in
 // while a prior skip is fresh — both paths are tolerated exactly as core-signin does.
 
-const RUN = String(Cypress.env('ACCEPTANCE') ?? '') === '1';
+const RUN = String(Cypress.expose('ACCEPTANCE') ?? '') === '1';
 
-const LOGIN_NAME = String(Cypress.env('ACCEPTANCE_LOGIN_NAME') ?? 'zitadel-e2e-user2');
-const PASSWORD = String(Cypress.env('ACCEPTANCE_PASSWORD') ?? 'LocalDev-Passw0rd!');
+const LOGIN_NAME = String(Cypress.expose('ACCEPTANCE_LOGIN_NAME') ?? 'zitadel-e2e-user2');
+const PASSWORD = String(Cypress.expose('ACCEPTANCE_PASSWORD') ?? 'LocalDev-Passw0rd!');
 
 // The `sessions` cookie name is defined in app/modules/auth/session/cookie.ts:
 //   export const sessionsCookie = createCookie('sessions', { ... });

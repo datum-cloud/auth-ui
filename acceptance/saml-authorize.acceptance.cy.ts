@@ -17,14 +17,14 @@
 // a Success StatusCode, confirming the assertion came from the real adapter (createSamlResponse),
 // not a synthetic fixture.
 
-const RUN = String(Cypress.env('ACCEPTANCE') ?? '') === '1';
+const RUN = String(Cypress.expose('ACCEPTANCE') ?? '') === '1';
 
-const ZITADEL = String(Cypress.env('ZITADEL_API_URL') ?? 'https://auth.localtest.me:30000');
+const ZITADEL = String(Cypress.expose('ZITADEL_API_URL') ?? 'https://auth.localtest.me:30000');
 const SSO = `${ZITADEL}/saml/v2/SSO`;
 const ACS = 'https://sp.localtest.me/acs';
 // user2 is the CLEAN password-only ceremony user (user3 has live TOTP enrolled).
-const LOGIN_NAME = String(Cypress.env('ACCEPTANCE_LOGIN_NAME') ?? 'zitadel-e2e-user2');
-const PASSWORD = String(Cypress.env('ACCEPTANCE_PASSWORD') ?? 'LocalDev-Passw0rd!');
+const LOGIN_NAME = String(Cypress.expose('ACCEPTANCE_LOGIN_NAME') ?? 'zitadel-e2e-user2');
+const PASSWORD = String(Cypress.expose('ACCEPTANCE_PASSWORD') ?? 'LocalDev-Passw0rd!');
 
 const SAML_SUCCESS = 'urn:oasis:names:tc:SAML:2.0:status:Success';
 
