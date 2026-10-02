@@ -1,5 +1,6 @@
 import { legacyRedirects } from './server/middleware/legacy-redirects';
 import { env } from '@/server/infra/env.server';
+import { publicOrigin } from '@/server/middleware/public-origin';
 import {
   loginPasswordRateLimit,
   signupRateLimit,
@@ -61,6 +62,9 @@ export default await createHonoServer<RequestContextEnv>({
     // transport. This is the effective SSRF defense; no strip middleware is needed.
     // httpMetrics must be first so the timer captures total request latency.
     app.use('*', httpMetrics);
+    // Re-base request.url on PUBLIC_ORIGIN (https) before anything reads it; React Router's
+    // action CSRF check rejects the gateway's plain-http URL otherwise.
+    app.use('*', publicOrigin);
     app.use('*', requestContext);
     app.use('*', appSecureHeaders(isDev, resolveFrameAncestors(env.FRAME_ANCESTORS)));
     // Legacy 301s: redirect hardcoded /ui/v2/login/* links (sibling repos) to /id/* before routing.
