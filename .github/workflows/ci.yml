@@ -153,13 +153,21 @@ jobs:
         #   axios           ^1.20.0   wait-on accepts ^1.18.1   fixes 12 axios advisories (7 high)
         #   esbuild         ^0.28.1   vite accepts ^0.28; build + i18n extract verified   fixes GHSA-g7r4-m6w7-qqqr / GHSA-gv7w-rqvm-qjhr
         #   postcss         ^8.5.25   vite/madge/precinct accept ^8.x   fixes GHSA-fxqj-rqcc-2cmp
+        #   joi             ^18.2.9   wait-on accepts ^18.x   fixes GHSA-wr44-6hxh-3jwq
+        #   source-map-js   ^1.2.2    postcss/@tailwindcss/node/css-tree/@vue/compiler-core accept ^1.2.1   fixes GHSA-68fv-2mgg-jv7q (high)
+        #   tinypool        ^2.2.0    @lingui/cli accepts ^2.1.0   fixes GHSA-5gmw-xhrv-c9v3 / GHSA-85c8-ppgw-ccpr (critical)
         # brace-expansion 2.1.7 / 5.0.12 and js-yaml 5.4.2 came from scoped in-range updates,
         # NO override: js-yaml via `bun update js-yaml` (GHSA-r3ph-w7gj-g6xm). bun 1.3.14's
         # `bun update` does not reach nested copies, so the brace-expansion lock entries
         # were bumped in place with the registry integrity (hoisted 2.1.4 -> 2.1.7 under
         # minimatch@9's ^2.0.2; nested 5.0.9 -> 5.0.12 under minimatch@10's ^5.0.5), fixing
         # GHSA-qhr7-859c-m2p7 / GHSA-6j4f-fj2g-mc7p / GHSA-q2hr-2g5m-vwhr.
-        # There are NO ignored advisories: `bun audit` is clean with no --ignore flags.
+        # One advisory is TEMPORARILY ignored. It has no patched release, so no override can fix it:
+        #   GHSA-vfj7-8cjw-p6xm  braces <=3.0.3 stack-exhaustion DoS from deeply nested patterns.
+        #                        No fixed version is published (3.0.3 is the latest). It reaches the
+        #                        tree only through dev tooling: micromatch under @lingui/cli and
+        #                        under fast-glob via cypress-split. The production image installs with
+        #                        --production, so it never ships. Drop this ignore once braces publishes a fix.
         # The two former exemptions are both genuinely fixed, not suppressed:
         #   GHSA-mh99-v99m-4gvg / GHSA-rgw5-rvv9-x895 (brace-expansion) — fixed without
         #     an override; each consumer nests its own minimatch on brace-expansion 5.x
@@ -172,7 +180,7 @@ jobs:
         #   GHSA-qwww-vcr4-c8h2 (react-router RSC CSRF) — fixed by the v8.3.0 upgrade.
         # If a NEW transitive advisory appears with no override-compatible fix, add a
         # documented `--ignore=<GHSA>` here as a temporary measure and open a remediation follow-up.
-        run: bun audit
+        run: bun audit --ignore=GHSA-vfj7-8cjw-p6xm
       - name: Generate SBOM (CycloneDX)
         run: bunx @cyclonedx/cdxgen@11.10.0 -t js -o sbom.cdx.json --spec-version 1.5
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
