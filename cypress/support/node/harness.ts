@@ -2440,7 +2440,7 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
           const cookie = await mintCookie();
           const res = await app.request('/id/sso/saml-post?id=sr-post', { headers: { cookie } });
           const body = await res.text();
-          outcome = { status: res.status, body };
+          outcome = { status: res.status, body, location: res.headers.get('location') };
         } else if (op === 'handlerRedirectBinding') {
           const app = buildSamlApp('n-1');
           const cookie = await mintCookie();

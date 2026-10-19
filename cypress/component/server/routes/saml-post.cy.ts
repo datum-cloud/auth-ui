@@ -45,4 +45,17 @@ describe('samlPostHandler', () => {
       expect(v.outcome.location).to.include('SAMLResponse=resp-sr-1');
     });
   });
+
+  it('a live session with no primary factor (otpEmail-only signup session) → 302 to /login, no assertion', () => {
+    callService({
+      fn: 'samlPostCheck',
+      samlPostOp: 'handlerPostBinding',
+      liveSessions: [{ id: 's1', token: 't1', factorKinds: ['otpEmail'] }],
+      seed: { samlRequests: SAML_SEEDS },
+    }).then((v) => {
+      expect(v.outcome.status).to.equal(302);
+      expect(v.outcome.location).to.equal('/id/login?requestId=saml_sr-post');
+      expect(v.outcome.body ?? '').to.not.include('SAMLResponse');
+    });
+  });
 });
