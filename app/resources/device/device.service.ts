@@ -17,6 +17,7 @@ import type { AuthProvider } from '@/modules/auth/auth-provider';
 import { readSessions, mostRecent, type SessionEntry } from '@/modules/auth/session/cookie';
 import { ProviderError } from '@/modules/auth/types';
 import { deviceDecision } from '@/resources/device/device-decision';
+import { hasPrimaryFactor } from '@/resources/shared/lifetimes';
 import { paths } from '@/routes/paths';
 import { logAuthEvent, hashActor } from '@/server/observability';
 import type { AppError } from '@/shared/errors/app-error';
@@ -240,6 +241,17 @@ export async function resolveDeviceDecision(
   // consent semantics — a user who refuses to sign in can still reject the device.
   if (decision === 'authorize' && !entry) {
     return { kind: 'redirect', location: `/login?requestId=${encodeURIComponent(requestId)}` };
+  }
+
+  // Zitadel approves with any live session; signed-in is ours to check. An otpEmail-only signup
+  // session (no passkey yet) must not approve a device. Unreadable sessions go to /login too:
+  // fail closed, nothing is pruned, and the worst case is one extra sign-in.
+  if (decision === 'authorize' && entry) {
+    const live = await provider.getSession(entry.id, entry.token).catch(() => null);
+    if (!live || !hasPrimaryFactor(live.factors)) {
+      logAuthEvent('session_incomplete', 'success', { requestId, sessionId: entry.id });
+      return { kind: 'redirect', location: `/login?requestId=${encodeURIComponent(requestId)}` };
+    }
   }
 
   try {

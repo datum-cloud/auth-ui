@@ -42,4 +42,24 @@ describe('resolveDeviceDecision (/device/authorize action)', () => {
       expect(loc).to.include('requestId=device_WDJB-MJHT');
     });
   });
+
+  it('authorize with a session holding no primary factor (otpEmail-only signup session) → /login, device not approved', () => {
+    callService({
+      fn: 'resolveDeviceDecision',
+      provider: 'singleton',
+      liveSessions: [{ id: 'sess-signup', token: 'tok-signup', factorKinds: ['otpEmail'] }],
+      request: {
+        url: 'http://localhost/id/device/authorize',
+        sessions: [{ id: 'sess-signup', token: 'tok-signup', loginName: 'new@acme.test' }],
+        form: { decision: 'authorize', deviceAuthId: 'dev-1', requestId: 'device_WDJB-MJHT' },
+      },
+    }).then((v) => {
+      expect(v.response?.status).to.equal(302);
+      const loc = v.response?.location ?? '';
+      expect(loc).to.include('/login');
+      expect(loc).to.include('requestId=device_WDJB-MJHT');
+      expect(loc).to.not.include('/device/complete');
+      expect(v.audit.some((e) => e.event === 'session_incomplete')).to.equal(true);
+    });
+  });
 });
