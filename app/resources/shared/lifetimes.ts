@@ -24,6 +24,11 @@ export function primaryFresh(f: Factors, nowMs: number, lifetimeMs: number | und
   );
 }
 
+/** Whether any primary factor was ever verified, ignoring lifetime. */
+export function hasPrimaryFactor(f: Factors): boolean {
+  return primaryFresh(f, 0, undefined);
+}
+
 /** Checks if any second factor is fresh. Pass `lifetimeMs` from `LoginSettings.secondFactorCheckLifetimeMs`. */
 export function secondFactorFresh(
   f: Factors,

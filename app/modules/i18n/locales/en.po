@@ -407,7 +407,7 @@ msgstr "Forgot password?"
 msgid "Get started"
 msgstr "Get started"
 
-#: app/routes/signup/success.tsx:101
+#: app/routes/signup/success.tsx:131
 msgid "Go to sign in"
 msgstr "Go to sign in"
 
@@ -769,6 +769,7 @@ msgid "Sign in with LDAP"
 msgstr "Sign in with LDAP"
 
 #: app/routes/login/passkey.tsx:127
+#: app/routes/signup/success.tsx:121
 msgid "Sign in with your passkey"
 msgstr "Sign in with your passkey"
 
@@ -811,6 +812,10 @@ msgstr "Signing up as"
 #: app/routes/signup/method.tsx:329
 msgid "Signing up isn't available right now. Please try again later or contact support."
 msgstr "Signing up isn't available right now. Please try again later or contact support."
+
+#: app/routes/signup/success.tsx:90
+msgid "Signing you in as <0>{loginName}</0> with your new passkey."
+msgstr "Signing you in as <0>{loginName}</0> with your new passkey."
 
 #: app/routes/setup/mfa.tsx:209
 msgid "Skip for now"
@@ -1125,7 +1130,7 @@ msgstr "You've been signed out"
 msgid "you@example.com"
 msgstr "you@example.com"
 
-#: app/routes/signup/success.tsx:84
+#: app/routes/signup/success.tsx:87
 msgid "Your account is ready"
 msgstr "Your account is ready"
 
@@ -1150,13 +1155,9 @@ msgstr "Your email is verified"
 msgid "Your passkey is ready — give it a name so you can recognize it later."
 msgstr "Your passkey is ready — give it a name so you can recognize it later."
 
-#: app/routes/signup/success.tsx:91
+#: app/routes/signup/success.tsx:94
 msgid "Your passkey is set up. Sign in with it to continue."
 msgstr "Your passkey is set up. Sign in with it to continue."
-
-#: app/routes/signup/success.tsx:87
-msgid "Your passkey is set up. Sign in with it using <0>{loginName}</0>."
-msgstr "Your passkey is set up. Sign in with it using <0>{loginName}</0>."
 
 #: app/utils/errors/auth-error-messages.tsx:60
 msgid "Your password has expired. Please reset it to continue."

@@ -5,6 +5,7 @@ import {
   serializeSessions,
 } from '@/modules/auth/session/cookie';
 import { ProviderError, type SamlResponse } from '@/modules/auth/types';
+import { hasPrimaryFactor } from '@/resources/shared/lifetimes';
 import { resolveSamlBinding } from '@/resources/sso/saml-binding';
 import { providerForRequest } from '@/server/auth-context.server';
 import { logAuthEvent } from '@/server/observability';
@@ -110,6 +111,10 @@ export async function samlPostHandler(c: Context): Promise<Response> {
           'set-cookie': await serializeSessions(pruned),
         },
       });
+    }
+    if (!hasPrimaryFactor(alive.factors)) {
+      logAuthEvent('session_incomplete', 'success', { requestId: id, sessionId: session.id });
+      return c.redirect('/id/login?requestId=saml_' + encodeURIComponent(id));
     }
   } catch (err) {
     if (

@@ -33,6 +33,7 @@ import { ProviderError } from '@/modules/auth/types';
 import { isAllowedRequestId } from '@/resources/authorize';
 import { postLoginDestinationWithSource } from '@/resources/login/post-login-destination';
 import { userCodeSchema } from '@/resources/schemas/user-code';
+import { hasPrimaryFactor } from '@/resources/shared/lifetimes';
 import { nextStepWithParams } from '@/resources/shared/next-step-params';
 import { resolveOrg } from '@/resources/shared/resolve-org';
 import { paths } from '@/routes/paths';
@@ -368,9 +369,22 @@ export async function listAccounts(
 
   // Build each EnrichedAccount from the batched maps. Per-session failures degrade gracefully
   // (enrichSessionEntry renders a needs-re-auth card). Synchronous map — all RPCs were batched above.
-  return liveSessions.map((entry) =>
-    enrichSessionEntry(entry, { providerMap, settingsMap, authMethodsMap })
-  );
+  return liveSessions
+    .filter((entry) => !isDeadEndSession(providerMap.get(entry.id), authMethodsMap))
+    .map((entry) => enrichSessionEntry(entry, { providerMap, settingsMap, authMethodsMap }));
+}
+
+const PRIMARY_METHODS: ReadonlySet<AuthMethod> = new Set(['password', 'passkey', 'idp']);
+
+/** No primary factor and no primary method to earn one, e.g. an abandoned passkey signup. */
+function isDeadEndSession(
+  session: Session | undefined,
+  authMethodsMap: Map<string, AuthMethod[]>
+): boolean {
+  const userId = session?.user?.id;
+  if (!session || !userId || hasPrimaryFactor(session.factors)) return false;
+  const methods = authMethodsMap.get(userId) ?? [];
+  return !methods.some((m) => PRIMARY_METHODS.has(m));
 }
 
 // ─── /accounts — switch / remove actions ─────────────────────────────────────

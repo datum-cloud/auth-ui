@@ -38,3 +38,34 @@ describe('listAccounts — listAuthMethods N+1 dedupe', () => {
     });
   });
 });
+
+describe('listAccounts — dead-end sessions', () => {
+  const user = { id: 'u-new', loginName: 'new@acme.test', displayName: 'New' };
+  const cookie = [{ id: 's-signup', token: 't-signup', loginName: 'new@acme.test' }];
+
+  function accountsFor(methods: string[], factorKinds: Array<'otpEmail' | 'passkey'>) {
+    return callService({
+      fn: 'listAccounts',
+      provider: 'fresh',
+      seed: { authMethods: { [user.id]: methods } },
+      liveSessions: [{ id: 's-signup', token: 't-signup', user, factorKinds }],
+      request: { url: 'http://localhost/id/accounts', sessions: cookie },
+    }).then((v) => (v.outcome as Account[]).map((a) => a.sessionId));
+  }
+
+  it('hides an otpEmail-only session whose account has no primary method (abandoned signup)', () => {
+    accountsFor(['otp_email'], ['otpEmail']).then((ids) => expect(ids).to.deep.equal([]));
+  });
+
+  it('keeps an otpEmail-only session once a passkey is enrolled (it can resume on /login/passkey)', () => {
+    accountsFor(['passkey', 'otp_email'], ['otpEmail']).then((ids) =>
+      expect(ids).to.deep.equal(['s-signup'])
+    );
+  });
+
+  it('keeps a passkey-verified session', () => {
+    accountsFor(['passkey', 'otp_email'], ['otpEmail', 'passkey']).then((ids) =>
+      expect(ids).to.deep.equal(['s-signup'])
+    );
+  });
+});
