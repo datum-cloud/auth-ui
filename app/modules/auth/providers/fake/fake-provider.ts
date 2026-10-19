@@ -9,6 +9,7 @@ import {
   decodePasskeyRegistrationCode,
   encodePasskeyRegistrationCode,
 } from '@/modules/auth/passkey-registration-code';
+import { FakeWebAuthn, type StoredCredential } from '@/modules/auth/providers/fake/fake-webauthn';
 import type {
   AuthMethod,
   AuthRequest,
@@ -145,6 +146,9 @@ interface Seed {
    * Component tests keep determinism by not setting it.
    */
   realFactorTimestamps?: boolean;
+  /** Credentials that already exist for a user (e.g. the e2e virtual authenticator's), so a real
+   *  assertion for them verifies. The prebaked CYPRESS_CREDENTIAL id is always accepted too. */
+  webauthnCredentials?: StoredCredential[];
 }
 
 export class FakeAuthProvider implements AuthProvider {
@@ -188,6 +192,11 @@ export class FakeAuthProvider implements AuthProvider {
     Array<{ id: string; state: 'active' | 'inactive'; name: string; createdAt?: string }>
   >();
   private realFactorTimestamps = false; // see Seed.realFactorTimestamps
+  private readonly webauthn: FakeWebAuthn;
+  // RP domain each pending ceremony was issued for, so verification uses the same one: passkeyId
+  // for registration, sessionId for assertion.
+  private readonly registrationDomains = new Map<string, string>();
+  private readonly assertionDomains = new Map<string, string>();
   private mfaSkippedAt = new Map<string, string>(); // P5: userId → ISO timestamp of last skip
   private issuedOtpEmailCodes = new Map<string, string>(); // sessionId → returnCode issued for that session
   private deviceAuthSeeds: DeviceAuthSeed[]; // P6
@@ -244,6 +253,7 @@ export class FakeAuthProvider implements AuthProvider {
     for (const [uid, links] of Object.entries(seed.idpLinks ?? {}))
       this.idpLinks.set(uid, [...links]);
     this.realFactorTimestamps = seed.realFactorTimestamps ?? false;
+    this.webauthn = new FakeWebAuthn(seed.webauthnCredentials);
     this.passwordComplexity = seed.passwordComplexity ?? {
       minLength: 8,
       requiresUppercase: false,
@@ -571,12 +581,25 @@ export class FakeAuthProvider implements AuthProvider {
     }
 
     if (checks.webAuthN !== undefined) {
-      // webAuthN assertion sets the passkey factor verified + userVerified=true
+      // The assertion is verified for real (prebaked credential id excepted); the stamped
+      // userVerified is what the authenticator actually reported.
+      const sessionUserId = (s.user ?? this.users[0])?.id ?? '';
+      let userVerified: boolean;
+      try {
+        ({ userVerified } = await this.webauthn.verifyAssertion(
+          sessionUserId,
+          id,
+          checks.webAuthN.credentialAssertionData,
+          this.assertionDomains.get(id) ?? ''
+        ));
+      } finally {
+        this.assertionDomains.delete(id);
+      }
       updated = {
         ...updated,
         factors: {
           ...updated.factors,
-          passkey: { verifiedAt: this.stamp(), userVerified: true },
+          passkey: { verifiedAt: this.stamp(), userVerified },
         },
       };
     }
@@ -607,14 +630,16 @@ export class FakeAuthProvider implements AuthProvider {
     if (checks.challenges !== undefined) {
       const challengeResult: Session['challenges'] = {};
       if (checks.challenges.webAuthN !== undefined) {
-        // Return a deterministic pre-baked assertion challenge for e2e/testing.
+        const { domain, userVerificationRequirement } = checks.challenges.webAuthN;
+        const sessionUserId = (s.user ?? this.users[0])?.id ?? '';
+        this.assertionDomains.set(id, domain);
         challengeResult.webAuthN = {
-          publicKeyCredentialRequestOptions: {
-            publicKey: {
-              challenge: 'ZmFrZS1jaGFsbGVuZ2U',
-              allowCredentials: [],
-            },
-          },
+          publicKeyCredentialRequestOptions: await this.webauthn.requestOptions(
+            sessionUserId,
+            domain,
+            userVerificationRequirement,
+            id
+          ),
         };
       }
       // otpEmail is the OtpEmailChallenge discriminated union. 'return-code' returns the
@@ -700,7 +725,7 @@ export class FakeAuthProvider implements AuthProvider {
   async registerPasskey(
     userId: string,
     code: string,
-    _domain: string
+    domain: string
   ): Promise<WebAuthnCreationOptions> {
     // Validates only when a code was minted for this user: legacy direct callers pass an opaque
     // string and never minted one. Single-use, like Zitadel: a consumed code is gone. Recovery
@@ -715,18 +740,35 @@ export class FakeAuthProvider implements AuthProvider {
       }
       this.passkeyCodes.set(userId, null);
     }
+    const passkeyId = `pk-${++this.seq}`;
+    const user = this.users.find((u) => u.id === userId);
+    this.registrationDomains.set(passkeyId, domain);
     return {
-      passkeyId: `pk-${++this.seq}`,
-      publicKeyCredentialCreationOptions: { publicKey: {} },
+      passkeyId,
+      publicKeyCredentialCreationOptions: await this.webauthn.creationOptions(
+        { id: userId, loginName: user?.loginName ?? userId, displayName: user?.displayName },
+        domain,
+        passkeyId
+      ),
     };
   }
 
   async verifyPasskey(
     userId: string,
     passkeyId: string,
-    _cred: unknown,
+    cred: unknown,
     passkeyName?: string
   ): Promise<void> {
+    try {
+      await this.webauthn.verifyRegistration(
+        userId,
+        passkeyId,
+        cred,
+        this.registrationDomains.get(passkeyId) ?? ''
+      );
+    } finally {
+      this.registrationDomains.delete(passkeyId);
+    }
     // Record the named inventory row (immutably); 'Passkey' mirrors the Zitadel
     // adapter's non-empty default (DEFAULT_PASSKEY_NAME in providers/zitadel/mfa.ts).
     this.passkeys.set(userId, [

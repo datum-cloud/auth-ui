@@ -47,4 +47,14 @@ describe('select.server — providerRegistry binding points + getAuthProvider', 
         expect((v.outcome as { threw: boolean }).threw).to.equal(false);
       });
   });
+
+  it('seeds the u5 passkey so a PASSKEY_U5 assertion verifies (select.server and fixture agree)', () => {
+    callService({
+      fn: 'selectProvider',
+      selectOp: 'u5SeedMatchesFixture',
+      request: { url: 'http://localhost/id' },
+    }).then((v) => {
+      expect((v.outcome as { ok: boolean }).ok).to.equal(true);
+    });
+  });
 });

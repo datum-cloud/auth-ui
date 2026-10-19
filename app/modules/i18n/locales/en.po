@@ -1002,7 +1002,7 @@ msgstr "Verify"
 msgid "Verify and enable"
 msgstr "Verify and enable"
 
-#: app/components/webauthn-button/webauthn-button.tsx:280
+#: app/components/webauthn-button/webauthn-button.tsx:281
 #: app/routes/login/passkey.tsx:104
 msgid "Verify with passkey"
 msgstr "Verify with passkey"
@@ -1138,7 +1138,7 @@ msgstr "Your account is ready"
 msgid "Your account is temporarily locked after too many attempts."
 msgstr "Your account is temporarily locked after too many attempts."
 
-#: app/components/webauthn-button/webauthn-button.tsx:260
+#: app/components/webauthn-button/webauthn-button.tsx:261
 msgid "Your browser does not support passkeys. Please use a supported browser."
 msgstr "Your browser does not support passkeys. Please use a supported browser."
 

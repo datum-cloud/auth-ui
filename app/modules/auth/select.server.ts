@@ -167,6 +167,16 @@ function makeFake(): FakeAuthProvider {
     // e2e sessions must carry REAL factor timestamps — sudo freshness (10-min window)
     // compares against Date.now() at the route layer; FIXED_NOW stamps would be permanently stale.
     realFactorTimestamps: true,
+    // u5's passkey, held by the e2e virtual authenticator (mirrors cypress/fixtures/passkey-u5.ts).
+    webauthnCredentials: [
+      {
+        id: 'Z77j9TdedloKCjYE5PyAIg',
+        publicKey:
+          'pQECAyYgASFYICaD9Yl7bwMPk4toY_WdWEAUndj0ZdHh-pLqqNAPuC0jIlggk0jTzWiN8ccu_cY4Hf7rWPpipjhjXv9caatWNuacIXg',
+        counter: 0,
+        userId: 'u5',
+      },
+    ],
   });
   return fakeSingleton;
 }

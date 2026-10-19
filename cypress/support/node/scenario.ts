@@ -63,6 +63,8 @@ export interface ScenarioSeed {
   idps?: Array<{ id: string; name: string; type: string; logoUrl?: string }>;
   /** Pre-linked IdP identities (userId → links), narrowed to the fields joinLinkedIdps reads. */
   idpLinks?: Record<string, Array<{ idpId: string; idpUserId: string; idpUserName?: string }>>;
+  /** Credentials a user already holds (FakeWebAuthn seed). */
+  webauthnCredentials?: Array<{ id: string; publicKey: string; counter: number; userId: string }>;
 }
 
 /** A live session to inject via provider.seedLiveSession (getSession/listSessions resolve it). */
@@ -263,6 +265,10 @@ export type ServiceFn =
   // select.server is stubbed in the browser bundle (a fake-only registry), so the REAL
   // provider-selection binding point (fake↔zitadel) is exercised node-side.
   | 'selectProvider'
+  // FakeWebAuthn (options + cryptographic verification); a discriminated op, see fakeWebAuthnOp.
+  | 'fakeWebAuthn'
+  // FakeAuthProvider.updateSession's webAuthN challenge + check path; see sessionWebAuthnOp.
+  | 'sessionWebAuthn'
   // ── Task 11 migrations ───────────────────────────────────────────────────────
   // env.server._envSchema — comprehensive Zod schema validation. Returns full
   // { success, data?, issues? } so specs can assert any field without re-implementing the schema.
@@ -747,7 +753,39 @@ export interface Scenario {
     | 'fakeIsInstance' // getAuthProvider({fake}) instanceof FakeAuthProvider → { isFake }
     | 'zitadelNoThrow' // getAuthProvider({zitadel, serviceUrl}) constructs without throwing → { threw }
     | 'registryKeys' // Object.keys(providerRegistry).sort() → { keys }
-    | 'fakeSingleton'; // providerRegistry.fake() x2 → { same }
+    | 'fakeSingleton' // providerRegistry.fake() x2 → { same }
+    | 'u5SeedMatchesFixture'; // singleton accepts a PASSKEY_U5 assertion → { ok, passkey }
+
+  // ── FakeWebAuthn (fn: 'fakeWebAuthn') ──────────────────────────────────────
+  /** REAL FakeWebAuthn seeded with PASSKEY_U5. Each op runs a whole ceremony node-side (the key
+   *  never leaves Bun) and returns data; the spec keeps every assertion.
+   *  creationOptions → { rpId, userId }; prebaked → { userVerified };
+   *  signed | unknownId | wrongChallenge | wrongOrigin | mangledSignature | otherUser
+   *    → { ok: true, userVerified } | { ok: false, code }
+   *  registerSuccess | registerUnknownKey | registerOtherUser (u6 registers) → { ok: true } | { ok: false, code }
+   *  prodOriginHttps | prodOriginHttp (assertion on auth.example.test) → as signed */
+  fakeWebAuthnOp?:
+    | 'creationOptions'
+    | 'prebaked'
+    | 'signed'
+    | 'unknownId'
+    | 'wrongChallenge'
+    | 'wrongOrigin'
+    | 'mangledSignature'
+    | 'otherUser'
+    | 'registerSuccess'
+    | 'registerUnknownKey'
+    | 'registerOtherUser'
+    | 'prodOriginHttps'
+    | 'prodOriginHttp';
+
+  // ── session WebAuthn (fn: 'sessionWebAuthn') ───────────────────────────────
+  /** Runs against the scenario's provider (seed it with PASSKEY_U5's credential), with live
+   *  sessions for u5. Every op returns { ok: true, passkey } | { ok: false, code, passkey }: session A's
+   *  passkey factor after the submit, and the ProviderError code if it threw.
+   *  signed: arm A, sign, submit.  twoSessions: arm A, arm B, sign A's challenge, submit on A.
+   *  unknownCredential: arm A, sign with an unseeded id, submit.  prebaked: submit the stub id. */
+  sessionWebAuthnOp?: 'signed' | 'twoSessions' | 'unknownCredential' | 'prebaked';
 
   // ── verification-mail client (fn: 'sendVerificationMail'; Task 5) ──────────
   /** Input for the REAL sendVerificationMail. */

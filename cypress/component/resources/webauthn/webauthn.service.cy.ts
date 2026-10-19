@@ -13,7 +13,7 @@
 import { callService } from '../../../support/node/call-service';
 
 const ALICE = 'alice@acme.test';
-const VALID_CRED = JSON.stringify({ id: 'cred-1' });
+const VALID_CRED = JSON.stringify({ id: 'fake-credential-id' });
 const sessionsFor = (organization?: string) => [
   { id: 's1', token: 't1', loginName: ALICE, organization },
 ];

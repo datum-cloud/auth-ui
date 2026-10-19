@@ -7,6 +7,7 @@
 // precondition-gate + challenge + verify + wrong-code behavior is the dedicated subject of
 // fake-otpemail.cy.ts and is not re-verified here to avoid duplicate coverage of the same code path.
 import { FakeAuthProvider, FIXED_NOW } from '@/modules/auth/providers/fake/fake-provider';
+import { PREBAKED_CREDENTIAL_ID } from '@/modules/auth/providers/fake/fake-webauthn';
 
 describe('FakeAuthProvider — MFA (P5)', () => {
   it('enrolls totp, passkey, and otp_email methods; listAuthMethods merges seeded + newly-enrolled methods', async () => {
@@ -23,7 +24,7 @@ describe('FakeAuthProvider — MFA (P5)', () => {
     const { code } = await p.passkeyRegisterLink('u1');
     expect(code).to.be.ok;
     await p.registerPasskey('u1', code, 'localhost');
-    await p.verifyPasskey('u1', 'pk1', { fake: true });
+    await p.verifyPasskey('u1', 'pk1', { id: PREBAKED_CREDENTIAL_ID });
 
     await p.verifyEmail('u1', 'email-u1');
     await p.addOtpEmail('u1');
@@ -35,7 +36,7 @@ describe('FakeAuthProvider — MFA (P5)', () => {
     expect(methods).to.include('otp_email');
   });
 
-  it('updateSession verifies totp/otpSms/webAuthN factors independently, treats an empty otpSms code as a no-op, and returns a deterministic challenge on request', async () => {
+  it('updateSession verifies totp/otpSms/webAuthN factors independently, treats an empty otpSms code as a no-op, and issues a real WebAuthn challenge on request', async () => {
     const seed = {
       users: [{ id: 'u1', loginName: 'a@acme.test' }],
       passwords: { u1: 'pw' },
@@ -47,7 +48,7 @@ describe('FakeAuthProvider — MFA (P5)', () => {
     const verified = await p1.updateSession(s1.id, s1.token, {
       totp: '123456',
       otpSms: '111111',
-      webAuthN: { credentialAssertionData: { fake: true } },
+      webAuthN: { credentialAssertionData: { id: PREBAKED_CREDENTIAL_ID } },
     });
     expect(verified.factors.totp?.verifiedAt).to.not.be.null;
     expect(verified.factors.otpSms?.verifiedAt).to.not.be.null;
@@ -72,7 +73,7 @@ describe('FakeAuthProvider — MFA (P5)', () => {
     const opts = challenged.challenges?.webAuthN?.publicKeyCredentialRequestOptions as {
       publicKey?: { challenge?: string };
     };
-    expect(opts?.publicKey?.challenge).to.equal('ZmFrZS1jaGFsbGVuZ2U');
+    expect(opts?.publicKey?.challenge).to.match(/^[A-Za-z0-9_-]{16,}$/);
     const stored = await p2.getSession(s2.id, s2.token);
     expect(stored?.challenges?.otpSms).to.be.undefined;
     expect(stored?.challenges?.webAuthN).to.be.undefined;

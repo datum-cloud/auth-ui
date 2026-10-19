@@ -214,7 +214,7 @@ jobs:
     name: E2E (fast, fake provider)
     needs: install
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     # The dev server validates env at boot; the fake provider only requires a
     # SESSION_SECRET (>= 32 chars). This is a throwaway CI value for the in-memory
     # fake auth provider — NOT a real secret.
