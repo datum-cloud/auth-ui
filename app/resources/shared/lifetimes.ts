@@ -24,6 +24,15 @@ export function primaryFresh(f: Factors, nowMs: number, lifetimeMs: number | und
   );
 }
 
+/**
+ * Has this session EVER verified a primary factor (password, passkey, IdP)? No lifetime: this is
+ * "is it signed in at all", not "is it fresh". A session holding only second factors — the
+ * otpEmail-only session passkey signup mints — is not, and must never finalize an auth request.
+ */
+export function hasPrimaryFactor(f: Factors): boolean {
+  return primaryFresh(f, 0, undefined);
+}
+
 /** Checks if any second factor is fresh. Pass `lifetimeMs` from `LoginSettings.secondFactorCheckLifetimeMs`. */
 export function secondFactorFresh(
   f: Factors,

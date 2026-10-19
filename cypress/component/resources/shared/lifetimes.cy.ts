@@ -3,7 +3,7 @@
 // Component (no-mount) port of app/resources/shared/__tests__/lifetimes.test.ts.
 // Pure freshness-window helpers → browser-side Chai only.
 import type { Factors } from '@/modules/auth/types';
-import { isFactorFresh, primaryFresh } from '@/resources/shared/lifetimes';
+import { hasPrimaryFactor, isFactorFresh, primaryFresh } from '@/resources/shared/lifetimes';
 
 const T0 = Date.parse('2026-01-01T00:00:00.000Z');
 const at = (iso: string | null) => ({ verifiedAt: iso === null ? null : new Date(iso) });
@@ -52,5 +52,27 @@ describe('isFactorFresh / primaryFresh', () => {
       true
     );
     expect(primaryFresh({}, T0 + 100, 1000), 'no factors at all').to.equal(false);
+  });
+});
+
+describe('hasPrimaryFactor', () => {
+  const LONG_AGO = '2020-01-01T00:00:00.000Z';
+
+  it('is true for any verified primary factor, however old (no lifetime)', () => {
+    expect(hasPrimaryFactor({ password: at(LONG_AGO) }), 'password').to.equal(true);
+    expect(hasPrimaryFactor({ passkey: at(LONG_AGO) }), 'passkey').to.equal(true);
+    expect(hasPrimaryFactor({ idpIntent: at(LONG_AGO) }), 'idpIntent').to.equal(true);
+  });
+
+  it('is false for second factors alone — the otpEmail-only signup session', () => {
+    const secondOnly: Factors = {
+      otpEmail: at(LONG_AGO),
+      totp: at(LONG_AGO),
+      otpSms: at(LONG_AGO),
+      u2f: at(LONG_AGO),
+    };
+    expect(hasPrimaryFactor(secondOnly)).to.equal(false);
+    expect(hasPrimaryFactor({ passkey: at(null) }), 'unverified passkey').to.equal(false);
+    expect(hasPrimaryFactor({}), 'no factors').to.equal(false);
   });
 });

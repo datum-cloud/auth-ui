@@ -26,7 +26,7 @@ import {
   decideAuthorize,
   deriveOrganizationFromScopes,
 } from '@/resources/authorize/authorize-decision';
-import { primaryFresh } from '@/resources/shared/lifetimes';
+import { hasPrimaryFactor, primaryFresh } from '@/resources/shared/lifetimes';
 import { resolveOrg } from '@/resources/shared/resolve-org';
 import { logAuthEvent } from '@/server/observability';
 import { realSleep, type Sleep } from '@/server/timing';
@@ -371,6 +371,23 @@ function rejectCrossOrgSession(
   return { kind: 'redirect', location: loginRedirect(requestId, organization) };
 }
 
+/**
+ * Zitadel's LinkSessionToAuthRequest checks only that the session is alive and its token valid —
+ * never its factors; that policy is the login UI's. Passkey signup mints a session holding
+ * otpEmail alone, which sits in the cookie while the user is still on /setup/passkey, so without
+ * this gate a plain /authorize signed them in with no passkey. Re-prompt /login and leave the
+ * session in place: the signup tab still needs it to finish enrolment.
+ */
+function refuseIncompleteSession(
+  entry: SessionEntry,
+  requestId: string,
+  rawId: string,
+  organization: string | undefined
+): AuthorizeOutcome {
+  logAuthEvent('session_incomplete', 'success', { requestId: rawId, sessionId: entry.id });
+  return { kind: 'redirect', location: loginRedirect(requestId, organization) };
+}
+
 /** Run createCallback for a resolved live session and map success/failure to an outcome. */
 async function runCallback(
   provider: AuthProvider,
@@ -529,6 +546,9 @@ async function resolveOidc(
       if (organization && isOrgMismatch(gate.session, organization)) {
         return rejectCrossOrgSession(gate.session, entry, requestId, rawId, organization);
       }
+      if (!hasPrimaryFactor(gate.session.factors)) {
+        return refuseIncompleteSession(entry, requestId, rawId, organization);
+      }
 
       // ANTI-FORGERY FRESHNESS GATE (prompt=login only). The sessionId is query-supplied, so a
       // caller can forge `&sessionId=<their_own_STALE_live_session>` onto a prompt=login request
@@ -572,6 +592,9 @@ async function resolveOidc(
     if ('kind' in healed) return healed;
     if (organization && isOrgMismatch(healed.session, organization)) {
       return rejectCrossOrgSession(healed.session, entry, requestId, rawId, organization);
+    }
+    if (!hasPrimaryFactor(healed.session.factors)) {
+      return refuseIncompleteSession(entry, requestId, rawId, organization);
     }
     return runCallback(provider, rawId, entry, list, requestId, organization);
   }
