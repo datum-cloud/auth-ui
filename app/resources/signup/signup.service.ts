@@ -708,11 +708,11 @@ export async function completeEmailLinkSignup(
   if (organization) params.set('organization', organization);
   if (requestId) params.set('requestId', requestId);
   params.set('force', 'false');
-  // checkAfter=false + returnTo: end at the signup terminal rather than running a ceremony the
-  // user did not ask for. Enrolling a passkey adds no factor to the session, whose only factor is
-  // the otpEmail proven above — which primaryFresh does not count — so post-enrollment routing
-  // originally sent the user to /login/password, a password they never set. returnTo is
-  // re-validated on the enroll POST.
+  // checkAfter=false + returnTo: end at the signup terminal, which signs the user in with the
+  // passkey they just made (issue #153). Enrolling a passkey adds no factor to the session, whose
+  // only factor is the otpEmail proven above — which primaryFresh does not count — so generic
+  // post-enrollment routing would send the user to /login/password, a password they never set.
+  // returnTo is re-validated on the enroll POST.
   params.set('checkAfter', 'false');
   params.set('returnTo', `/signup/success?${threadParams(loginName, requestId, organization)}`);
 

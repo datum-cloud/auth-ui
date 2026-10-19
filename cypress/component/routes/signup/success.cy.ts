@@ -1,11 +1,9 @@
 // cypress/component/routes/signup/success.cy.ts
 //
-// The signup terminal retires the signup session, plus the guard that stops it being a
-// cross-site logout.
-//
-// That session is authenticated by otpEmail alone and enrolling a passkey adds no factor, so it
-// arrives permanently incomplete. Left in the cookie, signing in mints a SECOND session and
-// prompt=select_account then offers two entries for one account — picking the stale one dead-ends.
+// The signup terminal signs the new user in with the passkey they just made, so it KEEPS the
+// signup session: that is the session the passkey assertion lands on. It only drops a session the
+// provider no longer knows, which cannot sign anyone in, plus the guard that stops this GET being
+// a cross-site logout.
 import { callService } from '../../../support/node/call-service';
 
 const LOGIN = 'newuser@acme.test';
@@ -26,8 +24,8 @@ function droppedSession(res: { setCookies?: string[]; dataSetCookies?: string[] 
   );
 }
 
-describe('signup/success — retires the factor-incomplete signup session', () => {
-  it('drops a session whose only factor is otpEmail (the shape signup actually mints)', () => {
+describe('signup/success — keeps the signup session it signs in with', () => {
+  it('keeps a live session whose only factor is otpEmail (the shape signup actually mints)', () => {
     callService({
       fn: 'signupSuccessLoader',
       seed: { users: [USER] },
@@ -38,7 +36,7 @@ describe('signup/success — retires the factor-incomplete signup session', () =
       request: { url: URL, sessions: COOKIE },
     }).then((v) => {
       expect(v.ok, v.error ?? '').to.be.true;
-      expect(droppedSession(v.response ?? {}), 'must rewrite the sessions cookie').to.be.true;
+      expect(droppedSession(v.response ?? {}), 'the passkey sign-in needs it').to.be.false;
     });
   });
 
@@ -58,8 +56,7 @@ describe('signup/success — retires the factor-incomplete signup session', () =
 
 // THE GUARD. This is a GET, so a cross-site page can point a victim's browser at
 // /signup/success?loginName=<them>. Evicting on the URL param alone would make that a
-// one-request logout, so the loader reads the LIVE session and only retires one with no primary
-// factor — i.e. one that could not sign anyone in anyway.
+// one-request logout, so the loader reads the LIVE session and only retires a dead one.
 // The passkey HINT must go too, and for a reason independent of the session.
 // signup/complete writes it so a returning user gets the passkey shortcut on /login. Left set
 // after signup it points /login at passkey paths this browser cannot yet complete: the shortcut
