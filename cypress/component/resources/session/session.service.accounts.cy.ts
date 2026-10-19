@@ -39,9 +39,6 @@ describe('listAccounts — listAuthMethods N+1 dedupe', () => {
   });
 });
 
-// A session with no primary factor only belongs in the picker while the account still has a way
-// to earn one. The abandoned passkey signup (otpEmail alone, nothing else enrolled) has none:
-// its card routed to /login/method, which offers nothing while email OTP sign-in is hidden.
 describe('listAccounts — dead-end sessions', () => {
   const user = { id: 'u-new', loginName: 'new@acme.test', displayName: 'New' };
   const cookie = [{ id: 's-signup', token: 't-signup', loginName: 'new@acme.test' }];

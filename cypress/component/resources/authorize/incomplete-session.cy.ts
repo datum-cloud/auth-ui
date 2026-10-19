@@ -1,15 +1,6 @@
 // cypress/component/resources/authorize/incomplete-session.cy.ts
 //
-// A session with no primary factor must never finalize an auth request.
-//
-// Zitadel's LinkSessionToAuthRequest checks only that the session is alive and the token is
-// valid — it does not look at factors, and leaves that policy to the login UI. Passkey signup
-// mints exactly such a session: otpEmail alone, held in the cookie while the user is still on
-// /setup/passkey. Before this gate, a plain /authorize (no prompt — what cloud-portal sends)
-// reused it as the most recent session and signed the user in without a passkey (confirmed on
-// staging). The session is NOT pruned: the signup tab still needs it to finish enrolment.
-//
-// Node-bound: resolveAuthorize reads a real signed `sessions` cookie off a Request.
+// A session with no primary factor (the otpEmail-only signup session) never finalizes.
 import { callService, type AuditEvent } from '../../../support/node/call-service';
 
 const SIGNUP = { id: 'sess-signup-1', token: 'tok-signup-1' };
@@ -34,7 +25,6 @@ function expectLoginWithoutCallback(v: {
   const refused = v.audit.find((e) => e.event === 'session_incomplete');
   expect(refused !== undefined, 'session_incomplete event').to.equal(true);
   expect(refused?.sessionId).to.equal(SIGNUP.id);
-  // Not pruned: no re-signed cookie is written at all.
   expect(v.response?.cookieEntries ?? null).to.equal(null);
 }
 

@@ -371,13 +371,7 @@ function rejectCrossOrgSession(
   return { kind: 'redirect', location: loginRedirect(requestId, organization) };
 }
 
-/**
- * Zitadel's LinkSessionToAuthRequest checks only that the session is alive and its token valid —
- * never its factors; that policy is the login UI's. Passkey signup mints a session holding
- * otpEmail alone, which sits in the cookie while the user is still on /setup/passkey, so without
- * this gate a plain /authorize signed them in with no passkey. Re-prompt /login and leave the
- * session in place: the signup tab still needs it to finish enrolment.
- */
+/** Zitadel never checks factors on link; keep the session, the signup tab still needs it. */
 function refuseIncompleteSession(
   entry: SessionEntry,
   requestId: string,

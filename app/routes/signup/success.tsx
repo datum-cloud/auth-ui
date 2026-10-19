@@ -25,12 +25,7 @@ import {
 
 export const meta: MetaFunction = () => [{ title: 'Your account is ready' }];
 
-/**
- * Terminal for passkey signup: account created, address verified, passkey registered. The page
- * then signs the user in with that passkey in place (issue #153), so they never retype their
- * address on /login. Registering a passkey adds no factor to the signup session, whose only
- * factor is otpEmail; the assertion here is what earns the primary factor /authorize requires.
- */
+/** Signup terminal: signs the user in with the passkey they just registered. */
 export async function loader({ request }: LoaderFunctionArgs) {
   const url = new URL(request.url);
   const loginName = url.searchParams.get('loginName') ?? undefined;
@@ -39,14 +34,10 @@ export async function loader({ request }: LoaderFunctionArgs) {
 
   const headers = new Headers();
 
-  // Clear the passkey hint. It drives /login's passkey shortcut and conditional-UI autofill, and
-  // conditional UI arms a discoverable request whose arming MINTS a session — so the next
-  // discover returns 409 already_signed_in. The sign-in below writes it back on success.
+  // Conditional-UI autofill would mint a second session; sign-in rewrites the hint on success.
   headers.append('set-cookie', await clearPasskeyHint());
 
-  // KEEP a live signup session: the passkey assertion lands on it. Only a session the provider no
-  // longer knows is dropped; it cannot sign anyone in, and arming a challenge on it would fail.
-  // A live session is never evicted, so this GET cannot be turned into a cross-site logout.
+  // Keep a live session (the sign-in needs it); drop only a dead one, so this GET can't log out.
   if (loginName) {
     const sessions = await readSessions(request);
     const entry = byLoginName(sessions, loginName, organization);
@@ -79,10 +70,7 @@ export default function SignupSuccess() {
   const serverError = useAuthActionError(ceremony.actionData);
   const busy = ceremony.phase !== 'idle';
 
-  // Start the sign-in on arrival: the user just made this passkey, so asking them to click again
-  // would be the extra step #153 removes. One-shot, as on /login/method. That attempt has no
-  // click behind it, and WebKit rejects navigator.credentials.get() without one, so its failure
-  // stays silent; the button below is the way forward and reports its own failures.
+  // Auto-start once, as /login/method does. WebKit rejects it without a click, so stay silent.
   const autoBegunRef = useRef(false);
   const [suppressAutoBeginReason, setSuppressAutoBeginReason] = useState(false);
   useEffect(() => {
@@ -116,8 +104,6 @@ export default function SignupSuccess() {
 
       <div className="flex flex-col gap-3">
         {loginName ? (
-          // A real <a> to /login/passkey, upgraded in place once hydrated (same convention as
-          // /login/method): unhydrated, the browser follows the href to the standalone screen.
           <LinkButton
             type="primary"
             theme="solid"

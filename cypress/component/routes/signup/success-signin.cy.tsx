@@ -1,14 +1,6 @@
 // cypress/component/routes/signup/success-signin.cy.tsx
 //
-// Issue #153: the signup terminal signs the new user in with the passkey they just registered,
-// instead of sending them to /login to do it by hand. The page runs the shared in-place
-// ceremony against the /login/passkey route (stubbed here): challenge from its loader, the
-// Cypress pre-baked credential posted to its action, whose success redirect the real route
-// follows into /authorize or /signed-in.
-//
-// The auto-begun attempt has no click behind it, and WebKit rejects navigator.credentials.get()
-// without one. So a failed AUTO attempt stays silent and leaves the button; a failed attempt the
-// user started reports its error. Same contract as /login/method's sole-passkey auto-start.
+// The signup terminal signs the new user in with their passkey, against a stubbed /login/passkey.
 import SignupSuccess from '@/routes/signup/success';
 import { setupI18n } from '@lingui/core';
 import { I18nProvider } from '@lingui/react';

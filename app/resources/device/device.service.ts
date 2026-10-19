@@ -243,9 +243,7 @@ export async function resolveDeviceDecision(
     return { kind: 'redirect', location: `/login?requestId=${encodeURIComponent(requestId)}` };
   }
 
-  // Zitadel approves with any live session; signed-in is ours to check. An otpEmail-only signup
-  // session (no passkey yet) must not approve a device. Unreadable sessions go to /login too:
-  // fail closed, nothing is pruned, and the worst case is one extra sign-in.
+  // Zitadel approves with any live session. Fail closed: unreadable sessions sign in again.
   if (decision === 'authorize' && entry) {
     const live = await provider.getSession(entry.id, entry.token).catch(() => null);
     if (!live || !hasPrimaryFactor(live.factors)) {

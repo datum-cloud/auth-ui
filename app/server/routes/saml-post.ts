@@ -112,8 +112,6 @@ export async function samlPostHandler(c: Context): Promise<Response> {
         },
       });
     }
-    // Alive is not signed in. An otpEmail-only signup session (no passkey yet) must never get an
-    // assertion; see refuseIncompleteSession in authorize.service.ts. Kept, not pruned.
     if (!hasPrimaryFactor(alive.factors)) {
       logAuthEvent('session_incomplete', 'success', { requestId: id, sessionId: session.id });
       return c.redirect('/id/login?requestId=saml_' + encodeURIComponent(id));

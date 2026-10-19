@@ -376,12 +376,7 @@ export async function listAccounts(
 
 const PRIMARY_METHODS: ReadonlySet<AuthMethod> = new Set(['password', 'passkey', 'idp']);
 
-/**
- * A session with no primary factor whose account has no primary method to earn one with. The
- * abandoned passkey signup is the case: otpEmail alone, nothing else enrolled. Its card routed to
- * /login/method, which offers nothing while email OTP sign-in is hidden. A session the provider
- * could not read stays listed, as the needs-re-auth card it has always been.
- */
+/** No primary factor and no primary method to earn one, e.g. an abandoned passkey signup. */
 function isDeadEndSession(
   session: Session | undefined,
   authMethodsMap: Map<string, AuthMethod[]>

@@ -1,9 +1,6 @@
 // cypress/component/routes/signup/success.cy.ts
 //
-// The signup terminal signs the new user in with the passkey they just made, so it KEEPS the
-// signup session: that is the session the passkey assertion lands on. It only drops a session the
-// provider no longer knows, which cannot sign anyone in, plus the guard that stops this GET being
-// a cross-site logout.
+// The signup terminal keeps the live signup session it signs in with and drops only a dead one.
 import { callService } from '../../../support/node/call-service';
 
 const LOGIN = 'newuser@acme.test';
@@ -55,8 +52,7 @@ describe('signup/success — keeps the signup session it signs in with', () => {
 });
 
 // THE GUARD. This is a GET, so a cross-site page can point a victim's browser at
-// /signup/success?loginName=<them>. Evicting on the URL param alone would make that a
-// one-request logout, so the loader reads the LIVE session and only retires a dead one.
+// /signup/success?loginName=<them>, so only a dead session may be evicted.
 // The passkey HINT must go too, and for a reason independent of the session.
 // signup/complete writes it so a returning user gets the passkey shortcut on /login. Left set
 // after signup it points /login at passkey paths this browser cannot yet complete: the shortcut
