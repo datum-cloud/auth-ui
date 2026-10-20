@@ -200,9 +200,10 @@ export function WebAuthnButton({
         return;
       }
       // Cypress fake-credential path: no publicKey needed. The pre-baked credential works for
-      // both assertion and attestation because the fake provider accepts any payload. A spec may
-      // opt OUT of the fake (window.__webAuthnRealCeremony) to drive the REAL ceremony against a
-      // stubbed navigator.credentials and assert reason-specific failure copy; undefined in prod.
+      // both assertion and attestation: the fake provider accepts only `fake-credential-id` or a
+      // cryptographically verified registration/assertion. A spec may opt OUT of the fake
+      // (window.__webAuthnRealCeremony) to drive the REAL ceremony against a stubbed
+      // navigator.credentials and assert reason-specific failure copy; undefined in prod.
       const useFakeCredential =
         isCypress &&
         !(window as unknown as { __webAuthnRealCeremony?: boolean }).__webAuthnRealCeremony;

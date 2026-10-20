@@ -1,37 +1,33 @@
 // cypress/e2e/passkey-discovery.cy.ts
 //
-// The usernameless DISCOVERY path end-to-end against the fake provider: a FRESH browser — no
-// passkey-hint, no session, nothing — signs in with zero typing. The identity tap
-// (auto-resolved via the Cypress seam; CYPRESS_CREDENTIAL carries userHandle
-// base64url('u5')) posts to /login/passkey-discover, which resolves u5 and mints
-// the real user-bound challenge; the modal ceremony auto-resolves and the verify
-// action signs the user in AND writes the hint — so the next visit takes the
-// one-tap HINTED path (browser self-upgrade, at-most-once-per-browser discovery).
+// The usernameless DISCOVERY path end-to-end against the fake provider, with REAL WebAuthn
+// ceremonies on Chrome's virtual authenticator: a FRESH browser — no passkey-hint, no
+// session — signs in with zero typing. The Passkey button runs a first assertion that is
+// posted to /login/passkey-discover (only its userHandle is read: it resolves u5 and mints a
+// user-bound challenge), then a second assertion goes to /login/passkey, where the fake
+// provider verifies the signature. The verify success writes the hint, so the next visit
+// takes the one-tap HINTED path (browser self-upgrade, at-most-once-per-browser discovery).
+import { PASSKEY_U5 } from '../fixtures/passkey-u5';
+import {
+  addVirtualAuthenticator,
+  expectPostedRealCredential,
+  plantCredential,
+  removeVirtualAuthenticator,
+  setAutomaticPresenceSimulation,
+  visitRealWebAuthn,
+} from '../support/virtual-authenticator';
+
 const USER = 'passkey-user@acme.test'; // u5 — the seeded passkey user
 
-const visitLoginArmed = () =>
-  cy.visit('/id/login', {
-    onBeforeLoad: (win) => {
-      win.__CYPRESS_HYDRATE__ = true; // the ceremony needs JS (see entry.client.tsx)
-      (
-        win as unknown as { __conditionalPasskeyAutoResolve?: boolean }
-      ).__conditionalPasskeyAutoResolve = true; // simulate "user taps the passkey in the dropdown"
-    },
-  });
-
 describe('usernameless passkey discovery (fresh browser)', () => {
+  let authenticatorId: string;
+
   // Warm Vite's dep optimization AND the hydrated client graph once (same rationale as
-  // passkey-conditional.cy.ts, plus hydration: the discovery journey's first armed visit
-  // is this spec's very first interaction, so any cold-load auto-reload would eat the
-  // onBeforeLoad flags). Settle a fully hydrated page before any test-critical visit.
+  // passkey-conditional.cy.ts, plus hydration: any cold-load auto-reload would eat the
+  // onBeforeLoad flags of the first test-critical visit).
   before(() => {
-    // Stage 1 — plain SSR visit: absorbs Vite's cold-start dep-optimization reload
-    // (which would silently drop any onBeforeLoad flag) exactly like
-    // passkey-conditional.cy.ts's warm-up.
     cy.visit('/id/login');
     cy.contains('button', /email/i);
-    // Stage 2 — hydrated visit on the now-warm server: settles the full client
-    // graph so the first test-critical armed visit isn't the first hydration.
     cy.visit('/id/login', {
       onBeforeLoad: (win) => {
         win.__CYPRESS_HYDRATE__ = true;
@@ -41,31 +37,45 @@ describe('usernameless passkey discovery (fresh browser)', () => {
     cy.contains('button', /email/i);
   });
 
+  beforeEach(() => {
+    addVirtualAuthenticator().then((id) => {
+      authenticatorId = id;
+      plantCredential(id, PASSKEY_U5);
+    });
+  });
+
+  afterEach(() => {
+    if (authenticatorId) removeVirtualAuthenticator(authenticatorId);
+    authenticatorId = '';
+  });
+
   it('fresh browser: BUTTON-initiated discovery signs in, then self-upgrades to the hinted path', () => {
-    // 1. FRESH-browser preconditions: no hint, no session. Cleared individually —
-    // cy.clearAllCookies() nukes Cypress-internal cookies too, and the next visit
-    // loses its onBeforeLoad flags to an uninstrumented reload (repo convention:
-    // passkey-conditional.cy.ts also clears specific cookies only).
+    // FRESH-browser preconditions: no hint, no session. Cleared individually —
+    // cy.clearAllCookies() nukes Cypress-internal cookies too.
     cy.clearCookie('passkey-hint');
     cy.clearCookie('sessions');
-    // Ambient arming is hinted-only: a hintless load stays quiet
-    // even with auto-resolve armed; the Passkey BUTTON is the discovery entry
-    // (beginDiscovery — under Cypress the pre-baked credential IS the picked passkey).
-    visitLoginArmed();
-    cy.settleHydration();
+    cy.intercept('POST', /\/id\/login\/passkey-discover(\.data)?(\?|$)/).as('discover');
+    cy.intercept('POST', /\/id\/login\/passkey(\.data)?(\?|$)/).as('verify');
+
+    // Ambient arming is hinted-only: a hintless load stays quiet; the Passkey BUTTON is the
+    // discovery entry.
+    visitRealWebAuthn('/id/login');
     cy.location('pathname').should('eq', '/id/login');
     cy.contains('button', /passkey/i).click();
     cy.location('pathname').should('eq', '/id/signed-in');
     cy.contains(USER);
 
-    // 2. Self-upgrade: the verify success wrote the hint (discover itself must not).
+    // Both assertions came from the planted credential, not the pre-baked shortcut one.
+    for (const alias of ['@discover', '@verify'])
+      expectPostedRealCredential(alias, authenticatorId);
+
+    // Self-upgrade: the verify success wrote the hint (discover itself must not).
     cy.getCookie('passkey-hint').should('exist');
 
-    // 3. Session expires (hint survives) → the returning visit takes the HINTED
-    //    one-tap path — discovery ran at most once for this browser.
+    // Session expires (hint survives) → the returning visit takes the HINTED one-tap path —
+    // discovery ran at most once for this browser.
     cy.clearCookie('sessions');
-    visitLoginArmed();
-    cy.settleHydration();
+    visitRealWebAuthn('/id/login');
     cy.location('pathname').should('eq', '/id/signed-in');
     cy.contains(USER);
   });
@@ -73,12 +83,9 @@ describe('usernameless passkey discovery (fresh browser)', () => {
   it('a parked discovery ceremony (no tap) never blocks the ordinary identifier flow', () => {
     cy.clearCookie('passkey-hint');
     cy.clearCookie('sessions');
-    cy.visit('/id/login', {
-      onBeforeLoad: (win) => {
-        win.__CYPRESS_HYDRATE__ = true; // armed but NO auto-resolve → ceremony parks
-      },
-    });
-    cy.settleHydration();
+    // No presence: any ceremony that starts parks instead of resolving.
+    setAutomaticPresenceSimulation(authenticatorId, false);
+    visitRealWebAuthn('/id/login');
     cy.contains('button', /email/i).click();
     cy.get('input[name="loginName"]').type('alice@acme.test');
     cy.get('input[name="loginName"]:visible').closest('form').submit();

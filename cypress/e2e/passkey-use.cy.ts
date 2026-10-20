@@ -1,54 +1,75 @@
+import { PASSKEY_U5 } from '../fixtures/passkey-u5';
 import { checkA11y } from '../support/a11y';
 import { loginAndGetSession } from '../support/session';
+import {
+  addVirtualAuthenticator,
+  getCredentials,
+  plantCredential,
+  removeVirtualAuthenticator,
+  setUserVerified,
+  toBase64,
+  visitRealWebAuthn,
+} from '../support/virtual-authenticator';
 
 describe('Passkey verify (/login/passkey)', () => {
-  it('renders accessibly, drives ceremony via Cypress path, redirects to /signed-in', () => {
-    // Plant the session cookie for passkey-user@acme.test
-    loginAndGetSession('passkey-user@acme.test');
+  const PASSKEY_URL = '/id/login/passkey?loginName=passkey-user%40acme.test';
+  const PASSKEY_BUTTON = /sign in with .*passkey|touch id|windows hello/i;
+  let authenticatorId: string;
 
-    // Navigate directly to the passkey verify screen with loginName threaded.
-    cy.visit('/id/login/passkey?loginName=passkey-user%40acme.test', {
-      onBeforeLoad: (win) => {
-        win.__CYPRESS_HYDRATE__ = true; // ceremony needs JS — opt into hydration (see entry.client.tsx)
-      },
+  beforeEach(() => {
+    addVirtualAuthenticator().then((id) => {
+      authenticatorId = id;
+      plantCredential(id, PASSKEY_U5);
     });
-    cy.settleHydration();
+  });
+
+  afterEach(() => {
+    if (authenticatorId) removeVirtualAuthenticator(authenticatorId);
+    authenticatorId = '';
+  });
+
+  it('renders accessibly, signs in with a real passkey ceremony, redirects to /signed-in', () => {
+    loginAndGetSession('passkey-user@acme.test');
+    visitRealWebAuthn(PASSKEY_URL);
 
     checkA11y();
 
-    // The WebAuthnButton detects window.Cypress and uses the pre-baked credential.
-    // Hydration gate: the button is disabled until React mounts; Cypress waits for it.
-    cy.contains('button', /sign in with .*passkey|touch id|windows hello/i)
-      .should('not.be.disabled')
-      .click();
+    cy.contains('button', PASSKEY_BUTTON).should('not.be.disabled').click();
+    cy.location('pathname').should('eq', '/id/signed-in');
 
-    // The fake provider marks passkey factor verified + userVerified=true,
-    // so nextStep returns /signed-in deterministically.
+    // Chrome's getCredentials does not surface the bumped counter, so assert the planted
+    // resident credential is still the one on the authenticator; counter advance is proven by
+    // the next test (the fake provider rejects a non-increasing counter on the second sign-in).
+    getCredentials(authenticatorId).then((creds) => {
+      expect(creds).to.have.length(1);
+      expect(creds[0].credentialId).to.eq(toBase64(PASSKEY_U5.credentialId));
+    });
+  });
+
+  it('signs in twice with the same passkey', () => {
+    loginAndGetSession('passkey-user@acme.test');
+    visitRealWebAuthn(PASSKEY_URL);
+    cy.contains('button', PASSKEY_BUTTON).should('not.be.disabled').click();
+    cy.location('pathname').should('eq', '/id/signed-in');
+
+    cy.get('form[action="/id/logout?index"]').submit();
+    cy.location('pathname').should('eq', '/id/logout/success');
+
+    loginAndGetSession('passkey-user@acme.test');
+    visitRealWebAuthn(PASSKEY_URL);
+    cy.contains('button', PASSKEY_BUTTON).should('not.be.disabled').click();
     cy.location('pathname').should('eq', '/id/signed-in');
   });
-});
 
-describe('Security key verify (/login/security-key)', () => {
-  it('renders accessibly, drives ceremony via Cypress path, redirects to /signed-in', () => {
-    // Plant the session cookie for u2f-user@acme.test
-    loginAndGetSession('u2f-user@acme.test');
+  it('refused user verification stays on the passkey screen with an error', () => {
+    loginAndGetSession('passkey-user@acme.test');
+    visitRealWebAuthn(PASSKEY_URL);
 
-    cy.visit('/id/login/security-key?loginName=u2f-user%40acme.test', {
-      onBeforeLoad: (win) => {
-        win.__CYPRESS_HYDRATE__ = true; // ceremony needs JS — opt into hydration (see entry.client.tsx)
-      },
-    });
-    cy.settleHydration();
+    setUserVerified(authenticatorId, false);
+    cy.contains('button', PASSKEY_BUTTON).should('not.be.disabled').click();
 
-    checkA11y();
-
-    // Hydration gate: the button is disabled until React mounts; Cypress waits for it.
-    cy.contains('button', /verify with security key/i)
-      .should('not.be.disabled')
-      .click();
-
-    // The fake provider marks passkey.userVerified=true → nextStep returns /signed-in.
-    cy.location('pathname').should('eq', '/id/signed-in');
+    cy.contains('[role="alert"]', 'Passkey sign-in was cancelled').should('be.visible');
+    cy.location('pathname').should('eq', '/id/login/passkey');
   });
 });
 

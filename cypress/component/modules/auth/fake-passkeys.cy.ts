@@ -3,13 +3,14 @@
 // NO-MOUNT: FakeAuthProvider passkey-inventory mirror of the port additions
 // (listPasskeys / removePasskey). Style of cypress/component/routes/paths.cy.ts.
 import { FakeAuthProvider } from '@/modules/auth/providers/fake/fake-provider';
+import { PREBAKED_CREDENTIAL_ID } from '@/modules/auth/providers/fake/fake-webauthn';
 
 const seedUser = { id: 'u1', loginName: 'alice@acme.test' };
 
 describe('FakeAuthProvider — passkey inventory (port mirror)', () => {
   it('records a named active passkey with an ISO createdAt, defaulting the name when absent', async () => {
     const named = new FakeAuthProvider({ users: [seedUser] });
-    await named.verifyPasskey('u1', 'pk-1', {}, 'MacBook Touch ID');
+    await named.verifyPasskey('u1', 'pk-1', { id: PREBAKED_CREDENTIAL_ID }, 'MacBook Touch ID');
     const [passkey] = await named.listPasskeys('u1');
     const { createdAt, ...rest } = passkey;
     expect(rest).to.deep.equal({ id: 'pk-1', state: 'active', name: 'MacBook Touch ID' });
@@ -20,7 +21,7 @@ describe('FakeAuthProvider — passkey inventory (port mirror)', () => {
     // Same call minus the 4th arg — on a fresh provider so the default is observed on a
     // passkey this case created, not one left over from the named case above.
     const unnamed = new FakeAuthProvider({ users: [seedUser] });
-    await unnamed.verifyPasskey('u1', 'pk-1', {});
+    await unnamed.verifyPasskey('u1', 'pk-1', { id: PREBAKED_CREDENTIAL_ID });
     expect((await unnamed.listPasskeys('u1'))[0].name).to.equal('Passkey');
   });
 
@@ -28,7 +29,7 @@ describe('FakeAuthProvider — passkey inventory (port mirror)', () => {
     // Dynamically enrolled passkey: removing the last one un-enrolls the method, and a
     // second remove must not throw (removal race).
     const enrolled = new FakeAuthProvider({ users: [seedUser] });
-    await enrolled.verifyPasskey('u1', 'pk-1', {}, 'A');
+    await enrolled.verifyPasskey('u1', 'pk-1', { id: PREBAKED_CREDENTIAL_ID }, 'A');
     await enrolled.removePasskey('u1', 'pk-1');
     await enrolled.removePasskey('u1', 'pk-1');
     expect(await enrolled.listPasskeys('u1')).to.deep.equal([]);

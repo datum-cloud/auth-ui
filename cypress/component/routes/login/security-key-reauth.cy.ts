@@ -2,8 +2,9 @@
 //
 // cy.task port of app/routes/login/__tests__/security-key-reauth.test.ts.
 // H-1: the webauthn verify route's re-auth identity guard exercised at the HTTP boundary.
-// FakeAuthProvider accepts credential='{}' (valid JSON, min(1)) without real FIDO2 validation.
+// FakeAuthProvider accepts the prebaked credential id without real FIDO2 validation.
 import { callService } from '../../../support/node/call-service';
+import { PREBAKED_CREDENTIAL_ID } from '@/modules/auth/providers/fake/fake-webauthn';
 
 const ALICE = 'alice@acme.test';
 const SESSION = { id: 's1', token: 't1', loginName: ALICE };
@@ -18,7 +19,11 @@ describe('login/security-key (webauthn) action — re-auth identity guard (H-1)'
       request: {
         url: 'http://localhost/id/login/security-key',
         sessions: [SESSION],
-        form: { loginName: ALICE, credential: '{}', requestId: 'oidc_x' },
+        form: {
+          loginName: ALICE,
+          credential: JSON.stringify({ id: PREBAKED_CREDENTIAL_ID }),
+          requestId: 'oidc_x',
+        },
         csrf: true,
         reauthIntent: 'totp-user@acme.test',
       },

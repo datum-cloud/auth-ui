@@ -6,6 +6,7 @@
 //
 // This file is imported (dynamically) by run-scenario.ts AFTER the required env vars are set, so the
 // env.server schema parse at module-load succeeds. Never import this from a browser spec.
+import { PASSKEY_U5 } from '../../fixtures/passkey-u5';
 import type {
   AuditEvent,
   CookieSessionSpec,
@@ -14,7 +15,9 @@ import type {
   SerializedResponse,
   Verdict,
 } from './scenario';
+import { signAssertion, signAttestation } from './sign-assertion';
 import { FakeAuthProvider } from '@/modules/auth/providers/fake/fake-provider';
+import { FakeWebAuthn, PREBAKED_CREDENTIAL_ID } from '@/modules/auth/providers/fake/fake-webauthn';
 import {
   createServerTransport,
   createServiceClient,
@@ -185,6 +188,126 @@ const DEFAULT_CREATION_TS = '2026-01-01T00:00:00.000Z';
 const DEFAULT_EXPIRATION_TS = '2099-01-01T00:00:00.000Z';
 const DEFAULT_CHANGE_TS = '2026-01-01T00:00:00.000Z';
 
+const FAKE_WEBAUTHN_ORIGIN = 'http://localhost:3000';
+
+type FakeWebAuthnOp = NonNullable<Scenario['fakeWebAuthnOp']>;
+type AssertionBase = Parameters<typeof signAssertion>[0];
+
+const PROD_DOMAIN = 'auth.example.test';
+
+const ASSERTION_TAMPERS: Partial<
+  Record<FakeWebAuthnOp, (base: AssertionBase) => Record<string, unknown>>
+> = {
+  unknownId: (b) => signAssertion({ ...b, credentialId: 'bm9wZQ' }),
+  wrongChallenge: (b) =>
+    signAssertion({ ...b, challenge: 'AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA' }),
+  wrongOrigin: (b) => signAssertion({ ...b, origin: 'http://evil.test' }),
+  mangledSignature: (b) => mangleSignature(signAssertion(b)),
+};
+
+function mangleSignature(credential: Record<string, unknown>): Record<string, unknown> {
+  const response = credential.response as { signature: string };
+  const sig = Buffer.from(response.signature, 'base64url');
+  sig[sig.length - 1] ^= 0xff;
+  return { ...credential, response: { ...response, signature: sig.toString('base64url') } };
+}
+
+async function settle(
+  run: () => Promise<Record<string, unknown>>
+): Promise<Record<string, unknown>> {
+  try {
+    return { ok: true, ...(await run()) };
+  } catch (err) {
+    if (err instanceof ProviderError) return { ok: false, code: err.code };
+    throw err;
+  }
+}
+
+async function runRegistrationOp(
+  fake: FakeWebAuthn,
+  op: FakeWebAuthnOp
+): Promise<Record<string, unknown>> {
+  const { publicKey } = await fake.creationOptions(
+    { id: 'u6', loginName: 'u6@acme.test' },
+    'localhost',
+    'k1'
+  );
+  const credential = signAttestation({
+    credentialId: op === 'registerOtherUser' ? PASSKEY_U5.credentialId : 'bm9wZQ',
+    publicKeyCose: PASSKEY_U5.publicKeyCose,
+    challenge: publicKey.challenge as string,
+    origin: FAKE_WEBAUTHN_ORIGIN,
+    rpId: 'localhost',
+  });
+  const key = op === 'registerUnknownKey' ? 'nope' : 'k1';
+  return settle(async () => {
+    await fake.verifyRegistration('u6', key, credential, 'localhost');
+    return {};
+  });
+}
+
+async function runProdOriginOp(
+  fake: FakeWebAuthn,
+  op: FakeWebAuthnOp
+): Promise<Record<string, unknown>> {
+  const { publicKey } = await fake.requestOptions('u5', PROD_DOMAIN, 'required', 's1');
+  const credential = signAssertion({
+    ...PASSKEY_U5,
+    rpId: PROD_DOMAIN,
+    challenge: publicKey.challenge as string,
+    origin: op === 'prodOriginHttps' ? `https://${PROD_DOMAIN}` : `http://${PROD_DOMAIN}`,
+    counter: 1,
+  });
+  return settle(() => fake.verifyAssertion('u5', 's1', credential, PROD_DOMAIN));
+}
+
+async function runAssertionOp(
+  fake: FakeWebAuthn,
+  op: FakeWebAuthnOp
+): Promise<Record<string, unknown>> {
+  const { publicKey } = await fake.requestOptions('u5', 'localhost', 'required', 's1');
+  const base = {
+    ...PASSKEY_U5,
+    challenge: publicKey.challenge as string,
+    origin: FAKE_WEBAUTHN_ORIGIN,
+    counter: 1,
+  };
+  const credential = (ASSERTION_TAMPERS[op] ?? signAssertion)(base);
+  const userId = op === 'otherUser' ? 'u6' : 'u5';
+  return settle(() => fake.verifyAssertion(userId, 's1', credential, 'localhost'));
+}
+
+/** Seed a FakeWebAuthn with PASSKEY_U5, run one ceremony op against it and report the outcome. */
+async function runFakeWebAuthnOp(op: FakeWebAuthnOp): Promise<Record<string, unknown>> {
+  const fake = new FakeWebAuthn([
+    {
+      id: PASSKEY_U5.credentialId,
+      publicKey: PASSKEY_U5.publicKeyCose,
+      counter: 0,
+      userId: PASSKEY_U5.userId,
+    },
+  ]);
+  if (op === 'creationOptions') {
+    const { publicKey } = await fake.creationOptions(
+      { id: 'u5', loginName: 'u5@acme.test' },
+      'localhost',
+      'k1'
+    );
+    return {
+      rpId: (publicKey.rp as { id: string }).id,
+      userId: (publicKey.user as { id: string }).id,
+    };
+  }
+  if (op === 'prebaked') {
+    return {
+      ...(await fake.verifyAssertion('u5', 's1', { id: PREBAKED_CREDENTIAL_ID }, 'localhost')),
+    };
+  }
+  if (op.startsWith('register')) return runRegistrationOp(fake, op);
+  if (op.startsWith('prodOrigin')) return runProdOriginOp(fake, op);
+  return runAssertionOp(fake, op);
+}
+
 /** Map the serializable cookie specs to the real SessionEntry[] (the Zod-validated entry shape).
  *  Shared by the cookie signer AND the 8d services that take an already-read SessionEntry[] list
  *  directly (chooseMfaMethod / resolveMfaPicker / resolveMfaSetup / verify*Enrollment). */
@@ -318,6 +441,60 @@ async function buildHandlerRequest(
   // object — the override is repeatable (async () => form).
   Object.defineProperty(request, 'clone', { value: () => request, configurable: true });
   return { request, form };
+}
+
+const U5 = { id: 'u5', loginName: 'u5@acme.test' };
+const wantChallenge = {
+  challenges: {
+    webAuthN: { domain: 'localhost', userVerificationRequirement: 'required' as const },
+  },
+};
+
+/** Arm a passkey challenge on a seeded u5 session and return the request-options challenge. */
+async function armSession(provider: FakeAuthProvider, id: string): Promise<string> {
+  provider.seedLiveSession({ id, token: `t-${id}`, user: U5, factorKinds: ['password'] });
+  const armed = await provider.updateSession(id, `t-${id}`, wantChallenge);
+  const options = armed.challenges?.webAuthN?.publicKeyCredentialRequestOptions as {
+    publicKey: { challenge: string };
+  };
+  return options.publicKey.challenge;
+}
+
+/** Drive FakeAuthProvider.updateSession's WebAuthn challenge + check path with live sessions. */
+async function runSessionWebAuthnOp(
+  provider: FakeAuthProvider,
+  op: NonNullable<Scenario['sessionWebAuthnOp']>
+): Promise<Record<string, unknown>> {
+  const sign = (challenge: string, credentialId: string = PASSKEY_U5.credentialId) =>
+    signAssertion({
+      ...PASSKEY_U5,
+      credentialId,
+      challenge,
+      origin: FAKE_WEBAUTHN_ORIGIN,
+      counter: 1,
+    });
+  let credential: Record<string, unknown>;
+  if (op === 'prebaked') {
+    provider.seedLiveSession({ id: 'sA', token: 't-sA', user: U5, factorKinds: ['password'] });
+    credential = { id: PREBAKED_CREDENTIAL_ID };
+  } else if (op === 'twoSessions') {
+    const challengeA = await armSession(provider, 'sA');
+    await armSession(provider, 'sB');
+    credential = sign(challengeA);
+  } else {
+    const challengeA = await armSession(provider, 'sA');
+    credential = sign(challengeA, op === 'unknownCredential' ? 'bm9wZQ' : undefined);
+  }
+  try {
+    const updated = await provider.updateSession('sA', 't-sA', {
+      webAuthN: { credentialAssertionData: credential },
+    });
+    return { ok: true, passkey: updated.factors.passkey ?? null };
+  } catch (err) {
+    if (!(err instanceof ProviderError)) throw err;
+    const stored = await provider.getSession('sA', 't-sA');
+    return { ok: false, code: err.code, passkey: stored?.factors.passkey ?? null };
+  }
 }
 
 /** Construct + seed + script the FakeAuthProvider for one scenario. */
@@ -1481,7 +1658,24 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
           const a = providerRegistry.fake({ AUTH_PROVIDER: 'fake' });
           const b = providerRegistry.fake({ AUTH_PROVIDER: 'fake' });
           outcome = { same: a === b };
+        } else if (op === 'u5SeedMatchesFixture') {
+          outcome = await runSessionWebAuthnOp(
+            providerRegistry.fake({ AUTH_PROVIDER: 'fake' }),
+            'signed'
+          );
         }
+        break;
+      }
+      case 'sessionWebAuthn': {
+        const op = s.sessionWebAuthnOp;
+        if (!op) throw new Error('sessionWebAuthn requires sessionWebAuthnOp');
+        outcome = await runSessionWebAuthnOp(provider, op);
+        break;
+      }
+      case 'fakeWebAuthn': {
+        const op = s.fakeWebAuthnOp;
+        if (!op) throw new Error('fakeWebAuthn requires fakeWebAuthnOp');
+        outcome = await runFakeWebAuthnOp(op);
         break;
       }
       // ── Task 10: server/* checks ─────────────────────────────────────────────
