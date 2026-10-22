@@ -4,7 +4,7 @@ Practical entries for the failures you are most likely to hit, and where to look
 
 ## The app refuses to boot
 
-**Symptom:** the process dies immediately on `bun run dev` or `bun run start` with a `ZodError` listing environment variables.
+**Symptom:** the process dies immediately on `npm run dev` or `npm run start` with a `ZodError` listing environment variables.
 
 `app/server/infra/env.server.ts` ends with:
 
@@ -72,12 +72,12 @@ The app is served under `/id`, and `vite.config.ts` sets `base: '/id/'`. Every d
 
 Path aliases come from **one** place: `paths: { "@/*": ["./app/*"] }` in the root `tsconfig.json`.
 
-- **At type-check time,** the root config **excludes `cypress/`**, so specs are typed by `cypress/tsconfig.json` — which `extends: "../tsconfig.json"` and re-includes `../app/**/*`. That inheritance is what gives specs the `@/*` alias. Run `bun run typecheck:cypress` to see these errors in ~2s rather than waiting for CI.
+- **At type-check time,** the root config **excludes `cypress/`**, so specs are typed by `cypress/tsconfig.json` — which `extends: "../tsconfig.json"` and re-includes `../app/**/*`. That inheritance is what gives specs the `@/*` alias. Run `npm run typecheck:cypress` to see these errors in ~2s rather than waiting for CI.
 - **At bundle time,** the component runner uses the Vite bundler, and `vite.config.ts` sets `resolve: { tsconfigPaths: true }` — so Vite reads the same alias from the same file.
 
-If an alias resolves in the editor but fails in the runner, check that you launched through `bun run test:unit` (which sets `CYPRESS=true`). That flag is what switches `vite.config.ts` into component mode and installs `stubServerModulesForCypress`, the plugin that stubs server-only modules. Without it, importing a resource that reaches for `process.env` or a Node built-in will blow up in the browser.
+If an alias resolves in the editor but fails in the runner, check that you launched through `npm run test:unit` (which sets `CYPRESS=true`). That flag is what switches `vite.config.ts` into component mode and installs `stubServerModulesForCypress`, the plugin that stubs server-only modules. Without it, importing a resource that reaches for `process.env` or a Node built-in will blow up in the browser.
 
-For service logic that genuinely cannot run in a browser (cookies, sessions, audit writes), do not fight the bundler — drive it through the Node task harness (`cy.task('callService', …)`, wired in `cypress/support/node/`), which runs it in real Bun.
+For service logic that genuinely cannot run in a browser (cookies, sessions, audit writes), do not fight the bundler — drive it through the Node task harness (`cy.task('callService', …)`, wired in `cypress/support/node/`), which runs it in real Node.
 
 ## Related Documentation
 

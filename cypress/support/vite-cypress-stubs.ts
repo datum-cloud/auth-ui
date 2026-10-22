@@ -77,7 +77,7 @@ export function stubServerModulesForCypress(root: string): Plugin {
     // to a browser shim with no named exports — importing it crashes any spec that reaches
     // idp-return-urls.ts. Browser specs only assert the URL SHAPE, so a deterministic,
     // purpose-bound placeholder is enough and keeps sign/verify a matched pair in-browser too.
-    // The REAL HMAC round-trip (and the forged-signature rejection) runs in Bun via cy.task —
+    // The REAL HMAC round-trip (and the forged-signature rejection) runs in Node via cy.task —
     // see the ?policyOrg specs in cypress/component/resources/sso/sso-callback.cy.ts.
     [resolve(root, './app/server/signed-param.ts')]: `
       const stub = (purpose, value) => 'stub-sig.' + purpose + '.' + value;
@@ -138,7 +138,7 @@ export function stubServerModulesForCypress(root: string): Plugin {
     // now exercised via the REAL code:
     //   • resolveServiceUrl lives in transport.util.ts (browser-safe, NOT stubbed) so
     //     transport.cy.ts imports it directly and gets the real implementation.
-    //   • Cache/createServerTransport tests run in Bun via cy.task (transport.cy.ts +
+    //   • Cache/createServerTransport tests run in Node via cy.task (transport.cy.ts +
     //     transport.cache.cy.ts), so the real SHA-256 fingerprint and real @zitadel/client/node
     //     transport factory are exercised.
     // What remains here: the __setCreateServiceClientImpl hook required by index.cy.ts and
@@ -166,7 +166,7 @@ export function stubServerModulesForCypress(root: string): Plugin {
       }
 
       // Kept for any lingering import (values are meaningless in the browser stub;
-      // the real values run via cy.task in Bun).
+      // the real values run via cy.task in Node).
       export const __cacheSize = () => 0;
       export const __CACHE_MAX = () => 256;
 

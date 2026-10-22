@@ -33,16 +33,16 @@ user-facing, add an entry under `## [Unreleased]` in the same PR.
 
 ## Checklist
 
-- [ ] `bun run typecheck` passes
-- [ ] `bun run lint:ci` passes (the `no-console` rule allows only `console.error`
+- [ ] `npm run typecheck` passes
+- [ ] `npm run lint:ci` passes (the `no-console` rule allows only `console.error`
       and `console.warn` in shipped `app/` source)
-- [ ] `bun run test:unit` passes (Cypress component tests)
+- [ ] `npm run test:unit` passes (Cypress component tests)
 - [ ] **Public URLs unchanged** — route, redirect, and callback URLs are a frozen
       contract (`app/routes/paths.ts`); changing one is a breaking change and needs
       explicit sign-off
 - [ ] **No raw PII in logs** — login names / emails go through `hashActor`; no
       secrets, tokens, or cookies logged
-- [ ] Architectural boundaries hold — `bun run lint:boundaries` passes (provider
+- [ ] Architectural boundaries hold — `npm run lint:boundaries` passes (provider
       seam, `shared` is a leaf, no cycles; see `.dependency-cruiser.cjs`)
 
 ## Screenshots

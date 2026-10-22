@@ -3,7 +3,7 @@
 //
 // env.server._envSchema is stubbed out of the Vite browser bundle (env = { public:{}, server:{} }).
 // The REAL Zod schema validation (security-critical: prod gates, placeholder guard, PUBLIC_ORIGIN
-// anti-Host-injection) runs in Bun via cy.task so the stub doesn't apply.
+// anti-Host-injection) runs in Node via cy.task so the stub doesn't apply.
 //
 // NOTE: This suite was deliberately reduced from a 36-test matrix (one it() per env var /
 // permutation) down to a small representative set. These are enumeration/matrix tests, not

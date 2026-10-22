@@ -3,7 +3,7 @@
 // CY-TASK: password/reset loader and action when AUTH_EMAIL_DELIVERY_ENABLED=false.
 // Migrated from: app/routes/password/__tests__/reset-delivery-guard.test.ts
 //
-// Each cy.task call spawns a fresh Bun process, so the env field injects
+// Each cy.task call spawns a fresh Node process, so the env field injects
 // AUTH_EMAIL_DELIVERY_ENABLED=false before the module is loaded. This is the same
 // mechanism as the Vitest vi.mock of env.server.
 import { callService } from '../../../support/node/call-service';

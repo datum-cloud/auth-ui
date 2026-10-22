@@ -3,7 +3,7 @@
 // Node-bound (cy.task) port of app/modules/auth/session/__tests__/last-used-login.test.ts.
 //
 // last-used-login.ts is signed with SESSION_SECRET (via env.server, stubbed out of the browser
-// bundle), so the REAL serialize→parse round-trip + absent branch run in Bun via cy.task.
+// bundle), so the REAL serialize→parse round-trip + absent branch run in Node via cy.task.
 import { callService } from '../../../../support/node/call-service';
 
 describe('last-used-login cookie', () => {

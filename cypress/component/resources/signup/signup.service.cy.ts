@@ -2,7 +2,7 @@
 //
 // CY-TASK: runs node-side via cy.task('runScenario') because signup.service.ts imports
 // observability.ts (logAuthEvent → console.log), which is stubbed to a no-op in the Vite
-// browser bundle. Real audit must flow through the Bun harness so audit-shape assertions
+// browser bundle. Real audit must flow through the Node harness so audit-shape assertions
 // are meaningful.
 //
 // Classification: CY-TASK
@@ -12,7 +12,7 @@ import type { Scenario, Verdict } from '../../../support/node/scenario';
 const BASE_URL = 'https://auth.datum.test';
 const ORIGIN = 'https://auth.datum.test';
 
-/** Drive the scenario through the real Bun node harness and return the raw verdict.
+/** Drive the scenario through the real Node harness and return the raw verdict.
  *  Uses the low-level cy.task('callService') rather than the callService() wrapper so that
  *  tests which examine error states (verdict.ok === false) can do so without the wrapper
  *  auto-failing the assertion. Each test checks verdict.ok / verdict.error explicitly. */
@@ -199,7 +199,7 @@ describe('registerEmailLinkSignup', () => {
 
     it('returns the identical result when the resend is rate-limited (side effect diverges, response does not)', () => {
       // BOTH submissions run inside ONE scenario/process: every callService spawns a fresh
-      // Bun process, so a cross-call test would silently reset the module-level limiter and
+      // Node process, so a cross-call test would silently reset the module-level limiter and
       // prove nothing.
       run({
         fn: 'registerEmailLinkSignupTwice',

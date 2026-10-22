@@ -6,32 +6,33 @@
   "type": "module",
   "scripts": {
     "build": "react-router build",
-    "dev": "bun --conditions=development ./node_modules/.bin/react-router dev",
-    "start": "NODE_ENV=production bun ./build/server/index.js",
-    "lint": "bunx eslint \"app/**/*.{ts,tsx}\" --fix",
-    "lint:ci": "bunx eslint \"app/**/*.{ts,tsx}\"",
-    "format": "bunx prettier --write \"**/*.{js,jsx,ts,tsx,json,css,md}\"",
+    "dev": "node --conditions=development ./node_modules/.bin/react-router dev",
+    "start": "NODE_ENV=production node ./build/server/index.js",
+    "lint": "eslint \"app/**/*.{ts,tsx}\" --fix",
+    "lint:ci": "eslint \"app/**/*.{ts,tsx}\"",
+    "format": "prettier --write \"**/*.{js,jsx,ts,tsx,json,css,md}\"",
     "prepare": "lefthook install || true",
-    "typecheck": "bunx react-router typegen && ./node_modules/typescript-native/bin/tsc",
-    "typecheck:watch": "bunx react-router typegen && ./node_modules/typescript-native/bin/tsc --noEmit --watch",
+    "typecheck": "react-router typegen && ./node_modules/typescript-native/bin/tsc",
+    "typecheck:watch": "react-router typegen && ./node_modules/typescript-native/bin/tsc --noEmit --watch",
     "typecheck:cypress": "tsc -p cypress/tsconfig.json --noEmit",
     "i18n:extract": "lingui extract --clean",
     "i18n:compile": "lingui compile --typescript",
     "test:unit": "CYPRESS=true cypress run --component",
     "test:unit:debug": "CYPRESS=true cypress open --component",
-    "test:e2e": "start-server-and-test 'bun run dev' http-get://localhost:3000/healthz 'bunx cypress run'",
+    "test:e2e": "start-server-and-test \"npm run dev\" http-get://localhost:3000/healthz \"cypress run\"",
     "test:e2e:fast": "bash scripts/e2e-fast.sh",
-    "test:acceptance": "bunx cypress run --spec acceptance/core-signin.acceptance.cy.ts",
+    "test:acceptance": "cypress run --spec acceptance/core-signin.acceptance.cy.ts",
     "size": "size-limit",
     "lint:boundaries": "depcruise app --config .dependency-cruiser.cjs",
     "lint:cycles": "madge --circular --extensions ts,tsx app"
   },
   "dependencies": {
-    "@bufbuild/protobuf": "^2.16.0",
+    "@bufbuild/protobuf": "2.16.0",
     "@conform-to/react": "1.21.1",
     "@conform-to/zod": "1.21.1",
     "@datum-cloud/datum-ui": "^3.4.0",
     "@epic-web/client-hints": "^1.3.9",
+    "@hono/node-server": "^2.1.3",
     "@lingui/core": "^6.9.0",
     "@lingui/detect-locale": "^6.9.0",
     "@lingui/react": "^6.9.0",
@@ -70,13 +71,22 @@
     "form-data": "^4.0.6",
     "dompurify": "^3.4.16",
     "esbuild": "^0.28.1",
-    "@hono/node-server": "^2.1.3",
+    "@hono/node-server": "$@hono/node-server",
     "@bufbuild/protobuf": "2.16.0",
     "qs": "^6.16.0",
     "joi": "^18.2.9",
     "source-map-js": "^1.2.2",
     "tinypool": "^2.2.0",
-    "follow-redirects": "^1.16.1"
+    "follow-redirects": "^1.16.1",
+    "cypress-axe": {
+      "cypress": "$cypress"
+    },
+    "madge": {
+      "typescript": "$typescript",
+      "dependency-tree": {
+        "typescript": "5.9.3"
+      }
+    }
   },
   "size-limit": [
     {
@@ -111,7 +121,6 @@
     "@tailwindcss/vite": "^4.3.3",
     "@testing-library/cypress": "^10.1.3",
     "@trivago/prettier-plugin-sort-imports": "^6.0.2",
-    "@types/bun": "^1.4.2",
     "@types/node": "^26.6.4",
     "@types/react": "^19.3.0",
     "@types/react-dom": "^19.3.0",
@@ -129,9 +138,10 @@
     "size-limit": "^14.1.0",
     "start-server-and-test": "^3.0.12",
     "tailwindcss": "^4.3.3",
+    "tsx": "^4.23.1",
     "typescript": "^6.0.3",
-    "typescript-native": "npm:typescript@^7.0.2",
     "typescript-eslint": "^8.71.0",
+    "typescript-native": "npm:typescript@^7.0.2",
     "vite": "^8.3.3",
     "vite-plugin-babel-macros": "^1.0.6"
   }

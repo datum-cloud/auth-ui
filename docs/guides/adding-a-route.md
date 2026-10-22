@@ -1,6 +1,6 @@
 # Adding a Route
 
-The one rule that shapes everything below: **a route component never calls the provider.** Routes parse a request and render; `app/resources/<domain>/` does the work; `app/modules/auth/` is the only thing that knows Zitadel exists. `bun run lint:boundaries` enforces this, so a shortcut here fails the build rather than shipping.
+The one rule that shapes everything below: **a route component never calls the provider.** Routes parse a request and render; `app/resources/<domain>/` does the work; `app/modules/auth/` is the only thing that knows Zitadel exists. `npm run lint:boundaries` enforces this, so a shortcut here fails the build rather than shipping.
 
 ## 1. Write the route module
 
@@ -29,7 +29,7 @@ export default function BackupCode({ actionData }: Route.ComponentProps) {
 }
 ```
 
-The `./+types/<name>` import is generated. If your editor cannot resolve it, run `bun run typecheck` (which runs `react-router typegen` first).
+The `./+types/<name>` import is generated. If your editor cannot resolve it, run `npm run typecheck` (which runs `react-router typegen` first).
 
 ## 2. Register it in `app/routes.ts`
 
@@ -71,8 +71,8 @@ Provider errors must not leak: map them to an `AuthErrorCode` so the UI and Sent
 Mirror the path. A route at `app/routes/login/backup-code.tsx` gets its spec at `cypress/component/routes/login/backup-code.cy.tsx`. Pure logic in the resource gets a no-mount spec (`.cy.ts`) under `cypress/component/resources/mfa/`.
 
 ```bash
-bun run test:unit:debug    # interactive, while you iterate
-bun run test:unit          # the full component suite
+npm run test:unit:debug    # interactive, while you iterate
+npm run test:unit          # the full component suite
 ```
 
 ## 5. Add an e2e spec if it is user-visible
@@ -80,7 +80,7 @@ bun run test:unit          # the full component suite
 If a user can reach the screen in a real flow, it needs a spec in `cypress/e2e/` that drives it against a running server with `AUTH_PROVIDER=fake`.
 
 ```bash
-bun run test:e2e
+npm run test:e2e
 ```
 
 ## Checklist
@@ -90,10 +90,10 @@ bun run test:e2e
 - [ ] All server logic lives in `app/resources/<domain>/` — the component imports no provider code
 - [ ] Input validated with a Zod schema through Conform
 - [ ] Provider errors mapped to the app's `AuthErrorCode` vocabulary
-- [ ] Strings wrapped in Lingui macros (`bun run i18n:extract` picks them up; the pre-commit hook does it for you)
+- [ ] Strings wrapped in Lingui macros (`npm run i18n:extract` picks them up; the pre-commit hook does it for you)
 - [ ] Component spec at the mirrored path under `cypress/component/`
 - [ ] E2E spec in `cypress/e2e/` if the flow is user-visible
-- [ ] `bun run lint && bun run typecheck && bun run lint:boundaries` all clean
+- [ ] `npm run lint && npm run typecheck && npm run lint:boundaries` all clean
 
 ## Related Documentation
 

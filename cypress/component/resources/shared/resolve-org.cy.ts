@@ -8,7 +8,7 @@
 //     pin is out of the way here — env.server is stubbed to `{}` in the Vite bundle, so
 //     env.ZITADEL_DEFAULT_ORG_ID is undefined.
 //   • Node-side (cy.task 'resolveOrgProbe'): the env-pin precedence, which is only reachable when
-//     the REAL env schema is loaded (Bun). Each cy.task is a fresh process ⇒ a clean module cache.
+//     the REAL env schema is loaded (Node). Each cy.task is a fresh process ⇒ a clean module cache.
 import { callService } from '../../../support/node/call-service';
 import type { AuthProvider } from '@/modules/auth/auth-provider';
 import { resolveOrg, resetDefaultOrgCache } from '@/resources/shared/resolve-org';

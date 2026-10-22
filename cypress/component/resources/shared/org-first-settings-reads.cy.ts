@@ -17,7 +17,7 @@ const ALICE = 'alice@acme.test';
 describe('login/method loader — org-first getLoginSettings + getBranding', () => {
   // One contract exercised twice — raw org EMPTY vs PRESENT. Same call, same three
   // assertions; only the URL and the expected org / default-lookup count vary. Each row is
-  // its own cy.task (fresh Bun process), so the recorded-call arrays cannot couple.
+  // its own cy.task (fresh Node process), so the recorded-call arrays cannot couple.
   const CASES: [label: string, query: string, expectedOrg: string, defaultOrgCalls: number][] = [
     ['NO ?organization', '', 'org-default-fake', 1],
     ['explicit ?organization', '&organization=org-explicit', 'org-explicit', 0],

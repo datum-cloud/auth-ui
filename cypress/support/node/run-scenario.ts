@@ -1,8 +1,8 @@
 // cypress/support/node/run-scenario.ts
 //
-// Bun CLI entry for the node-spec harness. Invoked by the `callService` cy.task (see tasks.ts) as
-//   bun cypress/support/node/run-scenario.ts '<scenario-json>'
-// from the repo root, so Bun resolves the `@/*` tsconfig path alias the real app modules use.
+// Node CLI entry for the node-spec harness. Invoked by the `callService` cy.task (see tasks.ts) as
+//   node --import tsx --import ./cypress/support/node/import-meta-env-hook.ts cypress/support/node/run-scenario.ts '<scenario-json>'
+// from the repo root, so tsx resolves the `@/*` tsconfig path alias the real app modules use.
 //
 // Required env is set HERE, before harness.ts (and therefore env.server's load-time schema parse)
 // is dynamically imported. AUTH_PROVIDER=fake is the ONLY substitution; everything else is real.

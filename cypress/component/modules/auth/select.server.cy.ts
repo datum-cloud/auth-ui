@@ -5,7 +5,7 @@
 // select.server.ts is stubbed out of the Vite browser bundle (it imports the server-only
 // ZitadelAuthProvider gRPC transport), and the stub returns a fake-only registry — so asserting
 // against it in the browser would test the STUB, not the real binding point. The REAL
-// getAuthProvider (fake↔zitadel selection) runs in Bun via cy.task.
+// getAuthProvider (fake↔zitadel selection) runs in Node via cy.task.
 //
 // Absorbed provider-registry.cy.ts (deleted): it drove the SAME production module through the
 // same `fn: 'selectProvider'` task, differing only by `selectOp`, so both now chain in one test —

@@ -34,7 +34,6 @@ export default defineConfig(() => {
       tailwindcss(),
       isCypress ? react() : reactRouter(),
       reactRouterHonoServer({
-        runtime: 'bun',
         serverEntryPoint: './app/server.ts',
         // The plugin's built-in dev excludes (what bypasses Hono and goes to Vite)
         // assume root-relative asset URLs (/app/*, /@vite/*, /node_modules/*). With

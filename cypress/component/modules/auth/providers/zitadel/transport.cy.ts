@@ -7,7 +7,7 @@
 //
 // createServerTransport tests need the real SHA-256 fingerprint (node:crypto) and the real
 // @zitadel/client/node transport factory — both node-only. They run via cy.task so the real
-// transport.ts code path executes in Bun (fresh process = fresh Maps per test, no afterEach).
+// transport.ts code path executes in Node (fresh process = fresh Maps per test, no afterEach).
 //
 // Final squeeze: resolveServiceUrl is a genuine security boundary (fail-closed forward-host
 // allowlist, SSRF-adjacent) so its accept/reject/fallback paths are kept together as one test —
@@ -56,7 +56,7 @@ describe('resolveServiceUrl', () => {
 });
 
 // EL-TRANSPORT-2: createServerTransport caching — real SHA-256 fingerprint, real HTTP/2 factory.
-// Each test is an independent cy.task call (fresh Bun process → fresh Maps).
+// Each test is an independent cy.task call (fresh Node process → fresh Maps).
 describe('createServerTransport — caching', () => {
   it('caches by url+token (hit), keys a different baseUrl distinctly (miss), and throws when baseUrl or token is empty', () => {
     callService({

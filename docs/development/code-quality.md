@@ -3,19 +3,19 @@
 Five commands make up the local gate. Run them before you push — CI runs the same checks.
 
 ```bash
-bun run lint             # eslint --fix
-bun run typecheck        # react-router typegen && tsc
-bun run lint:boundaries  # dependency-cruiser — enforces the provider seam
-bun run lint:cycles      # madge — no circular imports
-bun run size             # size-limit — 150 KB landing, 300 KB app page (gzip)
+npm run lint             # eslint --fix
+npm run typecheck        # react-router typegen && tsc
+npm run lint:boundaries  # dependency-cruiser — enforces the provider seam
+npm run lint:cycles      # madge — no circular imports
+npm run size             # size-limit — 150 KB landing, 300 KB app page (gzip)
 ```
 
 ## Lint and format
 
 ```bash
-bun run lint       # bunx eslint "app/**/*.{ts,tsx}" --fix
-bun run lint:ci    # same, without --fix — what CI runs
-bun run format     # bunx prettier --write "**/*.{js,jsx,ts,tsx,json,css,md}"
+npm run lint       # npx eslint "app/**/*.{ts,tsx}" --fix
+npm run lint:ci    # same, without --fix — what CI runs
+npm run format     # npx prettier --write "**/*.{js,jsx,ts,tsx,json,css,md}"
 ```
 
 ESLint is flat-config (`eslint.config.mjs`) on `typescript-eslint`. Prettier (`prettier.config.mjs`) sorts imports via `@trivago/prettier-plugin-sort-imports` and orders Tailwind classes via `prettier-plugin-tailwindcss`, so import order and class order are not things you hand-maintain.
@@ -23,8 +23,8 @@ ESLint is flat-config (`eslint.config.mjs`) on `typescript-eslint`. Prettier (`p
 ## Type checking
 
 ```bash
-bun run typecheck           # bunx react-router typegen && tsc
-bun run typecheck:cypress   # tsc -p cypress/tsconfig.json --noEmit
+npm run typecheck           # npx react-router typegen && tsc
+npm run typecheck:cypress   # tsc -p cypress/tsconfig.json --noEmit
 ```
 
 `react-router typegen` regenerates `.react-router/types` (the typed `Route.LoaderArgs`, `Route.ComponentProps`, and friends) — always run `typecheck` rather than bare `tsc`, or the generated types will be stale.
@@ -34,7 +34,7 @@ The root `tsconfig.json` excludes `cypress/` entirely, which is why the Cypress 
 ## Boundaries — the provider seam
 
 ```bash
-bun run lint:boundaries    # depcruise app --config .dependency-cruiser.cjs
+npm run lint:boundaries    # depcruise app --config .dependency-cruiser.cjs
 ```
 
 This is the check that keeps the architecture honest. `.dependency-cruiser.cjs` declares five `error`-severity rules:
@@ -52,7 +52,7 @@ If you find yourself wanting to import a Zitadel type into a route, this rule wi
 ## Cycles
 
 ```bash
-bun run lint:cycles    # madge --circular --extensions ts,tsx app
+npm run lint:cycles    # madge --circular --extensions ts,tsx app
 ```
 
 Redundant with dependency-cruiser's `no-circular`, but madge is faster and prints a readable cycle path, so it is the one to reach for when you are actually untangling something.
@@ -60,10 +60,10 @@ Redundant with dependency-cruiser's `no-circular`, but madge is faster and print
 ## Bundle budgets
 
 ```bash
-bun run size    # size-limit
+npm run size    # size-limit
 ```
 
-Needs a `bun run build` first — it measures the real artifacts in `build/client/assets/`. Two budgets, both gzipped, declared in the `size-limit` key of `package.json`:
+Needs a `npm run build` first — it measures the real artifacts in `build/client/assets/`. Two budgets, both gzipped, declared in the `size-limit` key of `package.json`:
 
 | Budget              | Limit  |
 | ------------------- | ------ |
@@ -84,7 +84,7 @@ Needs a `bun run build` first — it measures the real artifacts in `build/clien
 | `i18n`              | `lingui extract --clean && lingui compile --typescript`, then stages `app/modules/i18n/locales/` |
 | `typecheck:cypress` | `tsc -p cypress/tsconfig.json --noEmit` on staged `cypress/**`                                   |
 
-Both `locales/**` are excluded from the lint and format hooks — the catalogs are generated, not hand-edited. Hooks install via `bun run prepare` (`lefthook install`), which runs automatically on `bun install`.
+Both `locales/**` are excluded from the lint and format hooks — the catalogs are generated, not hand-edited. Hooks install via `npm run prepare` (`lefthook install`), which runs automatically on `npm install`.
 
 ## Related Documentation
 

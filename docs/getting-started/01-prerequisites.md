@@ -6,20 +6,13 @@ What you need on your machine before cloning `auth-ui`.
 
 | Tool | Version | Why |
 | --- | --- | --- |
-| [Bun](https://bun.sh) | 1.3+ (CI and the Docker image pin `1.3.14`) | Runtime and package manager — every script runs through `bun`. |
-| [Node.js](https://nodejs.org) | 22 (`.nvmrc`) | Some toolchain binaries (React Router typegen, Cypress) expect a Node runtime on `PATH`. |
-| [Git](https://git-scm.com) | any recent | Cloning and hooks (`lefthook` installs on `bun install`). |
+| [Node.js](https://nodejs.org) | 26.12.1 (`.nvmrc`; CI and the Docker image use the same version) | Runtime and package manager — every script runs through `npm`. |
+| [Git](https://git-scm.com) | any recent | Cloning and hooks (`lefthook` installs on `npm install`). |
 
-Install Bun:
-
-```bash
-curl -fsSL https://bun.sh/install | bash
-```
-
-Install Node 22 with your version manager of choice, e.g.:
+Install Node 26.12.1 with your version manager of choice, e.g.:
 
 ```bash
-nvm install    # reads .nvmrc → 22
+nvm install    # reads .nvmrc → 26.12.1
 nvm use
 ```
 
@@ -44,11 +37,10 @@ Zitadel instance to run it locally. Pick one:
 ## Checkpoint
 
 ```bash
-bun --version      # 1.3.x
-node --version     # v22.x
+node --version     # v26.12.1
 ```
 
-If both print the expected versions, you are ready to configure the environment.
+If it prints the expected version, you are ready to configure the environment.
 
 ## Next Step
 

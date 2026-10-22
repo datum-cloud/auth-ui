@@ -3,20 +3,15 @@
 # ==========================================
 # BASE STAGE - Common dependencies and setup
 # ==========================================
-FROM oven/bun:1.4.2@sha256:9114c058aeae42162ee16dd5084b95fe9473970bb6bcb5b232ab1630f0546895 AS base
+FROM node:26.12.1-alpine3.24@sha256:40cd011b55415bc894e45b02fdd5a5dfde056921b7d23a64c74f80497af48797 AS base
 
-# Install system dependencies and clean up in the same layer
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends unzip ca-certificates && \
-    update-ca-certificates && \
-    rm -rf /var/lib/apt/lists/* && \
-    apt-get clean
+RUN apk add --no-cache --upgrade 'ca-certificates>=20261020-r0'
+RUN ! grep -q MIICTjCCAdOgAwIBAgIKPPYHqWhwDtqLhDAKBggqhkjOPQQDAzBrMQswCQYDVQQG /etc/ssl/certs/ca-certificates.crt
 
 WORKDIR /app
 
 ENV NODE_ENV=production \
-    PORT=3000 \
-    BUN_RUNTIME_TRANSPILER_CACHE_PATH=/tmp/bun-transpiler-cache
+    PORT=3000
 
 # ==========================================
 # BUILD STAGE - Compile and prepare the app
@@ -28,16 +23,16 @@ ARG VERSION=dev
 ENV VERSION=${VERSION}
 ENV SENTRY_AUTH_TOKEN=${SENTRY_AUTH_TOKEN}
 
-COPY --link package.json bun.lock ./
-RUN bun install --frozen-lockfile
+COPY --link package.json package-lock.json ./
+RUN npm ci --include=dev --ignore-scripts --no-audit --no-fund
 
 COPY --link . .
 
 # @lingui/vite-plugin compiles message catalogs during the build — no separate
 # i18n:compile step is needed (committed catalogs are kept fresh by the lefthook
 # i18n hook and verified by the CI i18n-check job).
-RUN bun run build && \
-    bun install --production --frozen-lockfile && \
+RUN npm run build && \
+    npm prune --omit=dev --ignore-scripts --no-audit --no-fund && \
     touch .env
 
 # ==========================================
@@ -45,24 +40,19 @@ RUN bun run build && \
 # ==========================================
 FROM base
 
-RUN apt-get update && \
-    apt-get install -y --no-install-recommends --only-upgrade ca-certificates && \
-    rm -rf /var/lib/apt/lists/* && \
-    apt-get clean
-
 ARG VERSION=dev
 ENV VERSION=${VERSION}
 
-COPY --from=build /app /app
+# Non-root runtime user. uid/gid 1001 MUST match runAsUser/runAsGroup in
+# config/base/deployment.yaml.
+RUN addgroup -g 1001 datum && \
+    adduser -u 1001 -G datum -D -H datum && \
+    chown datum:datum /app
+
+COPY --from=build --chown=1001:1001 /app /app
 
 EXPOSE ${PORT}
 
-# Non-root runtime user. uid/gid 1001 MUST match runAsUser/runAsGroup in
-# config/base/deployment.yaml.
-RUN groupadd --gid 1001 datum && \
-    useradd --uid 1001 --gid 1001 --no-create-home datum && \
-    chown -R datum:datum /app
-
 USER datum
 
-CMD [ "bun", "run", "start" ]
+CMD [ "node", "./build/server/index.js" ]

@@ -11,7 +11,7 @@ import type { AuditEvent, Scenario, Verdict } from './scenario';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type SpecVerdict = Omit<Verdict, 'outcome'> & { outcome: any };
 
-/** Drive a real cookie/session/audit-dependent service in Bun and return the serialized verdict. */
+/** Drive a real cookie/session/audit-dependent service in Node and return the serialized verdict. */
 export function callService(scenario: Scenario): Cypress.Chainable<SpecVerdict> {
   return cy.task<Verdict>('callService', scenario).then((verdict) => {
     // Fail loudly if the runner itself errored — keeps a harness misconfig from masquerading as a

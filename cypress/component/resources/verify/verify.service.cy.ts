@@ -13,7 +13,7 @@ import type { Scenario, Verdict } from '../../../support/node/scenario';
 const TRUSTED_ORIGIN = 'https://auth.datum.net';
 const BASE_URL = 'https://auth.datum.test';
 
-/** Drive the scenario through the real Bun node harness and return the raw verdict.
+/** Drive the scenario through the real Node harness and return the raw verdict.
  *  Uses cy.task('callService') directly so that tests examining error states can check
  *  verdict.ok explicitly without the callService() wrapper auto-failing them. */
 function run(s: Scenario): Cypress.Chainable<Verdict> {

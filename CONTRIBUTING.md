@@ -5,15 +5,14 @@ opening a pull request.
 
 ## Prerequisites
 
-- [Bun](https://bun.sh/) >= 1.3.14
-- Node 20+ (managed via `.nvmrc`)
+- Node 26.12.1 (managed via `.nvmrc`), with npm
 - A running instance of the dev environment — see [Getting Started](docs/getting-started/)
 
 ## Local development
 
 ```bash
-bun install         # install dependencies and wire up lefthook pre-commit hooks
-bun run dev         # start the local dev server
+npm install         # install dependencies and wire up lefthook pre-commit hooks
+npm run dev         # start the local dev server
 ```
 
 ## Before you push
@@ -21,11 +20,11 @@ bun run dev         # start the local dev server
 Run the full local gate:
 
 ```bash
-bun run lint             # ESLint (auto-fix)
-bun run typecheck        # TypeScript + route type generation
-bun run lint:boundaries  # architecture fitness — dependency-cruiser
-bun run lint:cycles      # circular import check — madge
-bun run size             # bundle budget (requires bun run build first)
+npm run lint             # ESLint (auto-fix)
+npm run typecheck        # TypeScript + route type generation
+npm run lint:boundaries  # architecture fitness — dependency-cruiser
+npm run lint:cycles      # circular import check — madge
+npm run size             # bundle budget (requires npm run build first)
 ```
 
 CI runs the same checks. A PR that fails any of these will not be merged.
@@ -48,7 +47,7 @@ through explicit composition seams defined in `app/server/composition.ts`.
 | `app/resources/` importing from `app/routes/` (except `paths.ts`) | Resources must not couple to route modules |
 | Circular imports anywhere | Cycles make dependency graphs unresolvable |
 
-If `bun run lint:boundaries` rejects your import, the fix is to restructure the
+If `npm run lint:boundaries` rejects your import, the fix is to restructure the
 code — not to weaken or comment-out the rule. If you believe the rule is
 wrong for your use case, open an issue to discuss it first.
 
@@ -58,8 +57,8 @@ See [Architecture Overview](docs/architecture/overview.md) and
 ## Testing
 
 ```bash
-bun run test:unit          # Cypress component tests
-bun run test:e2e:fast      # E2E suite against the fake auth provider
+npm run test:unit          # Cypress component tests
+npm run test:e2e:fast      # E2E suite against the fake auth provider
 ```
 
 See [Testing](docs/development/testing.md) for the full test strategy.

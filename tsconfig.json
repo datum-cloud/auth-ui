@@ -3,7 +3,7 @@
   "exclude": ["cypress/**"],
   "compilerOptions": {
     "lib": ["DOM", "DOM.Iterable", "ES2023"],
-    "types": ["@react-router/node", "vite/client", "@types/bun"],
+    "types": ["@react-router/node", "vite/client", "node"],
     "target": "ES2023",
     "module": "ESNext",
     "moduleResolution": "bundler",

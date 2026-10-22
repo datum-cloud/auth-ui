@@ -1,6 +1,6 @@
 // cypress/component/server/middleware/rate-limit.cy.ts
 // CY-TASK port of app/server/middleware/__tests__/rate-limit.test.ts
-// Each cy.task = fresh Bun process → clean RateLimiter state; Date.now overridden per-case.
+// Each cy.task = fresh Node process → clean RateLimiter state; Date.now overridden per-case.
 // Reduced to one "limit enforced" case per distinct rate-limited route — each is a genuine
 // abuse-prevention control guarding a different endpoint. Bucket-sharing/no-consume/isolation
 // variants are covered structurally by middleware/rate-limit-store.cy.ts.

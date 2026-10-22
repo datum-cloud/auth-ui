@@ -37,20 +37,20 @@ export const SUPPORTED_LOCALES = ['en', 'fr'] as const;
 ## 4. Compile
 
 ```bash
-bun run i18n:extract    # populate fr.po with every msgid from app/
-bun run i18n:compile    # fr.po → fr.ts, which loadMessages() imports at runtime
+npm run i18n:extract    # populate fr.po with every msgid from app/
+npm run i18n:compile    # fr.po → fr.ts, which loadMessages() imports at runtime
 ```
 
-Then translate: fill in the `msgstr` entries in `app/modules/i18n/locales/fr.po` and re-run `bun run i18n:compile`.
+Then translate: fill in the `msgstr` entries in `app/modules/i18n/locales/fr.po` and re-run `npm run i18n:compile`.
 
 ## Checklist
 
 - [ ] `app/modules/i18n/locales/<code>.po` exists
 - [ ] `<code>` added to `locales[]` in `lingui.config.ts`
 - [ ] `<code>` added to `SUPPORTED_LOCALES` in `app/modules/i18n/lingui.ts`
-- [ ] `bun run i18n:extract && bun run i18n:compile` run, and `<code>.ts` generated
+- [ ] `npm run i18n:extract && npm run i18n:compile` run, and `<code>.ts` generated
 - [ ] The `msgstr` entries are **real translations** — not copies of the English
-- [ ] `bun run typecheck` clean
+- [ ] `npm run typecheck` clean
 
 ## Related Documentation
 

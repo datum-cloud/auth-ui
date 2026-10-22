@@ -1,7 +1,7 @@
 // cypress/component/modules/auth/session/passkey-hint.cy.ts
 //
 // Node-bound (cy.task) spec — passkey-hint.ts is signed with SESSION_SECRET (env.server is
-// stubbed out of the browser bundle), so the REAL serialize→parse round-trip runs in Bun.
+// stubbed out of the browser bundle), so the REAL serialize→parse round-trip runs in Node.
 import { callService } from '../../../../support/node/call-service';
 
 describe('passkey-hint cookie', () => {
