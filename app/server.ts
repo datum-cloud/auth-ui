@@ -23,10 +23,38 @@ import { appSecureHeaders, resolveFrameAncestors } from '@/server/middleware/sec
 import { registry, httpMetrics } from '@/server/observability';
 import { samlPostHandler } from '@/server/routes/saml-post';
 import { cspNonceContext, traceIdContext } from '@/shared/load-context';
-import { serveStatic } from 'hono/bun';
+import { serveStatic } from '@hono/node-server/serve-static';
 import { compress } from 'hono/compress';
+import type { Server } from 'node:http';
 import { RouterContextProvider } from 'react-router';
-import { createHonoServer } from 'react-router-hono-server/bun';
+import { createHonoServer } from 'react-router-hono-server/node';
+
+const KEEP_ALIVE_TIMEOUT_MS = 75_000;
+const HEADERS_TIMEOUT_MS = 76_000;
+const DRAIN_DEADLINE_MS = 45_000;
+
+function drainOnSignal(server: Server): void {
+  let draining = false;
+  const drain = (signal: NodeJS.Signals) => {
+    if (draining) return;
+    draining = true;
+    console.warn(`${signal} received, draining in-flight requests`);
+    const idleSweep = setInterval(() => server.closeIdleConnections(), 1_000);
+    const deadline = setTimeout(() => {
+      console.warn(`drain exceeded ${DRAIN_DEADLINE_MS} ms, closing remaining connections`);
+      server.closeAllConnections();
+    }, DRAIN_DEADLINE_MS);
+    idleSweep.unref();
+    deadline.unref();
+    server.close(() => {
+      console.warn('drained, exiting');
+      process.exit(0);
+    });
+    server.closeIdleConnections();
+  };
+  process.on('SIGTERM', drain);
+  process.on('SIGINT', drain);
+}
 
 // React Router 8 reads the load context through typed keys on a
 // RouterContextProvider instead of an augmented AppLoadContext interface.
@@ -34,17 +62,12 @@ import { createHonoServer } from 'react-router-hono-server/bun';
 // (root.tsx, entry.server.tsx) don't have to import this server entry.
 
 export default await createHonoServer<RequestContextEnv>({
-  // Supplying onGracefulShutdown activates react-router-hono-server/bun's built-in
-  // SIGTERM + SIGINT handler (see gracefulShutdown in its bun adapter): it calls
-  // serverInstance.stop(false) — draining all in-flight requests — then runs this
-  // callback, then exits 0.  The preStop sleep in the k8s Deployment (10 s) gives
-  // kube-proxy time to deregister the endpoint before SIGTERM arrives, so no new
-  // traffic reaches the pod during the drain window.
-  async onGracefulShutdown() {
-    // Nothing app-level to close today (no DB pool, no persistent connections).
-    // The hook intentionally left as a no-op so the SIGTERM path is active and
-    // future resources (e.g. a DB pool) can be closed here without changing the
-    // activation plumbing.
+  onServe(server) {
+    if (env.NODE_ENV !== 'production') return;
+    const http = server as Server;
+    http.keepAliveTimeout = KEEP_ALIVE_TIMEOUT_MS;
+    http.headersTimeout = HEADERS_TIMEOUT_MS;
+    drainOnSignal(http);
   },
   // beforeAll runs ahead of the adapter's built-in static serving. Since v4 the
   // adapter serves /id/assets/* itself (it honours vite base='/id/'), and the

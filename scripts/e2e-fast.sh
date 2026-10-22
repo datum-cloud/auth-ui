@@ -16,11 +16,11 @@ SPECS=(
   cypress/e2e/signup-passkey.cy.ts
 )
 
-bun run build
+npm run build
 
 for spec in "${SPECS[@]}"; do
   echo "==> ${spec}"
   AUTH_PROVIDER=fake PORT="${PORT}" PUBLIC_ORIGIN="${ORIGIN}" \
-    bunx start-server-and-test 'bun run start' "http-get://localhost:${PORT}/healthz" \
-    "bunx cypress run --browser chrome --config baseUrl=${ORIGIN} --spec ${spec}"
+    npx --no-install start-server-and-test 'npm run start' "http-get://localhost:${PORT}/healthz" \
+    "npx --no-install cypress run --browser chrome --config baseUrl=${ORIGIN} --spec ${spec}"
 done
