@@ -4,7 +4,7 @@ You have the app running. Now sign in, run the local gate, and make a change.
 
 ## 1. Sign in
 
-With the fake provider (`AUTH_PROVIDER=fake bun run dev`):
+With the fake provider (`AUTH_PROVIDER=fake npm run dev`):
 
 1. Open <http://localhost:3000/id/login>.
 2. Enter `alice@acme.test`.
@@ -18,11 +18,11 @@ picker), `nofactor-user@acme.test` (enrollment) — all with the same password. 
 ## 2. Run the local gate
 
 Run this before every push. It is a subset of what CI runs — CI additionally runs
-`typecheck:cypress`, `bun run size`, an i18n-freshness check, a supply-chain audit (`bun audit` +
+`typecheck:cypress`, `npm run size`, an i18n-freshness check, a supply-chain audit (`npm audit` +
 SBOM), and `test:e2e:fast`:
 
 ```bash
-bun run lint && bun run typecheck && bun run i18n:compile && bun run test:unit && bun run build
+npm run lint && npm run typecheck && npm run i18n:compile && npm run test:unit && npm run build
 ```
 
 | Step | What it does |
@@ -43,15 +43,15 @@ dependency and there is no Vitest config. If you are looking for a "unit test" f
 Debug a component spec interactively:
 
 ```bash
-bun run test:unit:debug     # CYPRESS=true cypress open --component
+npm run test:unit:debug     # CYPRESS=true cypress open --component
 ```
 
 ## 3. The other suites
 
 ```bash
-bun run test:e2e            # full Cypress e2e against `bun run dev`
-bun run test:e2e:fast       # built server + fake provider, core sign-in spec only
-bun run test:acceptance     # real Zitadel — needs a live instance
+npm run test:e2e            # full Cypress e2e against `npm run dev`
+npm run test:e2e:fast       # built server + fake provider, core sign-in spec only
+npm run test:acceptance     # real Zitadel — needs a live instance
 ```
 
 `test:e2e` and `test:e2e:fast` both wait on `http://localhost:3000/healthz` before starting the

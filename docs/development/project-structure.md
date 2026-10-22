@@ -1,6 +1,6 @@
 # Project Structure
 
-Everything the app runs is under `app/`. The layout is by **layer**, not by feature: a route renders, a resource does the work, and a module owns a cross-cutting concern. The import direction between those layers is enforced by `bun run lint:boundaries` (see [Code Quality](./code-quality.md)).
+Everything the app runs is under `app/`. The layout is by **layer**, not by feature: a route renders, a resource does the work, and a module owns a cross-cutting concern. The import direction between those layers is enforced by `npm run lint:boundaries` (see [Code Quality](./code-quality.md)).
 
 ## `app/`
 

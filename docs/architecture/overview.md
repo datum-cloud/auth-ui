@@ -6,7 +6,7 @@ Datum Auth UI is the login experience for Datum Cloud, served at `/id`. It is a 
 
 | Layer         | Choice                                    |
 | ------------- | ----------------------------------------- |
-| Runtime       | Bun 1.3                                   |
+| Runtime       | Node 26.12.1                              |
 | Framework     | React Router 7 (SSR, framework mode)      |
 | BFF           | Hono via `react-router-hono-server`       |
 | Identity      | Zitadel v2 APIs (`@zitadel/client`)       |
@@ -80,7 +80,7 @@ The Hono layer in `app/server.ts` owns everything that must run before routing: 
 
 **Fail-closed security defaults.** Every allowlist defaults to "deny": `FRAME_ANCESTORS` unset means `frame-ancestors 'none'`, an unlisted forward host is rejected before it reaches the Zitadel transport, and a post-logout redirect outside `POST_LOGOUT_ALLOWLIST` is not followed. See [Session & Security](./session-and-security.md).
 
-**Enforced boundaries.** The layering above is not a convention — it is checked. `bun run lint:boundaries` runs dependency-cruiser against `.dependency-cruiser.cjs`, and `bun run lint:cycles` runs madge for import cycles.
+**Enforced boundaries.** The layering above is not a convention — it is checked. `npm run lint:boundaries` runs dependency-cruiser against `.dependency-cruiser.cjs`, and `npm run lint:cycles` runs madge for import cycles.
 
 ## Related Documentation
 

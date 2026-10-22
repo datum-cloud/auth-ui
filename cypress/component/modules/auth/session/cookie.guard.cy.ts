@@ -5,7 +5,7 @@
 // readSessions(request) is a SECURITY gate (HMAC signature + Zod-shape guard with audit). The
 // cookie module is stubbed out of the Vite browser bundle (env.server + react-router signing),
 // and the Fetch spec forbids setting a Cookie header in the browser — so the REAL guard runs in
-// Bun via cy.task. Each op runs ONE readSessions call; logAuthEvent's console.log audit is
+// Node via cy.task. Each op runs ONE readSessions call; logAuthEvent's console.log audit is
 // captured into verdict.auditLines (the cy.task analogue of the original `vi.spyOn(console,'log')`).
 import { callService } from '../../../../support/node/call-service';
 import type { Verdict } from '../../../../support/node/call-service';

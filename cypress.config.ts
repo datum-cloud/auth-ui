@@ -122,7 +122,7 @@ export default defineConfig({
     modifyObstructiveCode: false,
     // set explicitly so the support file is always loaded (Task 12 adds the axe harness here)
     supportFile: 'cypress/support/e2e.ts',
-    // acceptance/ added so `bunx cypress run --spec acceptance/...` resolves the file;
+    // acceptance/ added so `npx cypress run --spec acceptance/...` resolves the file;
     // describe.skip keeps the suite from running until real Zitadel is wired.
     specPattern: ['cypress/e2e/**/*.cy.{js,jsx,ts,tsx}', 'acceptance/**/*.cy.{js,jsx,ts,tsx}'],
   },
@@ -137,7 +137,7 @@ export default defineConfig({
     specPattern: 'cypress/component/**/*.{cy,spec}.{js,jsx,ts,tsx}',
     setupNodeEvents(on, config) {
       cypressSplit(on, config);
-      // Node-spec harness: runs cookie/session/audit-dependent service logic in real Bun via
+      // Node-spec harness: runs cookie/session/audit-dependent service logic in real Node via
       // cy.task('callService', scenario). See cypress/support/node/* and §7 of the conversion recipe.
       registerNodeTasks(on);
       return config;

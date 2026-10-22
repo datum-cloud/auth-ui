@@ -63,9 +63,9 @@ Choosing `modules/auth/providers/` (rather than, say, `strategies/`) also keeps 
 
 | Risk                                                           | Mitigation                                                                                                                                                                                  |
 | -------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| A route or resource imports the Zitadel adapter directly       | `bun run lint:boundaries` (dependency-cruiser). The `only-composition-imports-providers` rule fails the build on any import into `app/modules/auth/providers/` from outside the exemptions. |
+| A route or resource imports the Zitadel adapter directly       | `npm run lint:boundaries` (dependency-cruiser). The `only-composition-imports-providers` rule fails the build on any import into `app/modules/auth/providers/` from outside the exemptions. |
 | The layering erodes in other directions (cycles, back-imports) | Four sibling rules in `.dependency-cruiser.cjs`: `resources-not-server-edge`, `no-routes-from-resources`, `shared-is-leaf`, `no-circular`.                                                  |
-| The fake adapter diverges from Zitadel's real behaviour        | Live-Zitadel acceptance run (`bun run test:acceptance`) gates the real behaviour.                                                                                                           |
+| The fake adapter diverges from Zitadel's real behaviour        | Live-Zitadel acceptance run (`npm run test:acceptance`) gates the real behaviour.                                                                                                           |
 
 ## References
 

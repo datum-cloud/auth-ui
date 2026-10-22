@@ -2,7 +2,7 @@
 //
 // cy.task node-spec port of app/resources/device/__tests__/device.service.test.ts. The decision
 // action reads a signed `sessions` cookie to gate authorize on a live session, so it is node-bound.
-// Each cy.task call is its own fresh Bun process, so the rich singleton seed (dev-1 / dev-deny /
+// Each cy.task call is its own fresh Node process, so the rich singleton seed (dev-1 / dev-deny /
 // dev-authorize / WDJB-MJHT) is clean per case — no cross-test state bleed.
 import { callService } from '../../../support/node/call-service';
 

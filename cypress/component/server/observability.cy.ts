@@ -1,6 +1,6 @@
 // cypress/component/server/observability.cy.ts
 // CY-TASK port of app/server/__tests__/observability.test.ts
-// Real observability module — not the Vite stub. ALS + prom-client run in Bun.
+// Real observability module — not the Vite stub. ALS + prom-client run in Node.
 import { callService } from '../../support/node/call-service';
 
 describe('logAuthEvent', () => {

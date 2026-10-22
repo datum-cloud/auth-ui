@@ -13,8 +13,8 @@
 //   SESSION_SECRET=<32+ chars> NODE_ENV=production AUTH_PROVIDER=zitadel \
 //   ZITADEL_API_URL=https://auth.localtest.me:30000 \
 //   ZITADEL_SERVICE_USER_TOKEN=<pat> NODE_EXTRA_CA_CERTS=./dev-ca.crt \
-//   bunx start-server-and-test 'bun run start' http-get://localhost:3000/healthz \
-//     'bunx cypress run --spec acceptance/logout.acceptance.cy.ts --env ACCEPTANCE=1'
+//   npx start-server-and-test 'npm run start' http-get://localhost:3000/healthz \
+//     'npx cypress run --spec acceptance/logout.acceptance.cy.ts --env ACCEPTANCE=1'
 //
 // Credentials default to the LOCAL dev-stack test user; override via
 // CYPRESS_ACCEPTANCE_LOGIN_NAME / _PASSWORD.

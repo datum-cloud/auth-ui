@@ -6,7 +6,7 @@
 // source of the match/mismatch decision for EVERY login factor (password, IdP callback,
 // passkey/security-key) — a SECURITY guard. reauth-intent.ts is signed with SESSION_SECRET and is
 // stubbed out of the Vite browser bundle, and the guard reads a Cookie header off a Request (which
-// the Fetch spec forbids in the browser), so the REAL guard runs in Bun via cy.task.
+// the Fetch spec forbids in the browser), so the REAL guard runs in Node via cy.task.
 import { callService } from '../../../../support/node/call-service';
 
 interface ReauthCheck {
@@ -17,7 +17,7 @@ interface ReauthCheck {
 
 describe('checkReauthIntent (shared identity guard)', () => {
   // The match/mismatch pair chains in one test, matching the established cy.task pattern. Each
-  // callService spawns a fresh Bun process, so the two decisions stay fully independent. The
+  // callService spawns a fresh Node process, so the two decisions stay fully independent. The
   // MISMATCH case runs first: it is the one that actually denies a re-auth against the wrong
   // identity, so it must never be masked by a failure in the permissive case.
   it('echoes the intent and clears the cookie, flagging mismatch only on a different identity', () => {

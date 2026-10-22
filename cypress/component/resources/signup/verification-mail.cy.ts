@@ -3,7 +3,7 @@
 // CY-TASK: sendVerificationMail (app/server/infra/verification-mail.server.ts) opens an outbound
 // node:http(s) connection and reads env.server — both unavailable/stubbed in the Vite browser
 // bundle — so the REAL client runs node-side via cy.task, same pattern as cypress/component/server/*.
-// Each callService() spawns a fresh Bun process (see run-scenario.ts), so env.VERIFICATION_MAIL_URL
+// Each callService() spawns a fresh Node process (see run-scenario.ts), so env.VERIFICATION_MAIL_URL
 // is threaded per-test via `env` and applied BEFORE the client module loads.
 //
 // Four contracts (task-5-brief.md, Step 1):

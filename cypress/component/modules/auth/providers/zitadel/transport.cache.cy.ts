@@ -2,12 +2,12 @@
 //
 // Component (no-mount) port of transport.cache.test.ts.
 //
-// All tests run via cy.task so the REAL transport.ts code executes in Bun:
+// All tests run via cy.task so the REAL transport.ts code executes in Node:
 //   • Real SHA-256 fingerprinting (node:crypto)
 //   • Real createServiceClient → createClientFor (with SessionService, a proper DescService)
 //   • Real LRU cap (CACHE_MAX=256) and eviction
 //
-// Each cy.task call spawns a fresh Bun process → module-level Maps start empty per test.
+// Each cy.task call spawns a fresh Node process → module-level Maps start empty per test.
 // No beforeEach/afterEach cache-reset needed.
 //
 // Kept: the bounded-growth cap (prevents unbounded memory growth) and the rotated-token
@@ -19,7 +19,7 @@ import type { Verdict } from '../../../../../support/node/call-service';
 
 describe('transport client cache', () => {
   // Both ops chained in one test, matching the pattern transport.cy.ts already uses for 4
-  // chained calls. Each callService spawns a fresh Bun process, so the two remain fully
+  // chained calls. Each callService spawns a fresh Node process, so the two remain fully
   // independent; the only cost is that a cap failure would mask the rotated-token result.
   it("does not grow unbounded across many distinct session tokens, and a rotated token does not reuse the previous token's client", () => {
     callService({

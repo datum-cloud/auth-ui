@@ -7,7 +7,7 @@ at startup** rather than at first request.
 ## Create your `.env`
 
 ```bash
-bun install
+npm install
 cp .env.example .env
 ```
 

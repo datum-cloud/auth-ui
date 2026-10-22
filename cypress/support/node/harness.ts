@@ -1,6 +1,6 @@
 // cypress/support/node/harness.ts
 //
-// The Bun-side node harness. It runs OUTSIDE the Vite browser bundle, so it imports the REAL app
+// The Node-side harness. It runs OUTSIDE the Vite browser bundle, so it imports the REAL app
 // modules — real HMAC cookie signing (cookie.ts), real audit emission (observability.ts), the real
 // services — with only the FakeAuthProvider (AUTH_PROVIDER=fake) substituted, per scenario.
 //
@@ -402,7 +402,7 @@ function buildForm(fields?: Record<string, string>): FormData {
  * Build the Request a ROUTE-HANDLER FACTORY (createOtpVerifyHandlers) consumes. Unlike the bare
  * service requests, the handler internals call remix-utils' CSRF helpers, whose `getHeaders` only
  * unwraps a value that is `instanceof Request` — so this MUST be a real Request (the cookie/CSRF
- * round-trip in Bun is NOT stripped). We build a real Request and override `headers` (to carry the
+ * round-trip in Node is NOT stripped). We build a real Request and override `headers` (to carry the
  * signed Cookie) + `formData` (the action calls `request.formData()`). When `request.csrf` is set,
  * a REAL signed CSRF cookie is minted (getCsrfToken) and its token threaded into the form so
  * `assertCsrf` (csrf.validate(form, headers)) passes.
@@ -1209,7 +1209,7 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
         break;
       }
       case 'allowResend': {
-        // Each callService spawns a fresh Bun process, so limiter state starts clean; the
+        // Each callService spawns a fresh Node process, so limiter state starts clean; the
         // reset is a belt-and-braces guard against that process model ever changing.
         _resetResendLimiterForTests();
         const verdicts: boolean[] = [];
@@ -1221,7 +1221,7 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
       }
       case 'registerEmailLinkSignupTwice': {
         // D-RL: both submissions must share one process, or the module-level rate limiter
-        // can never fire (every callService is a fresh Bun process).
+        // can never fire (every callService is a fresh Node process).
         if (!s.signupInput) throw new Error('registerEmailLinkSignupTwice requires signupInput');
         const i = s.signupInput;
         const signupInput = {
@@ -1359,7 +1359,7 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
       }
       // ── transport cache (9a fidelity fix) ────────────────────────────────────
       // Runs the REAL transport.ts code (SHA-256 fingerprint, real LRU cap, real
-      // @zitadel/client/node factory) in this Bun process. Each cy.task call is a
+      // @zitadel/client/node factory) in this Node process. Each cy.task call is a
       // fresh process so module-level Maps start empty — no afterEach needed.
       case 'transportCacheCheck': {
         const op = s.transportOp;
@@ -1440,7 +1440,7 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
         break;
       }
       // ── session-cookie / signing checks (batch 9b) ─────────────────────────────
-      // Runs the REAL cookie/last-used-login/reauth-intent/select.server code in Bun (those
+      // Runs the REAL cookie/last-used-login/reauth-intent/select.server code in Node (those
       // modules are stubbed out of the Vite browser bundle). Each op runs ONE real function so the
       // console.log audit captured above belongs to that single call; the spec asserts on it.
       case 'cookieGuardCheck': {
@@ -2075,7 +2075,7 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
         const op = s.rateLimitOp;
         if (!op) throw new Error('rateLimitCheck requires rateLimitOp');
 
-        // Control Date.now() for deterministic rate-limit windows (safe: fresh Bun process per cy.task)
+        // Control Date.now() for deterministic rate-limit windows (safe: fresh Node process per cy.task)
         let nowMs = 1_000_000;
         const origDateNow = Date.now;
         Date.now = () => nowMs;
@@ -2716,7 +2716,7 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
 
       // resolveOrg precedence probe (org-first / default-org fallback). The env pin
       // (ZITADEL_DEFAULT_ORG_ID) is set per-scenario via `env` (applied before app modules load),
-      // and each cy.task is a fresh Bun process so the module-level default-org cache starts clean.
+      // and each cy.task is a fresh Node process so the module-level default-org cache starts clean.
       case 'resolveOrgProbe': {
         const org = await resolveOrg(provider, s.resolveOrgInput?.urlOrg);
         outcome = { org: org ?? null };

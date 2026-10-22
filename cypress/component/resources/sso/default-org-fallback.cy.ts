@@ -14,7 +14,7 @@ const RECORD = ['getDefaultOrg', 'getActiveIdPs'] as const;
 
 describe('SSO IdP-display flows — org-first / default-org fallback', () => {
   // Both flows assert the identical two-call shape, differing only by which entry point
-  // drives the choke point. Chained in one test; each callService spawns a fresh Bun
+  // drives the choke point. Chained in one test; each callService spawns a fresh Node
   // process, so the two remain independent.
   it('resolves the default org for the active-IdP lookup on both entry points', () => {
     callService({

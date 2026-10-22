@@ -53,7 +53,7 @@ The login experience for Datum Cloud, served at `/id`. This documentation covers
 
 | Layer         | Choice                                    |
 | ------------- | ----------------------------------------- |
-| Runtime       | Bun 1.3                                   |
+| Runtime       | Node 26.12.1                              |
 | Framework     | React Router 7 (SSR, framework mode)      |
 | BFF           | Hono via `react-router-hono-server`       |
 | Identity      | Zitadel v2 APIs (`@zitadel/client`)       |

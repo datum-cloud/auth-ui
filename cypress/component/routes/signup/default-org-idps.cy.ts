@@ -15,7 +15,7 @@ import { callService } from '../../../support/node/call-service';
 import type { Scenario } from '../../../support/node/call-service';
 
 // Both loaders must honor the same five-part contract on a bare signup URL; each row is a
-// separate cy.task (its own Bun process + its own recorded-call arrays), differing only by
+// separate cy.task (its own Node process + its own recorded-call arrays), differing only by
 // {fn, url}. The row label prefixes every assertion so a failure names the exact loader.
 const LOADERS: Array<{ label: string; fn: Scenario['fn']; url: string }> = [
   {

@@ -1,10 +1,10 @@
 // cypress/support/node/scenario.ts
 //
 // Serializable contract shared across the cy.task node-spec boundary. Specs (browser bundle)
-// import the TYPES from here to shape a scenario and read back a verdict; the Bun-side harness
+// import the TYPES from here to shape a scenario and read back a verdict; the Node-side harness
 // (harness.ts / run-scenario.ts) imports the same types to interpret the scenario and run the
 // REAL services. Keep this file pure types + string-literal unions: it is bundled into BOTH the
-// browser spec bundle and the Bun runner, so it must never import an app value module.
+// browser spec bundle and the Node runner, so it must never import an app value module.
 
 /** Provider error codes the fake's scripting seams + the services understand. Open union: a
  *  bare string is accepted so future codes don't break the contract. */
@@ -219,7 +219,7 @@ export type ServiceFn =
   | 'parseEnv'
   // ── signup service (batch 8e) ──
   // vi.mock('@/server/observability') makes audit-shape assertions impossible in the browser bundle
-  // (observability is stubbed to a no-op). Real audit runs in Bun node-side.
+  // (observability is stubbed to a no-op). Real audit runs node-side.
   | 'registerWithPassword'
   // D-RL: replay an ordered list of resendChecks through the real allowResend (node-side —
   // the browser bundle stubs hashActor to '', collapsing every address into one key).
@@ -239,7 +239,7 @@ export type ServiceFn =
   // ── server/* checks (Task 10) ────────────────────────────────────────────────
   // Tests for app/server/**  — node:crypto (hashActor), prom-client (registry), Hono middleware
   // (httpMetrics, rate-limit, samlPostHandler), Cookie header round-trips (CSRF, user-agent,
-  // composition). All run in a fresh Bun process via cy.task so they bypass the Vite stubs.
+  // composition). All run in a fresh Node process via cy.task so they bypass the Vite stubs.
   | 'compositionCheck'
   | 'csrfFoundationsCheck'
   | 'csrfCheck'
@@ -248,8 +248,8 @@ export type ServiceFn =
   | 'rateLimitCheck'
   | 'samlPostCheck'
   // ── transport cache (9a fidelity fix) ────────────────────────────────────────
-  // Exercises the REAL transport.ts (SHA-256 fingerprint + @zitadel/client/node) in Bun.
-  // Each cy.task call spawns a fresh Bun process so the module-level Maps start empty.
+  // Exercises the REAL transport.ts (SHA-256 fingerprint + @zitadel/client/node) in Node.
+  // Each cy.task call spawns a fresh Node process so the module-level Maps start empty.
   | 'transportCacheCheck'
   // ── session-cookie / signing (batch 9b) ──────────────────────────────────────
   // The cookie / last-used-login / reauth-intent modules are stubbed out of the Vite browser
@@ -542,7 +542,7 @@ export interface Scenario {
   };
   // ── signup service inputs (batch 8e) ────────────────────────────────────────────────────────
   /** Ordered (email, nowMs) checks replayed through the real allowResend (fn: 'allowResend').
-   *  Outcome is boolean[] verdicts. Every callService spawns a fresh Bun process, so limiter
+   *  Outcome is boolean[] verdicts. Every callService spawns a fresh Node process, so limiter
    *  state is naturally per-scenario — which is also why the rate-limit service test must run
    *  both submissions inside ONE scenario (fn: 'registerEmailLinkSignupTwice'). */
   resendChecks?: Array<{ email: string; nowMs: number }>;
@@ -697,7 +697,7 @@ export interface Scenario {
     | 'handlerRedirectBadUrl'; // redirect binding with javascript: ACS url → 400 (assertHttpUrl gate)
 
   // ── transport cache check (fn: 'transportCacheCheck') ──────────────────────
-  /** Which transport cache property to assert. Each cy.task call = fresh Bun process = fresh Maps. */
+  /** Which transport cache property to assert. Each cy.task call = fresh Node process = fresh Maps. */
   transportOp?:
     | 'serverTransportCacheHit' // same url+token → same reference; outcome: { hit: boolean }
     | 'serverTransportCacheMiss' // different url → different reference; outcome: { miss: boolean }
@@ -758,7 +758,7 @@ export interface Scenario {
 
   // ── FakeWebAuthn (fn: 'fakeWebAuthn') ──────────────────────────────────────
   /** REAL FakeWebAuthn seeded with PASSKEY_U5. Each op runs a whole ceremony node-side (the key
-   *  never leaves Bun) and returns data; the spec keeps every assertion.
+   *  never leaves Node) and returns data; the spec keeps every assertion.
    *  creationOptions → { rpId, userId }; prebaked → { userVerified };
    *  signed | unknownId | wrongChallenge | wrongOrigin | mangledSignature | otherUser
    *    → { ok: true, userVerified } | { ok: false, code }

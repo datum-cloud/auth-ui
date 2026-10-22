@@ -3,10 +3,10 @@
 // Compile-time type-narrowing gates for the IdP method return types.
 // Port of app/modules/auth/__tests__/auth-provider.types.test.ts.
 //
-// The real assertions are the TypeScript assignments below, enforced by `bun run typecheck`
+// The real assertions are the TypeScript assignments below, enforced by `npm run typecheck`
 // (tsc). Unlike the old __tests__ files — which tsconfig EXCLUDED from typecheck — `cypress/**`
 // IS in the tsconfig include set, so porting these gates here makes them MORE load-bearing: a
-// regression to Promise<unknown> fails `bun run typecheck`. The runtime `it` is a witness only.
+// regression to Promise<unknown> fails `npm run typecheck`. The runtime `it` is a witness only.
 //
 // Why assignment-based, not expectTypeOf().resolves.toEqualTypeOf:
 //   expectTypeOf<Promise<unknown>>().resolves.toEqualTypeOf<T>() passes for any T because unknown
@@ -34,6 +34,6 @@ void _addIdpLink;
 describe('AuthProvider IdP method types', () => {
   it('compile-time gates above enforce non-unknown return types — see file header', () => {
     // Intentionally empty: the real assertions are the TypeScript assignments above, enforced at
-    // `bun run typecheck` time (cypress/** is in the tsconfig include set).
+    // `npm run typecheck` time (cypress/** is in the tsconfig include set).
   });
 });

@@ -12,7 +12,7 @@ The fastest path. An in-memory `FakeAuthProvider` with seeded users; no network 
 credentials beyond `SESSION_SECRET`.
 
 ```bash
-AUTH_PROVIDER=fake bun run dev
+AUTH_PROVIDER=fake npm run dev
 ```
 
 Seeded users all use the password `hunter2`. Start with `alice@acme.test` (password only);
@@ -27,7 +27,7 @@ Set the four variables from [Environment Setup](./02-environment-setup.md)
 then:
 
 ```bash
-bun run dev
+npm run dev
 ```
 
 `AUTH_PROVIDER` unset — or set to anything other than `fake` — selects the Zitadel adapter.
@@ -35,7 +35,7 @@ bun run dev
 If your Zitadel uses a self-signed certificate, point Node's TLS at its CA:
 
 ```bash
-NODE_EXTRA_CA_CERTS=/path/to/zitadel-local-ca.pem bun run dev
+NODE_EXTRA_CA_CERTS=/path/to/zitadel-local-ca.pem npm run dev
 ```
 
 ## Mode 3 — A local Zitadel (acceptance work)
@@ -51,7 +51,7 @@ still manual. Once you have a PAT, point `.env` at it (`ZITADEL_API_URL=http://l
 and run the acceptance spec:
 
 ```bash
-bun run test:acceptance
+npm run test:acceptance
 ```
 
 See [Testing](../development/testing.md) for what the acceptance suite covers.
@@ -95,12 +95,12 @@ These are served by the Hono layer and are **not** under `/id`. The e2e scripts 
 To exercise the built server instead of the dev server:
 
 ```bash
-bun run build
-bun run start                          # NODE_ENV=production bun ./build/server/index.js
+npm run build
+npm run start                          # NODE_ENV=production node ./build/server/index.js
 ```
 
 With `AUTH_PROVIDER=fake` this works without any Zitadel credentials — that is exactly what
-`bun run test:e2e:fast` does.
+`npm run test:e2e:fast` does.
 
 ## Next Step
 

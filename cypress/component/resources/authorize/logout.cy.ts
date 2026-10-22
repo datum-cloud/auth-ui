@@ -4,7 +4,7 @@
 // signed `sessions` cookie off the Request and self-heals stale post-logout sessions before
 // reusing them in createCallback — logic that cannot run as a browser component spec (the Fetch
 // spec forbids a Cookie request header). The harness runs the REAL resolveAuthorize +
-// outcomeToResponse + cookie + audit in Bun (see cypress/support/node/*); we assert browser-side.
+// outcomeToResponse + cookie + audit in Node (see cypress/support/node/*); we assert browser-side.
 //
 // Regression coverage for the post-logout stale-cookie bug (validate-before-reuse): dead →
 // /login + session_stale (self-heal); transient → /error (NOT a silent re-login — the crux of

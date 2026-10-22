@@ -31,7 +31,7 @@ Every authentication ceremony — password, passkey, MFA, SSO, device authorizat
 
 ### Built With
 
-- **[Bun](https://bun.sh)** — runtime and package manager
+- **[Node.js](https://nodejs.org)** — runtime, with npm as the package manager
 - **[React Router 7](https://reactrouter.com)** — SSR framework mode
 - **[Hono](https://hono.dev)** — backend-for-frontend server
 - **[Zitadel](https://zitadel.com)** — identity platform (v2 APIs)
@@ -44,12 +44,12 @@ Every authentication ceremony — password, passkey, MFA, SSO, device authorizat
 ## Quick Start
 
 ```bash
-bun install
+npm install
 cp .env.example .env    # set SESSION_SECRET, ZITADEL_API_URL, ZITADEL_SERVICE_USER_TOKEN, PUBLIC_ORIGIN
-bun run dev
+npm run dev
 ```
 
-No Zitadel to hand? Run against the built-in fake provider: `AUTH_PROVIDER=fake bun run dev`
+No Zitadel to hand? Run against the built-in fake provider: `AUTH_PROVIDER=fake npm run dev`
 
 ---
 
