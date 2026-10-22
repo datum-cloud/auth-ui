@@ -24,9 +24,9 @@ spec:
   template:
     metadata: { labels: { app.kubernetes.io/name: auth-ui } }
     spec:
-      # Allow 60 s for Bun to drain in-flight requests after SIGTERM.
-      # react-router-hono-server/bun owns the SIGTERM handler (wired only when
-      # onGracefulShutdown is supplied — see app/server.ts); the preStop sleep
+      # Allow 60 s for Node to drain in-flight requests after SIGTERM.
+      # app/server.ts owns the SIGTERM handler: it stops accepting, closes idle
+      # connections, and force-closes anything left after 45 s; the preStop sleep
       # provides a k8s-level drain window so kube-proxy has time to deregister
       # the endpoint before the pod receives SIGTERM.  The 60 s grace period is
       # consumed first by preStop (10 s), leaving a 50 s post-SIGTERM drain
@@ -34,10 +34,8 @@ spec:
       # with headroom for OOM or stuck-shutdown detection.
       terminationGracePeriodSeconds: 60
       # Non-root security posture — mirrors the cloud-portal convention.
-      # readOnlyRootFilesystem is omitted intentionally: Bun writes to /tmp
-      # at startup (e.g. transpiler cache); a read-only root would require a
-      # separate emptyDir mount that cloud-portal doesn't model — defer to a
-      # future hardening task that benchmarks the emptyDir overhead.
+      # readOnlyRootFilesystem is not set yet. The Node server writes nothing to
+      # disk, so it can be enabled in a separate hardening change.
       securityContext:
         runAsNonRoot: true
         runAsUser: 1001
