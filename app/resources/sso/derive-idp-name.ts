@@ -5,6 +5,7 @@
 // Zitadel reject the register: `invalid SetHumanProfile.GivenName: value length must
 // be between 1 and 200 runes`. This helper reproduces the old login app's fallback
 // chain so the register always carries non-empty profile names.
+import { placeholderNameFromEmail } from '@/resources/signup/placeholder-name';
 
 export interface DeriveIdpProfileNameInput {
   firstName?: string;
@@ -23,14 +24,33 @@ const MAX_NAME_RUNES = 200;
 // Trim, treat whitespace-only as empty, and cap at the Zitadel profile-field limit.
 const clean = (value: string | undefined): string => (value ?? '').trim().slice(0, MAX_NAME_RUNES);
 
+const isEmailShaped = (value: string): boolean => value.includes('@');
+
+// An email is never a name: email-shaped IdP names count as missing.
+const cleanName = (value: string | undefined): string => {
+  const cleaned = clean(value);
+  return isEmailShaped(cleaned) ? '' : cleaned;
+};
+
+// Google and other OIDC IdPs report the email as the IdP userName — reduce it to the
+// local part the same way the email-signup placeholder does.
+const cleanFallback = (idpUserName: string | undefined): string => {
+  const cleaned = clean(idpUserName);
+  if (!isEmailShaped(cleaned)) return cleaned || 'user';
+  return placeholderNameFromEmail(cleaned).firstName;
+};
+
 /**
- * Compute a non-empty { firstName, lastName } from an IdP draft, mirroring the old app:
- *   1. start with the IdP-provided given/family,
+ * Compute a non-empty { firstName, lastName } from an IdP draft:
+ *   1. start with the IdP-provided given/family (email-shaped values count as missing),
  *   2. if EITHER is empty AND a displayName is present, derive both by splitting the
- *      displayName on whitespace (first token → given, the rest → family),
- *   3. if givenName is still empty → fall back to idpUserName (or "user"),
- *   4. if familyName is still empty → fall back to idpUserName (or "user").
- * Every output is trimmed (whitespace-only treated as empty) and capped at 200 runes.
+ *      displayName on whitespace (leading tokens → given, last token → family),
+ *   3. if exactly one is still empty, mirror the present one into it,
+ *   4. if both are still empty, put idpUserName (its local part when email-shaped, else
+ *      "user") into both.
+ * Steps 3 and 4 deliberately produce givenName == familyName: milo's UserController then
+ * sets iam.miloapis.com/name-review-required and cloud-portal asks for the real name.
+ * Every output is trimmed and capped at 200 runes.
  */
 export function deriveIdpProfileName({
   firstName,
@@ -38,12 +58,12 @@ export function deriveIdpProfileName({
   displayName,
   idpUserName,
 }: DeriveIdpProfileNameInput): DeriveIdpProfileNameResult {
-  let given = clean(firstName);
-  let family = clean(lastName);
+  let given = cleanName(firstName);
+  let family = cleanName(lastName);
 
   // Step 2: derive from displayName only when something is still missing and we have one.
   if (!given || !family) {
-    const source = (displayName ?? '').trim();
+    const source = cleanName(displayName);
     if (source) {
       const parts = source.split(/\s+/);
       if (parts.length >= 2) {
@@ -53,10 +73,9 @@ export function deriveIdpProfileName({
     }
   }
 
-  // Steps 3 & 4: last-resort fallback to the IdP login (GitHub's username), then "user".
-  const fallback = clean(idpUserName) || 'user';
-  if (!given) given = fallback;
-  if (!family) family = fallback;
+  if (given && family) return { firstName: given, lastName: family };
 
-  return { firstName: given, lastName: family };
+  // Steps 3 & 4: mirror the partial name, else fall back to the IdP login (or "user").
+  const name = given || family || cleanFallback(idpUserName);
+  return { firstName: name, lastName: name };
 }
