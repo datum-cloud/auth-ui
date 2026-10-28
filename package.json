@@ -73,7 +73,7 @@
     "esbuild": "^0.28.1",
     "@hono/node-server": "$@hono/node-server",
     "@bufbuild/protobuf": "2.16.0",
-    "qs": "^6.16.0",
+    "qs": "^6.16.1",
     "joi": "^18.2.9",
     "source-map-js": "^1.2.2",
     "tinypool": "^2.2.0",

@@ -138,13 +138,9 @@ jobs:
         # were bumped in place with the registry integrity (hoisted 2.1.4 -> 2.1.7 under
         # minimatch@9's ^2.0.2; nested 5.0.9 -> 5.0.12 under minimatch@10's ^5.0.5), fixing
         # GHSA-qhr7-859c-m2p7 / GHSA-6j4f-fj2g-mc7p / GHSA-q2hr-2g5m-vwhr.
-        # One advisory is TEMPORARILY ignored. It has no patched release, so no override can fix it:
-        #   GHSA-vfj7-8cjw-p6xm  braces <=3.0.3 stack-exhaustion DoS from deeply nested patterns.
-        #                        No fixed version is published (3.0.3 is the latest). It reaches the
-        #                        tree only through dev tooling: micromatch under @lingui/cli and
-        #                        under fast-glob via cypress-split. The production image prunes dev
-        #                        dependencies, so it never ships. Drop this ignore once braces publishes a fix.
-        # The two former exemptions are both genuinely fixed, not suppressed:
+        #   qs              ^6.16.1   @cypress/request accepts ^6.x (dev-only)   fixes GHSA-6pq8-jhm2-2vcw
+        # No advisory is ignored. GitHub withdrew GHSA-vfj7-8cjw-p6xm (braces) on 2026-10-23.
+        # The former exemptions are all genuinely fixed, not suppressed:
         #   GHSA-mh99-v99m-4gvg / GHSA-rgw5-rvv9-x895 (brace-expansion) — fixed without
         #     an override; each consumer nests its own minimatch on brace-expansion 5.x
         #     and the hoisted copy stays on 2.x.
@@ -156,7 +152,7 @@ jobs:
         #   GHSA-qwww-vcr4-c8h2 (react-router RSC CSRF) — fixed by the v8.3.0 upgrade.
         # If a NEW transitive advisory appears with no override-compatible fix, add its
         # GHSA id to the scripts/npm-audit.sh arguments here as a temporary measure and open a remediation follow-up.
-        run: scripts/npm-audit.sh GHSA-vfj7-8cjw-p6xm
+        run: scripts/npm-audit.sh
       - name: Generate SBOM (CycloneDX)
         run: npx --yes @cyclonedx/cdxgen@11.10.0 -t js -o sbom.cdx.json --spec-version 1.5
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
