@@ -275,6 +275,104 @@ jobs:
       image-overlays: config/base
       image-name: ghcr.io/datum-cloud/auth-ui
 
+  # After a merge to main, wait for staging to serve this build, then sign in with the staging
+  # account's passkey. Not part of status-check: it runs after publish and reports on the merged
+  # commit. Account setup: acceptance/PASSKEY-TESTING.md.
+  staging-passkey-check:
+    name: Staging passkey check
+    needs: [publish-container-image, publish-kustomize-bundle]
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && !failure() && !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      STAGING_ORIGIN: https://auth.staging.env.datum.net
+    steps:
+      - name: Check secrets
+        id: secrets
+        env:
+          STAGING_PASSKEY_LOGIN_NAME: ${{ secrets.STAGING_PASSKEY_LOGIN_NAME }}
+          STAGING_PASSKEY_CREDENTIAL_ID: ${{ secrets.STAGING_PASSKEY_CREDENTIAL_ID }}
+          STAGING_PASSKEY_PRIVATE_KEY: ${{ secrets.STAGING_PASSKEY_PRIVATE_KEY }}
+          STAGING_PASSKEY_USER_HANDLE: ${{ secrets.STAGING_PASSKEY_USER_HANDLE }}
+        run: |
+          missing=()
+          for name in STAGING_PASSKEY_LOGIN_NAME STAGING_PASSKEY_CREDENTIAL_ID \
+            STAGING_PASSKEY_PRIVATE_KEY STAGING_PASSKEY_USER_HANDLE; do
+            [[ -z "${!name}" ]] && missing+=("$name")
+          done
+          if [[ ${#missing[@]} -eq 4 ]]; then
+            echo "::notice::Staging passkey secrets not set; skipping"
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          elif [[ ${#missing[@]} -gt 0 ]]; then
+            echo "::error::Staging passkey secrets incomplete: ${missing[*]}"
+            exit 1
+          else
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.secrets.outputs.present == 'true'
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - if: steps.secrets.outputs.present == 'true'
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with: { node-version-file: .nvmrc, cache: npm }
+      - if: steps.secrets.outputs.present == 'true'
+        run: npm ci --ignore-scripts
+      - if: steps.secrets.outputs.present == 'true'
+        run: npx cypress install
+      - name: Wait for this build on staging
+        if: steps.secrets.outputs.present == 'true'
+        run: scripts/wait-for-staging-version.sh "$STAGING_ORIGIN" "$BUILD_VERSION"
+        env:
+          BUILD_VERSION: ${{ needs.publish-container-image.outputs.build-version }}
+      - name: Passkey sign-in
+        id: attempt1
+        env:
+          CYPRESS_STAGING_PASSKEY_LOGIN_NAME: ${{ secrets.STAGING_PASSKEY_LOGIN_NAME }}
+          CYPRESS_STAGING_PASSKEY_CREDENTIAL_ID: ${{ secrets.STAGING_PASSKEY_CREDENTIAL_ID }}
+          CYPRESS_STAGING_PASSKEY_PRIVATE_KEY: ${{ secrets.STAGING_PASSKEY_PRIVATE_KEY }}
+          CYPRESS_STAGING_PASSKEY_USER_HANDLE: ${{ secrets.STAGING_PASSKEY_USER_HANDLE }}
+        if: steps.secrets.outputs.present == 'true'
+        continue-on-error: true
+        run: >-
+          npx --no-install cypress run --browser chrome
+          --config "baseUrl=${STAGING_ORIGIN},video=false"
+          --env STAGING_PASSKEY=1
+          --spec acceptance/staging-passkey.acceptance.cy.ts
+      - name: Passkey sign-in (retry)
+        id: attempt2
+        env:
+          CYPRESS_STAGING_PASSKEY_LOGIN_NAME: ${{ secrets.STAGING_PASSKEY_LOGIN_NAME }}
+          CYPRESS_STAGING_PASSKEY_CREDENTIAL_ID: ${{ secrets.STAGING_PASSKEY_CREDENTIAL_ID }}
+          CYPRESS_STAGING_PASSKEY_PRIVATE_KEY: ${{ secrets.STAGING_PASSKEY_PRIVATE_KEY }}
+          CYPRESS_STAGING_PASSKEY_USER_HANDLE: ${{ secrets.STAGING_PASSKEY_USER_HANDLE }}
+        if: steps.secrets.outputs.present == 'true' && steps.attempt1.outcome == 'failure'
+        continue-on-error: true
+        run: >-
+          npx --no-install cypress run --browser chrome
+          --config "baseUrl=${STAGING_ORIGIN},video=false"
+          --env STAGING_PASSKEY=1
+          --spec acceptance/staging-passkey.acceptance.cy.ts
+      - name: Report result
+        if: steps.secrets.outputs.present == 'true'
+        env:
+          FIRST: ${{ steps.attempt1.outcome }}
+          RETRY: ${{ steps.attempt2.outcome }}
+        run: |
+          if [[ "$FIRST" == "success" ]]; then
+            echo "Staging passkey sign-in passed"
+          elif [[ "$RETRY" == "success" ]]; then
+            echo "::warning::Staging passkey check passed on retry"
+          else
+            echo "::error::Staging passkey sign-in failed twice"
+            exit 1
+          fi
+      - if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: staging-passkey-artifacts-${{ github.run_id }}
+          path: cypress/screenshots
+          retention-days: 7
+          if-no-files-found: warn
+
   pr-comment:
     name: PR Test Summary
     needs: [status-check]

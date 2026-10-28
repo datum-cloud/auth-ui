@@ -74,6 +74,50 @@ platform authenticator directly, or with Chrome DevTools → WebAuthn panel →
 The SMTP catcher is a local-only canary + OTP delivery aid. It does **not**
 simulate production (prod SMTP is disabled).
 
+## Staging check account
+
+The `staging-passkey-check` CI job (`.github/workflows/ci.yml`) signs in to
+`https://auth.staging.env.datum.net` after each merge to `main`, using one
+long-lived account and its passkey, through
+`acceptance/staging-passkey.acceptance.cy.ts`. The run never creates, changes or
+deletes anything on staging. Until the secrets below exist the job skips with a
+notice.
+
+### Set up (or rotate) the account
+
+1. Create a staging account with a team-owned email address (a shared inbox, not a
+   person's), so whoever is on the team can recover it.
+2. In Chrome, open DevTools → More tools → WebAuthn, tick "Enable virtual
+   authenticator environment", and add an authenticator with protocol `ctap2`,
+   transport `internal`, "Supports resident keys" and "Supports user verification"
+   on.
+3. Signed in as that account on staging, register a passkey at
+   `https://auth.staging.env.datum.net/id/passkeys` with the virtual authenticator.
+   Sign out and sign back in with "Passkey" to check it works.
+4. Before closing the tab, export the credential with `WebAuthn.getCredentials`.
+   In DevTools open More tools → Protocol monitor (enable it under Settings →
+   Experiments if it is missing) and send
+   `{"command":"WebAuthn.getCredentials","parameters":{"authenticatorId":"<id>"}}`,
+   with the authenticator id shown in the WebAuthn panel. The response has one
+   credential with `credentialId`, `privateKey` and `userHandle`, all standard
+   base64.
+5. Set the four repo secrets (Settings → Secrets and variables → Actions):
+
+| Secret                          | Value                                                                                         | From `getCredentials`                                                 |
+| ------------------------------- | --------------------------------------------------------------------------------------------- | --------------------------------------------------------------------- |
+| `STAGING_PASSKEY_LOGIN_NAME`    | The account's login name as staging resolves it (the "Signing in as" name, usually the email) | not in the output                                                     |
+| `STAGING_PASSKEY_CREDENTIAL_ID` | base64url, no padding (e.g. `Z77j9TdedloKCjYE5PyAIg`)                                         | `credentialId`: replace `+` with `-`, `/` with `_`, drop trailing `=` |
+| `STAGING_PASSKEY_PRIVATE_KEY`   | PKCS#8, standard base64                                                                       | `privateKey`, as is                                                   |
+| `STAGING_PASSKEY_USER_HANDLE`   | the raw user handle: the Zitadel user id the passkey was registered for                       | `userHandle`, base64-decoded (`echo '<userHandle>' \| base64 -d`)     |
+
+The spec plants the credential with `WebAuthn.addCredential` for rpId
+`auth.staging.env.datum.net`, clicks "Passkey", and checks that the verify POST
+carried that credential id and login name and that `/id/signed-in` answered with
+its 302.
+
+To rotate, repeat steps 2 to 5 for the same account, then remove the old passkey
+at `/id/passkeys`. If the account is lost, create a new one and repeat all steps.
+
 ## Deprecated lightweight alternative
 
 `acceptance/docker-compose.zitadel.yml` is a bare Zitadel+Postgres stub

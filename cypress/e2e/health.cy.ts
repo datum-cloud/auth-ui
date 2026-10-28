@@ -5,6 +5,9 @@ describe('health endpoints', () => {
   it('readyz returns ready', () => {
     cy.request('/readyz').its('body.status').should('eq', 'ready');
   });
+  it('version returns the build version', () => {
+    cy.request('/id/version').its('body.version').should('be.a', 'string').and('not.be.empty');
+  });
   it('metrics exposes the auth_events_total series', () => {
     cy.request('/metrics').then((res) => {
       expect(res.status).to.eq(200);
