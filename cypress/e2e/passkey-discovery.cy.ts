@@ -66,7 +66,7 @@ describe('usernameless passkey discovery (fresh browser)', () => {
     cy.contains(USER);
 
     // Both assertions came from the planted credential, not the pre-baked shortcut one.
-    for (const alias of ['@discover', '@verify'])
+    for (const alias of ['@discover', '@verify'] as const)
       expectPostedRealCredential(alias, authenticatorId);
 
     // Self-upgrade: the verify success wrote the hint (discover itself must not).

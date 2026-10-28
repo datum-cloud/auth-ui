@@ -14,7 +14,7 @@ describe('resolveIdentifier — ignoreUnknownUsernames', () => {
     // would pass just as happily on the day one of the two moves and the other does not.
     const seed = {
       users: [{ id: 'u1', loginName: 'alice@acme.test' }],
-      authMethods: { u1: ['password'] as const },
+      authMethods: { u1: ['password' as const] },
       settingsByOrg: { 'org-default-fake': { ignoreUnknownUsernames: true } },
     };
     cy.wrap(null).then(async () => {

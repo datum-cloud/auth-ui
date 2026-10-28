@@ -49,7 +49,7 @@ describe('Signup → passkey registration → automatic sign-in', () => {
     cy.location('pathname').should('eq', '/id/signed-in');
 
     // Both POSTs carried the authenticator's own credential, not the pre-baked one.
-    for (const alias of ['@register', '@signIn'])
+    for (const alias of ['@register', '@signIn'] as const)
       expectPostedRealCredential(alias, authenticatorId);
   });
 });

@@ -7,7 +7,7 @@ const base: AuthRequest = { id: 'r1', scopes: [], prompt: [] };
 // it is the OIDC security decision and stays standalone below.
 const ROUTING: Array<{
   label: string;
-  prompt: string[];
+  prompt: AuthRequest['prompt'];
   hasSessions: boolean;
   organization?: string;
   target: string;

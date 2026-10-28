@@ -2,7 +2,7 @@
 //
 // Component (no-mount) port of app/resources/login/__tests__/login-decision.test.ts.
 // decideAfterIdentifier is a pure routing function → browser-side Chai only.
-import type { LoginSettings } from '@/modules/auth/types';
+import type { AuthMethod, LoginSettings } from '@/modules/auth/types';
 import { decideAfterIdentifier } from '@/resources/login/login-decision';
 
 const PRIMARY = { role: 'primary' } as const;
@@ -56,7 +56,7 @@ describe('decideAfterIdentifier → discriminated Decision union', () => {
 
   // Same settings, same full-object deep.equal — only the enrolled-method list and the
   // expected destination vary.
-  const ROUTING: [label: string, methods: string[], path: string][] = [
+  const ROUTING: [label: string, methods: AuthMethod[], path: string][] = [
     ['two methods → the chooser', ['idp', 'password'], '/login/method'],
     ['zero methods → the invite path', [], '/verify'],
   ];

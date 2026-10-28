@@ -25,8 +25,8 @@ const LOADER_DATA = {
   loginName: 'john.doe@example.com',
   firstName: 'John',
   lastName: 'Doe',
-  organization: undefined,
-  requestId: undefined,
+  organization: undefined as string | undefined,
+  requestId: undefined as string | undefined,
   deviceTrackingToken: '',
   maxmindAccountId: '',
 };
@@ -66,11 +66,7 @@ describe('signup/password — render adoption', () => {
   it('renders the ceremony BackLink to /signup and threads requestId + organization', () => {
     // Bare fixture: the ceremony-owned BackLink resolves to /signup.
     mountPassword();
-    cy.findByRole('link', { name: /back/i }, { timeout: 6000 }).should(
-      'have.attr',
-      'href',
-      '/signup'
-    );
+    cy.findByRole('link', { name: /back/i, timeout: 6000 }).should('have.attr', 'href', '/signup');
 
     // Seed real ceremony params so the assertion actually exercises threading — with the bare
     // fixture (requestId/organization undefined) the href degrades to "/signup" no matter whether

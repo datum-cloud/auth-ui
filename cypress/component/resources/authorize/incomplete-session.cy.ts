@@ -11,7 +11,11 @@ function authRequestSeed() {
 }
 
 function expectLoginWithoutCallback(v: {
-  response?: { status?: number; location?: string; cookieEntries?: Array<{ id: string }> | null };
+  response?: {
+    status?: number;
+    location?: string | null;
+    cookieEntries?: Array<{ id: string }> | null;
+  };
   audit: AuditEvent[];
 }) {
   expect(v.response?.status).to.equal(302);

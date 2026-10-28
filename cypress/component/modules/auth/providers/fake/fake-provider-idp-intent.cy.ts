@@ -11,7 +11,11 @@ describe('FakeAuthProvider.updateSession — idpIntent check', () => {
     const fake = new FakeAuthProvider({
       users: [{ id: 'u1', loginName: 'mia@acme.test' }],
       idpIntents: {
-        'intent-1': { idpIntentId: 'intent-1', idpIntentToken: 'tok-1', userId: 'u1' },
+        'intent-1': {
+          information: { idpId: 'idp-1', idpUserId: 'ext-intent-1', idpUserName: 'ext' },
+          userId: 'u1',
+          draft: null,
+        },
       },
     });
     const s = await fake.createSession({}, { userId: 'u1' });
@@ -28,7 +32,11 @@ describe('FakeAuthProvider.updateSession — idpIntent check', () => {
         { id: 'u2', loginName: 'bob@acme.test' },
       ],
       idpIntents: {
-        'intent-2': { idpIntentId: 'intent-2', idpIntentToken: 'tok-2', userId: 'u2' },
+        'intent-2': {
+          information: { idpId: 'idp-1', idpUserId: 'ext-intent-2', idpUserName: 'ext' },
+          userId: 'u2',
+          draft: null,
+        },
       },
     });
     const s = await fake.createSession({}, { userId: 'u1' });

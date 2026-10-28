@@ -46,7 +46,11 @@ async function seeded(opts?: {
 describe('passkeys.service — /id/passkeys management', () => {
   it('fresh sudo ⇒ view with rows + methodCount; validated returnTo is threaded', async () => {
     const { fake, sessions } = await seeded();
-    const v = await loadPasskeysView(fake, sessions, { returnTo: '/passkeys', nowMs: Date.now() });
+    const v = await loadPasskeysView(fake, sessions, {
+      returnTo: '/passkeys',
+      nowMs: Date.now(),
+      emailDeliveryEnabled: false,
+    });
     expect(v.kind).to.equal('view');
     if (v.kind === 'view') {
       expect(v.passkeys).to.deep.equal([{ id: 'pk-1', state: 'active', name: 'Seeded laptop' }]);
@@ -62,17 +66,29 @@ describe('passkeys.service — /id/passkeys management', () => {
     // PERMISSION_DENIED on getSession instead of returning null.
     const { fake, sessions } = await seeded();
     fake.setSessionResult(sessions[0].id, { mode: 'throw', code: 'PERMISSION_DENIED' });
-    const v = await loadPasskeysView(fake, sessions, { returnTo: '/passkeys', nowMs: Date.now() });
+    const v = await loadPasskeysView(fake, sessions, {
+      returnTo: '/passkeys',
+      nowMs: Date.now(),
+      emailDeliveryEnabled: false,
+    });
     expect(v).to.deep.equal({ kind: 'redirect', target: '/login' });
   });
 
   it('stale sudo ⇒ loader redirects to /reauth AND removeUserPasskey refuses server-side', async () => {
     const { fake, sessions } = await seeded();
     const staleNow = Date.now() + SUDO_TTL_MS + 1;
-    const v = await loadPasskeysView(fake, sessions, { returnTo: null, nowMs: staleNow });
+    const v = await loadPasskeysView(fake, sessions, {
+      returnTo: null,
+      nowMs: staleNow,
+      emailDeliveryEnabled: false,
+    });
     expect(v).to.deep.equal({ kind: 'redirect', target: '/reauth?returnTo=%2Fpasskeys' });
     // Server-side enforcement is independent of the loader:
-    const r = await removeUserPasskey(fake, sessions, { passkeyId: 'pk-1', nowMs: staleNow });
+    const r = await removeUserPasskey(fake, sessions, {
+      passkeyId: 'pk-1',
+      nowMs: staleNow,
+      emailDeliveryEnabled: false,
+    });
     expect(r).to.deep.equal({ ok: false, error: 'SUDO_REQUIRED' });
   });
 
@@ -90,8 +106,16 @@ describe('passkeys.service — /id/passkeys management', () => {
       ],
     });
     const [a, b] = await Promise.all([
-      removeUserPasskey(solo.fake, solo.sessions, { passkeyId: 'pk-1', nowMs: Date.now() }),
-      removeUserPasskey(solo.fake, solo.sessions, { passkeyId: 'pk-2', nowMs: Date.now() }),
+      removeUserPasskey(solo.fake, solo.sessions, {
+        passkeyId: 'pk-1',
+        nowMs: Date.now(),
+        emailDeliveryEnabled: false,
+      }),
+      removeUserPasskey(solo.fake, solo.sessions, {
+        passkeyId: 'pk-2',
+        nowMs: Date.now(),
+        emailDeliveryEnabled: false,
+      }),
     ]);
     const results = [a, b];
     expect(results.filter((r) => r.ok)).to.have.length(1);
@@ -145,6 +169,7 @@ describe('passkeys.service — /id/passkeys management', () => {
     const refused = await removeUserPasskey(solo.fake, solo.sessions, {
       passkeyId: 'pk-1',
       nowMs: Date.now(),
+      emailDeliveryEnabled: false,
     });
     expect(refused).to.deep.equal({ ok: false, error: 'LAST_METHOD' });
 
@@ -152,6 +177,7 @@ describe('passkeys.service — /id/passkeys management', () => {
     const removed = await removeUserPasskey(backed.fake, backed.sessions, {
       passkeyId: 'pk-1',
       nowMs: Date.now(),
+      emailDeliveryEnabled: false,
     });
     expect(removed).to.deep.equal({ ok: true, removedName: 'Seeded laptop' });
     expect(await backed.fake.listPasskeys('u1')).to.deep.equal([]);
@@ -181,7 +207,11 @@ describe('passkeys.service — /id/passkeys management', () => {
   it('removal race: already-gone passkey and a NOT_FOUND adapter error are both idempotent success', async () => {
     // Fake path: the id simply is not in the list (silent no-op).
     const { fake, sessions } = await seeded({ passkeys: [] });
-    const gone = await removeUserPasskey(fake, sessions, { passkeyId: 'pk-x', nowMs: Date.now() });
+    const gone = await removeUserPasskey(fake, sessions, {
+      passkeyId: 'pk-x',
+      nowMs: Date.now(),
+      emailDeliveryEnabled: false,
+    });
     expect(gone.ok).to.equal(true);
 
     // Real-adapter path: RemovePasskey rejects with NOT_FOUND — treated identically.
@@ -201,6 +231,7 @@ describe('passkeys.service — /id/passkeys management', () => {
     const raced = await removeUserPasskey(scripted, withScripted.sessions, {
       passkeyId: 'pk-1',
       nowMs: Date.now(),
+      emailDeliveryEnabled: false,
     });
     expect(raced.ok).to.equal(true);
   });
