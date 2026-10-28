@@ -34,7 +34,7 @@ const LOADER_DATA = {
   credentialId: 'pk1',
   publicKey: PK_CREATE,
   challengeFailed: false,
-  returnTo: null,
+  returnTo: null as string | null,
 };
 
 function mountRoute(

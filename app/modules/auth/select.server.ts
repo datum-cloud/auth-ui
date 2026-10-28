@@ -60,6 +60,10 @@ function makeFake(): FakeAuthProvider {
       // predict up front (`email-resend-u23` after the resend — see fake-provider.ts's
       // resendEmailCode).
       { id: 'u23', loginName: 'squatter@acme.test', displayName: 'Squatter' },
+      // e2e seed: real virtual-authenticator enrollment — one dedicated password-only user per
+      // factor so each starts factor-less.
+      { id: 'u24', loginName: 'pk-enroll@acme.test', displayName: 'Passkey Enroll' },
+      { id: 'u25', loginName: 'sk-enroll@acme.test', displayName: 'Security Key Enroll' },
     ],
     // dev/e2e journey seed: without authMethods the /login action routes to /verify
     passwords: {
@@ -78,6 +82,8 @@ function makeFake(): FakeAuthProvider {
       u13: 'hunter2',
       u20: 'hunter2', // e2e seed: /id/passkeys management (FAKE_PASSWORD helper parity)
       u22: 'hunter2', // e2e seed: passkey naming journey
+      u24: 'hunter2', // e2e seed: passkey enrollment
+      u25: 'hunter2', // e2e seed: security-key enrollment
     },
     authMethods: {
       u1: ['password'],
@@ -96,6 +102,8 @@ function makeFake(): FakeAuthProvider {
       u20: ['password', 'passkey'], // e2e seed: /id/passkeys management
       u21: ['passkey'], // e2e seed: passkey-only (last-method guard + banner)
       u22: ['password'], // e2e seed: passkey naming journey (starts passkey-less)
+      u24: ['password'], // e2e seed: passkey enrollment
+      u25: ['password'], // e2e seed: security-key enrollment
     },
     // e2e seed: /id/passkeys management — pre-seeded passkey inventory rows.
     passkeys: {
@@ -175,6 +183,16 @@ function makeFake(): FakeAuthProvider {
           'pQECAyYgASFYICaD9Yl7bwMPk4toY_WdWEAUndj0ZdHh-pLqqNAPuC0jIlggk0jTzWiN8ccu_cY4Hf7rWPpipjhjXv9caatWNuacIXg',
         counter: 0,
         userId: 'u5',
+        kind: 'passkey',
+      },
+      // u6's security key (mirrors cypress/fixtures/security-key-u6.ts).
+      {
+        id: 'zw3ZJ8jLJZGpLRmmOUZFTA',
+        publicKey:
+          'pQECAyYgASFYILHVqN_6-SVic1UyG9n1fM6lVQagzLf5I0XXbNtLDr_CIlgg_Sq5LxVnbxHilpL6VRCOFjnHDYCKO7lu0CYsZlwLwfg',
+        counter: 0,
+        userId: 'u6',
+        kind: 'u2f',
       },
     ],
   });

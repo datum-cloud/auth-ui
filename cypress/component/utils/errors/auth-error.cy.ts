@@ -49,6 +49,7 @@ describe('authErrorMessage', () => {
 });
 
 describe('providerErrorCode', () => {
+  // 'UNKNOWN' is deliberately outside the ProviderErrorCode union, hence the cast at the call.
   const MAPPINGS: [label: string, input: string | undefined, expected: string][] = [
     ['UNAVAILABLE is the one specific mapping', 'UNAVAILABLE', 'service_unavailable'],
     ['other provider code', 'DEADLINE_EXCEEDED', 'signin_failed'],
@@ -58,7 +59,9 @@ describe('providerErrorCode', () => {
 
   it('maps UNAVAILABLE to service_unavailable and falls back to signin_failed for any other code or undefined', () => {
     for (const [label, input, expected] of MAPPINGS) {
-      expect(providerErrorCode(input), label).to.equal(expected);
+      expect(providerErrorCode(input as Parameters<typeof providerErrorCode>[0]), label).to.equal(
+        expected
+      );
     }
   });
 

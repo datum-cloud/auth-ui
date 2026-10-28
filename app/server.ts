@@ -155,6 +155,10 @@ export default await createHonoServer<RequestContextEnv>({
     app.use('*', loginMethodIntentIpRateLimit);
     app.get('/healthz', (c) => c.json({ status: 'ok' }));
     app.get('/readyz', (c) => c.json({ status: 'ready' }));
+    app.get('/id/version', (c) => {
+      c.header('cache-control', 'no-store');
+      return c.json({ version: process.env.VERSION ?? 'dev' });
+    });
     app.get('/security', (c) =>
       c.text('Contact: security@datum.net\n', 200, { 'content-type': 'text/plain' })
     );

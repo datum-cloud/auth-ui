@@ -68,6 +68,57 @@ describe('FakeWebAuthn registration', () => {
   });
 });
 
+describe('FakeWebAuthn security keys', () => {
+  it('u2f creation options discourage resident key and user verification', () => {
+    callService({ fn: 'fakeWebAuthn', fakeWebAuthnOp: 'u2fCreationOptions' }).then((v) => {
+      expect(v.outcome).to.deep.equal({
+        residentKey: 'discouraged',
+        userVerification: 'discouraged',
+      });
+    });
+  });
+
+  it("a u2f credential registered without UV asserts with userVerified false under 'discouraged'", () => {
+    callService({ fn: 'fakeWebAuthn', fakeWebAuthnOp: 'u2fAssertDiscouraged' }).then((v) => {
+      expect(v.outcome).to.deep.equal({ ok: true, userVerified: false });
+    });
+  });
+
+  it("a u2f credential registered without UV is rejected under 'required'", () => {
+    callService({ fn: 'fakeWebAuthn', fakeWebAuthnOp: 'u2fAssertRequired' }).then((v) => {
+      expect(v.outcome).to.deep.equal({ ok: false, code: 'INVALID_CREDENTIALS' });
+    });
+  });
+});
+
+describe('FakeWebAuthn credential kinds', () => {
+  it('a u2f credential is not listed in passkey (UV required) request options', () => {
+    callService({ fn: 'fakeWebAuthn', fakeWebAuthnOp: 'u2fListedUnderRequired' }).then((v) => {
+      expect(v.outcome).to.deep.equal({ ok: true, ids: [] });
+    });
+  });
+
+  it('a passkey credential is not listed in u2f (UV discouraged) request options', () => {
+    callService({ fn: 'fakeWebAuthn', fakeWebAuthnOp: 'passkeyListedUnderDiscouraged' }).then(
+      (v) => {
+        expect(v.outcome).to.deep.equal({ ok: true, ids: [] });
+      }
+    );
+  });
+
+  it('a u2f credential registered on a UV-capable authenticator cannot answer a passkey challenge', () => {
+    callService({ fn: 'fakeWebAuthn', fakeWebAuthnOp: 'u2fUvAssertRequired' }).then((v) => {
+      expect(v.outcome).to.deep.equal({ ok: false, code: 'INVALID_CREDENTIALS' });
+    });
+  });
+
+  it('a passkey credential cannot answer a security-key challenge', () => {
+    callService({ fn: 'fakeWebAuthn', fakeWebAuthnOp: 'passkeyAssertDiscouraged' }).then((v) => {
+      expect(v.outcome).to.deep.equal({ ok: false, code: 'INVALID_CREDENTIALS' });
+    });
+  });
+});
+
 describe('FakeAuthProvider session passkey check', () => {
   const seed = {
     users: [{ id: 'u5', loginName: 'u5@acme.test' }],
@@ -77,6 +128,7 @@ describe('FakeAuthProvider session passkey check', () => {
         publicKey: PASSKEY_U5.publicKeyCose,
         counter: 0,
         userId: PASSKEY_U5.userId,
+        kind: 'passkey' as const,
       },
     ],
   };

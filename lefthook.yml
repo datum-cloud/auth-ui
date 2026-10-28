@@ -26,7 +26,7 @@ pre-commit:
       auto_add: true
     typecheck:cypress:
       # Fast Cypress spec typecheck — runs in ~2s, catches import/type errors in
-      # cypress/**/*.ts before they reach CI. Full component suite runs in CI only.
-      glob: 'cypress/**/*.{ts,tsx}'
+      # cypress/** and acceptance/** before they reach CI. Full component suite runs in CI only.
+      glob: '{cypress,acceptance}/**/*.{ts,tsx}'
       run: npx --no-install tsc -p cypress/tsconfig.json --noEmit
       stage_fixed: false

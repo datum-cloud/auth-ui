@@ -3,5 +3,6 @@
   "compilerOptions": {
     "types": ["cypress", "@testing-library/cypress", "node", "vite/client"]
   },
-  "include": ["**/*.ts", "**/*.tsx", "../app/**/*"]
+  "include": ["**/*.ts", "**/*.tsx", "../acceptance/**/*.ts", "../app/**/*"],
+  "exclude": ["../node_modules", "../build"]
 }

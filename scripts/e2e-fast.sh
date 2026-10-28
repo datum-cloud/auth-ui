@@ -14,6 +14,9 @@ SPECS=(
   cypress/e2e/passkey-discovery.cy.ts
   cypress/e2e/passkey-conditional.cy.ts
   cypress/e2e/signup-passkey.cy.ts
+  cypress/e2e/reauth.cy.ts
+  cypress/e2e/setup-passkey-mfa.cy.ts
+  cypress/e2e/security-key-use.cy.ts
 )
 
 npm run build

@@ -24,8 +24,8 @@ describe('resolveIdentifier — getLoginSettings dedupe', () => {
       settings: baseSettings,
     });
 
-    expect(r.ok).to.equal(true);
-    if (!r.ok) return;
+    expect(r.ok && 'params' in r).to.equal(true);
+    if (!r.ok || !('params' in r)) return;
     expect(r.params.get('organization')).to.equal('org-acme');
     // Discovery shifted org → the threaded (base) settings cannot be reused for org-acme;
     // the inner read for the discovered org still fires.

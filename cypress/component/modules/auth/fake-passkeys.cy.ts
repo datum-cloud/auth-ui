@@ -15,7 +15,7 @@ describe('FakeAuthProvider — passkey inventory (port mirror)', () => {
     const { createdAt, ...rest } = passkey;
     expect(rest).to.deep.equal({ id: 'pk-1', state: 'active', name: 'MacBook Touch ID' });
     expect(createdAt).to.be.a('string');
-    expect(new Date(createdAt).toISOString()).to.equal(createdAt);
+    expect(new Date(createdAt as string).toISOString()).to.equal(createdAt);
     expect(await named.listAuthMethods('u1')).to.include('passkey');
 
     // Same call minus the 4th arg — on a fresh provider so the default is observed on a

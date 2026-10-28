@@ -138,13 +138,9 @@ jobs:
         # were bumped in place with the registry integrity (hoisted 2.1.4 -> 2.1.7 under
         # minimatch@9's ^2.0.2; nested 5.0.9 -> 5.0.12 under minimatch@10's ^5.0.5), fixing
         # GHSA-qhr7-859c-m2p7 / GHSA-6j4f-fj2g-mc7p / GHSA-q2hr-2g5m-vwhr.
-        # One advisory is TEMPORARILY ignored. It has no patched release, so no override can fix it:
-        #   GHSA-vfj7-8cjw-p6xm  braces <=3.0.3 stack-exhaustion DoS from deeply nested patterns.
-        #                        No fixed version is published (3.0.3 is the latest). It reaches the
-        #                        tree only through dev tooling: micromatch under @lingui/cli and
-        #                        under fast-glob via cypress-split. The production image prunes dev
-        #                        dependencies, so it never ships. Drop this ignore once braces publishes a fix.
-        # The two former exemptions are both genuinely fixed, not suppressed:
+        #   qs              ^6.16.1   @cypress/request accepts ^6.x (dev-only)   fixes GHSA-6pq8-jhm2-2vcw
+        # No advisory is ignored. GitHub withdrew GHSA-vfj7-8cjw-p6xm (braces) on 2026-10-23.
+        # The former exemptions are all genuinely fixed, not suppressed:
         #   GHSA-mh99-v99m-4gvg / GHSA-rgw5-rvv9-x895 (brace-expansion) — fixed without
         #     an override; each consumer nests its own minimatch on brace-expansion 5.x
         #     and the hoisted copy stays on 2.x.
@@ -156,7 +152,7 @@ jobs:
         #   GHSA-qwww-vcr4-c8h2 (react-router RSC CSRF) — fixed by the v8.3.0 upgrade.
         # If a NEW transitive advisory appears with no override-compatible fix, add its
         # GHSA id to the scripts/npm-audit.sh arguments here as a temporary measure and open a remediation follow-up.
-        run: scripts/npm-audit.sh GHSA-vfj7-8cjw-p6xm
+        run: scripts/npm-audit.sh
       - name: Generate SBOM (CycloneDX)
         run: npx --yes @cyclonedx/cdxgen@11.10.0 -t js -o sbom.cdx.json --spec-version 1.5
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
@@ -274,6 +270,104 @@ jobs:
       bundle-path: config
       image-overlays: config/base
       image-name: ghcr.io/datum-cloud/auth-ui
+
+  # After a merge to main, wait for staging to serve this build, then sign in with the staging
+  # account's passkey. Not part of status-check: it runs after publish and reports on the merged
+  # commit. Account setup: acceptance/PASSKEY-TESTING.md.
+  staging-passkey-check:
+    name: Staging passkey check
+    needs: [publish-container-image, publish-kustomize-bundle]
+    if: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && !failure() && !cancelled() }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      STAGING_ORIGIN: https://auth.staging.env.datum.net
+    steps:
+      - name: Check secrets
+        id: secrets
+        env:
+          STAGING_PASSKEY_LOGIN_NAME: ${{ secrets.STAGING_PASSKEY_LOGIN_NAME }}
+          STAGING_PASSKEY_CREDENTIAL_ID: ${{ secrets.STAGING_PASSKEY_CREDENTIAL_ID }}
+          STAGING_PASSKEY_PRIVATE_KEY: ${{ secrets.STAGING_PASSKEY_PRIVATE_KEY }}
+          STAGING_PASSKEY_USER_HANDLE: ${{ secrets.STAGING_PASSKEY_USER_HANDLE }}
+        run: |
+          missing=()
+          for name in STAGING_PASSKEY_LOGIN_NAME STAGING_PASSKEY_CREDENTIAL_ID \
+            STAGING_PASSKEY_PRIVATE_KEY STAGING_PASSKEY_USER_HANDLE; do
+            [[ -z "${!name}" ]] && missing+=("$name")
+          done
+          if [[ ${#missing[@]} -eq 4 ]]; then
+            echo "::notice::Staging passkey secrets not set; skipping"
+            echo "present=false" >> "$GITHUB_OUTPUT"
+          elif [[ ${#missing[@]} -gt 0 ]]; then
+            echo "::error::Staging passkey secrets incomplete: ${missing[*]}"
+            exit 1
+          else
+            echo "present=true" >> "$GITHUB_OUTPUT"
+          fi
+      - if: steps.secrets.outputs.present == 'true'
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6
+      - if: steps.secrets.outputs.present == 'true'
+        uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
+        with: { node-version-file: .nvmrc, cache: npm }
+      - if: steps.secrets.outputs.present == 'true'
+        run: npm ci --ignore-scripts
+      - if: steps.secrets.outputs.present == 'true'
+        run: npx cypress install
+      - name: Wait for this build on staging
+        if: steps.secrets.outputs.present == 'true'
+        run: scripts/wait-for-staging-version.sh "$STAGING_ORIGIN" "$BUILD_VERSION"
+        env:
+          BUILD_VERSION: ${{ needs.publish-container-image.outputs.build-version }}
+      - name: Passkey sign-in
+        id: attempt1
+        env:
+          CYPRESS_STAGING_PASSKEY_LOGIN_NAME: ${{ secrets.STAGING_PASSKEY_LOGIN_NAME }}
+          CYPRESS_STAGING_PASSKEY_CREDENTIAL_ID: ${{ secrets.STAGING_PASSKEY_CREDENTIAL_ID }}
+          CYPRESS_STAGING_PASSKEY_PRIVATE_KEY: ${{ secrets.STAGING_PASSKEY_PRIVATE_KEY }}
+          CYPRESS_STAGING_PASSKEY_USER_HANDLE: ${{ secrets.STAGING_PASSKEY_USER_HANDLE }}
+        if: steps.secrets.outputs.present == 'true'
+        continue-on-error: true
+        run: >-
+          npx --no-install cypress run --browser chrome
+          --config "baseUrl=${STAGING_ORIGIN},video=false"
+          --env STAGING_PASSKEY=1
+          --spec acceptance/staging-passkey.acceptance.cy.ts
+      - name: Passkey sign-in (retry)
+        id: attempt2
+        env:
+          CYPRESS_STAGING_PASSKEY_LOGIN_NAME: ${{ secrets.STAGING_PASSKEY_LOGIN_NAME }}
+          CYPRESS_STAGING_PASSKEY_CREDENTIAL_ID: ${{ secrets.STAGING_PASSKEY_CREDENTIAL_ID }}
+          CYPRESS_STAGING_PASSKEY_PRIVATE_KEY: ${{ secrets.STAGING_PASSKEY_PRIVATE_KEY }}
+          CYPRESS_STAGING_PASSKEY_USER_HANDLE: ${{ secrets.STAGING_PASSKEY_USER_HANDLE }}
+        if: steps.secrets.outputs.present == 'true' && steps.attempt1.outcome == 'failure'
+        continue-on-error: true
+        run: >-
+          npx --no-install cypress run --browser chrome
+          --config "baseUrl=${STAGING_ORIGIN},video=false"
+          --env STAGING_PASSKEY=1
+          --spec acceptance/staging-passkey.acceptance.cy.ts
+      - name: Report result
+        if: steps.secrets.outputs.present == 'true'
+        env:
+          FIRST: ${{ steps.attempt1.outcome }}
+          RETRY: ${{ steps.attempt2.outcome }}
+        run: |
+          if [[ "$FIRST" == "success" ]]; then
+            echo "Staging passkey sign-in passed"
+          elif [[ "$RETRY" == "success" ]]; then
+            echo "::warning::Staging passkey check passed on retry"
+          else
+            echo "::error::Staging passkey sign-in failed twice"
+            exit 1
+          fi
+      - if: failure()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          name: staging-passkey-artifacts-${{ github.run_id }}
+          path: cypress/screenshots
+          retention-days: 7
+          if-no-files-found: warn
 
   pr-comment:
     name: PR Test Summary

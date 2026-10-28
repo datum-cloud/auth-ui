@@ -9,6 +9,7 @@
  * these actions apply to the subsequent cy.visit.
  */
 import { checkA11y } from './a11y';
+import { UNSAFE_decodeViaTurboStream } from 'react-router';
 
 /** Seeded password for all fake-provider test users. */
 export const FAKE_PASSWORD = 'hunter2';
@@ -47,28 +48,22 @@ export function extractCsrf(html: string): string {
   return decodeEntities(/name="csrf" value="([^"]+)"/.exec(html)?.[1] ?? '');
 }
 
-/**
- * Read the /login/method loader's own `methods` array out of a single-fetch (.data) payload.
- *
- * The chooser's loader publishes exactly the methods it decided the account can use, so this
- * asks the app what it computed instead of re-deriving the policy gates here or scraping the
- * rendered markup. The four names are a closed set (method.tsx) and appear in the payload only
- * as members of that array — the rest of the loader data is loginName, branding, idps and a
- * csrf token.
- */
-const CHOOSER_METHODS = ['passkey', 'password', 'otp_email', 'idp'] as const;
+const CHOOSER_METHODS = ['passkey', 'password', 'otp_email', 'idp'];
 
-/**
- * Matches ONLY a turbo-stream array whose every element is a chooser method — i.e. the `methods`
- * array itself. A bare `body.includes('"password"')` would also fire on an IdP display name or a
- * branding string that happened to contain one of the four words, silently reporting a method the
- * account does not have.
- */
-const METHODS_ARRAY = new RegExp(`\\[(?:"(?:${CHOOSER_METHODS.join('|')})",?)+\\]`);
+type RouteEntry = { data?: { methods?: unknown } };
 
-export function extractChooserMethods(body: string): string[] {
-  const found = METHODS_ARRAY.exec(body)?.[0] ?? '';
-  return CHOOSER_METHODS.filter((m) => found.includes(`"${m}"`));
+// Single-fetch dedupes strings, so `methods` is an index array in the raw payload; only the
+// router's own decoder resolves it back to names.
+export async function chooserMethodsFromSingleFetch(body: string): Promise<string[]> {
+  if (!body) return [];
+  const { value } = await UNSAFE_decodeViaTurboStream(new Response(body).body!, globalThis);
+  for (const entry of Object.values((value ?? {}) as Record<string, RouteEntry>)) {
+    const methods = entry?.data?.methods;
+    if (Array.isArray(methods)) {
+      return methods.filter((m): m is string => CHOOSER_METHODS.includes(m));
+    }
+  }
+  return [];
 }
 
 /**
@@ -171,13 +166,14 @@ export function loginAndGetSession(loginName: string) {
         url: `${pathOnly}.data${query ? `?${query}` : ''}`,
         followRedirect: false,
       }).then((chooser) => {
-        const methods = extractChooserMethods(String(chooser.body ?? ''));
-        if (methods.length !== 1 || methods[0] !== 'password') return;
-        completePasswordStep(
-          toRequestUrl(target.replace('/login/method', '/login/password')),
-          loginName,
-          csrf
-        );
+        cy.then(() => chooserMethodsFromSingleFetch(String(chooser.body ?? ''))).then((methods) => {
+          if (methods.length !== 1 || methods[0] !== 'password') return;
+          completePasswordStep(
+            toRequestUrl(target.replace('/login/method', '/login/password')),
+            loginName,
+            csrf
+          );
+        });
       });
     });
   });

@@ -1,5 +1,13 @@
+import { PASSKEY_U5 } from '../fixtures/passkey-u5';
 import { checkA11y } from '../support/a11y';
 import { loginAndGetSession } from '../support/session';
+import {
+  addVirtualAuthenticator,
+  expectPostedRealCredential,
+  plantCredential,
+  removeVirtualAuthenticator,
+  visitRealWebAuthn,
+} from '../support/virtual-authenticator';
 
 // /id/reauth — sudo interstitial journey (fake provider).
 // Sudo staleness is NOT required here: this spec drives /reauth directly.
@@ -38,20 +46,33 @@ describe('/id/reauth — verify one enrolled factor onto the existing session', 
     cy.contains('a', 'Password').should('be.visible');
   });
 
-  it('Passkey completes the ceremony in place with a single click (no ?method=passkey navigation)', () => {
-    loginAndGetSession('passkey-user@acme.test');
-    cy.visit('/id/reauth?returnTo=/passkeys', {
-      onBeforeLoad: (win) => {
-        win.__CYPRESS_HYDRATE__ = true; // ceremony fetcher needs JS
-      },
+  describe('with a virtual authenticator', () => {
+    let authenticatorId: string;
+
+    beforeEach(() => {
+      addVirtualAuthenticator().then((id) => {
+        authenticatorId = id;
+        plantCredential(id, PASSKEY_U5);
+      });
     });
-    cy.settleHydration();
 
-    cy.contains('button', 'Passkey').click();
+    afterEach(() => {
+      if (authenticatorId) removeVirtualAuthenticator(authenticatorId);
+      authenticatorId = '';
+    });
 
-    // Success → redirect straight to the validated returnTo. A single click, never
-    // a navigation to ?method=passkey / the old "Verify with passkey" second step.
-    cy.location('pathname').should('eq', '/id/passkeys');
+    it('Passkey completes the ceremony in place with a single click (no ?method=passkey navigation)', () => {
+      loginAndGetSession('passkey-user@acme.test');
+      visitRealWebAuthn('/id/reauth?returnTo=/passkeys');
+
+      cy.intercept('POST', /\/id\/reauth(\.data)?(\?|$)/).as('reauth');
+      cy.contains('button', 'Passkey').click();
+      expectPostedRealCredential('@reauth', authenticatorId);
+
+      // Success → redirect straight to the validated returnTo. A single click, never
+      // a navigation to ?method=passkey / the old "Verify with passkey" second step.
+      cy.location('pathname').should('eq', '/id/passkeys');
+    });
   });
 
   it('falls back to /id/passkeys when returnTo is tampered (//evil.test)', () => {
@@ -69,7 +90,7 @@ describe('/id/reauth — verify one enrolled factor onto the existing session', 
 
     // The tampered returnTo is rejected server-side → default target, never evil.test.
     cy.location('pathname').should('eq', '/id/passkeys');
-    cy.location('host').should('eq', 'localhost:3000');
+    cy.location('host').should('eq', new URL(Cypress.config('baseUrl') as string).host);
   });
 
   it('bounces to /login without a session', () => {

@@ -111,6 +111,7 @@ describe('reauth.service — verify one factor onto the EXISTING session', () =>
       factor: 'password',
       password: 'Password1!',
       returnTo: '/passkeys',
+      consoleUrl: 'https://console.acme.test',
     });
     expect(r.ok).to.equal(true);
     if (r.ok) {
@@ -124,12 +125,14 @@ describe('reauth.service — verify one factor onto the EXISTING session', () =>
       factor: 'password',
       password: 'nope',
       returnTo: null,
+      consoleUrl: 'https://console.acme.test',
     });
     expect(bad).to.deep.equal({ ok: false, error: 'INVALID_CREDENTIALS' });
     const dead = await performReauth(fake, [], {
       factor: 'password',
       password: 'x',
       returnTo: null,
+      consoleUrl: 'https://console.acme.test',
     });
     expect(dead).to.deep.equal({ ok: false, error: 'SESSION_EXPIRED' });
   });
@@ -140,7 +143,11 @@ describe('reauth.service — verify one factor onto the EXISTING session', () =>
       passwords: { u1: 'Password1!' },
       authMethods: { u1: ['password', 'idp'] },
       idpIntents: {
-        'intent-1': { idpIntentId: 'intent-1', idpIntentToken: 'tok-1', userId: 'u1' },
+        'intent-1': {
+          information: { idpId: 'idp-1', idpUserId: 'ext-intent-1', idpUserName: 'ext' },
+          userId: 'u1',
+          draft: null,
+        },
       },
     });
     const s = await fake.createSession({}, { userId: 'u1' });
@@ -159,6 +166,7 @@ describe('reauth.service — verify one factor onto the EXISTING session', () =>
       idpIntentId: 'intent-1',
       idpIntentToken: 'tok-1',
       returnTo: '/passkeys',
+      consoleUrl: 'https://console.acme.test',
     });
     expect(r.ok).to.equal(true);
     if (r.ok) {
@@ -171,7 +179,11 @@ describe('reauth.service — verify one factor onto the EXISTING session', () =>
     const fake = new FakeAuthProvider({
       users: [USER, { id: 'u2', loginName: 'bob@acme.test' }],
       idpIntents: {
-        'intent-2': { idpIntentId: 'intent-2', idpIntentToken: 'tok-2', userId: 'u2' },
+        'intent-2': {
+          information: { idpId: 'idp-1', idpUserId: 'ext-intent-2', idpUserName: 'ext' },
+          userId: 'u2',
+          draft: null,
+        },
       },
     });
     const s = await fake.createSession({}, { userId: 'u1' });
@@ -190,6 +202,7 @@ describe('reauth.service — verify one factor onto the EXISTING session', () =>
       idpIntentId: 'intent-2',
       idpIntentToken: 'tok-2',
       returnTo: null,
+      consoleUrl: 'https://console.acme.test',
     });
     expect(r).to.deep.equal({ ok: false, error: 'INVALID_CREDENTIALS' });
   });
