@@ -19,10 +19,14 @@ export interface StoredCredential {
   publicKey: string;
   counter: number;
   userId: string;
+  kind: CredentialKind;
 }
 
+type CredentialKind = 'passkey' | 'u2f';
 type UserVerification = 'required' | 'discouraged';
-type PendingChallenge = { challenge: string; uv: UserVerification };
+type PendingChallenge = { challenge: string; uv: UserVerification; kind: CredentialKind };
+
+const kindForUv = (uv: UserVerification): CredentialKind => (uv === 'required' ? 'passkey' : 'u2f');
 
 /** Loaded lazily: a devDependency, only needed under AUTH_PROVIDER=fake. */
 async function loadWebAuthnLib() {
@@ -86,16 +90,20 @@ export class FakeWebAuthn {
     for (const c of seed) this.credentials.set(c.id, { ...c });
   }
 
-  private forUser(userId: string): StoredCredential[] {
-    return [...this.credentials.values()].filter((c) => c.userId === userId);
+  private forUser(userId: string, kind?: CredentialKind): StoredCredential[] {
+    return [...this.credentials.values()].filter(
+      (c) => c.userId === userId && (kind === undefined || c.kind === kind)
+    );
   }
 
   async creationOptions(
     user: { id: string; loginName: string; displayName?: string },
     domain: string,
-    key: string
+    key: string,
+    kind: CredentialKind = 'passkey'
   ): Promise<{ publicKey: PublicKeyCredentialCreationOptionsJSON }> {
     const { generateRegistrationOptions } = await loadWebAuthnLib();
+    const uv: UserVerification = kind === 'u2f' ? 'discouraged' : 'required';
     const options = await generateRegistrationOptions({
       rpName: 'Datum',
       rpID: domain,
@@ -104,9 +112,9 @@ export class FakeWebAuthn {
       userID: new TextEncoder().encode(user.id),
       attestationType: 'none',
       excludeCredentials: this.forUser(user.id).map((c) => ({ id: c.id })),
-      authenticatorSelection: { residentKey: 'required', userVerification: 'required' },
+      authenticatorSelection: { residentKey: uv, userVerification: uv },
     });
-    this.challenges.set(key, { challenge: options.challenge, uv: 'required' });
+    this.challenges.set(key, { challenge: options.challenge, uv, kind });
     return { publicKey: options };
   }
 
@@ -141,7 +149,13 @@ export class FakeWebAuthn {
     if (owner !== undefined && owner !== userId) {
       throw new ProviderError('INVALID_CREDENTIALS', 'credential id belongs to another user');
     }
-    this.credentials.set(id, { id, publicKey: b64url.fromBytes(publicKey), counter, userId });
+    this.credentials.set(id, {
+      id,
+      publicKey: b64url.fromBytes(publicKey),
+      counter,
+      userId,
+      kind: pending.kind,
+    });
   }
 
   async requestOptions(
@@ -154,9 +168,9 @@ export class FakeWebAuthn {
     const options = await generateAuthenticationOptions({
       rpID: domain,
       userVerification: uv,
-      allowCredentials: this.forUser(userId).map((c) => ({ id: c.id })),
+      allowCredentials: this.forUser(userId, kindForUv(uv)).map((c) => ({ id: c.id })),
     });
-    this.challenges.set(sessionId, { challenge: options.challenge, uv });
+    this.challenges.set(sessionId, { challenge: options.challenge, uv, kind: kindForUv(uv) });
     return { publicKey: options };
   }
 
@@ -174,6 +188,9 @@ export class FakeWebAuthn {
     }
     const pending = this.challenges.get(sessionId);
     if (!pending) throw new ProviderError('INVALID_CREDENTIALS', 'no pending challenge');
+    if (stored.kind !== pending.kind) {
+      throw new ProviderError('INVALID_CREDENTIALS', 'unknown credential');
+    }
     this.challenges.delete(sessionId);
     const origin = vettedOrigin(posted, domain);
     const { verifyAuthenticationResponse } = await loadWebAuthnLib();

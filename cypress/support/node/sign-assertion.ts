@@ -12,15 +12,22 @@ export interface SignAssertionOpts {
   origin: string;
   rpId: string;
   counter: number;
+  userVerified?: boolean;
 }
 
-const FLAG_UP_UV = 0x05;
+const FLAG_UP = 0x01;
+const FLAG_UV = 0x04;
+const FLAG_AT = 0x40;
 
 export function signAssertion(opts: SignAssertionOpts): Record<string, unknown> {
   const rpIdHash = createHash('sha256').update(opts.rpId).digest();
   const counter = Buffer.alloc(4);
   counter.writeUInt32BE(opts.counter);
-  const authenticatorData = Buffer.concat([rpIdHash, Buffer.from([FLAG_UP_UV]), counter]);
+  const authenticatorData = Buffer.concat([
+    rpIdHash,
+    Buffer.from([opts.userVerified === false ? FLAG_UP : FLAG_UP | FLAG_UV]),
+    counter,
+  ]);
   const clientDataJSON = Buffer.from(
     JSON.stringify({ type: 'webauthn.get', challenge: opts.challenge, origin: opts.origin })
   );
@@ -53,20 +60,19 @@ export interface SignAttestationOpts {
   challenge: string;
   origin: string;
   rpId: string;
+  userVerified?: boolean;
 }
-
-const FLAG_UP_UV_AT = 0x45;
 
 const cborText = (s: string) => Buffer.concat([Buffer.from([0x60 + s.length]), Buffer.from(s)]);
 
-/** A `none`-format registration response, as a UV+UP platform authenticator would build it. */
+/** A `none`-format registration response, as a platform authenticator would build it (UV set unless `userVerified` is false). */
 export function signAttestation(opts: SignAttestationOpts): Record<string, unknown> {
   const credId = Buffer.from(opts.credentialId, 'base64url');
   const idLen = Buffer.alloc(2);
   idLen.writeUInt16BE(credId.length);
   const authData = Buffer.concat([
     createHash('sha256').update(opts.rpId).digest(),
-    Buffer.from([FLAG_UP_UV_AT]),
+    Buffer.from([FLAG_UP | FLAG_AT | (opts.userVerified === false ? 0 : FLAG_UV)]),
     Buffer.alloc(4),
     Buffer.alloc(16),
     idLen,

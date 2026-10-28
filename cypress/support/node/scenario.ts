@@ -64,7 +64,13 @@ export interface ScenarioSeed {
   /** Pre-linked IdP identities (userId → links), narrowed to the fields joinLinkedIdps reads. */
   idpLinks?: Record<string, Array<{ idpId: string; idpUserId: string; idpUserName?: string }>>;
   /** Credentials a user already holds (FakeWebAuthn seed). */
-  webauthnCredentials?: Array<{ id: string; publicKey: string; counter: number; userId: string }>;
+  webauthnCredentials?: Array<{
+    id: string;
+    publicKey: string;
+    counter: number;
+    userId: string;
+    kind: 'passkey' | 'u2f';
+  }>;
 }
 
 /** A live session to inject via provider.seedLiveSession (getSession/listSessions resolve it). */
@@ -763,6 +769,10 @@ export interface Scenario {
    *  signed | unknownId | wrongChallenge | wrongOrigin | mangledSignature | otherUser
    *    → { ok: true, userVerified } | { ok: false, code }
    *  registerSuccess | registerUnknownKey | registerOtherUser (u6 registers) → { ok: true } | { ok: false, code }
+   *  u2fCreationOptions → { residentKey, userVerification }
+   *  u2fAssertDiscouraged | u2fAssertRequired (u2f key registered without UV) → as signed
+   *  u2fListedUnderRequired | passkeyListedUnderDiscouraged → { ok: true, ids } (allowCredentials ids)
+   *  u2fUvAssertRequired | passkeyAssertDiscouraged → { ok: false, code } (credential of the other kind)
    *  prodOriginHttps | prodOriginHttp (assertion on auth.example.test) → as signed */
   fakeWebAuthnOp?:
     | 'creationOptions'
@@ -776,6 +786,13 @@ export interface Scenario {
     | 'registerSuccess'
     | 'registerUnknownKey'
     | 'registerOtherUser'
+    | 'u2fCreationOptions'
+    | 'u2fAssertDiscouraged'
+    | 'u2fAssertRequired'
+    | 'u2fListedUnderRequired'
+    | 'u2fUvAssertRequired'
+    | 'passkeyListedUnderDiscouraged'
+    | 'passkeyAssertDiscouraged'
     | 'prodOriginHttps'
     | 'prodOriginHttp';
 
@@ -852,7 +869,7 @@ export interface Verdict {
   ok: boolean;
   error?: string;
   /** The service's typed return value, serialized (outcome object or EnrichedAccount[]). */
-  outcome?: Record<string, unknown>;
+  outcome?: unknown;
   /** Present when the spec exercises a *toResponse translator. */
   response?: SerializedResponse;
   /** Parsed logAuthEvent JSON lines, in emission order. */

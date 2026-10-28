@@ -3,16 +3,22 @@
  * Cypress's `remote:debugger:protocol` automation so specs run real navigator.credentials
  * ceremonies in Chrome. Chromium-only; the CDP domain is enabled lazily per call chain.
  */
-import { PREBAKED_CREDENTIAL_ID, type PASSKEY_U5 } from '../fixtures/passkey-u5';
+import { PREBAKED_CREDENTIAL_ID } from '../fixtures/passkey-u5';
 
 type Cdp = Record<string, unknown>;
+
+export interface WebAuthnFixture {
+  credentialId: string;
+  privateKeyPkcs8B64: string;
+  userId: string;
+  rpId: string;
+}
 
 function cdp<T = Cdp>(command: string, params: Cdp = {}): Cypress.Chainable<T> {
   // Lazy on purpose: calling Cypress.automation directly would fire when the helper is invoked
   // while the test body enqueues commands, not when the chain reaches it, so a read such as
   // getCredentials() would see the authenticator as it was before earlier steps ran.
   return cy.then(
-    { log: false },
     () => Cypress.automation('remote:debugger:protocol', { command, params }) as Promise<T>
   );
 }
@@ -23,17 +29,30 @@ export function toBase64(b64url: string): string {
   return padded + '='.repeat((4 - (padded.length % 4)) % 4);
 }
 
-export function addVirtualAuthenticator(): Cypress.Chainable<string> {
+const AUTHENTICATOR_OPTIONS = {
+  platform: {
+    protocol: 'ctap2',
+    transport: 'internal',
+    hasResidentKey: true,
+    hasUserVerification: true,
+    isUserVerified: true,
+  },
+  'security-key': {
+    protocol: 'ctap2',
+    transport: 'usb',
+    hasResidentKey: false,
+    hasUserVerification: false,
+    isUserVerified: false,
+  },
+} as const;
+
+export function addVirtualAuthenticator(
+  kind: 'platform' | 'security-key' = 'platform'
+): Cypress.Chainable<string> {
   return cdp('WebAuthn.enable', { enableUI: false })
     .then(() =>
       cdp<{ authenticatorId: string }>('WebAuthn.addVirtualAuthenticator', {
-        options: {
-          protocol: 'ctap2',
-          transport: 'internal',
-          hasResidentKey: true,
-          hasUserVerification: true,
-          isUserVerified: true,
-        },
+        options: AUTHENTICATOR_OPTIONS[kind],
       })
     )
     .then((res) => res.authenticatorId);
@@ -43,21 +62,22 @@ export function removeVirtualAuthenticator(id: string): Cypress.Chainable {
   return cdp('WebAuthn.removeVirtualAuthenticator', { authenticatorId: id });
 }
 
-/** Plant a resident credential. signCount defaults to a wall-clock value so it always exceeds the
- *  counter the long-lived fake server last saw. */
+/** Plant a credential (resident by default). signCount defaults to a wall-clock value so it
+ *  always exceeds the counter the long-lived fake server last saw. */
 export function plantCredential(
   id: string,
-  fixture: typeof PASSKEY_U5,
-  signCount = freshSignCount()
+  fixture: WebAuthnFixture,
+  signCount = freshSignCount(),
+  resident = true
 ): Cypress.Chainable {
   return cdp('WebAuthn.addCredential', {
     authenticatorId: id,
     credential: {
       credentialId: toBase64(fixture.credentialId),
-      isResidentCredential: true,
+      isResidentCredential: resident,
       rpId: fixture.rpId,
       privateKey: fixture.privateKeyPkcs8B64,
-      userHandle: btoa(fixture.userId),
+      ...(resident ? { userHandle: btoa(fixture.userId) } : {}),
       signCount,
     },
   });
@@ -87,7 +107,7 @@ function postedCredentialId(body: unknown): string {
 
 /** Wait for the aliased POST and assert it carried the authenticator's own credential, not the
  *  prebaked one. CDP returns standard base64; the posted id is base64url. */
-export function expectPostedRealCredential(alias: string, authenticatorId: string): void {
+export function expectPostedRealCredential(alias: `@${string}`, authenticatorId: string): void {
   getCredentials(authenticatorId).then((creds) => {
     expect(creds).to.have.length(1);
     cy.wait(alias).then(({ request }) => {

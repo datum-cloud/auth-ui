@@ -263,9 +263,10 @@ async function runProdOriginOp(
 
 async function runAssertionOp(
   fake: FakeWebAuthn,
-  op: FakeWebAuthnOp
+  op: FakeWebAuthnOp,
+  uv: 'required' | 'discouraged' = 'required'
 ): Promise<Record<string, unknown>> {
-  const { publicKey } = await fake.requestOptions('u5', 'localhost', 'required', 's1');
+  const { publicKey } = await fake.requestOptions('u5', 'localhost', uv, 's1');
   const base = {
     ...PASSKEY_U5,
     challenge: publicKey.challenge as string,
@@ -277,6 +278,83 @@ async function runAssertionOp(
   return settle(() => fake.verifyAssertion(userId, 's1', credential, 'localhost'));
 }
 
+async function runKindOp(fake: FakeWebAuthn, op: FakeWebAuthnOp): Promise<Record<string, unknown>> {
+  const ids = async (uv: 'required' | 'discouraged', userId: string) => {
+    const { publicKey } = await fake.requestOptions(userId, 'localhost', uv, 's1');
+    return (publicKey.allowCredentials ?? []).map((c) => c.id);
+  };
+  if (op === 'passkeyListedUnderDiscouraged')
+    return { ok: true, ids: await ids('discouraged', 'u5') };
+  if (op === 'passkeyAssertDiscouraged') return runAssertionOp(fake, op, 'discouraged');
+  const { publicKey } = await fake.creationOptions(
+    { id: 'u6', loginName: 'u6@acme.test' },
+    'localhost',
+    'k1',
+    'u2f'
+  );
+  await fake.verifyRegistration(
+    'u6',
+    'k1',
+    signAttestation({
+      credentialId: 'bm9wZQ',
+      publicKeyCose: PASSKEY_U5.publicKeyCose,
+      challenge: publicKey.challenge as string,
+      origin: FAKE_WEBAUTHN_ORIGIN,
+      rpId: 'localhost',
+    }),
+    'localhost'
+  );
+  if (op === 'u2fListedUnderRequired') return { ok: true, ids: await ids('required', 'u6') };
+  const { publicKey: request } = await fake.requestOptions('u6', 'localhost', 'required', 's1');
+  const assertion = signAssertion({
+    ...PASSKEY_U5,
+    credentialId: 'bm9wZQ',
+    userId: 'u6',
+    challenge: request.challenge as string,
+    origin: FAKE_WEBAUTHN_ORIGIN,
+    counter: 1,
+  });
+  return settle(() => fake.verifyAssertion('u6', 's1', assertion, 'localhost'));
+}
+
+async function runU2fOp(fake: FakeWebAuthn, op: FakeWebAuthnOp): Promise<Record<string, unknown>> {
+  const user = { id: 'u6', loginName: 'u6@acme.test' };
+  const { publicKey } = await fake.creationOptions(user, 'localhost', 'k1', 'u2f');
+  if (op === 'u2fCreationOptions') {
+    const selection = publicKey.authenticatorSelection as {
+      residentKey: string;
+      userVerification: string;
+    };
+    return { residentKey: selection.residentKey, userVerification: selection.userVerification };
+  }
+  const credentialId = 'bm9wZQ';
+  await fake.verifyRegistration(
+    'u6',
+    'k1',
+    signAttestation({
+      credentialId,
+      publicKeyCose: PASSKEY_U5.publicKeyCose,
+      challenge: publicKey.challenge as string,
+      origin: FAKE_WEBAUTHN_ORIGIN,
+      rpId: 'localhost',
+      userVerified: false,
+    }),
+    'localhost'
+  );
+  const uv = op === 'u2fAssertRequired' ? 'required' : 'discouraged';
+  const { publicKey: request } = await fake.requestOptions('u6', 'localhost', uv, 's1');
+  const assertion = signAssertion({
+    ...PASSKEY_U5,
+    credentialId,
+    userId: 'u6',
+    challenge: request.challenge as string,
+    origin: FAKE_WEBAUTHN_ORIGIN,
+    counter: 1,
+    userVerified: false,
+  });
+  return settle(() => fake.verifyAssertion('u6', 's1', assertion, 'localhost'));
+}
+
 /** Seed a FakeWebAuthn with PASSKEY_U5, run one ceremony op against it and report the outcome. */
 async function runFakeWebAuthnOp(op: FakeWebAuthnOp): Promise<Record<string, unknown>> {
   const fake = new FakeWebAuthn([
@@ -285,6 +363,7 @@ async function runFakeWebAuthnOp(op: FakeWebAuthnOp): Promise<Record<string, unk
       publicKey: PASSKEY_U5.publicKeyCose,
       counter: 0,
       userId: PASSKEY_U5.userId,
+      kind: 'passkey',
     },
   ]);
   if (op === 'creationOptions') {
@@ -304,6 +383,9 @@ async function runFakeWebAuthnOp(op: FakeWebAuthnOp): Promise<Record<string, unk
     };
   }
   if (op.startsWith('register')) return runRegistrationOp(fake, op);
+  if (op === 'u2fListedUnderRequired' || op === 'u2fUvAssertRequired') return runKindOp(fake, op);
+  if (op.startsWith('passkey')) return runKindOp(fake, op);
+  if (op.startsWith('u2f')) return runU2fOp(fake, op);
   if (op.startsWith('prodOrigin')) return runProdOriginOp(fake, op);
   return runAssertionOp(fake, op);
 }
@@ -1660,7 +1742,7 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
           outcome = { same: a === b };
         } else if (op === 'u5SeedMatchesFixture') {
           outcome = await runSessionWebAuthnOp(
-            providerRegistry.fake({ AUTH_PROVIDER: 'fake' }),
+            providerRegistry.fake({ AUTH_PROVIDER: 'fake' }) as FakeAuthProvider,
             'signed'
           );
         }
@@ -2953,9 +3035,7 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
         } else {
           response = {
             isResponse: false,
-            dataBody:
-              (result as { data?: Record<string, unknown> }).data ??
-              (result as Record<string, unknown>),
+            dataBody: (result as { data?: Record<string, unknown> }).data ?? result,
             dataStatus: (result as { init?: { status?: number } }).init?.status,
           };
         }
@@ -2989,9 +3069,7 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
         } else {
           response = {
             isResponse: false,
-            dataBody:
-              (result as { data?: Record<string, unknown> }).data ??
-              (result as Record<string, unknown>),
+            dataBody: (result as { data?: Record<string, unknown> }).data ?? result,
             dataStatus: (result as { init?: { status?: number } }).init?.status,
           };
         }
@@ -3013,9 +3091,7 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
           // deviceIndexLoader returns data()-wrapped object; carry the payload as dataBody.
           response = {
             isResponse: false,
-            dataBody:
-              (result as { data?: Record<string, unknown> }).data ??
-              (result as Record<string, unknown>),
+            dataBody: (result as { data?: Record<string, unknown> }).data ?? result,
             dataStatus: (result as { init?: { status?: number } }).init?.status,
           };
         }
@@ -3053,9 +3129,7 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
         } else {
           response = {
             isResponse: false,
-            dataBody:
-              (result as { data?: Record<string, unknown> }).data ??
-              (result as Record<string, unknown>),
+            dataBody: (result as { data?: Record<string, unknown> }).data ?? result,
             dataStatus: (result as { init?: { status?: number } }).init?.status,
           };
         }
@@ -3076,9 +3150,7 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
         } else {
           response = {
             isResponse: false,
-            dataBody:
-              (result as { data?: Record<string, unknown> }).data ??
-              (result as Record<string, unknown>),
+            dataBody: (result as { data?: Record<string, unknown> }).data ?? result,
             dataStatus: (result as { init?: { status?: number } }).init?.status,
           };
         }
@@ -3124,9 +3196,7 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
         } else {
           response = {
             isResponse: false,
-            dataBody:
-              (result as { data?: Record<string, unknown> }).data ??
-              (result as Record<string, unknown>),
+            dataBody: (result as { data?: Record<string, unknown> }).data ?? result,
             dataStatus: (result as { init?: { status?: number } }).init?.status,
           };
         }
@@ -3191,9 +3261,7 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
         } else {
           response = {
             isResponse: false,
-            dataBody:
-              (result as { data?: Record<string, unknown> }).data ??
-              (result as Record<string, unknown>),
+            dataBody: (result as { data?: Record<string, unknown> }).data ?? result,
             dataStatus: (result as { init?: { status?: number } }).init?.status,
           };
         }

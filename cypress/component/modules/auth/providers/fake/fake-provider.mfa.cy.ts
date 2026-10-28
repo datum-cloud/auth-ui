@@ -79,6 +79,58 @@ describe('FakeAuthProvider — MFA (P5)', () => {
     expect(stored?.challenges?.webAuthN).to.be.undefined;
   });
 
+  it('updateSession records a non-verified webAuthN check as u2f and leaves passkey unset', async () => {
+    const p = new FakeAuthProvider({
+      users: [{ id: 'u1', loginName: 'a@acme.test' }],
+      passwords: { u1: 'pw' },
+    });
+    (
+      p as unknown as { webauthn: { verifyAssertion: () => Promise<{ userVerified: boolean }> } }
+    ).webauthn.verifyAssertion = async () => ({ userVerified: false });
+    const s = await p.createSession({ password: 'pw' }, { userId: 'u1' });
+    const out = await p.updateSession(s.id, s.token, {
+      webAuthN: { credentialAssertionData: { id: 'real-key' } },
+    });
+    expect(out.factors.u2f?.verifiedAt).to.be.instanceOf(Date);
+    expect(out.factors.u2f?.userVerified).to.equal(false);
+    expect(out.factors.passkey?.verifiedAt ?? null).to.be.null;
+  });
+
+  it('updateSession records a user-verified webAuthN check as passkey and leaves u2f unset', async () => {
+    const p = new FakeAuthProvider({
+      users: [{ id: 'u1', loginName: 'a@acme.test' }],
+      passwords: { u1: 'pw' },
+    });
+    const s = await p.createSession({ password: 'pw' }, { userId: 'u1' });
+    const out = await p.updateSession(s.id, s.token, {
+      webAuthN: { credentialAssertionData: { id: PREBAKED_CREDENTIAL_ID } },
+    });
+    expect(out.factors.passkey?.verifiedAt).to.be.instanceOf(Date);
+    expect(out.factors.passkey?.userVerified).to.equal(true);
+    expect(out.factors.u2f?.verifiedAt ?? null).to.be.null;
+  });
+
+  it('a later non-verified webAuthN check clears the passkey factor and sets u2f', async () => {
+    const p = new FakeAuthProvider({
+      users: [{ id: 'u1', loginName: 'a@acme.test' }],
+      passwords: { u1: 'pw' },
+    });
+    const s = await p.createSession({ password: 'pw' }, { userId: 'u1' });
+    const first = await p.updateSession(s.id, s.token, {
+      webAuthN: { credentialAssertionData: { id: PREBAKED_CREDENTIAL_ID } },
+    });
+    expect(first.factors.passkey?.verifiedAt).to.be.instanceOf(Date);
+    (
+      p as unknown as { webauthn: { verifyAssertion: () => Promise<{ userVerified: boolean }> } }
+    ).webauthn.verifyAssertion = async () => ({ userVerified: false });
+    const second = await p.updateSession(s.id, s.token, {
+      webAuthN: { credentialAssertionData: { id: 'real-key' } },
+    });
+    expect(second.factors.passkey?.verifiedAt).to.be.null;
+    expect(second.factors.passkey?.userVerified).to.equal(false);
+    expect(second.factors.u2f?.verifiedAt).to.be.instanceOf(Date);
+  });
+
   it('listSessions returns seeded sessions by id and an empty array for unknown ids; setMfaInitSkipped records the skip deterministically (FIXED_NOW) and is idempotent; getLoginSettings honors a per-org forceMfa override and falls back to base settings otherwise', async () => {
     const p = new FakeAuthProvider({
       users: [{ id: 'u1', loginName: 'a@acme.test' }],
@@ -100,5 +152,35 @@ describe('FakeAuthProvider — MFA (P5)', () => {
     const other = await p.getLoginSettings('other-org');
     expect(other.forceMfa).to.equal(false);
     expect(other.allowPassword).to.equal(true);
+  });
+
+  it('registerU2F options carry rp.id equal to the domain and a challenge', async () => {
+    const p = new FakeAuthProvider({ users: [{ id: 'u1', loginName: 'a@acme.test' }] });
+    const reg = await p.registerU2F('u1', 'auth.example.test');
+    const publicKey = (
+      reg.publicKeyCredentialCreationOptions as {
+        publicKey: { rp: { id: string }; challenge: string };
+      }
+    ).publicKey;
+    expect(reg.u2fId).to.be.ok;
+    expect(publicKey.rp.id).to.equal('auth.example.test');
+    expect(publicKey.challenge).to.match(/^[A-Za-z0-9_-]{16,}$/);
+  });
+
+  it('verifyU2F rejects an unknown non-prebaked credential', async () => {
+    const p = new FakeAuthProvider({ users: [{ id: 'u1', loginName: 'a@acme.test' }] });
+    const reg = await p.registerU2F('u1', 'localhost');
+    let code: string | undefined;
+    try {
+      await p.verifyU2F('u1', {
+        u2fId: reg.u2fId,
+        publicKeyCredential: { id: 'bm9wZQ' },
+        tokenName: '',
+      });
+    } catch (err) {
+      code = (err as { code?: string }).code;
+    }
+    expect(code).to.equal('INVALID_CREDENTIALS');
+    expect(await p.listAuthMethods('u1')).to.not.include('u2f');
   });
 });

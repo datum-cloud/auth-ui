@@ -1,27 +1,41 @@
+import { SECURITY_KEY_U6 } from '../fixtures/security-key-u6';
 import { checkA11y } from '../support/a11y';
 import { loginAndGetSession } from '../support/session';
+import {
+  addVirtualAuthenticator,
+  expectPostedRealCredential,
+  plantCredential,
+  removeVirtualAuthenticator,
+  visitRealWebAuthn,
+} from '../support/virtual-authenticator';
 
-// Not in scripts/e2e-fast.sh: u2f-user has no virtual-authenticator credential yet.
 describe('Security key verify (/login/security-key)', () => {
-  it('renders accessibly, drives ceremony via Cypress path, redirects to /signed-in', () => {
-    // Plant the session cookie for u2f-user@acme.test
-    loginAndGetSession('u2f-user@acme.test');
+  let authenticatorId: string;
 
-    cy.visit('/id/login/security-key?loginName=u2f-user%40acme.test', {
-      onBeforeLoad: (win) => {
-        win.__CYPRESS_HYDRATE__ = true; // ceremony needs JS — opt into hydration (see entry.client.tsx)
-      },
+  beforeEach(() => {
+    addVirtualAuthenticator('security-key').then((id) => {
+      authenticatorId = id;
+      plantCredential(id, SECURITY_KEY_U6, undefined, false);
     });
-    cy.settleHydration();
+  });
+
+  afterEach(() => {
+    if (authenticatorId) removeVirtualAuthenticator(authenticatorId);
+    authenticatorId = '';
+  });
+
+  it('renders accessibly, signs in with a real security key, redirects to /signed-in', () => {
+    loginAndGetSession('u2f-user@acme.test');
+    visitRealWebAuthn('/id/login/security-key?loginName=u2f-user%40acme.test');
 
     checkA11y();
 
-    // Hydration gate: the button is disabled until React mounts; Cypress waits for it.
+    cy.intercept('POST', /\/id\/login\/security-key(\.data)?(\?|$)/).as('verify');
     cy.contains('button', /verify with security key/i)
       .should('not.be.disabled')
       .click();
 
-    // The prebaked credential verifies with userVerified=true → nextStep returns /signed-in.
+    expectPostedRealCredential('@verify', authenticatorId);
     cy.location('pathname').should('eq', '/id/signed-in');
   });
 });

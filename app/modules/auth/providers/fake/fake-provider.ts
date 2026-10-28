@@ -595,11 +595,18 @@ export class FakeAuthProvider implements AuthProvider {
       } finally {
         this.assertionDomains.delete(id);
       }
+      // Mirrors the Zitadel mapper's split of its single webAuthN factor: user-verified is a
+      // passkey, anything else is a U2F security key.
+      // Both factors are written every time (the other one cleared), like the mapper's
+      // per-read split of the single proto factor.
+      const webAuthNFactor = { verifiedAt: this.stamp(), userVerified };
+      const clearedFactor = { verifiedAt: null, userVerified: false };
       updated = {
         ...updated,
         factors: {
           ...updated.factors,
-          passkey: { verifiedAt: this.stamp(), userVerified },
+          passkey: userVerified ? webAuthNFactor : clearedFactor,
+          u2f: userVerified ? clearedFactor : webAuthNFactor,
         },
       };
     }
@@ -814,14 +821,35 @@ export class FakeAuthProvider implements AuthProvider {
     }
   }
 
-  async registerU2F(_userId: string, _domain: string): Promise<U2FCreationOptions> {
+  async registerU2F(userId: string, domain: string): Promise<U2FCreationOptions> {
+    const u2fId = `u2f-${++this.seq}`;
+    const user = this.users.find((u) => u.id === userId);
+    this.registrationDomains.set(u2fId, domain);
     return {
-      u2fId: `u2f-${++this.seq}`,
-      publicKeyCredentialCreationOptions: { publicKey: {} },
+      u2fId,
+      publicKeyCredentialCreationOptions: await this.webauthn.creationOptions(
+        { id: userId, loginName: user?.loginName ?? userId, displayName: user?.displayName },
+        domain,
+        u2fId,
+        'u2f'
+      ),
     };
   }
 
-  async verifyU2F(userId: string, _cred: unknown): Promise<void> {
+  async verifyU2F(
+    userId: string,
+    cred: { u2fId: string; publicKeyCredential: unknown; tokenName: string }
+  ): Promise<void> {
+    try {
+      await this.webauthn.verifyRegistration(
+        userId,
+        cred.u2fId,
+        cred.publicKeyCredential,
+        this.registrationDomains.get(cred.u2fId) ?? ''
+      );
+    } finally {
+      this.registrationDomains.delete(cred.u2fId);
+    }
     this.enroll(userId, 'u2f');
   }
 
