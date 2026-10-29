@@ -78,6 +78,7 @@
     "source-map-js": "^1.2.2",
     "tinypool": "^2.2.0",
     "follow-redirects": "^1.16.1",
+    "systeminformation": "^5.33.16",
     "cypress-axe": {
       "cypress": "$cypress"
     },
