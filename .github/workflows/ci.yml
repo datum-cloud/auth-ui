@@ -132,6 +132,7 @@ jobs:
         #   source-map-js   ^1.2.2    postcss/@tailwindcss/node/css-tree/@vue/compiler-core accept ^1.2.1   fixes GHSA-68fv-2mgg-jv7q (high)
         #   tinypool        ^2.2.0    @lingui/cli accepts ^2.1.0   fixes GHSA-5gmw-xhrv-c9v3 / GHSA-85c8-ppgw-ccpr (critical)
         #   follow-redirects ^1.16.1  axios accepts ^1.16.0   fixes GHSA-q3jh-wrc6-jgq8 / GHSA-8r9p-f939-6h3c (high)
+        #   systeminformation ^5.33.16  cypress accepts ^5.31.1 (dev-only)   fixes GHSA-3f7j-7jwc-fxfj (high) / GHSA-7648-jmwf-vw7j / GHSA-4vjg-vx72-qq4g
         # brace-expansion 2.1.7 / 5.0.12 and js-yaml 5.4.2 came from scoped in-range updates,
         # NO override: js-yaml via `bun update js-yaml` (GHSA-r3ph-w7gj-g6xm). bun 1.3.14's
         # `bun update` did not reach nested copies, so the brace-expansion lock entries
