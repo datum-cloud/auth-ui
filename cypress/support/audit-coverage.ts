@@ -12,7 +12,7 @@
  *    must each appear as a string literal argument to a `logAuthEvent(` call site
  *    somewhere in the app/routes tree.  This pins against silent renames that
  *    would break Prometheus dashboards and alerts (which regex-match event names
- *    directly, e.g. `password_check|ldap_signin|idp\.signin`).
+ *    directly, e.g. `password_check|ldap_signin|idp[.]signin`).
  *
  * CONVENTION NOTE (frozen as-is):
  *   Phase 4 events: dot-case  (e.g. idp.signin, password.change)
@@ -323,7 +323,7 @@ const EXCUSED_ACTIONS: Record<string, string> = {
  *   New events must use snake_case.
  *
  * The three names pinned for Prometheus alert-rule compatibility:
- *   password_check | ldap_signin | idp\.signin
+ *   password_check | ldap_signin | idp[.]signin
  * These MUST remain in the registry and at their exact call sites.
  */
 export const REQUIRED_EVENTS = [

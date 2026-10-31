@@ -100,7 +100,7 @@ export const auditSink: LogSink = (line) => console.log(line);
 // conventions coexist in this codebase because they were introduced in separate
 // phases.  Do NOT mass-rename either group: doing so silently breaks P4-era audit
 // history and the Prometheus alert rules that regex-match event names directly
-// (specifically: password_check|ldap_signin|idp\.signin — those three are pinned).
+// (specifically: password_check|ldap_signin|idp[.]signin — those three are pinned).
 //
 //   Phase 4 era — dot-case:
 //     idp.signin  idp.link  idp.link.denied  idp.link.start  idp.unlink
