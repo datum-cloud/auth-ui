@@ -78,14 +78,14 @@ spec:
             (
               sum(rate(auth_events_total{
                 job="auth-ui",
-                event=~"password_check|ldap_signin|idp\.signin",
+                event=~"password_check|ldap_signin|idp[.]signin",
                 outcome="failure"
               }[5m]))
               /
               (
                 sum(rate(auth_events_total{
                   job="auth-ui",
-                  event=~"password_check|ldap_signin|idp\.signin",
+                  event=~"password_check|ldap_signin|idp[.]signin",
                   outcome="success"
                 }[5m])) > 0
               )

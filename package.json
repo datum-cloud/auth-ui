@@ -74,10 +74,10 @@
     "@hono/node-server": "$@hono/node-server",
     "@bufbuild/protobuf": "2.16.0",
     "qs": "^6.16.1",
-    "joi": "^18.2.9",
+    "joi": "^18.3.1",
     "source-map-js": "^1.2.2",
     "tinypool": "^2.2.0",
-    "follow-redirects": "^1.16.1",
+    "follow-redirects": "^1.16.2",
     "systeminformation": "^5.33.16",
     "cypress-axe": {
       "cypress": "$cypress"

@@ -128,10 +128,10 @@ jobs:
         #   axios           ^1.20.0   wait-on accepts ^1.18.1   fixes 12 axios advisories (7 high)
         #   esbuild         ^0.28.1   vite accepts ^0.28; build + i18n extract verified   fixes GHSA-g7r4-m6w7-qqqr / GHSA-gv7w-rqvm-qjhr
         #   postcss         ^8.5.25   vite/madge/precinct accept ^8.x   fixes GHSA-fxqj-rqcc-2cmp
-        #   joi             ^18.2.9   wait-on accepts ^18.x   fixes GHSA-wr44-6hxh-3jwq
+        #   joi             ^18.3.1   wait-on accepts ^18.2.3   fixes GHSA-wr44-6hxh-3jwq / GHSA-4528-x5fx-h6hg (high)
         #   source-map-js   ^1.2.2    postcss/@tailwindcss/node/css-tree/@vue/compiler-core accept ^1.2.1   fixes GHSA-68fv-2mgg-jv7q (high)
         #   tinypool        ^2.2.0    @lingui/cli accepts ^2.1.0   fixes GHSA-5gmw-xhrv-c9v3 / GHSA-85c8-ppgw-ccpr (critical)
-        #   follow-redirects ^1.16.1  axios accepts ^1.16.0   fixes GHSA-q3jh-wrc6-jgq8 / GHSA-8r9p-f939-6h3c (high)
+        #   follow-redirects ^1.16.2  axios accepts ^1.16.0   fixes GHSA-q3jh-wrc6-jgq8 / GHSA-8r9p-f939-6h3c / GHSA-mrwp-f3q8-3g9p (high)
         #   systeminformation ^5.33.16  cypress accepts ^5.31.1 (dev-only)   fixes GHSA-3f7j-7jwc-fxfj (high) / GHSA-7648-jmwf-vw7j / GHSA-4vjg-vx72-qq4g
         # brace-expansion 2.1.7 / 5.0.12 and js-yaml 5.4.2 came from scoped in-range updates,
         # NO override: js-yaml via `bun update js-yaml` (GHSA-r3ph-w7gj-g6xm). bun 1.3.14's
@@ -140,7 +140,10 @@ jobs:
         # minimatch@9's ^2.0.2; nested 5.0.9 -> 5.0.12 under minimatch@10's ^5.0.5), fixing
         # GHSA-qhr7-859c-m2p7 / GHSA-6j4f-fj2g-mc7p / GHSA-q2hr-2g5m-vwhr.
         #   qs              ^6.16.1   @cypress/request accepts ^6.x (dev-only)   fixes GHSA-6pq8-jhm2-2vcw
-        # No advisory is ignored. GitHub withdrew GHSA-vfj7-8cjw-p6xm (braces) on 2026-10-23.
+        # Two advisories have NO override-compatible fix and are ignored temporarily (remediation follow-up opened):
+        #   glob            <=14.0.1    @sentry/react-router and @sentry/bundler-plugins pin ^13.0.6 (latest still do); patched 14.0.2 is a major
+        #   minimatch       <11.0.1     eslint, typescript-eslint, find-cypress-specs and glob pin ^9 or ^10 (latest still do); patched 11.0.1 is a major
+        # GitHub withdrew GHSA-vfj7-8cjw-p6xm (braces) on 2026-10-23.
         # The former exemptions are all genuinely fixed, not suppressed:
         #   GHSA-mh99-v99m-4gvg / GHSA-rgw5-rvv9-x895 (brace-expansion) — fixed without
         #     an override; each consumer nests its own minimatch on brace-expansion 5.x
@@ -153,7 +156,7 @@ jobs:
         #   GHSA-qwww-vcr4-c8h2 (react-router RSC CSRF) — fixed by the v8.3.0 upgrade.
         # If a NEW transitive advisory appears with no override-compatible fix, add its
         # GHSA id to the scripts/npm-audit.sh arguments here as a temporary measure and open a remediation follow-up.
-        run: scripts/npm-audit.sh
+        run: scripts/npm-audit.sh GHSA-3g3m-2fjr-6pw4 GHSA-g3hv-75wg-m249
       - name: Generate SBOM (CycloneDX)
         run: npx --yes @cyclonedx/cdxgen@11.10.0 -t js -o sbom.cdx.json --spec-version 1.5
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
