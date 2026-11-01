@@ -250,7 +250,7 @@ jobs:
       contents: read
       packages: write
       attestations: write
-    uses: datum-cloud/actions/.github/workflows/publish-docker.yaml@6a889cf57ffcd56af2c5a2c65455ba01ab0fff15 # v1.24.0
+    uses: datum-cloud/actions/.github/workflows/publish-docker.yaml@95a63f871b9cd1f2b4c0224f4a23291beeeb5ef3 # v1.26.0
     with:
       image-name: auth-ui
     # NOTE: `secrets: inherit` is required because the upstream workflow
@@ -267,7 +267,7 @@ jobs:
       id-token: write
       contents: read
       packages: write
-    uses: datum-cloud/actions/.github/workflows/publish-kustomize-bundle.yaml@6a889cf57ffcd56af2c5a2c65455ba01ab0fff15 # v1.24.0
+    uses: datum-cloud/actions/.github/workflows/publish-kustomize-bundle.yaml@95a63f871b9cd1f2b4c0224f4a23291beeeb5ef3 # v1.26.0
     with:
       bundle-name: ghcr.io/datum-cloud/auth-ui-kustomize
       bundle-path: config
