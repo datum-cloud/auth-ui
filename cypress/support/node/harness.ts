@@ -3705,6 +3705,54 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
               );
               outcome = { unclaimed: unclaimed[0], unmounted: unmounted[0] };
             }
+          } else if (op === 'ssoUnlinkStaleSudo' || op === 'ssoUnlinkFreshSudo') {
+            // sso-unlink-sudo.cy.ts: the unlink branch of runSsoAction is step-up gated.
+            Date.now = origDateNow; // real factor stamps; the action's clock is injected below
+            const { FakeAuthProvider } =
+              await import('@/modules/auth/providers/fake/fake-provider');
+            const { SUDO_TTL_MS } = await import('@/resources/shared/sudo');
+            const link = { idpId: 'idp-google', idpUserId: 'g-1', idpUserName: 'mia' };
+            const fake = new FakeAuthProvider({
+              users: [{ id: 'u1', loginName: 'mia@acme.test' }],
+              passwords: { u1: 'Password1!' },
+              authMethods: { u1: ['password', 'idp'] },
+              idpLinks: { u1: [link] },
+              realFactorTimestamps: true,
+            });
+            const created = await fake.createSession({ password: 'Password1!' }, { userId: 'u1' });
+            const cookie = (
+              await serializeSessions([
+                {
+                  id: created.id,
+                  token: created.token,
+                  loginName: 'mia@acme.test',
+                  creationTs: created.changedAt,
+                  expirationTs: created.expiresAt,
+                  changeTs: created.changedAt,
+                },
+              ])
+            ).split(';')[0];
+            const prevUnlink = env.ALLOW_IDP_UNLINK;
+            (env as { ALLOW_IDP_UNLINK: boolean }).ALLOW_IDP_UNLINK = true;
+            try {
+              const form = new FormData();
+              form.set('intent', 'unlink');
+              form.set('idpId', link.idpId);
+              form.set('linkedUserId', link.idpUserId);
+              const req = new Request('http://localhost/id/sso', {
+                method: 'POST',
+                headers: { cookie },
+              });
+              const skew = op === 'ssoUnlinkStaleSudo' ? SUDO_TTL_MS + 1 : 0;
+              const o = await runSsoAction(fake, req, form, { now: () => Date.now() + skew });
+              outcome = {
+                kind: o.kind,
+                location: o.kind === 'redirect' ? o.location : undefined,
+                linksLeft: (await fake.listIdpLinks('u1')).length,
+              };
+            } finally {
+              (env as { ALLOW_IDP_UNLINK: boolean }).ALLOW_IDP_UNLINK = prevUnlink;
+            }
           } else {
             throw new Error(`unknown hardeningOp: ${String(op)}`);
           }

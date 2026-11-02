@@ -212,11 +212,11 @@ export const LIMITER_EXCUSED: Record<string, string> = {
   'logout/index.tsx':
     'CSRF-protected sign-out of the caller’s own cookie sessions; nothing to guess or enumerate',
   'password/change.tsx':
-    'requires a live signed session cookie; follow-up: add a session-class limiter',
+    'requires a live session AND fresh sudo (step-up); follow-up: add a session-class limiter',
   'password/new.tsx':
     'the reset code is Zitadel-issued and attempt-limited provider-side; follow-up: ip ceiling',
   'sso/index.tsx':
-    'CSRF-protected; unlink is session-gated, start only mints an IdP intent; ' +
+    'CSRF-protected; unlink is session- and sudo-gated, start only mints an IdP intent; ' +
     'follow-up: ip ceiling on intent minting',
 };
 

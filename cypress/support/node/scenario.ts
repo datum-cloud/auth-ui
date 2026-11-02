@@ -847,7 +847,10 @@ export interface Scenario {
     | 'deviceCodeBareGetNoConsume' // GETs without a user_code never count
     // audit-limiter-inventory.cy.ts
     | 'limiterInventoryLive' // every real POST route is throttled or excused
-    | 'limiterInventoryNegative'; // an unclaimed or unmounted POST route fails the scan
+    | 'limiterInventoryNegative' // an unclaimed or unmounted POST route fails the scan
+    // sso-unlink-sudo.cy.ts
+    | 'ssoUnlinkStaleSudo' // stale sudo → /reauth?returnTo=/sso, the link survives
+    | 'ssoUnlinkFreshSudo'; // fresh sudo → unlinked, back to /sso
 }
 
 /** A parsed logAuthEvent JSON line: { event, outcome, ...fields }. */
