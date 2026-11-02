@@ -56,15 +56,19 @@ describe('env schema — production Zitadel requirements (provider-gated)', () =
 // deployed Secret must fail boot; prod-mode fake runs (a11y, perf, load, e2e-fast) opt in.
 
 type Issue = { path: unknown[]; message: string };
-const hasAuthProviderIssue = (issues: unknown) =>
-  (issues as Issue[]).some((i) => i.path[0] === 'AUTH_PROVIDER');
+const authProviderIssue = (issues: unknown) =>
+  (issues as Issue[]).find((i) => i.path[0] === 'AUTH_PROVIDER');
+const hasAuthProviderIssue = (issues: unknown) => authProviderIssue(issues) !== undefined;
 
 describe('env schema — AUTH_PROVIDER=fake in production (ALLOW_FAKE_PROVIDER_IN_PRODUCTION)', () => {
   it('refuses the fake provider in production without the opt-in', () => {
     callService({ fn: 'envSchemaFull', parseEnvRaw: { ...PROD, AUTH_PROVIDER: 'fake' } }).then(
       (v) => {
         expect(v.outcome.success).to.equal(false);
-        expect(hasAuthProviderIssue(v.outcome.issues)).to.equal(true);
+        // The message names the escape hatch, so an operator hitting this at boot knows the fix.
+        expect(authProviderIssue(v.outcome.issues)?.message).to.contain(
+          'ALLOW_FAKE_PROVIDER_IN_PRODUCTION=true'
+        );
       }
     );
   });
@@ -88,6 +92,22 @@ describe('env schema — AUTH_PROVIDER=fake in production (ALLOW_FAKE_PROVIDER_I
       const data = v.outcome.data as Record<string, unknown>;
       expect(data.AUTH_PROVIDER).to.equal('fake');
       expect(data.ALLOW_FAKE_PROVIDER_IN_PRODUCTION).to.equal(true);
+    });
+  });
+
+  it('does not relax the Zitadel requirements when the provider is zitadel', () => {
+    callService({
+      fn: 'envSchemaFull',
+      parseEnvRaw: { ...PROD, ALLOW_FAKE_PROVIDER_IN_PRODUCTION: 'true' },
+    }).then((v) => {
+      expect(v.outcome.success).to.equal(false);
+      const paths = (v.outcome.issues as Issue[]).map((i) => i.path[0]);
+      expect(paths).to.include.members([
+        'ZITADEL_API_URL',
+        'ZITADEL_SERVICE_USER_TOKEN',
+        'PUBLIC_ORIGIN',
+      ]);
+      expect(paths).not.to.include('AUTH_PROVIDER');
     });
   });
 
