@@ -44,4 +44,22 @@ describe('/signed-in — identity + switch-account link + sign-out', () => {
     mountSignedIn(null);
     cy.contains('You are signed in as').should('not.exist');
   });
+
+  it('identifies the user to Rybbit by user id only, never with the login name', () => {
+    const calls: unknown[][] = [];
+    window.rybbit = {
+      event: () => {},
+      identify: (...args: unknown[]) => {
+        calls.push(args);
+      },
+      clearUserId: () => {},
+      pageview: () => {},
+    };
+    mountSignedIn('mia@acme.test');
+    cy.contains('You are signed in as').should('be.visible');
+    cy.then(() => {
+      expect(calls).to.deep.equal([['u1']]);
+      expect(JSON.stringify(calls)).not.to.contain('mia@acme.test');
+    });
+  });
 });

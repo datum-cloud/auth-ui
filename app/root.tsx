@@ -5,7 +5,7 @@ import { DynamicFaviconLinks } from './components/misc/dynamic-favicon';
 import allianceFontRegularUrl from './styles/fonts/AllianceNo1-Regular.woff2?url';
 import './styles/root.css';
 import { AuthCard } from '@/components/auth-card/auth-card';
-import { RybbitAnalytics, resolveRybbitSiteId } from '@/modules/analytics/rybbit';
+import { RouteGatedRybbitAnalytics, resolveRybbitSiteId } from '@/modules/analytics/rybbit';
 import { MaxMindTracker } from '@/modules/fraud/maxmind-tracker';
 import { loadMessages } from '@/modules/i18n/lingui';
 import { detectLocale } from '@/modules/i18n/lingui.server';
@@ -88,7 +88,12 @@ export function Layout({ children }: { children: React.ReactNode }) {
             the persisted ThemeToggle choice (localStorage) overrides it on return visits. */}
         <ThemeScript nonce={data?.cspNonce} attribute="class" defaultTheme="system" enableSystem />
 
-        <RybbitAnalytics siteId={data?.rybbitSiteId} tag={data?.rybbitTag} nonce={data?.cspNonce} />
+        {/* Loads only on terminal, credential-free pages (see analytics-routes.ts). */}
+        <RouteGatedRybbitAnalytics
+          siteId={data?.rybbitSiteId}
+          tag={data?.rybbitTag}
+          nonce={data?.cspNonce}
+        />
       </head>
       <body>
         {children}

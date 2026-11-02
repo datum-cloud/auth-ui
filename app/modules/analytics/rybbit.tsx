@@ -1,4 +1,6 @@
+import { isAnalyticsRoute } from '@/modules/analytics/analytics-routes';
 import { useEffect } from 'react';
+import { useLocation } from 'react-router';
 
 declare global {
   interface Window {
@@ -11,9 +13,13 @@ declare global {
   }
 }
 
-/** Traits with special handling in Rybbit's dashboard — see identifyUser. */
+/**
+ * Optional traits for identifyUser. Email is deliberately NOT accepted: this is the identity
+ * provider, and the account email must not reach a third-party analytics vendor. The user id
+ * alone stitches events to cloud-portal.
+ */
 export interface RybbitUserTraits {
-  email?: string;
+  email?: never;
   name?: string;
   username?: string;
   [key: string]: unknown;
@@ -52,9 +58,8 @@ export function trackAuthEvent(name: AuthEventName): void {
 
 /**
  * Stitches this app's events to the same user's events in cloud-portal. Call once the
- * authenticated user's id is known (e.g. on the terminal /signed-in page). Traits are
- * optional metadata shown in Rybbit's dashboard — email/name/username get special
- * display treatment there; anything else is a plain custom field.
+ * authenticated user's id is known (e.g. on the terminal /signed-in page). Pass the opaque
+ * user id only; traits stay optional and must never carry the email (see RybbitUserTraits).
  */
 export function identifyUser(userId: string, traits?: RybbitUserTraits): void {
   if (typeof window === 'undefined') return;
@@ -85,8 +90,12 @@ interface RybbitAnalyticsProps {
 
 /**
  * Renders the Rybbit script tag directly (per Rybbit's Remix integration guide — mounted in
- * root.tsx's <head>). No manual pageview tracking: SPA route-change tracking is automatic once
- * enabled in the Rybbit site's dashboard settings.
+ * root.tsx's <head>, only on the routes isAnalyticsRoute allows). No manual pageview tracking:
+ * SPA route-change tracking is automatic once enabled in the Rybbit site's dashboard settings.
+ *
+ * `async`, not `defer`: React 19 treats `<script async src>` as a resource and loads it even when
+ * the tag first appears on a client-side navigation (e.g. the redirect into /signed-in). A plain
+ * script element inserted by React on the client never executes.
  */
 export function RybbitAnalytics({ siteId, tag, nonce }: RybbitAnalyticsProps) {
   if (!siteId) return null;
@@ -96,9 +105,19 @@ export function RybbitAnalytics({ siteId, tag, nonce }: RybbitAnalyticsProps) {
       data-site-id={siteId}
       data-tag={tag}
       nonce={nonce}
-      defer
+      async
     />
   );
+}
+
+/**
+ * RybbitAnalytics for the current route only when isAnalyticsRoute allows it. Credential pages
+ * (login, signup forms, password, setup, recover, ...) never load the third-party script.
+ */
+export function RouteGatedRybbitAnalytics(props: RybbitAnalyticsProps) {
+  const { pathname } = useLocation();
+  if (!isAnalyticsRoute(pathname)) return null;
+  return <RybbitAnalytics {...props} />;
 }
 
 /**
