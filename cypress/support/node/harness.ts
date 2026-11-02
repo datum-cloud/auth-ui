@@ -3753,6 +3753,42 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
             } finally {
               (env as { ALLOW_IDP_UNLINK: boolean }).ALLOW_IDP_UNLINK = prevUnlink;
             }
+          } else if (
+            op === 'sessionsCookieScoped' ||
+            op === 'legacyClearMiddleware' ||
+            op === 'serverMountsLegacyClear'
+          ) {
+            // session-cookie-path.cy.ts: the sessions cookie is /id-scoped, and every response that
+            // sets it also expires the old Path=/ one (one-release migration).
+            const ck = await import('@/modules/auth/session/cookie');
+            if (op === 'sessionsCookieScoped') {
+              const written = await ck.serializeSessions([]);
+              outcome = { written, legacyClear: ck.legacyRootSessionsClear() };
+            } else if (op === 'legacyClearMiddleware') {
+              const app = new Hono();
+              app.use('*', ck.legacyRootSessionsClearMiddleware);
+              app.get('/id/sets', async (c) => {
+                c.header('set-cookie', await ck.serializeSessions([]), { append: true });
+                c.header('set-cookie', 'csrf=x; Path=/id', { append: true });
+                return c.text('ok');
+              });
+              app.get('/id/other', (c) => {
+                c.header('set-cookie', 'csrf=x; Path=/id', { append: true });
+                return c.text('ok');
+              });
+              const sets = await app.request('http://app/id/sets');
+              const other = await app.request('http://app/id/other');
+              outcome = {
+                setsCookies: sets.headers.getSetCookie(),
+                setsBody: await sets.text(),
+                otherCookies: other.headers.getSetCookie(),
+              };
+            } else {
+              const src = readFileSync(join(process.cwd(), 'app/server.ts'), 'utf-8');
+              outcome = {
+                mounted: src.includes("app.use('*', legacyRootSessionsClearMiddleware);"),
+              };
+            }
           } else {
             throw new Error(`unknown hardeningOp: ${String(op)}`);
           }

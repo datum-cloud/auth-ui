@@ -850,7 +850,11 @@ export interface Scenario {
     | 'limiterInventoryNegative' // an unclaimed or unmounted POST route fails the scan
     // sso-unlink-sudo.cy.ts
     | 'ssoUnlinkStaleSudo' // stale sudo → /reauth?returnTo=/sso, the link survives
-    | 'ssoUnlinkFreshSudo'; // fresh sudo → unlinked, back to /sso
+    | 'ssoUnlinkFreshSudo' // fresh sudo → unlinked, back to /sso
+    // session-cookie-path.cy.ts
+    | 'sessionsCookieScoped' // serializeSessions writes Path=/id; the clear targets Path=/
+    | 'legacyClearMiddleware' // a response setting sessions also expires the Path=/ cookie
+    | 'serverMountsLegacyClear'; // app/server.ts mounts the migration middleware
 }
 
 /** A parsed logAuthEvent JSON line: { event, outcome, ...fields }. */

@@ -10,8 +10,10 @@ import {
   type SessionEntry,
 } from './session';
 import type { Session } from '@/modules/auth/types';
+import { APP_BASENAME } from '@/resources/shared/app-basename';
 import { env } from '@/server/infra/env.server';
 import { logAuthEvent } from '@/server/observability';
+import type { MiddlewareHandler } from 'hono';
 import { createCookie } from 'react-router';
 import { z } from 'zod';
 
@@ -41,14 +43,58 @@ const SessionsSchema = z.array(EntrySchema);
 // Browsers silently drop a Set-Cookie over ~4KB; keep a safe 2KB budget (spec §7).
 const MAX_COOKIE_BYTES = 2048;
 
+// Scoped to the app basename like every sibling cookie (csrf, last-used-login, passkey-hint,
+// reauth-intent, idp-autostart). It used to be Path=/, so the session handles rode along on every
+// request to the whole host, including apps that are not this one.
 export const sessionsCookie = createCookie('sessions', {
   httpOnly: true,
   sameSite: 'lax',
-  path: '/',
+  path: APP_BASENAME,
   secure: env.NODE_ENV === 'production',
   secrets: [env.SESSION_SECRET],
   maxAge: 60 * 60 * 24,
 });
+
+// ---------------------------------------------------------------------------
+// One-release migration off the old Path=/ cookie
+// ---------------------------------------------------------------------------
+//
+// MIGRATION — remove after 2027-01-31 (one release after the Path=/id change ships).
+// A browser still holding the old root-scoped `sessions` cookie would send BOTH it and the new
+// /id one, and the parser reads whichever comes first. Every response that sets the sessions
+// cookie therefore also expires the root-scoped one. The cookie's maxAge is 24h, so any root
+// cookie is gone a day after deploy whether or not it is cleared; the release window is margin.
+// To remove: delete this block, the `legacyRootSessionsClear` mount in app/server.ts, and its
+// spec in cypress/component/modules/auth/session/session-cookie-path.cy.ts.
+
+/** Set-Cookie that expires a `sessions` cookie left over at Path=/. */
+export function legacyRootSessionsClear(): string {
+  const secure = env.NODE_ENV === 'production' ? '; Secure' : '';
+  return `sessions=; Path=/; Max-Age=0; HttpOnly; SameSite=Lax${secure}`;
+}
+
+/** True when the response sets the basename-scoped sessions cookie (and so should clear the old one). */
+export function setsScopedSessionsCookie(setCookies: readonly string[]): boolean {
+  const scoped = new RegExp(`;\\s*Path=${APP_BASENAME}(;|$)`, 'i');
+  return setCookies.some((c) => c.startsWith('sessions=') && scoped.test(c));
+}
+
+/**
+ * Hono middleware (mounted on '*' in app/server.ts): after the handler runs, if the response sets
+ * the sessions cookie, append the Path=/ expiry. One mount covers every call site that writes the
+ * cookie (sign-in, account switch, logout, IdP callbacks) without touching each of them.
+ */
+export const legacyRootSessionsClearMiddleware: MiddlewareHandler = async (c, next) => {
+  await next();
+  const res = c.res;
+  if (!setsScopedSessionsCookie(res.headers.getSetCookie())) return;
+  const headers = new Headers(res.headers);
+  headers.append('set-cookie', legacyRootSessionsClear());
+  // Reset first: assigning over an existing c.res makes Hono re-copy the old Set-Cookie list
+  // onto the new response, which would drop the appended header.
+  c.res = undefined;
+  c.res = new Response(res.body, { status: res.status, statusText: res.statusText, headers });
+};
 
 export async function readSessions(request: Request): Promise<SessionEntry[]> {
   const cookieHeader = request.headers.get('cookie');

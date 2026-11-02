@@ -1,4 +1,5 @@
 import { legacyRedirects } from './server/middleware/legacy-redirects';
+import { legacyRootSessionsClearMiddleware } from '@/modules/auth/session/cookie';
 import { env } from '@/server/infra/env.server';
 import { publicOrigin } from '@/server/middleware/public-origin';
 import {
@@ -95,6 +96,9 @@ export default await createHonoServer<RequestContextEnv>({
     app.use('*', appSecureHeaders(isDev, resolveFrameAncestors(env.FRAME_ANCESTORS)));
     // Legacy 301s: redirect hardcoded /ui/v2/login/* links (sibling repos) to /id/* before routing.
     app.use('*', legacyRedirects);
+    // MIGRATION (remove after 2027-01-31): the sessions cookie moved from Path=/ to Path=/id. Any
+    // response that sets it also expires the old root-scoped one — see cookie.ts.
+    app.use('*', legacyRootSessionsClearMiddleware);
     // Compress STATIC ASSETS ONLY — never SSR HTML. Auth pages embed a per-session
     // CSRF token (remix-utils commitToken reuses the cookie token) alongside
     // attacker-reflectable query params (loginName, user_code, …); compressing that
