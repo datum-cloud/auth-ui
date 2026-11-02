@@ -18,10 +18,8 @@ ENV NODE_ENV=production \
 # ==========================================
 FROM base AS build
 
-ARG SENTRY_AUTH_TOKEN
 ARG VERSION=dev
 ENV VERSION=${VERSION}
-ENV SENTRY_AUTH_TOKEN=${SENTRY_AUTH_TOKEN}
 
 COPY --link package.json package-lock.json ./
 RUN npm ci --include=dev --ignore-scripts --no-audit --no-fund

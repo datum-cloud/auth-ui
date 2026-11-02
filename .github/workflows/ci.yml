@@ -253,11 +253,9 @@ jobs:
     uses: datum-cloud/actions/.github/workflows/publish-docker.yaml@95a63f871b9cd1f2b4c0224f4a23291beeeb5ef3 # v1.26.0
     with:
       image-name: auth-ui
-    # NOTE: `secrets: inherit` is required because the upstream workflow
-    # references `secrets.SENTRY_AUTH_TOKEN` without declaring it under
-    # `workflow_call.secrets`. Once upstream declares it, switch to an
-    # explicit `secrets:` block passing only SENTRY_AUTH_TOKEN.
-    secrets: inherit
+    # No secrets are passed on purpose. The build does not upload source maps,
+    # and upstream forwards SENTRY_AUTH_TOKEN as a build arg, which BuildKit
+    # records in plaintext in the image's public provenance.
 
   publish-kustomize-bundle:
     name: Publish Kustomize Bundle
