@@ -11,18 +11,19 @@ deliberate: the alternative is mailing users verification links pointing at a pl
 
 The usual culprits, in order:
 
-| Message                                                                                           | Fix                                                                                                     |
-| ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
-| `SESSION_SECRET must be at least 32 characters`                                                   | Longer secret. `openssl rand -base64 32`.                                                               |
-| `ZITADEL_API_URL must be set in production`                                                       | Set it, or set `AUTH_PROVIDER=fake` if this is a fake-provider run.                                     |
-| `ZITADEL_SERVICE_USER_TOKEN must be set in production`                                            | Provision the service-user PAT in the `auth-ui` Secret.                                                 |
-| `PUBLIC_ORIGIN must be set in production`                                                         | Set the real public origin.                                                                             |
-| `PUBLIC_ORIGIN is still the deployment placeholder`                                               | `config/base/deployment.yaml` ships `https://REPLACE_ME.example`. Someone skipped the cutover step.     |
-| `SENTRY_DSN must be an https:// URL`                                                              | Fix or unset the DSN. Unset is a valid state: Sentry is a no-op.                                        |
-| `VERIFICATION_MAIL_URL is set to an https URL but VERIFICATION_MAIL_CLIENT_CERT_FILE / ...`       | Mount the client cert, key and CA and set all three `VERIFICATION_MAIL_*_FILE` paths, or unset the URL. |
-| `RECOVERY_MAIL_URL is set to an https URL but the VERIFICATION_MAIL_* client cert files are not.` | Same three files; recovery shares them.                                                                 |
-| `RECAPTCHA_SITE_KEY is set but RECAPTCHA_SECRET_KEY is not`                                       | Set the secret, or unset the site key.                                                                  |
-| `RECAPTCHA_SECRET_KEY is set but PUBLIC_ORIGIN is not`                                            | Set `PUBLIC_ORIGIN`.                                                                                    |
+| Message                                                                                           | Fix                                                                                                                                              |
+| ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `SESSION_SECRET must be at least 32 characters`                                                   | Longer secret. `openssl rand -base64 32`.                                                                                                        |
+| `ZITADEL_API_URL must be set in production`                                                       | Set it. Only for a local prod-mode fake run (never a deployment), set `AUTH_PROVIDER=fake` and `ALLOW_FAKE_PROVIDER_IN_PRODUCTION=true` instead. |
+| `AUTH_PROVIDER=fake is refused in production`                                                     | Unset `AUTH_PROVIDER` to use Zitadel. For a deliberate prod-mode fake run, set `ALLOW_FAKE_PROVIDER_IN_PRODUCTION=true`.                         |
+| `ZITADEL_SERVICE_USER_TOKEN must be set in production`                                            | Provision the service-user PAT in the `auth-ui` Secret.                                                                                          |
+| `PUBLIC_ORIGIN must be set in production`                                                         | Set the real public origin.                                                                                                                      |
+| `PUBLIC_ORIGIN is still the deployment placeholder`                                               | `config/base/deployment.yaml` ships `https://REPLACE_ME.example`. Someone skipped the cutover step.                                              |
+| `SENTRY_DSN must be an https:// URL`                                                              | Fix or unset the DSN. Unset is a valid state: Sentry is a no-op.                                                                                 |
+| `VERIFICATION_MAIL_URL is set to an https URL but VERIFICATION_MAIL_CLIENT_CERT_FILE / ...`       | Mount the client cert, key and CA and set all three `VERIFICATION_MAIL_*_FILE` paths, or unset the URL.                                          |
+| `RECOVERY_MAIL_URL is set to an https URL but the VERIFICATION_MAIL_* client cert files are not.` | Same three files; recovery shares them.                                                                                                          |
+| `RECAPTCHA_SITE_KEY is set but RECAPTCHA_SECRET_KEY is not`                                       | Set the secret, or unset the site key.                                                                                                           |
+| `RECAPTCHA_SECRET_KEY is set but PUBLIC_ORIGIN is not`                                            | Set `PUBLIC_ORIGIN`.                                                                                                                             |
 
 ```bash
 kubectl -n auth-ui logs -l app.kubernetes.io/name=auth-ui --tail=100

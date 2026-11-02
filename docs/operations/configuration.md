@@ -13,6 +13,9 @@ schema wins.
 other than `fake`. The `superRefine` guard in the schema enforces these three only under that
 condition; `SESSION_SECRET` is required in every environment.
 
+`AUTH_PROVIDER=fake` under `NODE_ENV=production` fails boot unless
+`ALLOW_FAKE_PROVIDER_IN_PRODUCTION=true` is also set (see [Development](#development)).
+
 | Variable                     | Required             | Default                 | Purpose                                                                                                                                                                                                                                   |
 | ---------------------------- | -------------------- | ----------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `SESSION_SECRET`             | Always               | none                    | HMAC-SHA256 key for signing session cookies, and the root the recovery-ticket key is derived from. **Minimum 32 characters**: shorter values fail validation at boot. Generate with `openssl rand -base64 32`.                            |
@@ -104,10 +107,11 @@ with the public site key on another domain).
 
 ## Development
 
-| Variable        | Required | Default         | Purpose                                                                                                                                                                                                 |
-| --------------- | -------- | --------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `AUTH_PROVIDER` | No       | unset → Zitadel | Provider selector. `fake` selects the in-memory `FakeAuthProvider` (no Zitadel needed). **Any other value, including unset, resolves to the Zitadel adapter**, so the Zitadel requirements above apply. |
-| `NODE_ENV`      | No       | `development`   | One of `development`, `production`, `test`.                                                                                                                                                             |
+| Variable                            | Required | Default         | Purpose                                                                                                                                                                                                                                                                                                                      |
+| ----------------------------------- | -------- | --------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `AUTH_PROVIDER`                     | No       | unset → Zitadel | Provider selector. `fake` selects the in-memory `FakeAuthProvider` (no Zitadel needed). **Any other value, including unset, resolves to the Zitadel adapter**, so the Zitadel requirements above apply.                                                                                                                      |
+| `ALLOW_FAKE_PROVIDER_IN_PRODUCTION` | No       | unset → refuse  | Only the exact string `true` lets `AUTH_PROVIDER=fake` boot under `NODE_ENV=production`; the app then logs a `fake_provider_in_production` warning at boot. The fake provider's seeded accounts have known passwords, so this is for prod-mode fake runs only (a11y, perf, load, `scripts/e2e-fast.sh`), never a deployment. |
+| `NODE_ENV`                          | No       | `development`   | One of `development`, `production`, `test`.                                                                                                                                                                                                                                                                                  |
 
 `NODE_EXTRA_CA_CERTS` is occasionally needed locally to trust a self-signed Zitadel CA. It is a
 Node runtime variable, not part of the app's schema.

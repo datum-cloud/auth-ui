@@ -45,7 +45,7 @@ For a quick signal without the full sweep:
 npm run test:e2e:fast       # npm run build && AUTH_PROVIDER=fake … --spec cypress/e2e/core-signin.cy.ts
 ```
 
-That one builds the app, serves it in production mode with the fake provider, and runs the core sign-in spec only. It needs no Zitadel and no credentials.
+That one builds the app, serves it in production mode with the fake provider (the script sets `ALLOW_FAKE_PROVIDER_IN_PRODUCTION=true`, which production mode requires for it), and runs the core sign-in spec only. It needs no Zitadel and no credentials.
 
 ## Acceptance
 

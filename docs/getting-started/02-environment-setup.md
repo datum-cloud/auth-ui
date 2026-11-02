@@ -24,7 +24,9 @@ cp .env.example .env
 
 "Production with the Zitadel provider" is precisely `NODE_ENV=production` **and**
 `AUTH_PROVIDER` set to anything other than `fake`. In development, or with
-`AUTH_PROVIDER=fake`, only `SESSION_SECRET` is required.
+`AUTH_PROVIDER=fake`, only `SESSION_SECRET` is required. The fake provider under
+`NODE_ENV=production` (for example `npm run start`) also needs
+`ALLOW_FAKE_PROVIDER_IN_PRODUCTION=true`, or boot fails.
 
 ## Generate a session secret
 

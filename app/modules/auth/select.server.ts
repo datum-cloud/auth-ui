@@ -1,6 +1,7 @@
 import type { AuthProvider } from './auth-provider';
 import { FakeAuthProvider } from '@/modules/auth/providers/fake/fake-provider';
 import { ZitadelAuthProvider } from '@/modules/auth/providers/zitadel';
+import { env } from '@/server/infra/env.server';
 
 export interface SelectOpts {
   AUTH_PROVIDER?: string;
@@ -205,13 +206,13 @@ export const providerRegistry: Record<ProviderMode, (opts: SelectOpts) => AuthPr
   fake: () => makeFake(),
   zitadel: (opts) =>
     new ZitadelAuthProvider({
-      serviceUrl: opts.serviceUrl ?? process.env.ZITADEL_API_URL ?? '',
-      serviceToken: opts.serviceToken ?? process.env.ZITADEL_SERVICE_USER_TOKEN ?? '',
+      serviceUrl: opts.serviceUrl ?? env.ZITADEL_API_URL,
+      serviceToken: opts.serviceToken ?? env.ZITADEL_SERVICE_USER_TOKEN ?? '',
     }),
 };
 
 export function getAuthProvider(opts: SelectOpts = {}): AuthProvider {
   const mode: ProviderMode =
-    (opts.AUTH_PROVIDER ?? process.env.AUTH_PROVIDER ?? 'zitadel') === 'fake' ? 'fake' : 'zitadel';
+    (opts.AUTH_PROVIDER ?? env.AUTH_PROVIDER ?? 'zitadel') === 'fake' ? 'fake' : 'zitadel';
   return providerRegistry[mode](opts);
 }
