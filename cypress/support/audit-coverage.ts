@@ -8,7 +8,12 @@
  *    factory it delegates to.  This is a cheap, static-analysis-style proxy that
  *    catches future actions added without audit.
  *
- * 2. EVENT-NAME REGISTRY — a canonical set of event names (the "frozen inventory")
+ * 2. LIMITER COVERAGE — every route file that exports an `action` (a POST handler) must be
+ *    either claimed by a rate limiter in app/server/middleware/rate-limit.ts that app/server.ts
+ *    mounts, or excused in LIMITER_EXCUSED with a written reason. A new POST route with
+ *    neither fails the scan.
+ *
+ * 3. EVENT-NAME REGISTRY — a canonical set of event names (the "frozen inventory")
  *    must each appear as a string literal argument to a `logAuthEvent(` call site
  *    somewhere in the app/routes tree.  This pins against silent renames that
  *    would break Prometheus dashboards and alerts (which regex-match event names
@@ -44,6 +49,7 @@ export interface RouteCoverageEntry {
 
 export interface AuditCoverageResult {
   routeCoverage: RouteCoverageEntry[];
+  limiterCoverage: RouteCoverageEntry[];
   missingEvents: string[];
   piiOffenders: string[];
 }
@@ -151,6 +157,115 @@ const SHARED_FACTORY_PATHS: Record<string, string | string[]> = {
   // passkey_remove / logout logAuthEvent calls) to the passkeys domain service.
   'passkeys.service.ts': join(RESOURCES_DIR, 'passkeys/passkeys.service.ts'),
 };
+
+// ---------------------------------------------------------------------------
+// Limiter inventory — every POST (action) route is throttled or excused
+// ---------------------------------------------------------------------------
+
+/** A route's POST is counted by `limiter`, whose matcher names `path` (normalized, /id-prefixed). */
+export interface LimiterClaim {
+  limiter: string;
+  path: string;
+}
+
+/** Route key (relative to app/routes) → the mounted limiter that counts its POST. */
+export const LIMITED_ACTION_ROUTES: Record<string, LimiterClaim> = {
+  'login/index.tsx': { limiter: 'loginIdentifierRateLimit', path: '/id/login' },
+  'login/password.tsx': { limiter: 'loginPasswordIpRateLimit', path: '/id/login/password' },
+  'login/method.tsx': { limiter: 'loginMethodRateLimit', path: '/id/login/method' },
+  'login/passkey.tsx': { limiter: 'webauthnVerifyRateLimit', path: '/id/login/passkey' },
+  'login/passkey-discover.tsx': {
+    limiter: 'webauthnVerifyRateLimit',
+    path: '/id/login/passkey-discover',
+  },
+  'login/security-key.tsx': { limiter: 'webauthnVerifyRateLimit', path: '/id/login/security-key' },
+  'login/mfa.tsx': { limiter: 'webauthnVerifyRateLimit', path: '/id/login/mfa' },
+  'login/verify/email.tsx': { limiter: 'mfaVerifyRateLimit', path: '/id/login/verify/' },
+  'login/verify/sms.tsx': { limiter: 'mfaVerifyRateLimit', path: '/id/login/verify/' },
+  'login/verify/authenticator.tsx': { limiter: 'mfaVerifyRateLimit', path: '/id/login/verify/' },
+  'signup/index.tsx': { limiter: 'signupIpRateLimit', path: '/id/signup' },
+  'signup/password.tsx': { limiter: 'signupIpRateLimit', path: '/id/signup/password' },
+  'signup/method.tsx': { limiter: 'signupIpRateLimit', path: '/id/signup/method' },
+  'recover/index.tsx': { limiter: 'signupIpRateLimit', path: '/id/recover' },
+  'recover/complete.tsx': { limiter: 'signupIpRateLimit', path: '/id/recover/complete' },
+  'password/reset.tsx': { limiter: 'passwordResetRateLimit', path: '/id/password/reset' },
+  'setup/passkey.tsx': { limiter: 'mfaEnrollRateLimit', path: '/id/setup/' },
+  'setup/security-key.tsx': { limiter: 'mfaEnrollRateLimit', path: '/id/setup/' },
+  'setup/authenticator.tsx': { limiter: 'mfaEnrollRateLimit', path: '/id/setup/' },
+  'setup/email.tsx': { limiter: 'mfaEnrollRateLimit', path: '/id/setup/' },
+  'setup/sms.tsx': { limiter: 'mfaEnrollRateLimit', path: '/id/setup/' },
+  'setup/mfa.tsx': { limiter: 'mfaEnrollRateLimit', path: '/id/setup/' },
+  'sso/ldap.tsx': { limiter: 'ldapRateLimit', path: '/id/sso/ldap' },
+  'verify/index.tsx': { limiter: 'verifyEmailSendRateLimit', path: '/id/verify' },
+  'accounts.tsx': { limiter: 'accountsRateLimit', path: '/id/accounts' },
+  'passkeys.tsx': { limiter: 'passkeysRateLimit', path: '/id/passkeys' },
+  'reauth.tsx': { limiter: 'reauthRateLimit', path: '/id/reauth' },
+  'device/index.tsx': { limiter: 'deviceCodeRateLimit', path: '/id/device' },
+  'device/authorize.tsx': { limiter: 'deviceCodeRateLimit', path: '/id/device/authorize' },
+};
+
+/**
+ * POST routes deliberately left without a limiter. Every entry needs a reason a reviewer can
+ * check; "not done yet" entries name the follow-up so the gap stays visible.
+ */
+export const LIMITER_EXCUSED: Record<string, string> = {
+  'logout/index.tsx':
+    'CSRF-protected sign-out of the caller’s own cookie sessions; nothing to guess or enumerate',
+  'password/change.tsx':
+    'requires a live signed session cookie; follow-up: add a session-class limiter',
+  'password/new.tsx':
+    'the reset code is Zitadel-issued and attempt-limited provider-side; follow-up: ip ceiling',
+  'sso/index.tsx':
+    'CSRF-protected; unlink is session-gated, start only mints an IdP intent; ' +
+    'follow-up: ip ceiling on intent minting',
+};
+
+/**
+ * Pure limiter-inventory check (exported so the harness can feed it a synthetic route list and
+ * prove the scan FAILS on an uncovered POST). `rateLimitSrc` / `serverSrc` are the source texts
+ * of app/server/middleware/rate-limit.ts and app/server.ts.
+ */
+export function checkLimiterCoverage(
+  actionRouteKeys: string[],
+  rateLimitSrc: string,
+  serverSrc: string,
+  limited: Record<string, LimiterClaim> = LIMITED_ACTION_ROUTES,
+  excused: Record<string, string> = LIMITER_EXCUSED
+): RouteCoverageEntry[] {
+  return actionRouteKeys.map((key): RouteCoverageEntry => {
+    const claim = limited[key];
+    if (claim) {
+      const exported = new RegExp(`export const ${escapeRegex(claim.limiter)}\\b`).test(
+        rateLimitSrc
+      );
+      const mounted = serverSrc.includes(`app.use('*', ${claim.limiter});`);
+      const pathNamed = rateLimitSrc.includes(`'${claim.path}'`);
+      if (exported && mounted && pathNamed) return { key, ok: true };
+      return {
+        key,
+        ok: false,
+        reason:
+          `${key} claims ${claim.limiter} on ${claim.path}, but ` +
+          [
+            exported ? '' : 'rate-limit.ts does not export it',
+            mounted ? '' : 'server.ts does not mount it',
+            pathNamed ? '' : 'rate-limit.ts never names that path',
+          ]
+            .filter(Boolean)
+            .join('; '),
+      };
+    }
+    const why = excused[key];
+    if (why) return { key, ok: true, reason: `excused: ${why}` };
+    return {
+      key,
+      ok: false,
+      reason:
+        `${key} exports an action (POST) but no rate limiter claims it — add a limiter ` +
+        `and list it in LIMITED_ACTION_ROUTES, or excuse it in LIMITER_EXCUSED with a reason`,
+    };
+  });
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -427,6 +542,7 @@ export function runAuditCoverage(): AuditCoverageResult {
   // ---- 1. Route coverage -----------------------------------------------
   const routeCoverage: RouteCoverageEntry[] = [];
   const files = routeFiles();
+  const actionRouteKeys: string[] = [];
 
   for (const filePath of files) {
     const key = routeKey(filePath);
@@ -439,6 +555,7 @@ export function runAuditCoverage(): AuditCoverageResult {
       // No action export — skip.
       continue;
     }
+    actionRouteKeys.push(key);
 
     if (EXCUSED_ACTIONS[key]) {
       routeCoverage.push({ key, ok: true, reason: `excused: ${EXCUSED_ACTIONS[key]}` });
@@ -477,6 +594,13 @@ export function runAuditCoverage(): AuditCoverageResult {
       });
     }
   }
+
+  // ---- 1b. Limiter coverage ---------------------------------------------
+  const limiterCoverage = checkLimiterCoverage(
+    actionRouteKeys,
+    readFile(join(MIDDLEWARE_DIR, 'rate-limit.ts')),
+    readFile(join(process.cwd(), 'app/server.ts'))
+  );
 
   // ---- 2. Event-name registry ------------------------------------------
   const all = allRouteText();
@@ -558,5 +682,5 @@ export function runAuditCoverage(): AuditCoverageResult {
     }
   }
 
-  return { routeCoverage, missingEvents, piiOffenders };
+  return { routeCoverage, limiterCoverage, missingEvents, piiOffenders };
 }

@@ -4,6 +4,7 @@
  * Runs the static-analysis scanner entirely in Node via cy.task('auditCoverage')
  * and asserts the three governance guarantees:
  *   1. Every audited route has logAuthEvent coverage (inline or via delegated factory).
+ *   1b. Every POST (action) route is counted by a mounted rate limiter, or excused with a reason.
  *   2. Every REQUIRED_EVENTS name is emitted at a logAuthEvent call site.
  *   3. No logAuthEvent call passes raw PII (loginName / email object keys).
  *
@@ -19,6 +20,8 @@ describe('Auth-event audit coverage (governance)', () => {
     cy.task<AuditCoverageResult>('auditCoverage').then((r) => {
       const failedRoutes = r.routeCoverage.filter((x: RouteCoverageEntry) => !x.ok);
       expect(failedRoutes, JSON.stringify(failedRoutes)).to.have.length(0);
+      const unthrottled = r.limiterCoverage.filter((x: RouteCoverageEntry) => !x.ok);
+      expect(unthrottled, JSON.stringify(unthrottled)).to.have.length(0);
       expect(r.missingEvents, r.missingEvents.join(', ')).to.have.length(0);
       expect(r.piiOffenders, r.piiOffenders.join('\n')).to.have.length(0);
     });

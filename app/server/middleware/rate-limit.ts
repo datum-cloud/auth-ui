@@ -422,3 +422,36 @@ export const loginMethodIntentIpRateLimit: MiddlewareHandler = createRateLimit({
   key: (_c, ip) => ip,
   logFields: (c, ip, pathname) => ({ ip, path: pathname, tier: 'ip' }),
 });
+
+// One shared limiter for the device authorization grant (RFC 8628): 10 attempts / 5 min per ip,
+// the same class as mfaVerifyLimiter. RFC 8628 §5.1 calls for rate-limiting user-code entry,
+// because the code is short and human-typable: POST /id/device resolves `provider.getDeviceAuth`
+// on every submit and answers a known code differently from an unknown one, so without a limiter
+// a script could guess codes as fast as the wire allows.
+//
+// Three surfaces resolve a code and share this one budget:
+//   • POST /id/device                        — the code-entry form.
+//   • GET  /id/device/authorize?user_code=X  — the consent loader resolves X the same way. A GET
+//     without a user_code only redirects to /id/device and is not counted.
+//   • POST /id/device/authorize              — the decision. A sessionless deny is allowed by
+//     design, so an unthrottled POST would let a guesser revoke other people's pending devices.
+// A real activation spends 3 (enter, consent, decide), or 4 with a sign-in detour, so a typo or
+// two still fits.
+// BODY-STREAM HAZARD: the code and deviceAuthId are in the POST body — key is ip-only.
+const deviceCodeLimiter = new RateLimiter({ limit: 10, windowMs: 5 * 60_000 });
+
+export const deviceCodeRateLimit: MiddlewareHandler = createRateLimit({
+  limiter: deviceCodeLimiter,
+  match: (c, pathname) => {
+    if (c.req.method === 'POST') {
+      return pathname === '/id/device' || pathname === '/id/device/authorize';
+    }
+    return (
+      c.req.method === 'GET' &&
+      pathname === '/id/device/authorize' &&
+      (new URL(c.req.url).searchParams.get('user_code') ?? '') !== ''
+    );
+  },
+  key: (_c, ip) => ip,
+  logFields: (_c, ip, pathname) => ({ ip, path: pathname }),
+});

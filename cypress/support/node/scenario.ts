@@ -841,7 +841,13 @@ export interface Scenario {
     | 'passwordIpCeiling' // 31 password POSTs, rotating ?loginName → 30 pass, 31st 429 (ip tier)
     | 'signupIpCeiling' // 21 signup POSTs, rotating ?loginName → 20 pass, 21st 429 (ip tier)
     | 'passwordTightTierStillPerAccount' // one loginName still stops at 5 with both tiers mounted
-    | 'serverMountsHardeningLimiters'; // app/server.ts mounts the new ip-only tiers
+    | 'serverMountsHardeningLimiters' // app/server.ts mounts the new ip-only tiers
+    // device-code-rate-limit.cy.ts
+    | 'deviceCodeBlocked' // 10 device-code hits across the 3 surfaces pass, the 11th 429s
+    | 'deviceCodeBareGetNoConsume' // GETs without a user_code never count
+    // audit-limiter-inventory.cy.ts
+    | 'limiterInventoryLive' // every real POST route is throttled or excused
+    | 'limiterInventoryNegative'; // an unclaimed or unmounted POST route fails the scan
 }
 
 /** A parsed logAuthEvent JSON line: { event, outcome, ...fields }. */

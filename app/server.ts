@@ -19,6 +19,7 @@ import {
   loginMethodIntentRateLimit,
   loginMethodIntentIpRateLimit,
   loginIdentifierRateLimit,
+  deviceCodeRateLimit,
 } from '@/server/middleware/rate-limit';
 import { requestContext, type RequestContextEnv } from '@/server/middleware/request-context';
 import { appSecureHeaders, resolveFrameAncestors } from '@/server/middleware/secure-headers';
@@ -159,6 +160,8 @@ export default await createHonoServer<RequestContextEnv>({
     // see the two-tier rationale in rate-limit.ts.
     app.use('*', loginMethodIntentRateLimit);
     app.use('*', loginMethodIntentIpRateLimit);
+    // RFC 8628 §5.1: user-code entry, the consent loader and the decision share one budget.
+    app.use('*', deviceCodeRateLimit);
     app.get('/healthz', (c) => c.json({ status: 'ok' }));
     app.get('/readyz', (c) => c.json({ status: 'ready' }));
     app.get('/id/version', (c) => {

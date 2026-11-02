@@ -3641,6 +3641,70 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
               passwordIp: mounted('loginPasswordIpRateLimit'),
               signupIp: mounted('signupIpRateLimit'),
             };
+          } else if (op === 'deviceCodeBlocked' || op === 'deviceCodeBareGetNoConsume') {
+            // device-code-rate-limit.cy.ts: RFC 8628 §5.1 user-code guessing.
+            const app = new Hono();
+            app.use('*', rl.deviceCodeRateLimit);
+            app.all('/id/device', (c) => c.json({ ok: true }, 200));
+            app.all('/id/device/authorize', (c) => c.json({ ok: true }, 200));
+            const hd = {
+              'x-forwarded-for': `1.2.3.4, ${op === 'deviceCodeBlocked' ? '10.9.1.1' : '10.9.1.2'}`,
+            };
+            const hit = async (method: string, path: string) => {
+              nowMs += 10;
+              return app.request(new Request(`http://app${path}`, { method, headers: hd }));
+            };
+            if (op === 'deviceCodeBlocked') {
+              const statuses: number[] = [];
+              // The three surfaces share one budget: 8 code-entry POSTs, a consent GET, a decision.
+              for (let i = 0; i < 8; i++) statuses.push((await hit('POST', '/id/device')).status);
+              statuses.push((await hit('GET', '/id/device/authorize?user_code=WDJB-MJHT')).status);
+              statuses.push((await hit('POST', '/id/device/authorize')).status);
+              const blocked = await hit('POST', '/id/device');
+              const blockedGet = await hit('GET', '/id/device/authorize?user_code=AAAA-BBBB');
+              const dataVariant = await hit('POST', '/id/device.data');
+              outcome = {
+                underLimitPassed: statuses.every((st) => st === 200),
+                blockedStatus: blocked.status,
+                retryAfter: blocked.headers.get('Retry-After') ?? undefined,
+                blockedGetStatus: blockedGet.status,
+                dataVariantStatus: dataVariant.status,
+              };
+            } else {
+              // Rendering the forms (no code) must never spend anyone's budget.
+              for (let i = 0; i < 15; i++) {
+                await hit('GET', '/id/device');
+                await hit('GET', '/id/device/authorize');
+              }
+              const post = await hit('POST', '/id/device');
+              outcome = { postStatus: post.status };
+            }
+          } else if (op === 'limiterInventoryLive' || op === 'limiterInventoryNegative') {
+            // audit-limiter-inventory.cy.ts: the POST-route limiter inventory in audit-coverage.ts.
+            const inv = await import('../audit-coverage');
+            if (op === 'limiterInventoryLive') {
+              const r = inv.runAuditCoverage();
+              outcome = {
+                failures: r.limiterCoverage.filter((e) => !e.ok),
+                deviceIndex: r.limiterCoverage.find((e) => e.key === 'device/index.tsx'),
+                deviceAuthorize: r.limiterCoverage.find((e) => e.key === 'device/authorize.tsx'),
+                count: r.limiterCoverage.length,
+              };
+            } else {
+              const rlSrc = readFileSync(
+                join(process.cwd(), 'app/server/middleware/rate-limit.ts'),
+                'utf-8'
+              );
+              const serverSrc = readFileSync(join(process.cwd(), 'app/server.ts'), 'utf-8');
+              // A brand-new POST route nobody claimed, and device/index with its mount removed.
+              const unclaimed = inv.checkLimiterCoverage(['brand-new.tsx'], rlSrc, serverSrc);
+              const unmounted = inv.checkLimiterCoverage(
+                ['device/index.tsx'],
+                rlSrc,
+                serverSrc.replace("app.use('*', deviceCodeRateLimit);", '')
+              );
+              outcome = { unclaimed: unclaimed[0], unmounted: unmounted[0] };
+            }
           } else {
             throw new Error(`unknown hardeningOp: ${String(op)}`);
           }
