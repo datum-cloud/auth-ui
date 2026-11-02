@@ -3539,6 +3539,22 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
         break;
       }
 
+      // cypress/component/server/hash-actor.cy.ts: recompute the keyed pseudonym independently.
+      case 'hashActorKeyedCheck': {
+        const { createHash, createHmac, hkdfSync } = await import('node:crypto');
+        const input = 'alice@example.com';
+        const key = Buffer.from(
+          hkdfSync('sha256', process.env.SESSION_SECRET ?? '', '', 'auth-ui/audit-actor/v1', 32)
+        );
+        const h = hashActor(input);
+        outcome = {
+          matchesKeyedHmac:
+            h === createHmac('sha256', key).update(input).digest('hex').slice(0, 16),
+          differsFromSha256: h !== createHash('sha256').update(input).digest('hex').slice(0, 16),
+        };
+        break;
+      }
+
       default: {
         const exhaustive: never = s.fn;
         throw new Error(`unknown service fn: ${String(exhaustive)}`);

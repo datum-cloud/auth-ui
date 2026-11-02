@@ -59,6 +59,24 @@ The store is pluggable (`app/server/middleware/rate-limit-store.ts`), but only o
 
 A bare `*` is rejected outright: a wildcard `frame-ancestors` defeats the protection entirely. The default is `'none'`: the auth UI is not embeddable unless an environment explicitly opts in.
 
+## Analytics on auth pages
+
+Rybbit (`https://app.rybbit.io/api/script.js`) is the only third-party analytics script. It is unversioned, so SRI cannot pin it, and it carries the CSP nonce, so it runs with full `'strict-dynamic'` trust. To keep it away from password, OTP and passkey fields, `RouteGatedRybbitAnalytics` in `app/modules/analytics/rybbit.tsx` renders it only on the allowlist in `app/modules/analytics/analytics-routes.ts`:
+
+- `/id/signed-in`
+- `/id/logout/success`
+- `/id/verify/success`
+
+Every other route ships no analytics script. That covers all login, signup, password, setup, recover, reauth, device and SSO screens, and `/signup/success`, which runs a passkey sign-in ceremony. An allowlisted page whose URL carries `loginName` or `email` (for example `/verify/success?loginName=…`) also ships none, because Rybbit records the query string with every pageview and event.
+
+The tag is `async` so React 19 also loads it when one of these pages is reached by a client-side navigation. The page's own mount effects can run before the script has loaded, so `trackAuthEvent`, `identifyUser` and `clearIdentifiedUser` wait for the tag's `load` event when `window.rybbit` is not there yet.
+
+A browser that has loaded the script keeps it in memory if it then navigates client-side to another page (for example from `/logout/success` back to `/login`); only a full page load removes it. The tag's `data-skip-patterns` stops the script from sending pageviews or events for any page outside the allowlist, but the code itself still runs there.
+
+No email or login name goes to Rybbit from this app's code. `/signed-in` calls `identifyUser(userId)` with the opaque user id only, and `RybbitUserTraits` no longer accepts an `email` trait. The server-side `trackServerEvent` (signup) sends the user id and a channel, nothing else. `/signed-in` and `/verify/success` show the email as page text, so Rybbit session replay, copy tracking and button-click tracking must stay off in the Rybbit site settings.
+
+MaxMind `device.js` on the signup screens is separate and intentional; see [Fraud Signals](#fraud-signals).
+
 ## Trusted Forwarding
 
 `x-zitadel-forward-host` decides where the service-user token is sent, so an external caller controlling it is an SSRF. The header is honoured **only** when its value appears in `ZITADEL_TRUSTED_FORWARD_HOSTS`, a fail-closed, comma-separated allowlist parsed in `app/server/infra/env.server.ts` and enforced in `app/server/composition.ts` before the value ever reaches the Zitadel transport. Unset means no forward host is trusted.

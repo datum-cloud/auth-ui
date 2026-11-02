@@ -57,6 +57,19 @@ The registry is exposed at `/metrics`. That endpoint is intentionally unauthenti
 `HTTPRoute` never exposes it externally, so it is reachable cluster-internally only. Do not add
 app-level auth there without a matching gateway-policy decision; scraping breaks otherwise.
 
+## Audit log actor
+
+Audit lines from `logAuthEvent` never carry a login name or email. Before a user id is known, the
+`actor` field holds `hashActor(loginName)`: a correlation-only pseudonym, keyed. It is an
+HMAC-SHA256 under a key derived from `SESSION_SECRET` with HKDF (info `auth-ui/audit-actor/v1`),
+truncated to 16 hex chars. Without the secret, someone holding the logs cannot confirm a guessed
+address by hashing it.
+
+The key follows `SESSION_SECRET`, so **every `actor` value changes when the secret rotates**. The
+same person gets a different `actor` before and after a rotation (and across environments with
+different secrets). Grafana panels, Loki queries or alerts that group or join on `actor` must
+expect that break; correlate across a rotation by `userId` where the line has one.
+
 ## Scraping and alerts
 
 ```

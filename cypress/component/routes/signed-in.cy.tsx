@@ -34,6 +34,11 @@ function mountSignedIn(loginName: string | null = 'mia@acme.test') {
 }
 
 describe('/signed-in — identity + switch-account link + sign-out', () => {
+  // The identify test installs a window.rybbit stub; keep it out of the other tests.
+  afterEach(() => {
+    window.rybbit = undefined;
+  });
+
   it('renders the signed-in identity with a Not you? link and a Sign out form posting to ?index', () => {
     mountSignedIn();
     cy.contains('You are signed in as').should('be.visible');
@@ -43,5 +48,23 @@ describe('/signed-in — identity + switch-account link + sign-out', () => {
 
     mountSignedIn(null);
     cy.contains('You are signed in as').should('not.exist');
+  });
+
+  it('identifies the user to Rybbit by user id only, never with the login name', () => {
+    const calls: unknown[][] = [];
+    window.rybbit = {
+      event: () => {},
+      identify: (...args: unknown[]) => {
+        calls.push(args);
+      },
+      clearUserId: () => {},
+      pageview: () => {},
+    };
+    mountSignedIn('mia@acme.test');
+    cy.contains('You are signed in as').should('be.visible');
+    cy.then(() => {
+      expect(calls).to.deep.equal([['u1']]);
+      expect(JSON.stringify(calls)).not.to.contain('mia@acme.test');
+    });
   });
 });

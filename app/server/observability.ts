@@ -1,7 +1,8 @@
+import { env } from '@/server/infra/env.server';
 import { getTraceId } from '@/server/middleware/request-context';
 import type { MiddlewareHandler } from 'hono';
 import { routePath } from 'hono/route';
-import { createHash } from 'node:crypto';
+import { createHmac, hkdfSync } from 'node:crypto';
 import { Registry, collectDefaultMetrics, Counter, Histogram } from 'prom-client';
 
 export const registry = new Registry();
@@ -55,11 +56,18 @@ export const httpMetrics: MiddlewareHandler = async (c, next) => {
 
 // Audit actorRef pseudonymization. Audit logs must never carry a raw loginName or
 // email. Callers pass hashActor(loginName) at the identifier stage and the resolved userId
-// once available. Truncated SHA-256 (first 16 hex chars) is collision-safe for audit
-// correlation and non-reversible. Empty input → '' (no actor identified yet).
+// once available. Correlation-only pseudonym, keyed: HMAC-SHA256 under a key derived from
+// SESSION_SECRET (HKDF, info 'auth-ui/audit-actor/v1'), truncated to 16 hex chars. An unkeyed
+// hash of an email can be reversed by hashing a list of candidate addresses; the key stops that
+// for anyone who has the logs but not the secret. Rotating SESSION_SECRET changes every
+// pseudonym, so correlation does not survive a rotation. Empty input → '' (no actor identified yet).
+const AUDIT_ACTOR_KEY = Buffer.from(
+  hkdfSync('sha256', env.SESSION_SECRET, '', 'auth-ui/audit-actor/v1', 32)
+);
+
 export function hashActor(loginName: string): string {
   if (!loginName) return '';
-  return createHash('sha256').update(loginName).digest('hex').slice(0, 16);
+  return createHmac('sha256', AUDIT_ACTOR_KEY).update(loginName).digest('hex').slice(0, 16);
 }
 
 // Injectable logger keeps the helper deterministic and unit-testable (default = console.log).
