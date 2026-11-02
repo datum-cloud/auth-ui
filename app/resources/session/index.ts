@@ -13,5 +13,6 @@ export {
   performLogout,
   logoutOutcomeToResponse,
   completeOidcLogout,
+  validatePostLogoutRedirect,
 } from './session.service';
 export type { SignedInConfig } from './session.service';
