@@ -351,7 +351,9 @@ export type ServiceFn =
   | 'passwordResetAction'
   | 'setupAuthenticatorLoader'
   | 'verifyIndexLoader'
-  | 'verifyIndexAction';
+  | 'verifyIndexAction'
+  // cypress/component/server/hash-actor.cy.ts: hashActor is the keyed HMAC, not plain sha256.
+  | 'hashActorKeyedCheck';
 
 export type SessionResultScript =
   | { mode: 'null' }
