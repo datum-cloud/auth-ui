@@ -24,4 +24,36 @@ describe('sessions cookie scope after sign-in', () => {
     });
     cy.getCookie('sessions').should('have.property', 'path', '/id');
   });
+
+  it('a browser holding the old Path=/ cookie drops it on sign-in', () => {
+    cy.setCookie('sessions', 'legacy-root-value', { path: '/' });
+    cy.getCookies().should((all) => {
+      expect(all.filter((c) => c.name === 'sessions' && c.path === '/')).to.have.length(1);
+    });
+    // Submit from the page with the browser's own fetch, so the browser (not cy.request's cookie
+    // automation) applies both Set-Cookie headers exactly as it would for a real user.
+    cy.visit('/id/login');
+    cy.document().then((doc) => {
+      const csrf = doc.querySelector<HTMLInputElement>('input[name="csrf"]')?.value ?? '';
+      expect(csrf, 'the login page carries a csrf token').to.not.equal('');
+      cy.window()
+        .then((win) =>
+          win.fetch('/id/login.data?index', {
+            method: 'POST',
+            credentials: 'same-origin',
+            redirect: 'manual',
+            body: new URLSearchParams({ csrf, loginName: 'alice@acme.test' }),
+          })
+        )
+        .its('status')
+        .should('be.lessThan', 400);
+    });
+    cy.getCookies().should((all) => {
+      const sessions = all.filter((c) => c.name === 'sessions');
+      expect(
+        sessions.map((c) => c.path),
+        'only the /id cookie remains'
+      ).to.deep.equal(['/id']);
+    });
+  });
 });
