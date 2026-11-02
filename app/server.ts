@@ -3,7 +3,9 @@ import { env } from '@/server/infra/env.server';
 import { publicOrigin } from '@/server/middleware/public-origin';
 import {
   loginPasswordRateLimit,
+  loginPasswordIpRateLimit,
   signupRateLimit,
+  signupIpRateLimit,
   passwordResetRateLimit,
   mfaVerifyRateLimit,
   ldapRateLimit,
@@ -137,8 +139,12 @@ export default await createHonoServer<RequestContextEnv>({
     // The identifier submit is what hands out the ceremony session /id/login/method's gate
     // demands, so it needs its own ceiling — see the rationale in rate-limit.ts.
     app.use('*', loginIdentifierRateLimit);
+    // Password and signup are two-tier like the chooser GET below: the ip|loginName tier reads
+    // loginName from the query string, so the ip-only ceiling is what bounds a rotating query.
     app.use('*', loginPasswordRateLimit);
+    app.use('*', loginPasswordIpRateLimit);
     app.use('*', signupRateLimit);
+    app.use('*', signupIpRateLimit);
     app.use('*', passwordResetRateLimit);
     app.use('*', mfaVerifyRateLimit);
     app.use('*', ldapRateLimit);

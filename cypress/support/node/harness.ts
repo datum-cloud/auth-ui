@@ -3555,6 +3555,101 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
         break;
       }
 
+      // ── auth-endpoint hardening (#187) — used by cypress/component/server/middleware/rate-limit-hardening.cy.ts
+      // and the other hardening specs. Appended as one contiguous block; each op names its spec.
+      case 'hardeningCheck': {
+        const op = s.hardeningOp;
+        if (!op) throw new Error('hardeningCheck requires hardeningOp');
+        const rl = await import('@/server/middleware/rate-limit');
+        let nowMs = 2_000_000;
+        const origDateNow = Date.now;
+        Date.now = () => nowMs;
+        try {
+          // rate-limit-hardening.cy.ts: POST `count` times, rotating ?loginName each time, through
+          // BOTH tiers mounted exactly as server.ts mounts them.
+          const rotate = async (
+            tiers: import('hono').MiddlewareHandler[],
+            path: string,
+            ip: string,
+            count: number
+          ): Promise<{ statuses: number[]; last: Response }> => {
+            const app = new Hono();
+            for (const t of tiers) app.use('*', t);
+            app.all(path, (c) => c.json({ ok: true }, 200));
+            const hd = { 'x-forwarded-for': `1.2.3.4, ${ip}` };
+            const statuses: number[] = [];
+            let last = new Response(null);
+            for (let i = 0; i < count; i++) {
+              nowMs += 10;
+              last = await app.request(
+                new Request(`http://app${path}?loginName=victim${i}%40acme.test`, {
+                  method: 'POST',
+                  headers: hd,
+                })
+              );
+              statuses.push(last.status);
+            }
+            return { statuses, last };
+          };
+          if (op === 'passwordIpCeiling') {
+            const { statuses, last } = await rotate(
+              [rl.loginPasswordRateLimit, rl.loginPasswordIpRateLimit],
+              '/id/login/password',
+              '10.9.0.1',
+              31
+            );
+            outcome = {
+              underCeilingPassed: statuses.slice(0, 30).every((st) => st === 200),
+              blockedStatus: last.status,
+              retryAfter: last.headers.get('Retry-After') ?? undefined,
+            };
+          } else if (op === 'signupIpCeiling') {
+            const { statuses, last } = await rotate(
+              [rl.signupRateLimit, rl.signupIpRateLimit],
+              '/id/signup/password',
+              '10.9.0.2',
+              21
+            );
+            outcome = {
+              underCeilingPassed: statuses.slice(0, 20).every((st) => st === 200),
+              blockedStatus: last.status,
+              retryAfter: last.headers.get('Retry-After') ?? undefined,
+            };
+          } else if (op === 'passwordTightTierStillPerAccount') {
+            // The ceiling must not loosen the per-account tier: one loginName still stops at 5.
+            const app = new Hono();
+            app.use('*', rl.loginPasswordRateLimit);
+            app.use('*', rl.loginPasswordIpRateLimit);
+            app.all('/id/login/password', (c) => c.json({ ok: true }, 200));
+            const hd = { 'x-forwarded-for': '1.2.3.4, 10.9.0.3' };
+            const statuses: number[] = [];
+            for (let i = 0; i < 6; i++) {
+              nowMs += 10;
+              const r = await app.request(
+                new Request('http://app/id/login/password?loginName=alice', {
+                  method: 'POST',
+                  headers: hd,
+                })
+              );
+              statuses.push(r.status);
+            }
+            outcome = { statuses };
+          } else if (op === 'serverMountsHardeningLimiters') {
+            const src = readFileSync(join(process.cwd(), 'app/server.ts'), 'utf-8');
+            const mounted = (name: string) => src.includes(`app.use('*', ${name});`);
+            outcome = {
+              passwordIp: mounted('loginPasswordIpRateLimit'),
+              signupIp: mounted('signupIpRateLimit'),
+            };
+          } else {
+            throw new Error(`unknown hardeningOp: ${String(op)}`);
+          }
+        } finally {
+          Date.now = origDateNow;
+        }
+        break;
+      }
+
       default: {
         const exhaustive: never = s.fn;
         throw new Error(`unknown service fn: ${String(exhaustive)}`);

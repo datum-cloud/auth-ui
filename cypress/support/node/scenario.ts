@@ -353,7 +353,9 @@ export type ServiceFn =
   | 'verifyIndexLoader'
   | 'verifyIndexAction'
   // cypress/component/server/hash-actor.cy.ts: hashActor is the keyed HMAC, not plain sha256.
-  | 'hashActorKeyedCheck';
+  | 'hashActorKeyedCheck'
+  // auth-endpoint hardening (#187) — rate-limit-hardening.cy.ts and sibling hardening specs
+  | 'hardeningCheck';
 
 export type SessionResultScript =
   | { mode: 'null' }
@@ -833,6 +835,13 @@ export interface Scenario {
   /** Unsets PUBLIC_ORIGIN for one call to exercise the hostname-check skip. Unreachable in a
    *  real boot (env.server refuses it), so this only proves the fallback branch behaves. */
   recaptchaSkipPublicOrigin?: boolean;
+
+  // ── auth-endpoint hardening (#187) (fn: 'hardeningCheck') — rate-limit-hardening.cy.ts ──
+  hardeningOp?:
+    | 'passwordIpCeiling' // 31 password POSTs, rotating ?loginName → 30 pass, 31st 429 (ip tier)
+    | 'signupIpCeiling' // 21 signup POSTs, rotating ?loginName → 20 pass, 21st 429 (ip tier)
+    | 'passwordTightTierStillPerAccount' // one loginName still stops at 5 with both tiers mounted
+    | 'serverMountsHardeningLimiters'; // app/server.ts mounts the new ip-only tiers
 }
 
 /** A parsed logAuthEvent JSON line: { event, outcome, ...fields }. */
