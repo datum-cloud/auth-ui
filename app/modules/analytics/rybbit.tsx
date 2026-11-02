@@ -1,4 +1,4 @@
-import { isAnalyticsRoute } from '@/modules/analytics/analytics-routes';
+import { isAnalyticsRoute, rybbitSkipPatterns } from '@/modules/analytics/analytics-routes';
 import { useEffect } from 'react';
 import { useLocation } from 'react-router';
 
@@ -30,6 +30,9 @@ export interface RybbitUserTraits {
  * (see identifyUser below) — both this app and cloud-portal report to the same Rybbit site, and
  * Rybbit's identify() is per-origin, so each app calls it once it knows the user.
  * Deferred (server-redirect flows, no terminal render): password_changed, mfa_enrolled.
+ * Inert since the route gate (analytics-routes.ts): password_reset_requested and the client-side
+ * signup_submitted render on /password/reset and /signup/password, which never load the script.
+ * Password and IdP signup still send signup_submitted server-side (rybbit.server.ts).
  */
 export type AuthEventName =
   | 'signup_submitted'
@@ -47,13 +50,39 @@ export function resolveRybbitSiteId(siteId: string | undefined): string | undefi
   return siteId || undefined;
 }
 
+const RYBBIT_SCRIPT_SRC = 'https://app.rybbit.io/api/script.js';
+
+type RybbitApi = NonNullable<Window['rybbit']>;
+
+/**
+ * Runs `call` against window.rybbit now, or once the gated script tag has loaded. The tag first
+ * appears when an allowlisted page renders, so on a client-side navigation into that page (or a
+ * slow full load) the page's mount effects run before the script has defined window.rybbit.
+ * The script installs its own call queue as soon as it executes, so waiting for the tag's load
+ * event is enough. No tag on the page (no site id, or a route the gate blocks) drops the call.
+ */
+function withRybbit(call: (api: RybbitApi) => void): void {
+  if (typeof window === 'undefined') return;
+  if (window.rybbit) {
+    call(window.rybbit);
+    return;
+  }
+  const tag = document.querySelector<HTMLScriptElement>(`script[src="${RYBBIT_SCRIPT_SRC}"]`);
+  tag?.addEventListener(
+    'load',
+    () => {
+      if (window.rybbit) call(window.rybbit);
+    },
+    { once: true }
+  );
+}
+
 /**
  * Thin wrapper over window.rybbit.event. Safe to call even when the Rybbit script never
- * loaded (no siteId) — no-ops until the script tag has run.
+ * loaded (no siteId); waits for the tag if it is still loading (see withRybbit).
  */
 export function trackAuthEvent(name: AuthEventName): void {
-  if (typeof window === 'undefined') return;
-  window.rybbit?.event(name);
+  withRybbit((rybbit) => rybbit.event(name));
 }
 
 /**
@@ -62,12 +91,13 @@ export function trackAuthEvent(name: AuthEventName): void {
  * user id only; traits stay optional and must never carry the email (see RybbitUserTraits).
  */
 export function identifyUser(userId: string, traits?: RybbitUserTraits): void {
-  if (typeof window === 'undefined') return;
-  if (traits) {
-    window.rybbit?.identify(userId, traits);
-  } else {
-    window.rybbit?.identify(userId);
-  }
+  withRybbit((rybbit) => {
+    if (traits) {
+      rybbit.identify(userId, traits);
+    } else {
+      rybbit.identify(userId);
+    }
+  });
 }
 
 /**
@@ -75,8 +105,7 @@ export function identifyUser(userId: string, traits?: RybbitUserTraits): void {
  * events to the previous user after logout. Call once, on the terminal logout page.
  */
 export function clearIdentifiedUser(): void {
-  if (typeof window === 'undefined') return;
-  window.rybbit?.clearUserId();
+  withRybbit((rybbit) => rybbit.clearUserId());
 }
 
 interface RybbitAnalyticsProps {
@@ -96,14 +125,18 @@ interface RybbitAnalyticsProps {
  * `async`, not `defer`: React 19 treats `<script async src>` as a resource and loads it even when
  * the tag first appears on a client-side navigation (e.g. the redirect into /signed-in). A plain
  * script element inserted by React on the client never executes.
+ *
+ * `data-skip-patterns` makes the loaded script drop pageviews and events on every page outside
+ * the allowlist, since it keeps auto-tracking client-side navigations after it loads.
  */
 export function RybbitAnalytics({ siteId, tag, nonce }: RybbitAnalyticsProps) {
   if (!siteId) return null;
   return (
     <script
-      src="https://app.rybbit.io/api/script.js"
+      src={RYBBIT_SCRIPT_SRC}
       data-site-id={siteId}
       data-tag={tag}
+      data-skip-patterns={rybbitSkipPatterns()}
       nonce={nonce}
       async
     />
@@ -112,11 +145,12 @@ export function RybbitAnalytics({ siteId, tag, nonce }: RybbitAnalyticsProps) {
 
 /**
  * RybbitAnalytics for the current route only when isAnalyticsRoute allows it. Credential pages
- * (login, signup forms, password, setup, recover, ...) never load the third-party script.
+ * (login, signup forms, password, setup, recover, ...) and URLs carrying the login name never
+ * load the third-party script.
  */
 export function RouteGatedRybbitAnalytics(props: RybbitAnalyticsProps) {
-  const { pathname } = useLocation();
-  if (!isAnalyticsRoute(pathname)) return null;
+  const { pathname, search } = useLocation();
+  if (!isAnalyticsRoute(pathname, search)) return null;
   return <RybbitAnalytics {...props} />;
 }
 

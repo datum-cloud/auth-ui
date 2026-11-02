@@ -34,6 +34,11 @@ function mountSignedIn(loginName: string | null = 'mia@acme.test') {
 }
 
 describe('/signed-in — identity + switch-account link + sign-out', () => {
+  // The identify test installs a window.rybbit stub; keep it out of the other tests.
+  afterEach(() => {
+    window.rybbit = undefined;
+  });
+
   it('renders the signed-in identity with a Not you? link and a Sign out form posting to ?index', () => {
     mountSignedIn();
     cy.contains('You are signed in as').should('be.visible');
