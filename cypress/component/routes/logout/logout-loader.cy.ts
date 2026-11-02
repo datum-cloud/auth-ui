@@ -41,6 +41,18 @@ describe('logout loader — logout_token GET', () => {
     });
   });
 
+  it('a logout_token with no sessions in the cookie redirects without a confirm click', () => {
+    callService({
+      fn: 'logoutLoader',
+      request: { url: `${BASE}?logout_token=garbage` },
+    }).then((v) => {
+      expect(v.error).to.be.undefined;
+      expect(v.response?.status).to.equal(302);
+      expect(v.response?.location).to.equal('/logout/success');
+      expect(v.response?.setCookie ?? '', 'no cookie is written').to.not.match(/^sessions=/);
+    });
+  });
+
   it('without a logout_token the GET is the plain confirm page', () => {
     callService({
       fn: 'logoutLoader',

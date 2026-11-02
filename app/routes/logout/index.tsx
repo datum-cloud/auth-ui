@@ -17,6 +17,7 @@ import { Button } from '@datum-cloud/datum-ui/button';
 import { Trans } from '@lingui/react/macro';
 import {
   data,
+  redirect,
   useLoaderData,
   type ActionFunctionArgs,
   type LoaderFunctionArgs,
@@ -40,11 +41,18 @@ export async function loader({ request }: LoaderFunctionArgs) {
     logAuthEvent('logout', 'failure', { reason: 'logout_token_unverified' });
   }
 
+  const sessions = await readSessions(request);
+  const postLogoutRedirect = endSessionAll ? validatePostLogoutRedirect(request) : null;
+  // Nothing to sign out of: skip the confirm click and go straight to the (allowlist-validated)
+  // destination, as the end_session handshake did before. No session state is touched.
+  if (endSessionAll && sessions.length === 0) {
+    return redirect(postLogoutRedirect ?? '/logout/success');
+  }
+
   const { csrfToken, headers } = await loaderCsrf(request);
   // Show which account is being signed out of, mirroring password/change.tsx's pattern.
   // Empty string (no active session) falls back to the generic confirm copy below.
-  const loginName = mostRecent(await readSessions(request))?.loginName ?? '';
-  const postLogoutRedirect = endSessionAll ? validatePostLogoutRedirect(request) : null;
+  const loginName = mostRecent(sessions)?.loginName ?? '';
   return data({ csrfToken, loginName, endSessionAll, postLogoutRedirect }, { headers });
 }
 

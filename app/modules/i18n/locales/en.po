@@ -92,7 +92,7 @@ msgstr "An account with this email already exists. Sign in to that account, then
 msgid "An account with this email already exists. Try signing in instead."
 msgstr "An account with this email already exists. Try signing in instead."
 
-#: app/routes/logout/index.tsx:95
+#: app/routes/logout/index.tsx:103
 msgid "Are you sure you want to sign out?"
 msgstr "Are you sure you want to sign out?"
 
@@ -775,12 +775,12 @@ msgstr "Sign in with your passkey"
 
 #: app/components/sign-out-button/sign-out-button.tsx:27
 #: app/components/sign-out-button/sign-out-button.tsx:31
-#: app/routes/logout/index.tsx:79
-#: app/routes/logout/index.tsx:90
+#: app/routes/logout/index.tsx:87
+#: app/routes/logout/index.tsx:98
 msgid "Sign out"
 msgstr "Sign out"
 
-#: app/routes/logout/index.tsx:93
+#: app/routes/logout/index.tsx:101
 msgid "Sign out of"
 msgstr "Sign out of"
 
