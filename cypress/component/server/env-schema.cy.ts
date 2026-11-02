@@ -51,6 +51,58 @@ describe('env schema — production Zitadel requirements (provider-gated)', () =
   });
 });
 
+// ── AUTH_PROVIDER=fake in production (explicit opt-in) ───────────────────────
+// The fake provider serves seeded accounts with known passwords. A stray AUTH_PROVIDER=fake in a
+// deployed Secret must fail boot; prod-mode fake runs (a11y, perf, load, e2e-fast) opt in.
+
+type Issue = { path: unknown[]; message: string };
+const hasAuthProviderIssue = (issues: unknown) =>
+  (issues as Issue[]).some((i) => i.path[0] === 'AUTH_PROVIDER');
+
+describe('env schema — AUTH_PROVIDER=fake in production (ALLOW_FAKE_PROVIDER_IN_PRODUCTION)', () => {
+  it('refuses the fake provider in production without the opt-in', () => {
+    callService({ fn: 'envSchemaFull', parseEnvRaw: { ...PROD, AUTH_PROVIDER: 'fake' } }).then(
+      (v) => {
+        expect(v.outcome.success).to.equal(false);
+        expect(hasAuthProviderIssue(v.outcome.issues)).to.equal(true);
+      }
+    );
+  });
+
+  it('accepts only the exact string "true" as the opt-in', () => {
+    callService({
+      fn: 'envSchemaFull',
+      parseEnvRaw: { ...PROD, AUTH_PROVIDER: 'fake', ALLOW_FAKE_PROVIDER_IN_PRODUCTION: '1' },
+    }).then((v) => {
+      expect(v.outcome.success).to.equal(false);
+      expect(hasAuthProviderIssue(v.outcome.issues)).to.equal(true);
+    });
+  });
+
+  it('boots the fake provider in production with the opt-in, still without Zitadel config', () => {
+    callService({
+      fn: 'envSchemaFull',
+      parseEnvRaw: { ...PROD, AUTH_PROVIDER: 'fake', ALLOW_FAKE_PROVIDER_IN_PRODUCTION: 'true' },
+    }).then((v) => {
+      expect(v.outcome.success).to.equal(true);
+      const data = v.outcome.data as Record<string, unknown>;
+      expect(data.AUTH_PROVIDER).to.equal('fake');
+      expect(data.ALLOW_FAKE_PROVIDER_IN_PRODUCTION).to.equal(true);
+    });
+  });
+
+  it('needs no opt-in outside production', () => {
+    callService({ fn: 'envSchemaFull', parseEnvRaw: { ...BASE, AUTH_PROVIDER: 'fake' } }).then(
+      (v) => {
+        expect(v.outcome.success).to.equal(true);
+        expect(
+          (v.outcome.data as Record<string, unknown>).ALLOW_FAKE_PROVIDER_IN_PRODUCTION
+        ).to.equal(false);
+      }
+    );
+  });
+});
+
 // ── PUBLIC_ORIGIN (anti Host-header injection) ────────────────────────────────
 // Representative test for the anti-Host-header-injection guard: rejecting the
 // deployment placeholder is the most load-bearing case (unique security logic,

@@ -14,7 +14,8 @@ The usual culprits, in order:
 | Message                                                                                           | Fix                                                                                                     |
 | ------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------- |
 | `SESSION_SECRET must be at least 32 characters`                                                   | Longer secret. `openssl rand -base64 32`.                                                               |
-| `ZITADEL_API_URL must be set in production`                                                       | Set it, or set `AUTH_PROVIDER=fake` if this is a fake-provider run.                                     |
+| `ZITADEL_API_URL must be set in production`                                                       | Set it. For a fake-provider run, set `AUTH_PROVIDER=fake` and `ALLOW_FAKE_PROVIDER_IN_PRODUCTION=true`.|
+| `AUTH_PROVIDER=fake is refused in production` | Unset `AUTH_PROVIDER` to use Zitadel. For a deliberate prod-mode fake run, set `ALLOW_FAKE_PROVIDER_IN_PRODUCTION=true`. |
 | `ZITADEL_SERVICE_USER_TOKEN must be set in production`                                            | Provision the service-user PAT in the `auth-ui` Secret.                                                 |
 | `PUBLIC_ORIGIN must be set in production`                                                         | Set the real public origin.                                                                             |
 | `PUBLIC_ORIGIN is still the deployment placeholder`                                               | `config/base/deployment.yaml` ships `https://REPLACE_ME.example`. Someone skipped the cutover step.     |

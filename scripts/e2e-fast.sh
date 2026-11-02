@@ -23,7 +23,8 @@ npm run build
 
 for spec in "${SPECS[@]}"; do
   echo "==> ${spec}"
-  AUTH_PROVIDER=fake PORT="${PORT}" PUBLIC_ORIGIN="${ORIGIN}" \
+  # `npm run start` sets NODE_ENV=production, where the fake provider needs an explicit opt-in.
+  AUTH_PROVIDER=fake ALLOW_FAKE_PROVIDER_IN_PRODUCTION=true PORT="${PORT}" PUBLIC_ORIGIN="${ORIGIN}" \
     npx --no-install start-server-and-test 'npm run start' "http-get://localhost:${PORT}/healthz" \
     "npx --no-install cypress run --browser chrome --config baseUrl=${ORIGIN} --spec ${spec}"
 done

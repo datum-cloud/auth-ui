@@ -17,6 +17,14 @@ const schema = z
     // (matches select.server / providerForRequest), so the Zitadel env requirements
     // below apply whenever this is unset or 'zitadel' — never for 'fake'.
     AUTH_PROVIDER: z.string().optional(),
+    // Opt-in for prod-mode fake-provider runs (a11y audit, perf, load, scripts/e2e-fast.sh).
+    // AUTH_PROVIDER=fake under NODE_ENV=production serves seeded test accounts with known
+    // passwords, so the superRefine below refuses it unless this is exactly 'true'. A stray
+    // AUTH_PROVIDER=fake in a deployed Secret then fails boot instead of going live.
+    ALLOW_FAKE_PROVIDER_IN_PRODUCTION: z
+      .string()
+      .optional()
+      .transform((v) => v === 'true'),
     NODE_ENV: z.enum(['development', 'production', 'test']).default('development'),
     // Comma-separated list of trusted values for x-zitadel-forward-host.
     // Unset (default) = reject ALL forward-host overrides (fail-closed).
@@ -198,8 +206,22 @@ const schema = z
     RECAPTCHA_SECRET_KEY: z.string().optional(),
   })
   .superRefine((v, ctx) => {
+    if (
+      v.NODE_ENV === 'production' &&
+      v.AUTH_PROVIDER === 'fake' &&
+      !v.ALLOW_FAKE_PROVIDER_IN_PRODUCTION
+    ) {
+      ctx.addIssue({
+        code: 'custom',
+        path: ['AUTH_PROVIDER'],
+        message:
+          'AUTH_PROVIDER=fake is refused in production: it serves seeded test accounts with ' +
+          'known passwords. Unset AUTH_PROVIDER to use Zitadel, or set ' +
+          'ALLOW_FAKE_PROVIDER_IN_PRODUCTION=true for a deliberate prod-mode fake run',
+      });
+    }
     // Zitadel creds are only required when the Zitadel adapter is actually selected.
-    // AUTH_PROVIDER=fake (prod-mode fake runs: a11y audit, perf, load) needs neither.
+    // AUTH_PROVIDER=fake (prod-mode fake runs: a11y audit, perf, load, opted in above) needs neither.
     const usesZitadel = v.NODE_ENV === 'production' && v.AUTH_PROVIDER !== 'fake';
     if (usesZitadel && !v.ZITADEL_API_URL) {
       ctx.addIssue({
