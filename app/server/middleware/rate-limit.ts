@@ -150,11 +150,33 @@ const signupLimiter = new RateLimiter({ limit: 10, windowMs: 10 * 60_000 });
 const normalizedLoginName = (c: Context): string =>
   (new URL(c.req.url).searchParams.get('loginName') ?? '').slice(0, 128).toLowerCase();
 
+const isPasswordPost = (c: Context, pathname: string): boolean =>
+  c.req.method === 'POST' && pathname === '/id/login/password';
+
 export const loginPasswordRateLimit: MiddlewareHandler = createRateLimit({
   limiter: passwordLimiter,
-  match: (c, pathname) => c.req.method === 'POST' && pathname === '/id/login/password',
+  match: isPasswordPost,
   key: (c, ip) => `${ip}|${normalizedLoginName(c)}`,
-  logFields: (c, ip) => ({ ip, actor: hashActor(normalizedLoginName(c)) }),
+  logFields: (c, ip) => ({ ip, actor: hashActor(normalizedLoginName(c)), tier: 'ip+loginName' }),
+});
+
+// The ip|loginName key above takes its loginName from the `?loginName=` QUERY STRING, but the
+// action authenticates the loginName from the POST BODY. The two are independent, so rotating the
+// query param handed every attempt a fresh bucket and the 5/5min cap never tripped. This ip-only
+// ceiling counts every password POST from an address regardless of query data, the same two-tier
+// shape loginMethodIntentRateLimit + loginMethodIntentIpRateLimit use.
+//
+// 30/5min: six times the per-account budget, so a NAT'd office with several people mistyping a
+// password at once still gets through, while a single address can no longer spray more than
+// ~6 guesses a minute across accounts. Zitadel's failedAttempts lockout remains the per-account
+// backstop behind both tiers.
+const passwordIpLimiter = new RateLimiter({ limit: 30, windowMs: 5 * 60_000 });
+
+export const loginPasswordIpRateLimit: MiddlewareHandler = createRateLimit({
+  limiter: passwordIpLimiter,
+  match: isPasswordPost,
+  key: (_c, ip) => ip,
+  logFields: (_c, ip, pathname) => ({ ip, path: pathname, tier: 'ip' }),
 });
 
 // Mounted on `/id/signup/*` in server.ts. Self-guards on POST + normalized path so the
@@ -170,18 +192,20 @@ export const loginPasswordRateLimit: MiddlewareHandler = createRateLimit({
 // always passed through, but /signup now registers inline and /signup/method stays reachable as a
 // deep link — otherwise the one unthrottled way to make this app send mail. Its loginName is a URL
 // param, so it keys per-account.
+const isSignupPost = (c: Context, pathname: string): boolean =>
+  c.req.method === 'POST' &&
+  (pathname === '/id/signup' ||
+    pathname === '/id/signup/password' ||
+    pathname === '/id/signup/method' ||
+    // Recovery sends mail too, and draws on the same per-address budget as the resend above —
+    // but the address is in the POST body (body-stream hazard), so this per-IP key degrades to
+    // ip-only exactly as /id/signup does. The per-address bound is allowResend, not this.
+    pathname === '/id/recover' ||
+    pathname === '/id/recover/complete');
+
 export const signupRateLimit: MiddlewareHandler = createRateLimit({
   limiter: signupLimiter,
-  match: (c, pathname) =>
-    c.req.method === 'POST' &&
-    (pathname === '/id/signup' ||
-      pathname === '/id/signup/password' ||
-      pathname === '/id/signup/method' ||
-      // Recovery sends mail too, and draws on the same per-address budget as the resend above —
-      // but the address is in the POST body (body-stream hazard), so this per-IP key degrades to
-      // ip-only exactly as /id/signup does. The per-address bound is allowResend, not this.
-      pathname === '/id/recover' ||
-      pathname === '/id/recover/complete'),
+  match: isSignupPost,
   key: (c, ip) => {
     const loginName = normalizedLoginName(c);
     return loginName ? `${ip}|${loginName}` : ip;
@@ -190,6 +214,22 @@ export const signupRateLimit: MiddlewareHandler = createRateLimit({
     const loginName = normalizedLoginName(c);
     return { ip, actor: loginName ? hashActor(loginName) : undefined, path: pathname };
   },
+});
+
+// Same query-vs-body mismatch as the password tier: when `?loginName=` is present the key above
+// is ip|loginName, so rotating the param gave every POST its own 10-request bucket. This ip-only
+// ceiling counts every POST signupRateLimit matches, whatever the query says.
+//
+// 20/10min: twice the per-key budget. Registration and recovery are one-off flows (a person
+// needs a handful of POSTs), so 20 covers a shared egress IP with two or three sign-ups in flight
+// while capping a single address at two mail-sending POSTs a minute.
+const signupIpLimiter = new RateLimiter({ limit: 20, windowMs: 10 * 60_000 });
+
+export const signupIpRateLimit: MiddlewareHandler = createRateLimit({
+  limiter: signupIpLimiter,
+  match: isSignupPost,
+  key: (_c, ip) => ip,
+  logFields: (_c, ip, pathname) => ({ ip, path: pathname, tier: 'ip' }),
 });
 
 // One shared limiter for /login/verify/* (TOTP, email OTP, SMS OTP): 10 attempts / 5 min per ip.
@@ -381,4 +421,37 @@ export const loginMethodIntentIpRateLimit: MiddlewareHandler = createRateLimit({
   match: isIdentifiedChooserGet,
   key: (_c, ip) => ip,
   logFields: (c, ip, pathname) => ({ ip, path: pathname, tier: 'ip' }),
+});
+
+// One shared limiter for the device authorization grant (RFC 8628): 10 attempts / 5 min per ip,
+// the same class as mfaVerifyLimiter. RFC 8628 §5.1 calls for rate-limiting user-code entry,
+// because the code is short and human-typable: POST /id/device resolves `provider.getDeviceAuth`
+// on every submit and answers a known code differently from an unknown one, so without a limiter
+// a script could guess codes as fast as the wire allows.
+//
+// Three surfaces resolve a code and share this one budget:
+//   • POST /id/device                        — the code-entry form.
+//   • GET  /id/device/authorize?user_code=X  — the consent loader resolves X the same way. A GET
+//     without a user_code only redirects to /id/device and is not counted.
+//   • POST /id/device/authorize              — the decision. A sessionless deny is allowed by
+//     design, so an unthrottled POST would let a guesser revoke other people's pending devices.
+// A real activation spends 3 (enter, consent, decide), or 4 with a sign-in detour, so a typo or
+// two still fits.
+// BODY-STREAM HAZARD: the code and deviceAuthId are in the POST body — key is ip-only.
+const deviceCodeLimiter = new RateLimiter({ limit: 10, windowMs: 5 * 60_000 });
+
+export const deviceCodeRateLimit: MiddlewareHandler = createRateLimit({
+  limiter: deviceCodeLimiter,
+  match: (c, pathname) => {
+    if (c.req.method === 'POST') {
+      return pathname === '/id/device' || pathname === '/id/device/authorize';
+    }
+    return (
+      c.req.method === 'GET' &&
+      pathname === '/id/device/authorize' &&
+      (new URL(c.req.url).searchParams.get('user_code') ?? '') !== ''
+    );
+  },
+  key: (_c, ip) => ip,
+  logFields: (_c, ip, pathname) => ({ ip, path: pathname }),
 });

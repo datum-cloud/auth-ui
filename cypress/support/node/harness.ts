@@ -3555,6 +3555,249 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
         break;
       }
 
+      // ── auth-endpoint hardening (#187) — used by cypress/component/server/middleware/rate-limit-hardening.cy.ts
+      // and the other hardening specs. Appended as one contiguous block; each op names its spec.
+      case 'hardeningCheck': {
+        const op = s.hardeningOp;
+        if (!op) throw new Error('hardeningCheck requires hardeningOp');
+        const rl = await import('@/server/middleware/rate-limit');
+        let nowMs = 2_000_000;
+        const origDateNow = Date.now;
+        Date.now = () => nowMs;
+        try {
+          // rate-limit-hardening.cy.ts: POST `count` times, rotating ?loginName each time, through
+          // BOTH tiers mounted exactly as server.ts mounts them.
+          const rotate = async (
+            tiers: import('hono').MiddlewareHandler[],
+            path: string,
+            ip: string,
+            count: number
+          ): Promise<{ statuses: number[]; last: Response }> => {
+            const app = new Hono();
+            for (const t of tiers) app.use('*', t);
+            app.all(path, (c) => c.json({ ok: true }, 200));
+            const hd = { 'x-forwarded-for': `1.2.3.4, ${ip}` };
+            const statuses: number[] = [];
+            let last = new Response(null);
+            for (let i = 0; i < count; i++) {
+              nowMs += 10;
+              last = await app.request(
+                new Request(`http://app${path}?loginName=victim${i}%40acme.test`, {
+                  method: 'POST',
+                  headers: hd,
+                })
+              );
+              statuses.push(last.status);
+            }
+            return { statuses, last };
+          };
+          if (op === 'passwordIpCeiling') {
+            const { statuses, last } = await rotate(
+              [rl.loginPasswordRateLimit, rl.loginPasswordIpRateLimit],
+              '/id/login/password',
+              '10.9.0.1',
+              31
+            );
+            outcome = {
+              underCeilingPassed: statuses.slice(0, 30).every((st) => st === 200),
+              blockedStatus: last.status,
+              retryAfter: last.headers.get('Retry-After') ?? undefined,
+            };
+          } else if (op === 'signupIpCeiling') {
+            const { statuses, last } = await rotate(
+              [rl.signupRateLimit, rl.signupIpRateLimit],
+              '/id/signup/password',
+              '10.9.0.2',
+              21
+            );
+            outcome = {
+              underCeilingPassed: statuses.slice(0, 20).every((st) => st === 200),
+              blockedStatus: last.status,
+              retryAfter: last.headers.get('Retry-After') ?? undefined,
+            };
+          } else if (op === 'passwordTightTierStillPerAccount') {
+            // The ceiling must not loosen the per-account tier: one loginName still stops at 5.
+            const app = new Hono();
+            app.use('*', rl.loginPasswordRateLimit);
+            app.use('*', rl.loginPasswordIpRateLimit);
+            app.all('/id/login/password', (c) => c.json({ ok: true }, 200));
+            const hd = { 'x-forwarded-for': '1.2.3.4, 10.9.0.3' };
+            const statuses: number[] = [];
+            for (let i = 0; i < 6; i++) {
+              nowMs += 10;
+              const r = await app.request(
+                new Request('http://app/id/login/password?loginName=alice', {
+                  method: 'POST',
+                  headers: hd,
+                })
+              );
+              statuses.push(r.status);
+            }
+            outcome = { statuses };
+          } else if (op === 'serverMountsHardeningLimiters') {
+            const src = readFileSync(join(process.cwd(), 'app/server.ts'), 'utf-8');
+            const mounted = (name: string) => src.includes(`app.use('*', ${name});`);
+            outcome = {
+              passwordIp: mounted('loginPasswordIpRateLimit'),
+              signupIp: mounted('signupIpRateLimit'),
+            };
+          } else if (op === 'deviceCodeBlocked' || op === 'deviceCodeBareGetNoConsume') {
+            // device-code-rate-limit.cy.ts: RFC 8628 §5.1 user-code guessing.
+            const app = new Hono();
+            app.use('*', rl.deviceCodeRateLimit);
+            app.all('/id/device', (c) => c.json({ ok: true }, 200));
+            app.all('/id/device/authorize', (c) => c.json({ ok: true }, 200));
+            const hd = {
+              'x-forwarded-for': `1.2.3.4, ${op === 'deviceCodeBlocked' ? '10.9.1.1' : '10.9.1.2'}`,
+            };
+            const hit = async (method: string, path: string) => {
+              nowMs += 10;
+              return app.request(new Request(`http://app${path}`, { method, headers: hd }));
+            };
+            if (op === 'deviceCodeBlocked') {
+              const statuses: number[] = [];
+              // The three surfaces share one budget: 8 code-entry POSTs, a consent GET, a decision.
+              for (let i = 0; i < 8; i++) statuses.push((await hit('POST', '/id/device')).status);
+              statuses.push((await hit('GET', '/id/device/authorize?user_code=WDJB-MJHT')).status);
+              statuses.push((await hit('POST', '/id/device/authorize')).status);
+              const blocked = await hit('POST', '/id/device');
+              const blockedGet = await hit('GET', '/id/device/authorize?user_code=AAAA-BBBB');
+              const dataVariant = await hit('POST', '/id/device.data');
+              outcome = {
+                underLimitPassed: statuses.every((st) => st === 200),
+                blockedStatus: blocked.status,
+                retryAfter: blocked.headers.get('Retry-After') ?? undefined,
+                blockedGetStatus: blockedGet.status,
+                dataVariantStatus: dataVariant.status,
+              };
+            } else {
+              // Rendering the forms (no code) must never spend anyone's budget.
+              for (let i = 0; i < 15; i++) {
+                await hit('GET', '/id/device');
+                await hit('GET', '/id/device/authorize');
+              }
+              const post = await hit('POST', '/id/device');
+              outcome = { postStatus: post.status };
+            }
+          } else if (op === 'limiterInventoryLive' || op === 'limiterInventoryNegative') {
+            // audit-limiter-inventory.cy.ts: the POST-route limiter inventory in audit-coverage.ts.
+            const inv = await import('../audit-coverage');
+            if (op === 'limiterInventoryLive') {
+              const r = inv.runAuditCoverage();
+              outcome = {
+                failures: r.limiterCoverage.filter((e) => !e.ok),
+                deviceIndex: r.limiterCoverage.find((e) => e.key === 'device/index.tsx'),
+                deviceAuthorize: r.limiterCoverage.find((e) => e.key === 'device/authorize.tsx'),
+                count: r.limiterCoverage.length,
+              };
+            } else {
+              const rlSrc = readFileSync(
+                join(process.cwd(), 'app/server/middleware/rate-limit.ts'),
+                'utf-8'
+              );
+              const serverSrc = readFileSync(join(process.cwd(), 'app/server.ts'), 'utf-8');
+              // A brand-new POST route nobody claimed, and device/index with its mount removed.
+              const unclaimed = inv.checkLimiterCoverage(['brand-new.tsx'], rlSrc, serverSrc);
+              const unmounted = inv.checkLimiterCoverage(
+                ['device/index.tsx'],
+                rlSrc,
+                serverSrc.replace("app.use('*', deviceCodeRateLimit);", '')
+              );
+              outcome = { unclaimed: unclaimed[0], unmounted: unmounted[0] };
+            }
+          } else if (op === 'ssoUnlinkStaleSudo' || op === 'ssoUnlinkFreshSudo') {
+            // sso-unlink-sudo.cy.ts: the unlink branch of runSsoAction is step-up gated.
+            Date.now = origDateNow; // real factor stamps; the action's clock is injected below
+            const { FakeAuthProvider } =
+              await import('@/modules/auth/providers/fake/fake-provider');
+            const { SUDO_TTL_MS } = await import('@/resources/shared/sudo');
+            const link = { idpId: 'idp-google', idpUserId: 'g-1', idpUserName: 'mia' };
+            const fake = new FakeAuthProvider({
+              users: [{ id: 'u1', loginName: 'mia@acme.test' }],
+              passwords: { u1: 'Password1!' },
+              authMethods: { u1: ['password', 'idp'] },
+              idpLinks: { u1: [link] },
+              realFactorTimestamps: true,
+            });
+            const created = await fake.createSession({ password: 'Password1!' }, { userId: 'u1' });
+            const cookie = (
+              await serializeSessions([
+                {
+                  id: created.id,
+                  token: created.token,
+                  loginName: 'mia@acme.test',
+                  creationTs: created.changedAt,
+                  expirationTs: created.expiresAt,
+                  changeTs: created.changedAt,
+                },
+              ])
+            ).split(';')[0];
+            const prevUnlink = env.ALLOW_IDP_UNLINK;
+            (env as { ALLOW_IDP_UNLINK: boolean }).ALLOW_IDP_UNLINK = true;
+            try {
+              const form = new FormData();
+              form.set('intent', 'unlink');
+              form.set('idpId', link.idpId);
+              form.set('linkedUserId', link.idpUserId);
+              const req = new Request('http://localhost/id/sso', {
+                method: 'POST',
+                headers: { cookie },
+              });
+              const skew = op === 'ssoUnlinkStaleSudo' ? SUDO_TTL_MS + 1 : 0;
+              const o = await runSsoAction(fake, req, form, { now: () => Date.now() + skew });
+              outcome = {
+                kind: o.kind,
+                location: o.kind === 'redirect' ? o.location : undefined,
+                linksLeft: (await fake.listIdpLinks('u1')).length,
+              };
+            } finally {
+              (env as { ALLOW_IDP_UNLINK: boolean }).ALLOW_IDP_UNLINK = prevUnlink;
+            }
+          } else if (
+            op === 'sessionsCookieScoped' ||
+            op === 'legacyClearMiddleware' ||
+            op === 'serverMountsLegacyClear'
+          ) {
+            // session-cookie-path.cy.ts: the sessions cookie is /id-scoped, and every response that
+            // sets it also expires the old Path=/ one (one-release migration).
+            const ck = await import('@/modules/auth/session/cookie');
+            if (op === 'sessionsCookieScoped') {
+              const written = await ck.serializeSessions([]);
+              outcome = { written, legacyClear: ck.legacyRootSessionsClear() };
+            } else if (op === 'legacyClearMiddleware') {
+              const app = new Hono();
+              app.use('*', ck.legacyRootSessionsClearMiddleware);
+              app.get('/id/sets', async (c) => {
+                c.header('set-cookie', await ck.serializeSessions([]), { append: true });
+                c.header('set-cookie', 'csrf=x; Path=/id', { append: true });
+                return c.text('ok');
+              });
+              app.get('/id/other', (c) => {
+                c.header('set-cookie', 'csrf=x; Path=/id', { append: true });
+                return c.text('ok');
+              });
+              const sets = await app.request('http://app/id/sets');
+              const other = await app.request('http://app/id/other');
+              outcome = {
+                setsCookies: sets.headers.getSetCookie(),
+                setsBody: await sets.text(),
+                otherCookies: other.headers.getSetCookie(),
+              };
+            } else {
+              const src = readFileSync(join(process.cwd(), 'app/server.ts'), 'utf-8');
+              outcome = {
+                mounted: src.includes("app.use('*', legacyRootSessionsClearMiddleware);"),
+              };
+            }
+          } else {
+            throw new Error(`unknown hardeningOp: ${String(op)}`);
+          }
+        } finally {
+          Date.now = origDateNow;
+        }
+        break;
+      }
+
       default: {
         const exhaustive: never = s.fn;
         throw new Error(`unknown service fn: ${String(exhaustive)}`);

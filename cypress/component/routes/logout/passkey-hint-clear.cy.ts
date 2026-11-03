@@ -45,14 +45,16 @@ describe('/logout — passkey-hint clearing', () => {
     });
   });
 
-  it('OIDC sign-out-of-all (logout_token) always clears the hint', () => {
+  it('OIDC sign-out-of-all (the confirmed scope=all POST) always clears the hint', () => {
     callService({
-      fn: 'logoutLoader',
+      fn: 'logoutAction',
       provider: 'singleton',
       liveSessions: [{ id: 's1', token: 't1', user: { id: 'u9', loginName: BOB } }],
       request: {
-        url: 'http://localhost/id/logout?logout_token=tok',
+        url: 'http://localhost/id/logout?index',
+        csrf: true,
         sessions: [BOB_SESSION],
+        form: { scope: 'all' },
         passkeyHint: ALICE, // even a hint for someone ELSE is cleared on sign-out-of-all
       },
     }).then((v) => {

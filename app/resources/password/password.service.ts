@@ -9,7 +9,7 @@
 // returns a typed result; no Request parsing, no CSRF, no cookie I/O lives here.
 import type { AuthProvider } from '@/modules/auth/auth-provider';
 import type { PasswordComplexity } from '@/modules/auth/types';
-import { ProviderError } from '@/modules/auth/types';
+import { ProviderError, isStaleSessionError } from '@/modules/auth/types';
 import {
   changePasswordSchema,
   changePasswordSchemaFor,
@@ -17,7 +17,9 @@ import {
   newPasswordSchemaFor,
   resetRequestSchema,
 } from '@/resources/password/password.schema';
+import { isSudoFresh } from '@/resources/shared/sudo';
 import { verifyUrlTemplate } from '@/resources/verify/verify-url-template';
+import { paths } from '@/routes/paths';
 import { logAuthEvent, hashActor } from '@/server/observability';
 import { constantTimeNoop } from '@/server/timing';
 
@@ -133,7 +135,10 @@ export type ChangePasswordError =
   | 'PERMISSION_DENIED';
 
 export type ChangePasswordResult =
-  { ok: true; target: string } | { ok: false; error: ChangePasswordError };
+  | { ok: true; target: string }
+  | { ok: false; error: ChangePasswordError }
+  // Step-up required: the route redirects to `reauthTarget` (/reauth with a returnTo back here).
+  | { ok: false; error: 'SUDO_REQUIRED'; reauthTarget: string };
 
 /** A resolved ceremony session — only the fields the change flow needs. */
 export interface ActiveSession {
@@ -141,11 +146,45 @@ export interface ActiveSession {
   token: string;
 }
 
+/** The /reauth target that returns to /password/change, keeping a mid-ceremony requestId. */
+export function passwordChangeReauthTarget(requestId?: string | null): string {
+  return paths.reauth({
+    returnTo: paths.password.change(requestId ? { requestId } : undefined),
+  });
+}
+
+/**
+ * Step-up check for the password change (the same sudo window /id/passkeys uses). Returns
+ * 'fresh' when a factor was verified within SUDO_TTL_MS, 'stale' when the session is live but
+ * older than that, and 'dead' when the provider no longer knows the session.
+ */
+export async function passwordChangeSudo(
+  provider: AuthProvider,
+  session: ActiveSession,
+  nowMs: number
+): Promise<'fresh' | 'stale' | 'dead'> {
+  try {
+    const live = await provider.getSession(session.id, session.token);
+    if (!live) return 'dead';
+    return isSudoFresh(live.factors, nowMs) ? 'fresh' : 'stale';
+  } catch (err) {
+    if (isStaleSessionError(err)) return 'dead';
+    throw err;
+  }
+}
+
 /**
  * Parse + dispatch an authenticated password change.
  *
  * `resolveSession` looks up the session token by id from the SIGNED cookie (never
  * from client input); the route supplies it. A missing session → SESSION_EXPIRED.
+ *
+ * STEP-UP: a live session alone is not enough. The session cookie lives 24h, so one lifted from
+ * an unattended browser could otherwise rotate the password. Zitadel's SetPassword (called with
+ * the session token and no current password or code) documents no freshness check, so this is
+ * the only freshness gate: a factor must have been verified within the sudo window, else
+ * SUDO_REQUIRED and the route bounces through /reauth. This is THE security boundary; the
+ * loader's check is UX only.
  *
  * On success returns the redirect target. Provider failures:
  *  - INITIAL-state users are normalized to PERMISSION_DENIED by the adapter; complexity
@@ -158,8 +197,9 @@ export async function changePassword(
   formEntries: Record<string, unknown>,
   resolveSession: (sessionId: string) => ActiveSession | undefined,
   // See submitNewPassword: the org complexity policy the route resolved + fetched, so the SERVER
-  // validation matches the policy-driven UI. Omitted → legacy min-8/no-classes.
-  policy?: PasswordComplexity
+  // validation matches the policy-driven UI. undefined → legacy min-8/no-classes.
+  policy: PasswordComplexity | undefined,
+  nowMs: number
 ): Promise<ChangePasswordResult> {
   const parsed = changePasswordSchemaFor(policy).safeParse(formEntries);
   if (!parsed.success) return { ok: false, error: 'INVALID_INPUT' };
@@ -167,6 +207,20 @@ export async function changePassword(
 
   const session = resolveSession(sessionId);
   if (!session) return { ok: false, error: 'SESSION_EXPIRED' };
+
+  const sudo = await passwordChangeSudo(provider, session, nowMs);
+  if (sudo === 'dead') return { ok: false, error: 'SESSION_EXPIRED' };
+  if (sudo === 'stale') {
+    logAuthEvent('password.change', 'failure', {
+      sessionId: session.id,
+      reason: 'sudo_required',
+    });
+    return {
+      ok: false,
+      error: 'SUDO_REQUIRED',
+      reauthTarget: passwordChangeReauthTarget(requestId),
+    };
+  }
 
   try {
     await provider.changePasswordWithSession(session.id, session.token, password);

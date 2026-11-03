@@ -9,11 +9,13 @@ import { idpTypeToSlug, slugify } from '@/modules/auth/idp-slug';
 import { readSessions, mostRecent } from '@/modules/auth/session/cookie';
 import { ProviderError } from '@/modules/auth/types';
 import { ssoErrorRedirect } from '@/resources/shared/next-step-params';
+import { isSudoFresh } from '@/resources/shared/sudo';
 import { getActiveIdPs } from '@/resources/sso/idp-providers';
 import { idpReturnUrls } from '@/resources/sso/idp-return-urls';
 import { canUnlinkIdp } from '@/resources/sso/sso-management';
 import { resolveSsoOrg } from '@/resources/sso/sso-org';
 import type { SsoOutcome } from '@/resources/sso/sso-outcome';
+import { paths } from '@/routes/paths';
 import { trustedAppOrigin } from '@/server/infra/app-origin.server';
 import { env } from '@/server/infra/env.server';
 import { logAuthEvent } from '@/server/observability';
@@ -30,6 +32,8 @@ export interface SsoActionDeps {
     urls: { success: string; failure: string }
   ) => Promise<{ authUrl?: string | null | undefined }>;
   onAuthEvent?: (event: string, outcome: 'success' | 'failure') => void;
+  /** Clock for the unlink step-up check; defaults to Date.now. */
+  now?: () => number;
 }
 
 // ── /sso action ─────────────────────────────────────────────────────────────────
@@ -92,6 +96,18 @@ export async function runSsoAction(
       // Session expired/absent (CSRF already asserted upstream) — keep the probe observable.
       logAuthEvent('idp.unlink', 'failure', { reason: 'no_session' });
       return { kind: 'response', response: new Response(null) }; // never trust a form userId
+    }
+
+    // STEP-UP: unlinking can detach the user's only IdP, so a live session is not enough — a
+    // 24h session cookie lifted from an unattended browser must not be able to do it. Same sudo
+    // window and /reauth round-trip as /id/passkeys; the sudo check here is the security boundary.
+    if (!session || !isSudoFresh(session.factors, (deps.now ?? Date.now)())) {
+      logAuthEvent('idp.unlink', 'failure', {
+        userId,
+        idpId: payload.idpId,
+        reason: 'sudo_required',
+      });
+      return { kind: 'redirect', location: paths.reauth({ returnTo: paths.sso.index() }) };
     }
 
     // Lockout guard (defense-in-depth): never remove the user's last primary sign-in method,

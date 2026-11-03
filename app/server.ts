@@ -1,9 +1,12 @@
 import { legacyRedirects } from './server/middleware/legacy-redirects';
+import { legacyRootSessionsClearMiddleware } from '@/modules/auth/session/cookie';
 import { env } from '@/server/infra/env.server';
 import { publicOrigin } from '@/server/middleware/public-origin';
 import {
   loginPasswordRateLimit,
+  loginPasswordIpRateLimit,
   signupRateLimit,
+  signupIpRateLimit,
   passwordResetRateLimit,
   mfaVerifyRateLimit,
   ldapRateLimit,
@@ -17,6 +20,7 @@ import {
   loginMethodIntentRateLimit,
   loginMethodIntentIpRateLimit,
   loginIdentifierRateLimit,
+  deviceCodeRateLimit,
 } from '@/server/middleware/rate-limit';
 import { requestContext, type RequestContextEnv } from '@/server/middleware/request-context';
 import { appSecureHeaders, resolveFrameAncestors } from '@/server/middleware/secure-headers';
@@ -92,6 +96,9 @@ export default await createHonoServer<RequestContextEnv>({
     app.use('*', appSecureHeaders(isDev, resolveFrameAncestors(env.FRAME_ANCESTORS)));
     // Legacy 301s: redirect hardcoded /ui/v2/login/* links (sibling repos) to /id/* before routing.
     app.use('*', legacyRedirects);
+    // MIGRATION (remove after 2027-01-31): the sessions cookie moved from Path=/ to Path=/id. Any
+    // response that sets it also expires the old root-scoped one — see cookie.ts.
+    app.use('*', legacyRootSessionsClearMiddleware);
     // Compress STATIC ASSETS ONLY — never SSR HTML. Auth pages embed a per-session
     // CSRF token (remix-utils commitToken reuses the cookie token) alongside
     // attacker-reflectable query params (loginName, user_code, …); compressing that
@@ -137,8 +144,12 @@ export default await createHonoServer<RequestContextEnv>({
     // The identifier submit is what hands out the ceremony session /id/login/method's gate
     // demands, so it needs its own ceiling — see the rationale in rate-limit.ts.
     app.use('*', loginIdentifierRateLimit);
+    // Password and signup are two-tier like the chooser GET below: the ip|loginName tier reads
+    // loginName from the query string, so the ip-only ceiling is what bounds a rotating query.
     app.use('*', loginPasswordRateLimit);
+    app.use('*', loginPasswordIpRateLimit);
     app.use('*', signupRateLimit);
+    app.use('*', signupIpRateLimit);
     app.use('*', passwordResetRateLimit);
     app.use('*', mfaVerifyRateLimit);
     app.use('*', ldapRateLimit);
@@ -153,6 +164,8 @@ export default await createHonoServer<RequestContextEnv>({
     // see the two-tier rationale in rate-limit.ts.
     app.use('*', loginMethodIntentRateLimit);
     app.use('*', loginMethodIntentIpRateLimit);
+    // RFC 8628 §5.1: user-code entry, the consent loader and the decision share one budget.
+    app.use('*', deviceCodeRateLimit);
     app.get('/healthz', (c) => c.json({ status: 'ok' }));
     app.get('/readyz', (c) => c.json({ status: 'ready' }));
     app.get('/id/version', (c) => {

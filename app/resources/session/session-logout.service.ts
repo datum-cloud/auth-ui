@@ -136,7 +136,13 @@ export function logoutOutcomeToResponse(outcome: LogoutOutcome) {
 }
 
 /**
- * Complete a Zitadel-initiated OIDC logout (the end_session → /id/logout?logout_token handshake).
+ * Sign out of EVERY account in this browser — the end_session → /id/logout?logout_token handshake.
+ *
+ * Reached ONLY from the CSRF-protected POST /id/logout with `scope=all`, never from the GET. The
+ * GET's `logout_token` used to be taken as proof of a Zitadel-initiated logout without being read,
+ * so any page could force a top-level navigation there (the cookie is SameSite=Lax) and sign the
+ * victim out everywhere. The token is not verified: this login UI has no OIDC client of its own,
+ * so there is no audience to check it against. The GET now renders the confirm page instead.
  *
  * Global SSO logout: deletes EVERY v2 session in the cookie (not just the active one) so no
  * residual session can be silently reused by /authorize, then clears the whole `sessions` cookie.

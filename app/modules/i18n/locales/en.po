@@ -92,7 +92,7 @@ msgstr "An account with this email already exists. Sign in to that account, then
 msgid "An account with this email already exists. Try signing in instead."
 msgstr "An account with this email already exists. Try signing in instead."
 
-#: app/routes/logout/index.tsx:56
+#: app/routes/logout/index.tsx:103
 msgid "Are you sure you want to sign out?"
 msgstr "Are you sure you want to sign out?"
 
@@ -155,11 +155,11 @@ msgstr "Can't use your passkey?"
 msgid "Cancel"
 msgstr "Cancel"
 
-#: app/routes/password/change.tsx:126
+#: app/routes/password/change.tsx:139
 msgid "Change password"
 msgstr "Change password"
 
-#: app/routes/password/change.tsx:99
+#: app/routes/password/change.tsx:112
 msgid "Change your password"
 msgstr "Change your password"
 
@@ -213,7 +213,7 @@ msgstr "Confirm it's you"
 msgid "Confirm new password"
 msgstr "Confirm new password"
 
-#: app/routes/password/change.tsx:120
+#: app/routes/password/change.tsx:133
 #: app/routes/signup/password.tsx:267
 msgid "Confirm password"
 msgstr "Confirm password"
@@ -462,7 +462,7 @@ msgstr "Needs re-authentication"
 msgid "New passkey added. Sign in with it below."
 msgstr "New passkey added. Sign in with it below."
 
-#: app/routes/password/change.tsx:116
+#: app/routes/password/change.tsx:129
 #: app/routes/password/new.tsx:102
 msgid "New password"
 msgstr "New password"
@@ -775,11 +775,12 @@ msgstr "Sign in with your passkey"
 
 #: app/components/sign-out-button/sign-out-button.tsx:27
 #: app/components/sign-out-button/sign-out-button.tsx:31
-#: app/routes/logout/index.tsx:51
+#: app/routes/logout/index.tsx:87
+#: app/routes/logout/index.tsx:98
 msgid "Sign out"
 msgstr "Sign out"
 
-#: app/routes/logout/index.tsx:54
+#: app/routes/logout/index.tsx:101
 msgid "Sign out of"
 msgstr "Sign out of"
 
@@ -796,7 +797,7 @@ msgid "Signed-in sessions on other devices can still be active. Sign out your ot
 msgstr "Signed-in sessions on other devices can still be active. Sign out your other sessions?"
 
 #: app/components/identity-badge/identity-badge.tsx:29
-#: app/routes/password/change.tsx:112
+#: app/routes/password/change.tsx:125
 msgid "Signing in as"
 msgstr "Signing in as"
 

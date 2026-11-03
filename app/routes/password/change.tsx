@@ -7,7 +7,11 @@ import { FormError } from '@/components/form-error/form-error';
 import { IdentityBadge } from '@/components/identity-badge/identity-badge';
 import { useAuthActionError } from '@/hooks/use-auth-action-error';
 import { readSessions, mostRecent, byId } from '@/modules/auth/session/cookie';
-import { changePassword } from '@/resources/password';
+import {
+  changePassword,
+  passwordChangeReauthTarget,
+  passwordChangeSudo,
+} from '@/resources/password';
 import { changePasswordClientSchemaFor } from '@/resources/password/password.schema';
 import { resolveOrg } from '@/resources/shared/resolve-org';
 import { providerForRequest } from '@/server/auth-context.server';
@@ -36,9 +40,15 @@ export async function loader({ request }: LoaderFunctionArgs) {
   // Resolve the active ceremony session so the form can carry its id and show whose
   // password is being changed. The session token never leaves the server cookie.
   const active = mostRecent(await readSessions(request));
+  const requestId = url.searchParams.get('requestId') ?? undefined;
+  const provider = providerForRequest(request);
+  // Stale sudo: bounce through /reauth BEFORE the user types a new password (UX only — the
+  // action re-enforces). No session is left to the action's SESSION_EXPIRED path as before.
+  if (active && (await passwordChangeSudo(provider, active, Date.now())) === 'stale') {
+    return redirect(passwordChangeReauthTarget(requestId));
+  }
   // Fetch the org's complexity policy (org-first from the active session, default-org fallback) so
   // the change-password form shows + validates against the same rules the provider enforces.
-  const provider = providerForRequest(request);
   const passwordComplexity = await provider.getPasswordComplexity(
     await resolveOrg(provider, active?.organization)
   );
@@ -47,7 +57,7 @@ export async function loader({ request }: LoaderFunctionArgs) {
       csrfToken,
       sessionId: active?.id ?? '',
       loginName: active?.loginName ?? '',
-      requestId: url.searchParams.get('requestId') ?? undefined,
+      requestId,
       passwordComplexity,
     },
     { headers }
@@ -71,9 +81,12 @@ export async function action({ request }: ActionFunctionArgs) {
       provider,
       Object.fromEntries(form),
       (sessionId) => byId(sessions, sessionId),
-      policy
+      policy,
+      Date.now()
     );
     if (result.ok) return redirect(result.target);
+    // Stale sudo: bounce through /reauth and return here (server-side enforcement).
+    if (result.error === 'SUDO_REQUIRED') return redirect(result.reauthTarget);
     return data({ error: result.error }, { status: 400 });
   } catch (err) {
     return actionError(err);

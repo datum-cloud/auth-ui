@@ -353,7 +353,9 @@ export type ServiceFn =
   | 'verifyIndexLoader'
   | 'verifyIndexAction'
   // cypress/component/server/hash-actor.cy.ts: hashActor is the keyed HMAC, not plain sha256.
-  | 'hashActorKeyedCheck';
+  | 'hashActorKeyedCheck'
+  // auth-endpoint hardening (#187) — rate-limit-hardening.cy.ts and sibling hardening specs
+  | 'hardeningCheck';
 
 export type SessionResultScript =
   | { mode: 'null' }
@@ -833,6 +835,26 @@ export interface Scenario {
   /** Unsets PUBLIC_ORIGIN for one call to exercise the hostname-check skip. Unreachable in a
    *  real boot (env.server refuses it), so this only proves the fallback branch behaves. */
   recaptchaSkipPublicOrigin?: boolean;
+
+  // ── auth-endpoint hardening (#187) (fn: 'hardeningCheck') — rate-limit-hardening.cy.ts ──
+  hardeningOp?:
+    | 'passwordIpCeiling' // 31 password POSTs, rotating ?loginName → 30 pass, 31st 429 (ip tier)
+    | 'signupIpCeiling' // 21 signup POSTs, rotating ?loginName → 20 pass, 21st 429 (ip tier)
+    | 'passwordTightTierStillPerAccount' // one loginName still stops at 5 with both tiers mounted
+    | 'serverMountsHardeningLimiters' // app/server.ts mounts the new ip-only tiers
+    // device-code-rate-limit.cy.ts
+    | 'deviceCodeBlocked' // 10 device-code hits across the 3 surfaces pass, the 11th 429s
+    | 'deviceCodeBareGetNoConsume' // GETs without a user_code never count
+    // audit-limiter-inventory.cy.ts
+    | 'limiterInventoryLive' // every real POST route is throttled or excused
+    | 'limiterInventoryNegative' // an unclaimed or unmounted POST route fails the scan
+    // sso-unlink-sudo.cy.ts
+    | 'ssoUnlinkStaleSudo' // stale sudo → /reauth?returnTo=/sso, the link survives
+    | 'ssoUnlinkFreshSudo' // fresh sudo → unlinked, back to /sso
+    // session-cookie-path.cy.ts
+    | 'sessionsCookieScoped' // serializeSessions writes Path=/id; the clear targets Path=/
+    | 'legacyClearMiddleware' // a response setting sessions also expires the Path=/ cookie
+    | 'serverMountsLegacyClear'; // app/server.ts mounts the migration middleware
 }
 
 /** A parsed logAuthEvent JSON line: { event, outcome, ...fields }. */

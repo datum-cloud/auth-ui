@@ -23,6 +23,8 @@ SESSION_SECRET must be at least 32 characters (HMAC-SHA256 key)
 
 The session _state_ itself (who is signed in, which factors are satisfied) is held by the identity provider. The cookie carries the session handles, not the credentials.
 
+Every one of these cookies is scoped to `Path=/id` (`APP_BASENAME` in `app/resources/shared/app-basename.ts`), so the browser sends them only to this app and not to other apps on the same host. The `sessions` cookie was the exception until it moved from `Path=/` to `Path=/id`. A browser that still held the old root cookie would send both, and the parser would read whichever came first. For one release, `legacyRootSessionsClearMiddleware` in `cookie.ts`, mounted on `*` in `app/server.ts`, appends `sessions=; Path=/; Max-Age=0` to every response that sets the `sessions` cookie, so the old cookie is expired the first time the user signs in, switches account or signs out. The cookie's `maxAge` is 24 hours, so a root cookie that is never cleared expires on its own a day after the deploy. Remove the middleware, its mount and its spec after 2027-01-31.
+
 Account recovery runs without a session and keeps its state in two cookies of its own, defined in `app/resources/recovery/recovery-ticket.server.ts` and scoped to `/id/recover`. They are not HMAC-signed: each value is sealed with AES-256-GCM under a key derived from `SESSION_SECRET` (HKDF), and padded to a fixed length so no one can tell a real ticket from a filler. See [Account Recovery](./account-recovery.md).
 
 | Cookie              | Purpose                                                                                                                  |
