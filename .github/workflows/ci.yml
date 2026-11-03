@@ -85,7 +85,7 @@ jobs:
           SPLIT: ${{ strategy.job-total }}
           SPLIT_INDEX: ${{ strategy.job-index }}
       - if: failure()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: component-artifacts-${{ github.run_id }}-shard-${{ matrix.shard }}
           path: |
@@ -158,7 +158,7 @@ jobs:
         run: scripts/npm-audit.sh GHSA-3g3m-2fjr-6pw4 GHSA-g3hv-75wg-m249
       - name: Generate SBOM (CycloneDX)
         run: npx --yes @cyclonedx/cdxgen@11.10.0 -t js -o sbom.cdx.json --spec-version 1.5
-      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: sbom-cyclonedx
           path: sbom.cdx.json
@@ -199,7 +199,7 @@ jobs:
       - run: npx cypress install
       - run: npm run test:e2e:fast
       - if: failure()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: e2e-artifacts-${{ github.run_id }}
           path: |
@@ -363,7 +363,7 @@ jobs:
             exit 1
           fi
       - if: failure()
-        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: staging-passkey-artifacts-${{ github.run_id }}
           path: cypress/screenshots
