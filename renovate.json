@@ -1,4 +1,16 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
-  "extends": ["local>datum-cloud/.github:renovate-config", "helpers:pinGitHubActionDigests", "docker:pinDigests"]
+  "extends": [
+    "local>datum-cloud/.github:renovate-config",
+    "helpers:pinGitHubActionDigests",
+    "docker:pinDigests"
+  ],
+  "npmrc": "replace-registry-host=always",
+  "packageRules": [
+    {
+      "description": "Renovate updates a transitive dependency pinned in overrides by installing the new version directly, which npm rejects as EOVERRIDE unless the override range moves too. Bump the override range together with the version.",
+      "matchDepTypes": ["overrides"],
+      "rangeStrategy": "bump"
+    }
+  ]
 }
