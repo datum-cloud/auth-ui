@@ -157,7 +157,7 @@ describe('/login/method — identity header + in-place passkey ceremony', () => 
     mountMethod({ holdChallenge: true });
     cy.contains('a', 'Passkey').click();
     // Held at the challenge, so this is the steady busy state rather than a moment in flight.
-    cy.contains('a', 'Passkey').find('svg.animate-spin').should('exist');
+    cy.contains('a', 'Passkey').find('svg[data-slot="spinner"]').should('exist');
   });
 
   it('Passkey fires the ceremony in place and submits the pre-baked credential', () => {
