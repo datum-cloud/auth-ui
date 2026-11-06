@@ -15,6 +15,12 @@ import { I18nProvider } from '@lingui/react';
 import { mount } from 'cypress/react';
 import { createMemoryRouter, RouterProvider } from 'react-router';
 
+// The identifier form requires a name; client validation blocks the submit without one.
+function fillName() {
+  cy.get('input[name="firstName"]').type('Ada');
+  cy.get('input[name="lastName"]').type('Lovelace');
+}
+
 function withProviders(node: React.ReactNode) {
   const i18n = setupI18n({ locale: 'en', messages: { en: {} } });
   return (
@@ -141,6 +147,7 @@ describe('signup/index — MaxMind deviceTrackingToken submit-time sync', () => 
     const submitted: FormData[] = [];
     mountSignup(loaderData(), (form) => submitted.push(form));
     cy.contains('button', 'Email', { timeout: 6000 }).click();
+    fillName();
     cy.get('input[name="email"]').type('racer@example.com');
     // Seed the token AFTER the form is already showing — the periodic sync interval may not
     // have ticked yet (it runs every 300ms); the click-time read must still pick it up.
@@ -293,6 +300,7 @@ describe('signup/index — the reCAPTCHA token actually reaches the submitted re
       win.grecaptcha = { execute };
     });
     cy.contains('button', 'Email', { timeout: 6000 }).click();
+    fillName();
     cy.get('input[name="email"]').type('racer@example.com');
     cy.contains('button', 'Continue').click();
     cy.wrap(submitted, { timeout: 6000 }).should('have.length', 1);
@@ -337,6 +345,7 @@ describe('signup/index — the reCAPTCHA token actually reaches the submitted re
       win.grecaptcha = { execute };
     });
     cy.contains('button', 'Email', { timeout: 6000 }).click();
+    fillName();
     cy.get('input[name="email"]').type('rejected@example.com');
     cy.contains('button', 'Continue').click();
     cy.wrap(submitted, { timeout: 6000 }).should('have.length', 1);
@@ -361,6 +370,7 @@ describe('signup/index — the reCAPTCHA token actually reaches the submitted re
       win.grecaptcha = { execute };
     });
     cy.contains('button', 'Email', { timeout: 6000 }).click();
+    fillName();
     cy.get('input[name="email"]').type('hung@example.com');
     cy.contains('button', 'Continue').click();
     // Comfortably past RECAPTCHA_MINT_TIMEOUT_MS (5s) — the timeout race has to have fired for
@@ -382,6 +392,7 @@ describe('signup/index — the reCAPTCHA token actually reaches the submitted re
     // "Unset config ⇒ feature entirely off" covers the field itself, not just the script and
     // the verification: an unconfigured deployment must not ship this input at all.
     cy.get('input[name="recaptchaToken"]').should('not.exist');
+    fillName();
     cy.get('input[name="email"]').type('noconfig@example.com');
     cy.contains('button', 'Continue').click();
     cy.wrap(submitted, { timeout: 6000 }).should('have.length', 1);
@@ -412,6 +423,7 @@ describe('signup/index — the reCAPTCHA token actually reaches the submitted re
     cy.contains('button', 'Email', { timeout: 6000 }).click();
     // {enter} in the sole text field triggers HTML's implicit form submission — no button is
     // clicked anywhere in this test.
+    fillName();
     cy.get('input[name="email"]').type('enter-user@example.com{enter}');
     cy.wrap(submitted, { timeout: 6000 }).should('have.length', 1);
     cy.then(() => {
@@ -461,6 +473,7 @@ describe('signup/index — the reCAPTCHA token actually reaches the submitted re
       win.grecaptcha = { execute };
     });
     cy.contains('button', 'Email', { timeout: 6000 }).click();
+    fillName();
     cy.get('input[name="email"]').type('racer2@example.com');
     cy.contains('button', 'Continue').click();
     cy.get('input[name="email"]').type('{enter}');

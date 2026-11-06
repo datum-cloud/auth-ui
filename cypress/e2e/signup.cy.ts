@@ -1,5 +1,12 @@
 import { checkA11y } from '../support/a11y';
 
+// /signup's identifier form: first name, last name, email. Typed by every flow that registers.
+function fillSignupIdentifier(email: string, firstName = 'Ada', lastName = 'Lovelace') {
+  cy.get('input[name=firstName]').type(firstName);
+  cy.get('input[name=lastName]').type(lastName);
+  cy.get('input[name=email]').type(email);
+}
+
 // axe / WCAG 2.2 AA per-screen gate
 
 // The signup register action is enumeration-safe: it renders the SAME generic
@@ -17,11 +24,10 @@ describe('signup → check your email', () => {
     cy.visit('/id/signup');
     checkA11y(); // /signup
 
-    // /signup collects ONLY an email — firstName/lastName are derived server-side by
-    // placeholderNameFromEmail and never typed. (This spec used to type them; it had gone
-    // stale against the screen and was failing on inputs that no longer exist.)
+    // /signup collects the user's first and last name alongside the email, so the account is
+    // created with a real name rather than one derived from the address.
     cy.contains('button', /^Email$/).click();
-    cy.get('input[name=email]').type('new@acme.test');
+    fillSignupIdentifier('new@acme.test');
     cy.get('input[name=email]').closest('form').submit();
 
     // No interstitial: the register happens in this action, so the terminal renders on /signup.
@@ -41,7 +47,7 @@ describe('signup → check your email', () => {
   it('offers a sign-in link on the terminal regardless of whether the address has an account', () => {
     cy.visit('/id/signup');
     cy.contains('button', /^Email$/).click();
-    cy.get('input[name=email]').type('brand-new@acme.test');
+    fillSignupIdentifier('brand-new@acme.test');
     cy.get('input[name=email]').closest('form').submit();
     cy.contains(/check your email/i);
     cy.contains(/already have an account/i).should('be.visible');
@@ -50,10 +56,22 @@ describe('signup → check your email', () => {
       .and('match', /\/login/);
   });
 
+  // The name is required server-side, not just by the client schema: a POST without it must
+  // not register anything (this spec runs unhydrated, so the submit is a native form POST that
+  // only the action's signupIdentifierSchema can stop).
+  it('refuses to register without a first and last name', () => {
+    cy.visit('/id/signup');
+    cy.contains('button', /^Email$/).click();
+    cy.get('input[name=email]').type('noname@acme.test');
+    cy.get('input[name=email]').closest('form').submit();
+    cy.contains(/check your email/i).should('not.exist');
+    cy.get('input[name=firstName]').should('exist');
+  });
+
   it('never routes through the /signup/method interstitial', () => {
     cy.visit('/id/signup');
     cy.contains('button', /^Email$/).click();
-    cy.get('input[name=email]').type('nomethod@acme.test');
+    fillSignupIdentifier('nomethod@acme.test');
     cy.get('input[name=email]').closest('form').submit();
     cy.contains(/check your email/i);
     cy.location('pathname').should('not.include', '/signup/method');
@@ -136,7 +154,7 @@ describe('signup → code entry', () => {
     });
     cy.settleHydration();
     cy.contains('button', /^Email$/).click();
-    cy.get('input[name=email]').type('squatter@acme.test');
+    fillSignupIdentifier('squatter@acme.test');
     cy.get('input[name=email]').closest('form').submit();
 
     cy.contains(/check your email/i);

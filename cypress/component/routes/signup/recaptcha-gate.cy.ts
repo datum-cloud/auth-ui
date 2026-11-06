@@ -24,6 +24,9 @@ const ok = (over: Record<string, unknown> = {}) => ({
 
 type ScoredEvent = { action?: string; verdict?: string; reason?: string; score?: number | null };
 
+// The identifier form requires a name; without it the action would 400 on schema, not on the gate.
+const NAMED = { firstName: 'Ada', lastName: 'Lovelace' };
+
 describe('signup reCAPTCHA gate', () => {
   it('rejects an identifier submit with no token', () => {
     callService({
@@ -35,7 +38,7 @@ describe('signup reCAPTCHA gate', () => {
       recordCalls: ['register'],
       request: {
         url: URL,
-        form: { email: 'bot@acme.test' },
+        form: { email: 'bot@acme.test', ...NAMED },
         csrf: true,
       },
     }).then((v) => {
@@ -136,7 +139,7 @@ describe('signup reCAPTCHA gate', () => {
       recaptchaFetch: { reject: true },
       request: {
         url: URL,
-        form: { email: 'sunny@acme.test', recaptchaToken: 'tok' },
+        form: { email: 'sunny@acme.test', recaptchaToken: 'tok', ...NAMED },
         csrf: true,
       },
     }).then((v) => {
@@ -166,7 +169,7 @@ describe('signup reCAPTCHA gate', () => {
       recaptchaFetch: { body: ok({ score: 0.1 }) },
       request: {
         url: URL,
-        form: { email: 'lowscore@acme.test', recaptchaToken: 'tok' },
+        form: { email: 'lowscore@acme.test', recaptchaToken: 'tok', ...NAMED },
         csrf: true,
       },
     }).then((v) => {
@@ -224,7 +227,7 @@ describe('signup reCAPTCHA gate', () => {
       env: { AUTH_EMAIL_DELIVERY_ENABLED: 'true' },
       request: {
         url: URL,
-        form: { email: 'noconfig@acme.test' },
+        form: { email: 'noconfig@acme.test', ...NAMED },
         csrf: true,
       },
     }).then((v) => {

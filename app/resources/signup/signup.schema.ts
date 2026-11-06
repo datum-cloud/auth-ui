@@ -36,9 +36,29 @@ export function signupPasswordSchemaFor(policy?: PasswordComplexity) {
 
 export const signupPasswordSchema = signupPasswordSchemaFor();
 
-// Screen 1 (/signup): collect just the email identifier (name is parsed from it).
+// A person's name as Zitadel's AddHumanUser accepts it: profile.givenName/familyName must be
+// 1–200 runes. Trimmed first so a whitespace-only entry fails here instead of at Zitadel.
+// Every failure carries readable copy: conform submits an empty field as `undefined`, so
+// without the type-level `error` the user would see Zod's "expected string, received undefined".
+function personName(label: string) {
+  const required = `Enter your ${label}`;
+  return z
+    .string({ error: required })
+    .trim()
+    .min(1, { error: required })
+    .max(200, { error: `Your ${label} must be 200 characters or fewer` });
+}
+
+// Screen 1 (/signup): the email identifier plus the user's real name. The name used to be
+// derived from the email's local part (placeholder-name.ts), which left every email signup
+// named "jane.doe jane.doe" until they filled in cloud-portal's "Complete your profile" screen.
+// Asking up front means the account carries a real name from the first write.
 export const signupIdentifierSchema = z.object({
-  email: z.string().email(),
+  email: z
+    .string({ error: 'Enter your email address' })
+    .email({ error: 'Enter a valid email address' }),
+  firstName: personName('first name'),
+  lastName: personName('last name'),
   organization: z.string().optional(),
   requestId: z.string().optional(),
   deviceTrackingToken: z.string().optional(),
