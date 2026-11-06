@@ -18,7 +18,6 @@ import { genericCheckYourEmail } from '@/resources/schemas/check-your-email.sche
 import { resolveOrg } from '@/resources/shared/resolve-org';
 import { completeSignupHandoff } from '@/resources/signup/complete-handoff';
 import { registerPasskeySignup } from '@/resources/signup/passkey-signup';
-import { placeholderNameFromEmail } from '@/resources/signup/placeholder-name';
 import { decideSignupIdpIntent } from '@/resources/signup/signup-decision';
 import { resolveSignupView } from '@/resources/signup/signup-view';
 import { signupCodeSchema, signupIdentifierSchema } from '@/resources/signup/signup.schema';
@@ -212,27 +211,23 @@ export async function action({ request }: ActionFunctionArgs) {
     }
   }
 
-  // Identifier flow: collect email, derive the placeholder name, and REGISTER — sending the
-  // verification mail from this action.
+  // Identifier flow: collect email and name, and REGISTER — sending the verification mail from
+  // this action.
   //
   // This used to redirect to /signup/method, a screen whose only remaining job was to echo the
   // address back and offer one button. Signup is passkey-only, so that chooser had nothing to
-  // choose: the derived firstName/lastName made a round-trip through the URL into hidden inputs
-  // (user-editable in transit) purely to be posted straight back here. Registering inline keeps
-  // the derived name server-side and puts the mail-send behind this route's IP rate limiter,
-  // which /signup/method is not covered by (see server/middleware/rate-limit.ts).
+  // choose: firstName/lastName made a round-trip through the URL into hidden inputs purely to be
+  // posted straight back here. Registering inline puts the mail-send behind this route's IP rate
+  // limiter, which /signup/method is not covered by (see server/middleware/rate-limit.ts).
   //
   // /signup/method is deliberately still live and unchanged — an in-flight tab mid-signup must
   // not break — it is simply no longer where this flow routes.
   const parsed = signupIdentifierSchema.safeParse(Object.fromEntries(form));
   if (!parsed.success) return data({ error: 'INVALID_INPUT' as const }, { status: 400 });
 
-  const { email, organization, requestId } = parsed.data;
-  // The placeholder name is derived here rather than via decideAfterSignupIdentifier: that
-  // decider exists to produce a /signup/method REDIRECT, and the shared Decision union types
-  // `params` as optional, so consuming it for a value would mean asserting past the type. The
-  // derivation itself is the only part this flow needs, and placeholder-name.ts owns it.
-  const { firstName, lastName } = placeholderNameFromEmail(email);
+  // The name is what the user typed. It only lands on a FRESH account: an address that already
+  // exists answers with the same generic terminal and its stored name is left alone.
+  const { email, firstName, lastName, organization, requestId } = parsed.data;
 
   // t0 for the same constant-time deadline the code branch uses. The two responses that MUST stay
   // indistinguishable here are fresh and squatted: both return the generic terminal below, but they
@@ -375,8 +370,12 @@ export default function Signup() {
 
   const [showEmailField, setShowEmailField] = useState(false);
 
-  // Client-side schema for the email field (advisory; server re-validates).
-  const emailClientSchema = signupIdentifierSchema.pick({ email: true });
+  // Client-side schema for the identifier form (advisory; server re-validates).
+  const identifierClientSchema = signupIdentifierSchema.pick({
+    email: true,
+    firstName: true,
+    lastName: true,
+  });
 
   // Client-side schema for the emailed code. Picked down to `code` alone (min(1), same as the
   // server's signupCodeSchema) — Form.Field/Form.Input need a Form.Root ancestor to resolve field
@@ -542,10 +541,10 @@ export default function Signup() {
                   </Button>
                 ) : (
                   <Form.Root
-                    schema={emailClientSchema}
+                    schema={identifierClientSchema}
                     formComponent={RRForm}
                     method="POST"
-                    defaultValues={{ email: prefill.email }}
+                    defaultValues={{ email: prefill.email, firstName: '', lastName: '' }}
                     isSubmitting={navigation.state === 'submitting'}
                     // Intercepts every submit trigger for this form — click, Enter,
                     // requestSubmit() — not just a button's onClick. See handleIdentifierSubmit's
@@ -572,6 +571,25 @@ export default function Signup() {
                     {recaptchaSiteKey ? (
                       <input type="hidden" name="recaptchaToken" defaultValue="" />
                     ) : null}
+                    {/* mb-0 cancels Form.Root's space-y-6, as every Form.Field here does. */}
+                    <div className="mb-0 grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      <Form.Field
+                        name="firstName"
+                        label={t`First name`}
+                        required
+                        labelClassName="text-xs"
+                        className="mb-0">
+                        <Form.Input autoFocus autoComplete="given-name" className="h-9" />
+                      </Form.Field>
+                      <Form.Field
+                        name="lastName"
+                        label={t`Last name`}
+                        required
+                        labelClassName="text-xs"
+                        className="mb-0">
+                        <Form.Input autoComplete="family-name" className="h-9" />
+                      </Form.Field>
+                    </div>
                     <Form.Field
                       name="email"
                       label={t`Email`}
@@ -580,7 +598,6 @@ export default function Signup() {
                       className="mb-0">
                       <Form.Input
                         type="email"
-                        autoFocus
                         autoComplete="email"
                         placeholder="email@example.com"
                         className="h-9"

@@ -49,7 +49,7 @@ const ROUTES: RouteCase[] = [
   {
     route: '/signup',
     fn: 'signupIndexAction',
-    form: (loginName) => ({ email: loginName }),
+    form: (loginName) => ({ email: loginName, firstName: 'A', lastName: 'B' }),
   },
   {
     route: '/signup/method',

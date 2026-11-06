@@ -74,8 +74,8 @@ msgstr "Added {0}"
 msgid "Additional verification is required to continue."
 msgstr "Additional verification is required to continue."
 
-#: app/routes/signup/index.tsx:486
-#: app/routes/signup/index.tsx:620
+#: app/routes/signup/index.tsx:485
+#: app/routes/signup/index.tsx:637
 msgid "Already have an account?"
 msgstr "Already have an account?"
 
@@ -165,7 +165,7 @@ msgstr "Change your password"
 
 #: app/routes/password/reset.tsx:109
 #: app/routes/recover/index.tsx:307
-#: app/routes/signup/index.tsx:408
+#: app/routes/signup/index.tsx:407
 #: app/routes/signup/method.tsx:259
 #: app/routes/signup/password.tsx:218
 msgid "Check your email"
@@ -226,8 +226,8 @@ msgstr "Connected accounts"
 #: app/routes/login/index.tsx:568
 #: app/routes/recover/complete.tsx:248
 #: app/routes/recover/index.tsx:346
-#: app/routes/signup/index.tsx:459
-#: app/routes/signup/index.tsx:605
+#: app/routes/signup/index.tsx:458
+#: app/routes/signup/index.tsx:622
 msgid "Continue"
 msgstr "Continue"
 
@@ -256,7 +256,7 @@ msgstr "Couldn't sign in"
 msgid "Couldn't verify"
 msgstr "Couldn't verify"
 
-#: app/routes/signup/index.tsx:507
+#: app/routes/signup/index.tsx:506
 msgid "Create a new account"
 msgstr "Create a new account"
 
@@ -295,8 +295,8 @@ msgstr "Didn't get the email?"
 #: app/routes/login/index.tsx:392
 #: app/routes/login/index.tsx:407
 #: app/routes/recover/index.tsx:382
-#: app/routes/signup/index.tsx:541
-#: app/routes/signup/index.tsx:577
+#: app/routes/signup/index.tsx:540
+#: app/routes/signup/index.tsx:595
 msgid "Email"
 msgstr "Email"
 
@@ -395,6 +395,10 @@ msgstr "Enter your SMS code"
 msgid "Finish creating your account"
 msgstr "Finish creating your account"
 
+#: app/routes/signup/index.tsx:578
+msgid "First name"
+msgstr "First name"
+
 #: app/routes/reauth.tsx:275
 msgid "For your security, verify one of your sign-in methods to continue."
 msgstr "For your security, verify one of your sign-in methods to continue."
@@ -403,7 +407,7 @@ msgstr "For your security, verify one of your sign-in methods to continue."
 msgid "Forgot password?"
 msgstr "Forgot password?"
 
-#: app/routes/signup/index.tsx:504
+#: app/routes/signup/index.tsx:503
 msgid "Get started"
 msgstr "Get started"
 
@@ -422,6 +426,10 @@ msgstr "Inactive"
 #: app/utils/errors/auth-error-messages.tsx:19
 msgid "Incorrect credentials. Please try again."
 msgstr "Incorrect credentials. Please try again."
+
+#: app/routes/signup/index.tsx:586
+msgid "Last name"
+msgstr "Last name"
 
 #: app/components/auth-form/last-used-badge.tsx:14
 msgid "Last used"
@@ -513,7 +521,7 @@ msgstr "Open your authenticator app and enter the 6-digit code."
 msgid "or"
 msgstr "or"
 
-#: app/routes/signup/index.tsx:442
+#: app/routes/signup/index.tsx:441
 msgid "Or enter the code from that email"
 msgstr "Or enter the code from that email"
 
@@ -613,7 +621,7 @@ msgstr "Please finish setting up your passkey before leaving this page. It will 
 
 #: app/routes/error.tsx:52
 #: app/routes/recover/index.tsx:362
-#: app/routes/signup/index.tsx:598
+#: app/routes/signup/index.tsx:615
 #: app/routes/verify/index.tsx:234
 msgid "Recover your account"
 msgstr "Recover your account"
@@ -639,7 +647,7 @@ msgstr "Register a passkey using your device's biometric sensor or PIN. You'll u
 msgid "Register passkey"
 msgstr "Register passkey"
 
-#: app/routes/signup/index.tsx:513
+#: app/routes/signup/index.tsx:512
 msgid "Registration is currently unavailable. Please contact your administrator."
 msgstr "Registration is currently unavailable. Please contact your administrator."
 
@@ -744,8 +752,8 @@ msgid "Set up SMS one-time code"
 msgstr "Set up SMS one-time code"
 
 #: app/routes/login/password.tsx:206
-#: app/routes/signup/index.tsx:490
-#: app/routes/signup/index.tsx:622
+#: app/routes/signup/index.tsx:489
+#: app/routes/signup/index.tsx:639
 #: app/routes/sso/ldap.tsx:85
 msgid "Sign in"
 msgstr "Sign in"
@@ -1062,7 +1070,7 @@ msgstr "We've sent a password reset link to <0>{0}</0>"
 msgid "We've sent a verification link to <0>{0}</0>"
 msgstr "We've sent a verification link to <0>{0}</0>"
 
-#: app/routes/signup/index.tsx:411
+#: app/routes/signup/index.tsx:410
 msgid "We've sent a verification link to <0>{sentEmail}</0>. Open it on this device to finish setting up your passkey."
 msgstr "We've sent a verification link to <0>{sentEmail}</0>. Open it on this device to finish setting up your passkey."
 
@@ -1075,7 +1083,7 @@ msgid "While Datum is currently free of charge to use, we require a valid paymen
 msgstr "While Datum is currently free of charge to use, we require a valid payment method during the signup process."
 
 #: app/routes/recover/index.tsx:351
-#: app/routes/signup/index.tsx:471
+#: app/routes/signup/index.tsx:470
 msgid "Wrong address? Start over"
 msgstr "Wrong address? Start over"
 

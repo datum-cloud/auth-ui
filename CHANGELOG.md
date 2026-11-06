@@ -6,6 +6,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+- Email signup now asks for first and last name alongside the email address, and
+  the account is created with that name. Previously the name was copied from the
+  email address (e.g. "jane.doe jane.doe") until the user completed their profile
+  in the portal.
+
 ### Fixed
 - Signing in with an external identity provider (e.g. GitHub) stored the provider's
   own username in the session instead of the Datum login name, so "Add passkey"

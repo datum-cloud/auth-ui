@@ -9,18 +9,17 @@ import { callService } from '../../../support/node/call-service';
 // ── Action: email identifier ──────────────────────────────────────────────────
 
 describe('signup/index — action: email identifier', () => {
-  // This used to assert a 302 to /signup/method carrying loginName + the duplicated placeholder
-  // name in the query. The interstitial is gone from the flow: /signup registers inline, so the
-  // derived name never enters a URL (which also means it can no longer be edited in transit).
-  // The derivation itself stays covered by resources/signup/placeholder-name.cy.ts.
-  it('registers and returns the generic check-your-email terminal, not a redirect', () => {
+  // This used to assert a 302 to /signup/method carrying loginName + a placeholder name derived
+  // from the address. /signup now registers inline with the name the user typed.
+  it('registers with the typed name and returns the generic check-your-email terminal', () => {
     callService({
       fn: 'signupIndexAction',
       provider: 'singleton',
       env: { AUTH_EMAIL_DELIVERY_ENABLED: 'true' },
+      recordCalls: ['register'],
       request: {
         url: 'http://localhost/id/signup',
-        form: { email: 'john.doe@example.com' },
+        form: { email: 'john.doe@example.com', firstName: ' John ', lastName: 'Doe' },
         csrf: true,
       },
     }).then((v) => {
@@ -29,6 +28,29 @@ describe('signup/index — action: email identifier', () => {
       const body = v.response?.dataBody as Record<string, unknown> | undefined;
       expect(body?.sent).to.equal(true);
       expect(body?.email).to.equal('john.doe@example.com');
+
+      // The account is created with the typed (trimmed) name, never the email-derived placeholder.
+      const registered = (v.calls?.register ?? []) as Array<[Record<string, unknown>]>;
+      expect(registered).to.have.length(1);
+      expect(registered[0][0]).to.include({ firstName: 'John', lastName: 'Doe' });
+    });
+  });
+
+  it('returns 400 INVALID_INPUT without a first and last name, registering nothing', () => {
+    callService({
+      fn: 'signupIndexAction',
+      provider: 'singleton',
+      env: { AUTH_EMAIL_DELIVERY_ENABLED: 'true' },
+      recordCalls: ['register'],
+      request: {
+        url: 'http://localhost/id/signup',
+        form: { email: 'no.name@example.com' },
+        csrf: true,
+      },
+    }).then((v) => {
+      expect(v.response?.dataStatus).to.equal(400);
+      expect(v.response?.dataBody).to.have.property('error', 'INVALID_INPUT');
+      expect(v.calls?.register ?? []).to.have.length(0);
     });
   });
 
@@ -42,7 +64,7 @@ describe('signup/index — action: email identifier', () => {
       env: { AUTH_EMAIL_DELIVERY_ENABLED: 'false' },
       request: {
         url: 'http://localhost/id/signup',
-        form: { email: 'delivery-off@example.com' },
+        form: { email: 'delivery-off@example.com', firstName: 'Ada', lastName: 'Lovelace' },
         csrf: true,
       },
     }).then((v) => {
