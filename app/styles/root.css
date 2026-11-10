@@ -37,11 +37,22 @@
 }
 
 /* 755-M5 / M3 / M4 — color tokens: auth-ui uses datum-ui's ORIGINAL alpha-theme colors as the single
-   source of truth (NO --primary / --btn-primary / --muted-foreground overrides). Three of them
+   source of truth (NO --primary / --btn-primary overrides; the dark-only exceptions are below). Three of them
    (the light canyon-clay primary button, and --primary / --destructive used as text colours in the
    light theme) fall short of WCAG AA contrast — a datum-ui alpha-theme concern to be fixed UPSTREAM
    (Phase 6), not patched here. The cypress-axe `color-contrast` rule stays ON; cypress/support/a11y.ts
-   exempts only those three selectors. Drop each exemption once datum-ui's theme passes AA. */
+   exempts only those three selectors. Drop each exemption once datum-ui's theme passes AA.
+
+   Two dark-theme overrides, until datum-ui's dark theme passes AA on its own card surface
+   (--card, #223143), where auth forms sit:
+   - --destructive reuses the light red (--alert-red-light, 3.39:1 on the card). Dark points it
+     at datum-ui's own --alert-red-dark (5.56:1).
+   - --muted-foreground (--app-dark-utility-4, oklch 0.67) is 4.43:1 on the card, and datum-ui has
+     no lighter neutral below its 0.913 near-white. Same hue, lightened to 0.70: 4.96:1. */
+.dark {
+  --destructive: var(--alert-red-dark);
+  --muted-foreground: oklch(0.7 0.011 248);
+}
 
 /* Required-field asterisk: datum-ui's Form.Field renders it as span[aria-hidden] at
    text-destructive/80. Point it at datum-ui's --destructive token (theme-aware for light + dark)
