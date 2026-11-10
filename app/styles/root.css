@@ -37,11 +37,11 @@
 }
 
 /* 755-M5 / M3 / M4 — color tokens: auth-ui uses datum-ui's ORIGINAL alpha-theme colors as the single
-   source of truth (NO --primary / --btn-primary / --muted-foreground overrides). Some of those tokens
-   (the light canyon-clay primary button, the muted side-panel text) fall short of WCAG AA contrast —
-   that is a datum-ui alpha-theme concern to be fixed UPSTREAM (Phase 6), not patched here. The
-   cypress-axe `color-contrast` rule is correspondingly disabled in cypress/support/a11y.ts so the
-   a11y gate doesn't fail on datum-ui's tokens; re-enable it once datum-ui's theme passes AA. */
+   source of truth (NO --primary / --btn-primary / --muted-foreground overrides). Three of them
+   (the light canyon-clay primary button, and --primary / --destructive used as text colours in the
+   light theme) fall short of WCAG AA contrast — a datum-ui alpha-theme concern to be fixed UPSTREAM
+   (Phase 6), not patched here. The cypress-axe `color-contrast` rule stays ON; cypress/support/a11y.ts
+   exempts only those three selectors. Drop each exemption once datum-ui's theme passes AA. */
 
 /* Required-field asterisk: datum-ui's Form.Field renders it as span[aria-hidden] at
    text-destructive/80. Point it at datum-ui's --destructive token (theme-aware for light + dark)

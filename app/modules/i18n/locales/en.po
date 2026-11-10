@@ -142,7 +142,7 @@ msgstr "Back"
 msgid "Back to sign in"
 msgstr "Back to sign in"
 
-#: app/layouts/split.layout.tsx:33
+#: app/layouts/split.layout.tsx:39
 msgid "By continuing, you agree to Datum's <0>Terms of Service</0> and <1>Privacy Policy</1>, and to receive periodic emails with updates."
 msgstr "By continuing, you agree to Datum's <0>Terms of Service</0> and <1>Privacy Policy</1>, and to receive periodic emails with updates."
 
@@ -415,7 +415,7 @@ msgstr "Get started"
 msgid "Go to sign in"
 msgstr "Go to sign in"
 
-#: app/layouts/split.layout.tsx:105
+#: app/layouts/split.layout.tsx:111
 msgid "If you prefer a demo, just <0>reach out</0>."
 msgstr "If you prefer a demo, just <0>reach out</0>."
 
@@ -856,7 +856,7 @@ msgstr "Something went wrong. Please try again."
 msgid "Start over"
 msgstr "Start over"
 
-#: app/layouts/split.layout.tsx:117
+#: app/layouts/split.layout.tsx:123
 msgid "Thanks,"
 msgstr "Thanks,"
 
@@ -927,7 +927,7 @@ msgstr "This device was not granted access. You may close this window."
 msgid "This directory account can't be linked here yet. Sign in with your password instead."
 msgstr "This directory account can't be linked here yet. Sign in with your password instead."
 
-#: app/layouts/split.layout.tsx:101
+#: app/layouts/split.layout.tsx:107
 msgid "This helps us keep our platform stable by heading off fraud and abusive behavior."
 msgstr "This helps us keep our platform stable by heading off fraud and abusive behavior."
 
@@ -1078,7 +1078,7 @@ msgstr "We've sent a verification link to <0>{sentEmail}</0>. Open it on this de
 msgid "Welcome"
 msgstr "Welcome"
 
-#: app/layouts/split.layout.tsx:96
+#: app/layouts/split.layout.tsx:102
 msgid "While Datum is currently free of charge to use, we require a valid payment method during the signup process."
 msgstr "While Datum is currently free of charge to use, we require a valid payment method during the signup process."
 

@@ -18,10 +18,16 @@ export default function SplitLayout({
 }) {
   const signatureUrl = assetUrl('/images/zac-sign.svg');
 
+  // ONE breakpoint (lg, 1024px) drives both the two-column grid and the marketing panel's
+  // visibility. Below it the page is the form alone: at tablet widths (768-1023px) half the
+  // viewport is too narrow for either panel, and showing the panel without the second
+  // column stacked it under the form. Surfaces are datum-ui theme tokens, so light and dark
+  // both follow the theme: the form panel is the raised `card` surface (white in light),
+  // the marketing panel the page `background`.
   return (
     <div className="grid min-h-svh lg:grid-cols-2">
       {/* Left panel is the login form.*/}
-      <div className="relative flex min-h-screen w-full flex-col bg-white p-3 sm:p-4 md:px-[41px] md:py-8 dark:bg-[#19293B]">
+      <div className="bg-card relative flex min-h-screen w-full flex-col p-3 sm:p-4 md:px-[41px] md:py-8">
         <div className="flex items-center justify-between">
           <BrandLogo branding={branding} />
         </div>
@@ -54,7 +60,7 @@ export default function SplitLayout({
       {/* Right panel is a marketing / branding panel.*/}
       <aside
         aria-label="Datum overview"
-        className="bg-background relative hidden min-h-screen w-full flex-col p-3 sm:p-4 md:flex md:px-[41px] md:py-8 dark:bg-[#132336]">
+        className="bg-background relative hidden min-h-screen w-full flex-col px-[41px] py-8 lg:flex">
         <div className="flex items-center justify-end">
           <LinkButton
             type="quaternary"
@@ -92,7 +98,7 @@ export default function SplitLayout({
               />
             </div>
 
-            <div className="text-muted-foreground stretch dark:text-card-quaternary leading-6">
+            <div className="text-foreground/70 stretch dark:text-card-quaternary leading-6">
               <Trans>
                 While Datum is currently free of charge to use, we require a valid payment method
                 during the signup process.
@@ -133,27 +139,29 @@ export default function SplitLayout({
                 />
                 <AvatarFallback>ZS</AvatarFallback>
               </Avatar>
-              <span className="text-muted-foreground dark:text-card-quaternary leading-4">
+              <span className="text-foreground/70 dark:text-card-quaternary leading-4">
                 Zac Smith
               </span>
-              {/* Full-opacity --muted-foreground (not /80). At 12px the /80 alpha composites
-                  to ≈3.8:1 on the cream panel (fails WCAG AA); full opacity clears ≈6:1 in light and
-                  keeps dark mode's own muted token. */}
-              <span className="text-muted-foreground dark:text-card-quaternary text-xs">
+              {/* Panel copy uses foreground/70, the same tone as the form footer. The
+                  muted-foreground token measures 4.46:1 on the light panel background, just under
+                  WCAG AA's 4.5:1; foreground/70 clears it. Dark keeps card-quaternary. */}
+              <span className="text-foreground/70 dark:text-card-quaternary text-xs">
                 Co-founder and CEO
               </span>
             </div>
 
             {/* 95×38 signature (transparent-RGBA raster wrapped in SVG) recoloured via CSS mask:
                 the asset's alpha is the stencil and background-color paints it, so the single-colour
-                mark takes an exact hue per theme — #060606 ink in light (matches the source raster)
-                and #e6ede0 in dark so it reads on the dark panel. A mask beats filter:invert here
-                because invert only flips pixels and can never land on a specific colour. w-24/h-[38px]
+                mark takes an exact hue per theme. Light keeps the literal #060606 ink because it
+                must match the source raster, and no theme token is that near-black; dark uses the
+                card-quaternary token, the same one the text above it uses on the dark panel. A mask
+                beats filter:invert here because invert only flips pixels and can never land on a
+                specific colour. w-24/h-[38px]
                 pin the box (CLS) and mask-size:contain keeps the strokes crisp. The -webkit- prefixes
                 cover Safari. Design note (asset pending): a true vector signature is still wanted. */}
             <span
               aria-hidden="true"
-              className="inline-block h-[38px] w-24 bg-[#060606] dark:bg-[#e6ede0]"
+              className="dark:bg-card-quaternary inline-block h-[38px] w-24 bg-[#060606]"
               style={{
                 maskImage: `url(${signatureUrl})`,
                 WebkitMaskImage: `url(${signatureUrl})`,
@@ -168,7 +176,7 @@ export default function SplitLayout({
           </div>
         </div>
 
-        <div className="absolute right-0 bottom-0 z-0 max-w-[500px] md:max-w-[800px]">
+        <div className="absolute right-0 bottom-0 z-0 max-w-[800px]">
           {/* Intrinsic 707×155 raster line-art stretched into a fluid box up to 800px wide,
               so it currently upscales (soft). width/height pin the aspect ratio for CLS; object-contain
               avoids the crop/extra blur object-cover introduced. Design note (asset pending): replace with a vector

@@ -6,6 +6,7 @@
  *   2. Focus order / keyboard — DOM-order assertions using compareDocumentPosition
  *   3. prefers-reduced-motion — absence of entrance-animation CSS classes
  */
+import { configureContrastExemptions, failWithViolations } from '../../../support/a11y';
 import { AuthCeremony } from '@/components/auth-ceremony/auth-ceremony';
 import { OtpCodeField } from '@/components/auth-ceremony/otp-code-field';
 import { AuthFormFields } from '@/components/auth-form/auth-form-fields';
@@ -57,7 +58,6 @@ const FOCUSABLE_SEL = [
  */
 const AXE_COMPONENT_RULES = {
   rules: {
-    'color-contrast': { enabled: false },
     'document-title': { enabled: false },
     'html-has-lang': { enabled: false },
     'landmark-one-main': { enabled: false },
@@ -67,7 +67,8 @@ const AXE_COMPONENT_RULES = {
 
 function checkComponentA11y() {
   cy.injectAxe();
-  cy.checkA11y('[data-cy-root]', AXE_COMPONENT_RULES);
+  configureContrastExemptions();
+  cy.checkA11y('[data-cy-root]', AXE_COMPONENT_RULES, failWithViolations);
 }
 
 describe('a11y guard — axe structural/aria (0 violations)', () => {
@@ -106,10 +107,12 @@ describe('a11y guard — axe structural/aria (0 violations)', () => {
       cy.mount(surface.node, surface.opts);
       if (i === 0) {
         // axe persists on the AUT window across mounts within a test — inject
-        // once after the first mount instead of re-evaluating the bundle per row.
+        // once after the first mount instead of re-evaluating the bundle per row. The
+        // contrast exemptions are axe configuration, so they persist the same way.
         cy.injectAxe();
+        configureContrastExemptions();
       }
-      cy.checkA11y('[data-cy-root]', AXE_COMPONENT_RULES);
+      cy.checkA11y('[data-cy-root]', AXE_COMPONENT_RULES, failWithViolations);
     });
   });
 
