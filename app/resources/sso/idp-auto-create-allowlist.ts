@@ -3,7 +3,7 @@
  * TEMPORARY — staging dual-org interim. Delete this module, its two env flags
  * (`IDP_AUTO_CREATE_EMAIL_DOMAINS`, `IDP_AUTO_CREATE_ALIAS_TAG`), the single call site in
  * `sso-callback.ts`, and ADR 007 once staging runs one Zitadel org for humans like production
- * (design: docs/superpowers/specs/2026-09-21-staging-single-org-migration-design.md).
+ * (decision and sunset: docs/architecture/adrs/007-staging-idp-auto-create-allowlist.md).
  *
  * WHY. Staging pins the staff portal to a Zitadel org whose login policy disallows
  * registration, so a new staff member's first Google sign-in dead-ends on `creation-disabled`
