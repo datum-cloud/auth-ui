@@ -67,10 +67,10 @@ function cypressSeam() {
  * verify submits are tagged passkeyCeremony so neither /login's nor /login/passkey's
  * loader re-mints mid-flight (the discover hop bypasses RR entirely — see submitDiscover).
  * ONE-SHOT by design: abort() — form submit, inline-ceremony takeover — permanently
- * retires it. Every failure is a designed NON-EVENT (the ordinary form is already on
- * screen). A rejected assertion re-fetches + re-arms exactly once in hinted mode; in
- * discovery mode it stops silently (a cross-device QR passkey must never be forced
- * through a second phone round-trip).
+ * retires it, and unmounting aborts the parked request the same way. Every failure is
+ * a designed NON-EVENT (the ordinary form is already on screen). A rejected assertion
+ * re-fetches + re-arms exactly once in hinted mode; in discovery mode it stops silently
+ * (a cross-device QR passkey must never be forced through a second phone round-trip).
  */
 export function useConditionalPasskey(input: ConditionalPasskeyInput) {
   const mode = input.mode ?? 'hinted';
@@ -95,7 +95,23 @@ export function useConditionalPasskey(input: ConditionalPasskeyInput) {
   const retriedRef = useRef(false); // expired-challenge re-arm, once (hinted only)
   const abortedRef = useRef(false); // abort() latch for the async discovery stages
   const explicitRef = useRef(false); // true while a button-initiated (modal) flow runs
+  const unmountedRef = useRef(false); // true once the host component has really unmounted
   const abortRef = useRef<AbortController | null>(null);
+
+  /** True once nothing may fire any more: abort() was called, or the host unmounted. */
+  const isRetired = useCallback(() => abortedRef.current || unmountedRef.current, []);
+
+  // Unmount: abort the parked conditional request so it cannot outlive the page. Setup
+  // clears the flag again because StrictMode runs cleanup + setup once on mount, and that
+  // simulated unmount must not retire the ceremony (the arm latch is left untouched).
+  useEffect(() => {
+    unmountedRef.current = false;
+    return () => {
+      unmountedRef.current = true;
+      abortRef.current?.abort();
+      abortRef.current = null;
+    };
+  }, []);
 
   const verifyPath = useCallback(
     (loginName: string) =>
@@ -127,37 +143,42 @@ export function useConditionalPasskey(input: ConditionalPasskeyInput) {
   );
 
   /** Discovery handoff: run the MODAL ceremony over the discover-returned real challenge. */
-  const completeDiscovery = useCallback(async (d: DiscoverResponse) => {
-    const { fake } = cypressSeam();
-    if (fake) {
-      // Headless can't run a modal ceremony; the pre-baked credential stands in for
-      // assertion #2 exactly as it does for the other ceremony hooks.
-      setPendingVerify({
-        csrfToken: d.csrfToken,
-        credential: CYPRESS_CREDENTIAL,
-        loginName: d.loginName,
-      });
-      return;
-    }
-    try {
-      const credential = await marshalAssertion(
-        unwrapPublicKey(d.publicKeyCredentialRequestOptions) as WebAuthnChallengeInput
-      );
-      // The single biometric of the whole flow fires here (identity tap was UV
-      // 'discouraged'; this real challenge is UV 'required').
-      setPendingVerify({ csrfToken: d.csrfToken, credential, loginName: d.loginName });
-    } catch {
-      // Modal cancel / ceremony failure — designed non-event, never retried.
-      setPhase('done');
-    }
-  }, []);
+  const completeDiscovery = useCallback(
+    async (d: DiscoverResponse) => {
+      const { fake } = cypressSeam();
+      if (fake) {
+        // Headless can't run a modal ceremony; the pre-baked credential stands in for
+        // assertion #2 exactly as it does for the other ceremony hooks.
+        if (isRetired()) return;
+        setPendingVerify({
+          csrfToken: d.csrfToken,
+          credential: CYPRESS_CREDENTIAL,
+          loginName: d.loginName,
+        });
+        return;
+      }
+      try {
+        const credential = await marshalAssertion(
+          unwrapPublicKey(d.publicKeyCredentialRequestOptions) as WebAuthnChallengeInput
+        );
+        if (isRetired()) return;
+        // The single biometric of the whole flow fires here (identity tap was UV
+        // 'discouraged'; this real challenge is UV 'required').
+        setPendingVerify({ csrfToken: d.csrfToken, credential, loginName: d.loginName });
+      } catch {
+        // Modal cancel / ceremony failure — designed non-event, never retried.
+        setPhase('done');
+      }
+    },
+    [isRetired]
+  );
 
   // Staged verify dispatch (see the pendingVerify comment above).
   useEffect(() => {
-    if (!pendingVerify || abortedRef.current) return;
+    if (!pendingVerify || isRetired()) return;
     setPendingVerify(null);
     submit(pendingVerify.csrfToken, pendingVerify.credential, pendingVerify.loginName);
-  }, [pendingVerify, submit]);
+  }, [pendingVerify, submit, isRetired]);
 
   /**
    * Discovery: post the identity assertion (assertion #1) to the discover action.
@@ -170,6 +191,7 @@ export function useConditionalPasskey(input: ConditionalPasskeyInput) {
    */
   const submitDiscover = useCallback(
     async (csrfToken: string, credential: Record<string, unknown>) => {
+      if (isRetired()) return;
       setPhase('submitting');
       try {
         const res = await fetch(`${APP_BASENAME}${paths.login.passkeyDiscover()}`, {
@@ -182,14 +204,14 @@ export function useConditionalPasskey(input: ConditionalPasskeyInput) {
             ...(input.organization ? { organization: input.organization } : {}),
           }),
         });
-        if (abortedRef.current) return;
+        if (isRetired()) return;
         // 409 = the tapped credential belongs to an account this browser is ALREADY
         // signed into. Not a failure: send the user there rather than showing ceremony
         // error copy for a session that already exists. Full navigation, not RR
         // routing — the destination resolves the session server-side.
         if (res.status === 409) {
           const body = (await res.json().catch(() => null)) as { loginName?: string } | null;
-          if (abortedRef.current) return;
+          if (isRetired()) return;
           setPhase('done');
           if (typeof body?.loginName === 'string' && body.loginName.length > 0) {
             // Land on the ACCOUNTS PICKER, not /signed-in. /signed-in resolves
@@ -225,7 +247,7 @@ export function useConditionalPasskey(input: ConditionalPasskeyInput) {
           return;
         }
         const d = (await res.json()) as Partial<DiscoverResponse> | null;
-        if (abortedRef.current) return;
+        if (isRetired()) return;
         if (
           !d ||
           typeof d.loginName !== 'string' ||
@@ -244,7 +266,7 @@ export function useConditionalPasskey(input: ConditionalPasskeyInput) {
         setPhase('done');
       }
     },
-    [completeDiscovery]
+    [completeDiscovery, isRetired]
   );
 
   /**
@@ -313,6 +335,8 @@ export function useConditionalPasskey(input: ConditionalPasskeyInput) {
       };
       if (typeof pkc.isConditionalMediationAvailable !== 'function') return;
       if (!(await pkc.isConditionalMediationAvailable())) return;
+      // Unmounted or abort()ed while detection was pending: never park a request.
+      if (isRetired()) return;
       const controller = new AbortController();
       abortRef.current = controller;
       setPhase('armed');
@@ -321,6 +345,9 @@ export function useConditionalPasskey(input: ConditionalPasskeyInput) {
           unwrapPublicKey(options) as WebAuthnChallengeInput,
           { mediation: 'conditional', signal: controller.signal }
         );
+        // The browser can still deliver an assertion that raced the abort (unmount or
+        // abort()); it must not reach the verify action or the discover endpoint.
+        if (controller.signal.aborted || isRetired()) return;
         if (mode === 'discovery') void submitDiscover(csrfToken, credential);
         else submit(csrfToken, credential, input.loginName);
       } catch {
@@ -328,7 +355,7 @@ export function useConditionalPasskey(input: ConditionalPasskeyInput) {
         setPhase('done');
       }
     },
-    [mode, input.loginName, submit, submitDiscover]
+    [mode, input.loginName, submit, submitDiscover, isRetired]
   );
 
   // Arm once when enabled with a loader-minted challenge.
