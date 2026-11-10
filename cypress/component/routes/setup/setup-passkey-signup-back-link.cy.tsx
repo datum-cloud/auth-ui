@@ -34,7 +34,7 @@ const IDENTITY = {
 };
 
 /** Mounts /setup/passkey with a real /setup/mfa sibling, so a rendered Back has a target. */
-function mountPasskey(returnTo?: string) {
+function mountPasskey(returnTo?: string, recoveryEnabled = false) {
   const router = createMemoryRouter(
     [
       { id: 'setup-passkey', path: '/setup/passkey', element: <SetupPasskey /> },
@@ -44,7 +44,13 @@ function mountPasskey(returnTo?: string) {
       initialEntries: ['/setup/passkey'],
       hydrationData: {
         loaderData: {
-          'setup-passkey': { ...IDENTITY, force: 'false', checkAfter: 'false', returnTo },
+          'setup-passkey': {
+            ...IDENTITY,
+            force: 'false',
+            checkAfter: 'false',
+            returnTo,
+            recoveryEnabled,
+          },
         },
       },
     }
@@ -52,18 +58,20 @@ function mountPasskey(returnTo?: string) {
   return mount(withProviders(<RouterProvider router={router} />));
 }
 
-// TEMPORARY — remove with the alert itself when Phase C ships account recovery.
-//
-// Abandoning enrolment here strands the account permanently: the email is already verified
-// (that step enrolled otpEmail), so a retry returns ALREADY_EXISTS, while otpEmail is not a
-// primary factor and cannot sign anyone in. The warning is the only thing standing between a
-// closed tab and an unreachable account, so its presence is pinned rather than incidental.
-describe('/setup/passkey — signup leg warns that leaving strands the account', () => {
-  const WARNING = /Please finish setting up your passkey before leaving this page/i;
+const SIGNUP_RETURN_TO = '/signup/success?loginName=a%40b.test&requestId=rq1';
+const WARNING = /Please finish setting up your passkey before leaving this page/i;
+const RECOVERABLE = /you can set it up later through account recovery/i;
 
+// With self-serve recovery OFF (AUTH_ACCOUNT_RECOVERY_ENABLED unset), abandoning enrolment here
+// strands the account: the email is already verified (that step enrolled otpEmail), so a retry
+// returns ALREADY_EXISTS, while otpEmail is not a primary factor and cannot sign anyone in. The
+// warning is the only thing standing between a closed tab and an unreachable account, so its
+// presence is pinned rather than incidental.
+describe('/setup/passkey — signup leg, recovery off: warns that leaving strands the account', () => {
   it('warns when returnTo points back into signup', () => {
-    mountPasskey('/signup/success?loginName=a%40b.test&requestId=rq1');
+    mountPasskey(SIGNUP_RETURN_TO);
     cy.contains(WARNING).should('be.visible');
+    cy.contains(RECOVERABLE).should('not.exist');
   });
 
   // A security-settings enrolment is additive — that account already works, so the warning
@@ -75,6 +83,23 @@ describe('/setup/passkey — signup leg warns that leaving strands the account',
 
   it('stays silent when no returnTo is threaded at all', () => {
     mountPasskey(undefined);
+    cy.contains(WARNING).should('not.exist');
+  });
+});
+
+// With recovery ON, /recover resumes an unfinished signup, so "your account won't be usable"
+// is no longer true. The signup leg gets a calm note pointing at recovery instead.
+describe('/setup/passkey — signup leg, recovery on: no lockout warning', () => {
+  it('replaces the warning with a recovery note on the signup leg', () => {
+    mountPasskey(SIGNUP_RETURN_TO, true);
+    cy.contains(RECOVERABLE).should('be.visible');
+    cy.contains(WARNING).should('not.exist');
+    cy.contains("won't be usable").should('not.exist');
+  });
+
+  it('stays silent for a security-settings enrolment', () => {
+    mountPasskey('/passkeys', true);
+    cy.contains(RECOVERABLE).should('not.exist');
     cy.contains(WARNING).should('not.exist');
   });
 });

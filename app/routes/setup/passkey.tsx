@@ -49,6 +49,7 @@ export default function SetupPasskey() {
     publicKey,
     challengeFailed,
     returnTo,
+    recoveryEnabled,
   } = useLoaderData<typeof loader>();
   const actionData = useActionData() as WebAuthnEnrollActionData | undefined;
   const formRef = useRef<HTMLFormElement>(null);
@@ -121,21 +122,32 @@ export default function SetupPasskey() {
          assumes an already-established account. Hide the control for the signup leg;
          security-settings visits (returnTo=/passkeys) keep it. */
       showBackLink={!isSignupEnrollment(returnTo)}>
-      {/* TEMPORARY — delete when Phase C ships account recovery.
-          Leaving this page strands the account with no way back in: verification already ran
-          (enrolling otpEmail), so a retried signup answers ALREADY_EXISTS, while otpEmail is
-          not a primary factor and signs nobody in. Until recovery exists, saying so plainly is
-          the only protection the user gets. Signup leg only — a security-settings enrolment is
-          additive, and the warning would be false there. */}
+      {/* Signup leg only — a security-settings enrolment is additive, so neither note applies.
+          Verification already ran (enrolling otpEmail), so a retried signup answers
+          ALREADY_EXISTS, while otpEmail is not a primary factor and signs nobody in. With
+          self-serve recovery off, leaving this page strands the account and the warning is the
+          only protection the user gets. With it on (/recover resumes an unfinished signup), the
+          account stays reachable, so the copy says that instead of threatening a lockout. */}
       {isSignupEnrollment(returnTo) ? (
-        <Alert variant="warning">
-          <AlertDescription>
-            <Trans>
-              Please finish setting up your passkey before leaving this page. It will be the only
-              way to sign in, and your account won't be usable without it.
-            </Trans>
-          </AlertDescription>
-        </Alert>
+        recoveryEnabled ? (
+          <Alert variant="info">
+            <AlertDescription>
+              <Trans>
+                Finish setting up your passkey to sign in. If you leave this page first, you can set
+                it up later through account recovery.
+              </Trans>
+            </AlertDescription>
+          </Alert>
+        ) : (
+          <Alert variant="warning">
+            <AlertDescription>
+              <Trans>
+                Please finish setting up your passkey before leaving this page. It will be the only
+                way to sign in, and your account won't be usable without it.
+              </Trans>
+            </AlertDescription>
+          </Alert>
+        )
       ) : null}
       {/* One form spans both steps — the hidden fields ride along on the step-2 submit. */}
       <RRForm ref={formRef} method="POST" className="flex w-full flex-col gap-4">

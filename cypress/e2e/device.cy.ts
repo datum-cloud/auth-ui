@@ -22,9 +22,10 @@ describe('Device code entry (/device)', () => {
 
     checkA11y();
 
-    // Consent screen must show the app name and scope from the seeded device auth.
+    // Consent screen must show the app name and the seeded device auth's scope, described in
+    // plain language (openid → "Confirm your identity") rather than as a raw identifier.
     cy.contains(/CLI/i).should('be.visible');
-    cy.contains(/openid/i).should('be.visible');
+    cy.contains(/confirm your identity/i).should('be.visible');
 
     // Authorize — scope the selector to a button to avoid matching the card title.
     cy.contains('button', /^authorize$/i).click();

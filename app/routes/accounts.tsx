@@ -16,14 +16,17 @@ import { providerForRequest } from '@/server/auth-context.server';
 import { loaderCsrf, assertCsrf } from '@/server/csrf';
 import { Badge } from '@datum-cloud/datum-ui/badge';
 import { Button, LinkButton } from '@datum-cloud/datum-ui/button';
+import { Dialog } from '@datum-cloud/datum-ui/dialog';
 import { Icon } from '@datum-cloud/datum-ui/icons';
-import { Trans } from '@lingui/react/macro';
+import { Trans, useLingui } from '@lingui/react/macro';
 import { Trash2 } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import {
   data,
   redirect,
   useLoaderData,
   useActionData,
+  useNavigation,
   type ActionFunctionArgs,
   type LoaderFunctionArgs,
   type MetaFunction,
@@ -133,6 +136,92 @@ export function addAccountHref({
 
 // ─── Component ───────────────────────────────────────────────────────────────
 
+interface RemoveAccountDialogProps {
+  sessionId: string;
+  /** Display name, else login name — names the account in the trigger label and the dialog. */
+  accountLabel: string;
+  csrfToken: string;
+  requestId: string | undefined;
+  organization: string | undefined;
+  userCode: string | null;
+}
+
+/**
+ * Confirm-before-remove dialog for one account row. The destructive submit lives inside the
+ * dialog so a stray click on the trash icon can't sign an account out (mirrors the passkeys
+ * RemoveConfirmDialog). The remove form keeps the same hidden fields it had as an inline form.
+ */
+function RemoveAccountDialog({
+  sessionId,
+  accountLabel,
+  csrfToken,
+  requestId,
+  organization,
+  userCode,
+}: RemoveAccountDialogProps) {
+  const [open, setOpen] = useState(false);
+  const actionData = useActionData();
+  const navigation = useNavigation();
+  const { t } = useLingui();
+  // Scoped to THIS row: useNavigation is global and every account row renders its own dialog —
+  // matching on sessionId keeps one row's removal from spinning all of them.
+  const removing =
+    navigation.state !== 'idle' &&
+    navigation.formData?.get('intent') === 'remove' &&
+    navigation.formData?.get('sessionId') === sessionId;
+  // Close when an action result lands, so an inline error is not hidden behind the overlay.
+  useEffect(() => {
+    if (actionData !== undefined) setOpen(false);
+  }, [actionData]);
+  return (
+    <Dialog open={open} onOpenChange={setOpen}>
+      <Dialog.Trigger asChild>
+        <Button
+          size="xs"
+          theme="link"
+          type="danger"
+          htmlType="button"
+          className="text-destructive p-0"
+          aria-label={t`Remove ${accountLabel}`}
+          title={t`Remove ${accountLabel}`}>
+          <Icon icon={Trash2} size={16} />
+        </Button>
+      </Dialog.Trigger>
+      <Dialog.Content>
+        <Dialog.Header
+          title={<Trans>Remove this account?</Trans>}
+          description={
+            <Trans>
+              "{accountLabel}" will be signed out on this device. You can sign in again at any time.
+            </Trans>
+          }
+        />
+        <Dialog.Footer>
+          <Button
+            type="secondary"
+            theme="outline"
+            htmlType="button"
+            disabled={removing}
+            onClick={() => setOpen(false)}>
+            <Trans>Cancel</Trans>
+          </Button>
+          <RRForm method="POST">
+            {/* Preserve the ceremony id on the post-remove redirect back to /accounts. */}
+            <AuthFormFields csrf={csrfToken} requestId={requestId} organization={organization} />
+            <input type="hidden" name="intent" value="remove" />
+            <input type="hidden" name="sessionId" value={sessionId} />
+            {/* Device "change account": keep the device context after a mid-flow remove. */}
+            {userCode ? <input type="hidden" name="userCode" value={userCode} /> : null}
+            <Button type="danger" theme="solid" htmlType="submit" loading={removing}>
+              <Trans>Remove account</Trans>
+            </Button>
+          </RRForm>
+        </Dialog.Footer>
+      </Dialog.Content>
+    </Dialog>
+  );
+}
+
 export default function AccountPicker() {
   const { csrfToken, accounts, requestId, organization, userCode, reauthMismatch } =
     useLoaderData<typeof loader>();
@@ -178,9 +267,9 @@ export default function AccountPicker() {
         ) : (
           <>
             {/* Each row is itself the SWITCH target: the row-level <button type=submit> wraps
-                the account info. The remove control is a SEPARATE sibling form — never nested
-                inside the switch button — so there are no nested interactives (the prod a11y
-                build rejects <button><button>/<button><a>). */}
+                the account info. The remove control is a SEPARATE sibling (a confirm dialog that
+                owns its own form) — never nested inside the switch button — so there are no
+                nested interactives (the prod a11y build rejects <button><button>/<button><a>). */}
             {accounts.map((account) => (
               <div key={account.sessionId} className="flex items-stretch gap-2 rounded-lg border">
                 {/* Switch form: the whole account-info area is the submit control. */}
@@ -230,28 +319,17 @@ export default function AccountPicker() {
                   </button>
                 </RRForm>
 
-                {/* Remove form — sibling, NOT nested in the switch button. */}
-                <RRForm method="POST" className="flex shrink-0 items-center pr-2">
-                  {/* Preserve the ceremony id on the post-remove redirect back to /accounts. */}
-                  <AuthFormFields
-                    csrf={csrfToken}
+                {/* Remove control — sibling, NOT nested in the switch button. */}
+                <div className="flex shrink-0 items-center pr-2">
+                  <RemoveAccountDialog
+                    sessionId={account.sessionId}
+                    accountLabel={account.displayName ?? account.loginName}
+                    csrfToken={csrfToken}
                     requestId={requestId ?? undefined}
                     organization={organization}
+                    userCode={userCode}
                   />
-                  <input type="hidden" name="intent" value="remove" />
-                  <input type="hidden" name="sessionId" value={account.sessionId} />
-                  {/* Device "change account": keep the device context after a mid-flow remove. */}
-                  {userCode ? <input type="hidden" name="userCode" value={userCode} /> : null}
-                  <Button
-                    size="xs"
-                    theme="link"
-                    type="danger"
-                    htmlType="submit"
-                    className="text-destructive p-0"
-                    aria-label="Remove account">
-                    <Icon icon={Trash2} size={16} />
-                  </Button>
-                </RRForm>
+                </div>
               </div>
             ))}
 

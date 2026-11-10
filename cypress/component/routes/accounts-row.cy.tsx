@@ -8,6 +8,8 @@
 // are covered by inline-action-error.cy.tsx which uses the same approach. Second-pass
 // trim: keeps the CSRF-bearing switch form, the separate-remove-form safety property,
 // and the IdP badge branch; requestId-threading and plain-login-link permutations cut.
+// The remove form now lives inside a confirm dialog (accounts-remove-confirm.cy.tsx owns the
+// dialog behaviour), so these tests open it before reading the form.
 import AccountPicker, { addAccountHref } from '@/routes/accounts';
 import { ConformAdapter } from '@datum-cloud/datum-ui/form/adapters/conform';
 import { setupI18n } from '@lingui/core';
@@ -57,6 +59,7 @@ describe('accounts row — switch form structure', () => {
       cy.get('input[name="sessionId"]').should('have.value', 's1');
       cy.get('input[name="csrf"]').should('have.value', 'csrf-tok');
     });
+    cy.get('button[aria-label="Remove Alice"]').click();
     cy.get('form:has(input[name="intent"][value="remove"])')
       .find('button[type="submit"]')
       .should('exist');
@@ -81,6 +84,7 @@ describe('accounts row — switch form structure', () => {
       cy.get('input[name="requestId"]').should('have.value', 'oidc_V2_123');
       cy.get('input[name="organization"]').should('have.value', 'org-1');
     });
+    cy.get('button[aria-label="Remove Alice"]').click();
     cy.get('form:has(input[name="intent"][value="remove"])').within(() => {
       cy.get('input[name="requestId"]').should('have.value', 'oidc_V2_123');
       cy.get('input[name="organization"]').should('have.value', 'org-1');
