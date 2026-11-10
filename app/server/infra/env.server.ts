@@ -1,3 +1,4 @@
+import { parseCustomRequestHeaders } from '@/shared/custom-request-headers';
 import { z } from 'zod';
 
 const schema = z
@@ -36,7 +37,22 @@ const schema = z
     // public-facing URLs (OIDC issuer, SAML metadata/ACS, redirect-URI checks). Unset =
     // no extra headers. (Renamed from the fork's `CUSTOM_REQUEST_HEADERS` — Zitadel-only,
     // so it now carries the ZITADEL_ prefix like the other transport vars.)
-    ZITADEL_CUSTOM_REQUEST_HEADERS: z.string().optional(),
+    // A value may contain ':' (only the first one separates the name) but not ','. A malformed
+    // entry fails boot here instead of being dropped from every request at runtime. The issue
+    // message carries a count, never the entry text: a header value can be a credential.
+    ZITADEL_CUSTOM_REQUEST_HEADERS: z
+      .string()
+      .optional()
+      .superRefine((raw, ctx) => {
+        const { malformed } = parseCustomRequestHeaders(raw);
+        if (malformed.length === 0) return;
+        ctx.addIssue({
+          code: 'custom',
+          message:
+            `ZITADEL_CUSTOM_REQUEST_HEADERS has ${malformed.length} malformed ` +
+            `entr${malformed.length === 1 ? 'y' : 'ies'}: use comma-separated Name:Value pairs`,
+        });
+      }),
     // Optional ops pin for the org-first / default-org fallback (resolveOrg). When set, a login
     // without an explicit `?organization=` (or OIDC org-id scope) uses THIS org id instead of
     // calling the provider's getDefaultOrg. Unset (default) ⇒ resolveOrg falls back to the

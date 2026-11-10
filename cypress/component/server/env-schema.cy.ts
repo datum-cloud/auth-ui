@@ -461,3 +461,30 @@ describe('env schema — RECAPTCHA_SITE_KEY / RECAPTCHA_SECRET_KEY (reCAPTCHA v3
     });
   });
 });
+
+// ── ZITADEL_CUSTOM_REQUEST_HEADERS ───────────────────────────────────────────
+// The transport used to drop a malformed entry on every request with no signal. The schema now
+// fails boot on one, and accepts a value containing ':' (only the first ':' is the separator).
+describe('env schema — ZITADEL_CUSTOM_REQUEST_HEADERS', () => {
+  it("accepts well-formed pairs, including a value containing ':'", () => {
+    callService({
+      fn: 'envSchemaFull',
+      parseEnvRaw: {
+        ...BASE,
+        ZITADEL_CUSTOM_REQUEST_HEADERS:
+          'x-zitadel-public-host:auth.example.test:8443,x-zitadel-public-proto:https',
+      },
+    }).then((v) => {
+      expect(v.outcome.success).to.equal(true);
+    });
+  });
+
+  it('rejects a malformed entry', () => {
+    callService({
+      fn: 'envSchemaFull',
+      parseEnvRaw: { ...BASE, ZITADEL_CUSTOM_REQUEST_HEADERS: 'x-ok:1,x-no-separator' },
+    }).then((v) => {
+      expect(v.outcome.success).to.equal(false);
+    });
+  });
+});

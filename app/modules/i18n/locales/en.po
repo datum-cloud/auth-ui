@@ -70,7 +70,7 @@ msgstr "Add your phone number as a second factor. We will send a one-time code v
 msgid "Added {0}"
 msgstr "Added {0}"
 
-#: app/utils/errors/auth-error-messages.tsx:52
+#: app/utils/errors/auth-error-messages.tsx:50
 msgid "Additional verification is required to continue."
 msgstr "Additional verification is required to continue."
 
@@ -88,7 +88,7 @@ msgstr "An account with this email already exists — sign in to continue."
 msgid "An account with this email already exists. Sign in to that account, then link this provider from your account settings."
 msgstr "An account with this email already exists. Sign in to that account, then link this provider from your account settings."
 
-#: app/utils/errors/auth-error-messages.tsx:25
+#: app/utils/errors/auth-error-messages.tsx:30
 msgid "An account with this email already exists. Try signing in instead."
 msgstr "An account with this email already exists. Try signing in instead."
 
@@ -423,7 +423,7 @@ msgstr "If you prefer a demo, just <0>reach out</0>."
 msgid "Inactive"
 msgstr "Inactive"
 
-#: app/utils/errors/auth-error-messages.tsx:19
+#: app/utils/errors/auth-error-messages.tsx:27
 msgid "Incorrect credentials. Please try again."
 msgstr "Incorrect credentials. Please try again."
 
@@ -487,7 +487,7 @@ msgstr "No passkeys yet."
 msgid "No sign-in method is available for re-authentication."
 msgstr "No sign-in method is available for re-authentication."
 
-#: app/utils/errors/auth-error-messages.tsx:64
+#: app/utils/errors/auth-error-messages.tsx:56
 msgid "No sign-in method is available for this account."
 msgstr "No sign-in method is available for this account."
 
@@ -577,27 +577,27 @@ msgstr "Passkeys let you sign in with your fingerprint, face, or device PIN."
 msgid "Password"
 msgstr "Password"
 
-#: app/utils/errors/auth-error-messages.tsx:17
+#: app/utils/errors/auth-error-messages.tsx:24
 msgid "Password is too short."
 msgstr "Password is too short."
 
-#: app/utils/errors/auth-error-messages.tsx:13
+#: app/utils/errors/auth-error-messages.tsx:22
 msgid "Password must contain a lowercase letter."
 msgstr "Password must contain a lowercase letter."
 
-#: app/utils/errors/auth-error-messages.tsx:15
+#: app/utils/errors/auth-error-messages.tsx:23
 msgid "Password must contain a number."
 msgstr "Password must contain a number."
 
-#: app/utils/errors/auth-error-messages.tsx:9
+#: app/utils/errors/auth-error-messages.tsx:20
 msgid "Password must contain a symbol."
 msgstr "Password must contain a symbol."
 
-#: app/utils/errors/auth-error-messages.tsx:11
+#: app/utils/errors/auth-error-messages.tsx:21
 msgid "Password must contain an uppercase letter."
 msgstr "Password must contain an uppercase letter."
 
-#: app/utils/errors/auth-error-messages.tsx:66
+#: app/utils/errors/auth-error-messages.tsx:57
 msgid "Password sign-in isn't available for this account."
 msgstr "Password sign-in isn't available for this account."
 
@@ -606,14 +606,18 @@ msgstr "Password sign-in isn't available for this account."
 msgid "Phone"
 msgstr "Phone"
 
-#: app/utils/errors/auth-error-messages.tsx:37
+#: app/utils/errors/auth-error-messages.tsx:38
 msgid "Phone sign-in isn't available — use your email or username."
 msgstr "Phone sign-in isn't available — use your email or username."
 
 #: app/routes/login/password.tsx:201
-#: app/utils/errors/auth-error-messages.tsx:27
+#: app/utils/errors/auth-error-messages.tsx:16
 msgid "Please check your input and try again."
 msgstr "Please check your input and try again."
+
+#: app/utils/errors/auth-error-messages.tsx:62
+msgid "Please confirm it's you before making this change."
+msgstr "Please confirm it's you before making this change."
 
 #: app/routes/setup/passkey.tsx:133
 msgid "Please finish setting up your passkey before leaving this page. It will be the only way to sign in, and your account won't be usable without it."
@@ -705,7 +709,7 @@ msgstr "Send recovery link"
 msgid "Send reset link"
 msgstr "Send reset link"
 
-#: app/utils/errors/auth-error-messages.tsx:21
+#: app/utils/errors/auth-error-messages.tsx:28
 msgid "Service temporarily unavailable. Please try again."
 msgstr "Service temporarily unavailable. Please try again."
 
@@ -847,7 +851,7 @@ msgstr "SMS OTP"
 msgid "Something went wrong with <0>{provider}</0>."
 msgstr "Something went wrong with <0>{provider}</0>."
 
-#: app/utils/errors/auth-error-messages.tsx:74
+#: app/utils/errors/auth-error-messages.tsx:15
 msgid "Something went wrong. Please try again."
 msgstr "Something went wrong. Please try again."
 
@@ -860,7 +864,7 @@ msgstr "Start over"
 msgid "Thanks,"
 msgstr "Thanks,"
 
-#: app/utils/errors/auth-error-messages.tsx:23
+#: app/utils/errors/auth-error-messages.tsx:29
 msgid "That action isn't available right now."
 msgstr "That action isn't available right now."
 
@@ -868,21 +872,25 @@ msgstr "That action isn't available right now."
 msgid "That code is invalid or has expired. Check the email, or start over."
 msgstr "That code is invalid or has expired. Check the email, or start over."
 
-#: app/utils/errors/auth-error-messages.tsx:70
+#: app/utils/errors/auth-error-messages.tsx:59
 msgid "That code is invalid or has expired. Start over to get a new one."
 msgstr "That code is invalid or has expired. Start over to get a new one."
 
-#: app/utils/errors/auth-error-messages.tsx:50
+#: app/utils/errors/auth-error-messages.tsx:45
 msgid "That device code isn't valid. Check the code on your device and try again."
 msgstr "That device code isn't valid. Check the code on your device and try again."
 
-#: app/utils/errors/auth-error-messages.tsx:48
+#: app/utils/errors/auth-error-messages.tsx:44
 msgid "That device code was not found. Check the code on your device and try again."
 msgstr "That device code was not found. Check the code on your device and try again."
 
-#: app/utils/errors/auth-error-messages.tsx:33
+#: app/utils/errors/auth-error-messages.tsx:36
 msgid "That didn't go through. Please try again."
 msgstr "That didn't go through. Please try again."
+
+#: app/utils/errors/auth-error-messages.tsx:60
+msgid "That directory account isn't linked to an account here, so we can't sign you in with it."
+msgstr "That directory account isn't linked to an account here, so we can't sign you in with it."
 
 #: app/routes/reauth/provider/error.tsx:17
 #: app/routes/sso/provider/error.tsx:13
@@ -890,7 +898,19 @@ msgstr "That didn't go through. Please try again."
 msgid "That identity belongs to a different account."
 msgstr "That identity belongs to a different account."
 
-#: app/utils/errors/auth-error-messages.tsx:68
+#: app/utils/errors/auth-error-messages.tsx:66
+msgid "That link has expired. Start over to get a new one."
+msgstr "That link has expired. Start over to get a new one."
+
+#: app/utils/errors/auth-error-messages.tsx:26
+msgid "That password doesn't meet the password requirements."
+msgstr "That password doesn't meet the password requirements."
+
+#: app/utils/errors/auth-error-messages.tsx:67
+msgid "That recovery link has expired. Request a new one."
+msgstr "That recovery link has expired. Request a new one."
+
+#: app/utils/errors/auth-error-messages.tsx:58
 msgid "That's already been done."
 msgstr "That's already been done."
 
@@ -898,7 +918,7 @@ msgstr "That's already been done."
 msgid "The passkey verification failed. Please try again."
 msgstr "The passkey verification failed. Please try again."
 
-#: app/utils/errors/auth-error-messages.tsx:58
+#: app/utils/errors/auth-error-messages.tsx:53
 msgid "The request timed out. Please try again."
 msgstr "The request timed out. Please try again."
 
@@ -951,11 +971,11 @@ msgstr "This removes it as a sign-in method for your account."
 msgid "This sign-in link is invalid or has expired."
 msgstr "This sign-in link is invalid or has expired."
 
-#: app/utils/errors/auth-error-messages.tsx:41
+#: app/utils/errors/auth-error-messages.tsx:40
 msgid "This sign-in provider is currently unavailable. Please try again later."
 msgstr "This sign-in provider is currently unavailable. Please try again later."
 
-#: app/utils/errors/auth-error-messages.tsx:54
+#: app/utils/errors/auth-error-messages.tsx:51
 msgid "Too many attempts. Please wait a moment and try again."
 msgstr "Too many attempts. Please wait a moment and try again."
 
@@ -1029,11 +1049,15 @@ msgstr "Verify your email"
 msgid "WDJB-MJHT"
 msgstr "WDJB-MJHT"
 
-#: app/utils/errors/auth-error-messages.tsx:35
+#: app/utils/errors/auth-error-messages.tsx:37
 msgid "We could not find an account for that identifier."
 msgstr "We could not find an account for that identifier."
 
-#: app/utils/errors/auth-error-messages.tsx:43
+#: app/utils/errors/auth-error-messages.tsx:17
+msgid "We couldn't complete that request. Please try again."
+msgstr "We couldn't complete that request. Please try again."
+
+#: app/utils/errors/auth-error-messages.tsx:41
 msgid "We couldn't find what you were looking for. Please try again."
 msgstr "We couldn't find what you were looking for. Please try again."
 
@@ -1041,9 +1065,17 @@ msgstr "We couldn't find what you were looking for. Please try again."
 msgid "We couldn't finish setting up your passkey. Please try again."
 msgstr "We couldn't finish setting up your passkey. Please try again."
 
+#: app/utils/errors/auth-error-messages.tsx:61
+msgid "We couldn't set up that sign-in method. Please try again."
+msgstr "We couldn't set up that sign-in method. Please try again."
+
 #: app/components/webauthn-button/webauthn-button.tsx:115
 msgid "We couldn't set up your passkey. Please try again."
 msgstr "We couldn't set up your passkey. Please try again."
+
+#: app/utils/errors/auth-error-messages.tsx:64
+msgid "We couldn't sign you in with that passkey. Please try again."
+msgstr "We couldn't sign you in with that passkey. Please try again."
 
 #: app/routes/setup/passkey.tsx:204
 msgid "We couldn't start passkey setup. Please try again."
@@ -1108,10 +1140,11 @@ msgid "You can now sign in using <0>{loginName}</0>."
 msgstr "You can now sign in using <0>{loginName}</0>."
 
 #: app/routes/passkeys.tsx:259
+#: app/utils/errors/auth-error-messages.tsx:63
 msgid "You can't remove your only sign-in method. Add another method first."
 msgstr "You can't remove your only sign-in method. Add another method first."
 
-#: app/utils/errors/auth-error-messages.tsx:56
+#: app/utils/errors/auth-error-messages.tsx:52
 msgid "You don't have permission to do that."
 msgstr "You don't have permission to do that."
 
@@ -1130,6 +1163,10 @@ msgstr "You signed in as a different account than the one you were re-authentica
 #: app/routes/device/authorize.tsx:127
 msgid "You'll be asked to sign in before authorizing."
 msgstr "You'll be asked to sign in before authorizing."
+
+#: app/utils/errors/auth-error-messages.tsx:65
+msgid "You're already signed in."
+msgstr "You're already signed in."
 
 #: app/routes/logout/success.tsx:48
 msgid "You've been signed out"
@@ -1168,7 +1205,7 @@ msgstr "Your passkey is ready — give it a name so you can recognize it later."
 msgid "Your passkey is set up. Sign in with it to continue."
 msgstr "Your passkey is set up. Sign in with it to continue."
 
-#: app/utils/errors/auth-error-messages.tsx:60
+#: app/utils/errors/auth-error-messages.tsx:54
 msgid "Your password has expired. Please reset it to continue."
 msgstr "Your password has expired. Please reset it to continue."
 
@@ -1181,6 +1218,6 @@ msgid "Your session has ended and you've been securely signed out of Datum. You 
 msgstr "Your session has ended and you've been securely signed out of Datum. You can safely close this tab, or sign back in any time to pick up where you left off."
 
 #: app/routes/login/password.tsx:193
-#: app/utils/errors/auth-error-messages.tsx:62
+#: app/utils/errors/auth-error-messages.tsx:55
 msgid "Your session has expired."
 msgstr "Your session has expired."

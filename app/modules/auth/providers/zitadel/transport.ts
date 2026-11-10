@@ -1,4 +1,5 @@
 import { type TransportEnv, resolveServiceUrl } from './transport.util';
+import { parseCustomRequestHeaders } from '@/shared/custom-request-headers';
 import type { DescService } from '@bufbuild/protobuf';
 import { createClientFor } from '@zitadel/client';
 import { createServerTransport as libCreateServerTransport } from '@zitadel/client/node';
@@ -31,6 +32,20 @@ function capInsert<V>(cache: Map<string, V>, key: string, value: V): void {
 // must validate the forward-host value before it becomes part of the cache key.
 const transportCache = new Map<string, ReturnType<typeof libCreateServerTransport>>();
 
+// Parse ZITADEL_CUSTOM_REQUEST_HEADERS into header pairs. The env schema rejects a malformed
+// value at boot; this guard covers a raw process.env read that never went through the schema,
+// so a bad entry fails loudly here instead of being dropped from every request.
+function customRequestHeaders(raw: string | undefined) {
+  const { headers, malformed } = parseCustomRequestHeaders(raw);
+  if (malformed.length > 0) {
+    // Entry count only: a header value can be a credential, so the text stays out of the error.
+    throw new Error(
+      `ZITADEL_CUSTOM_REQUEST_HEADERS has ${malformed.length} malformed entr${malformed.length === 1 ? 'y' : 'ies'} (expected comma-separated Name:Value pairs)`
+    );
+  }
+  return headers;
+}
+
 // Mirror fork zitadel.ts:createServerTransport — injects token, applies the extra request
 // headers from ZITADEL_CUSTOM_REQUEST_HEADERS (fork name: CUSTOM_REQUEST_HEADERS).
 export function createServerTransport(token: string, baseUrl: string, env: TransportEnv = {}) {
@@ -40,19 +55,19 @@ export function createServerTransport(token: string, baseUrl: string, env: Trans
   const key = `${baseUrl}|${tokenFingerprint(token)}|${custom ?? ''}`;
   const cached = transportCache.get(key);
   if (cached) return cached;
+  // Parsed ONCE per transport (the transport is cached), not on every RPC.
+  const headers = customRequestHeaders(custom);
   const transport = libCreateServerTransport(token, {
     baseUrl,
-    interceptors: !custom
-      ? undefined
-      : [
-          (next) => (req) => {
-            for (const header of custom.split(',')) {
-              const [k, v] = header.split(':');
-              if (k && v) req.header.set(k.trim(), v.trim());
-            }
-            return next(req);
-          },
-        ],
+    interceptors:
+      headers.length === 0
+        ? undefined
+        : [
+            (next) => (req) => {
+              for (const [name, value] of headers) req.header.set(name, value);
+              return next(req);
+            },
+          ],
   });
   capInsert(transportCache, key, transport);
   return transport;
