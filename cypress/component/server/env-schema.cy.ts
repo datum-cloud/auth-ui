@@ -156,14 +156,6 @@ describe('env schema — PUBLIC_ORIGIN (verification-link origin; anti Host-head
 // permissive-off, this is fail-closed-on, because verification-off makes signup pass
 // emailVerified:true and mint accounts on addresses nobody proved they own. Polarity here
 // matches AUTH_PASSKEY_DISCOVERY_ENABLED, the repo's other inverse flag.
-//
-// EMAIL_VERIFICATION is the deprecated old name for this same flag, still honoured as an alias
-// (see the resolution in env.server.ts's final .transform()) so a deployment that hasn't
-// migrated doesn't silently flip to verification-ON and dead-end every signup.
-
-const readWarnings = (v: { outcome: Record<string, unknown> }) => v.outcome.warnings as string[];
-const DEPRECATION_WARNING =
-  '[env] EMAIL_VERIFICATION is deprecated; rename it to AUTH_EMAIL_VERIFICATION_REQUIRED (same values, same meaning)';
 
 describe('env schema — AUTH_EMAIL_VERIFICATION_REQUIRED (fail-closed, default true)', () => {
   it("defaults to true when unset, and only an explicit 'false'/'0' disables it", () => {
@@ -195,65 +187,6 @@ describe('env schema — AUTH_EMAIL_VERIFICATION_REQUIRED (fail-closed, default 
       expect((v.outcome.data as Record<string, unknown>).AUTH_EMAIL_VERIFICATION_REQUIRED).to.equal(
         true
       );
-    });
-  });
-
-  it('honours the deprecated EMAIL_VERIFICATION alias when the new name is unset', () => {
-    callService({
-      fn: 'envSchemaFull',
-      parseEnvRaw: { ...BASE, EMAIL_VERIFICATION: 'false' },
-    }).then((v) => {
-      expect(
-        (v.outcome.data as Record<string, unknown>).AUTH_EMAIL_VERIFICATION_REQUIRED,
-        'alias must resolve the same as the new name'
-      ).to.equal(false);
-    });
-  });
-
-  it('prefers AUTH_EMAIL_VERIFICATION_REQUIRED over EMAIL_VERIFICATION when both are set', () => {
-    callService({
-      fn: 'envSchemaFull',
-      parseEnvRaw: {
-        ...BASE,
-        AUTH_EMAIL_VERIFICATION_REQUIRED: 'true',
-        EMAIL_VERIFICATION: 'false',
-      },
-    }).then((v) => {
-      expect(
-        (v.outcome.data as Record<string, unknown>).AUTH_EMAIL_VERIFICATION_REQUIRED,
-        'new name wins'
-      ).to.equal(true);
-    });
-  });
-
-  it('warns exactly when only the deprecated EMAIL_VERIFICATION name is set', () => {
-    callService({
-      fn: 'envSchemaFull',
-      parseEnvRaw: { ...BASE, EMAIL_VERIFICATION: 'false' },
-    }).then((v) => {
-      expect(readWarnings(v), 'old name alone must warn').to.include(DEPRECATION_WARNING);
-    });
-
-    callService({
-      fn: 'envSchemaFull',
-      parseEnvRaw: { ...BASE, AUTH_EMAIL_VERIFICATION_REQUIRED: 'true' },
-    }).then((v) => {
-      expect(readWarnings(v), 'new name set alone must not warn').to.deep.equal([]);
-    });
-
-    callService({
-      fn: 'envSchemaFull',
-      parseEnvRaw: {
-        ...BASE,
-        AUTH_EMAIL_VERIFICATION_REQUIRED: 'true',
-        EMAIL_VERIFICATION: 'false',
-      },
-    }).then((v) => {
-      expect(readWarnings(v), 'new name set alongside the alias must not warn').to.deep.equal([]);
-    });
-
-    callService({ fn: 'envSchemaFull', parseEnvRaw: { ...BASE } }).then((v) => {
-      expect(readWarnings(v), 'neither set must not warn').to.deep.equal([]);
     });
   });
 });

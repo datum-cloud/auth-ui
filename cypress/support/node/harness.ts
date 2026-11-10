@@ -2764,33 +2764,18 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
 
       // ── Task 11 migrations ───────────────────────────────────────────────────────
       // env.server._envSchema comprehensive validation: takes parseEnvRaw, runs the REAL Zod
-      // schema (not the Vite browser stub), and returns full { success, data?, issues?, warnings }.
+      // schema (not the Vite browser stub), and returns full { success, data?, issues? }.
       case 'envSchemaFull': {
-        // The AUTH_EMAIL_VERIFICATION_REQUIRED resolution warns via console.warn on the deprecated
-        // EMAIL_VERIFICATION-only path. Intercept it here (scoped to this case, restored in the
-        // finally below) so specs can assert presence/absence without a real startup log to read.
-        const capturedWarnings: string[] = [];
-        const originalWarn = console.warn;
-        console.warn = (...args: unknown[]) => {
-          capturedWarnings.push(args.map((a) => (typeof a === 'string' ? a : String(a))).join(' '));
-        };
-        let result: ReturnType<typeof _envSchema.safeParse>;
-        try {
-          result = _envSchema.safeParse(s.parseEnvRaw ?? {});
-        } finally {
-          console.warn = originalWarn;
-        }
+        const result = _envSchema.safeParse(s.parseEnvRaw ?? {});
         if (result.success) {
           outcome = {
             success: true,
             data: result.data as unknown as Record<string, unknown>,
-            warnings: capturedWarnings,
           };
         } else {
           outcome = {
             success: false,
             issues: result.error.issues.map((i) => ({ path: i.path, message: i.message })),
-            warnings: capturedWarnings,
           };
         }
         break;

@@ -44,7 +44,6 @@ linking flags.
 | ---------------------------------- | -------- | ------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
 | `AUTH_EMAIL_DELIVERY_ENABLED`      | No       | `false` | Whether email delivery is wired in this environment (email is sent via Datum infra, not Zitadel SMTP, so this is an explicit switch, not auto-detected). Off keeps magic-link sign-in and password reset hidden and refuses passkey signup, so the UI never offers a dead-end flow.                                |
 | `AUTH_EMAIL_VERIFICATION_REQUIRED` | No       | `true`  | Whether signup must verify the address. **Default on**: only `false` or `0` skips it, and skipping makes password registration pass `emailVerified: true`. Read through `requireEmailVerification()` in `app/server/env.ts`. Temporary; the source marks it for removal once production runs with verification on. |
-| `EMAIL_VERIFICATION`               | No       | unset   | **Deprecated** name for `AUTH_EMAIL_VERIFICATION_REQUIRED`, same values and meaning. Honoured only when the new name is unset, and then logs `[env] EMAIL_VERIFICATION is deprecated; rename it to AUTH_EMAIL_VERIFICATION_REQUIRED` once at boot.                                                                 |
 | `AUTH_ACCOUNT_RECOVERY_ENABLED`    | No       | `false` | Self-serve passkey recovery. Off makes `/recover` and `/recover/complete` return 404 from loader and action and hides every entry-point link. See [Account Recovery](../architecture/account-recovery.md).                                                                                                         |
 | `AUTH_PASSKEY_DISCOVERY_ENABLED`   | No       | `true`  | Kill switch for usernameless passkey discovery: the `/login` loader's discovery arm and the `/login/passkey-discover` action. **Default on**; only `false` or `0` disables it. It exists so an operator can contain an incident with a config change instead of a revert deploy.                                   |
 | `ALLOW_IDP_AUTO_LINK`              | No       | `false` | Auto-links an external IdP identity into an existing same-email account during login/register. Off means a same-email collision is a hard `account-exists` error and the owner must link the IdP from the signed-in `/sso` screen.                                                                                 |
@@ -133,7 +132,7 @@ The half-configured mail and reCAPTCHA pairs above fail the same way, in every e
 crash-loop on deploy is almost always one of these. See [Troubleshooting](./troubleshooting.md).
 
 **2. `AUTH_EMAIL_VERIFICATION_REQUIRED` defaults on.** An environment that relied on the old
-unset-means-off behaviour of `EMAIL_VERIFICATION` must now set
+unset-means-off behaviour of the removed `EMAIL_VERIFICATION` name must now set
 `AUTH_EMAIL_VERIFICATION_REQUIRED=false` explicitly. `.env.example` lists the valid combinations
 with `AUTH_EMAIL_DELIVERY_ENABLED`; delivery off with verification on dead-ends every signup.
 

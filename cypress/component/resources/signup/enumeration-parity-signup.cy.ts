@@ -17,7 +17,7 @@ import type { Scenario, Verdict } from '../../../support/node/scenario';
 const TARGET = 'target@b.test';
 const U = { id: 'u-1', loginName: TARGET, displayName: 'Target' };
 
-const ENV = { AUTH_EMAIL_DELIVERY_ENABLED: 'true', EMAIL_VERIFICATION: 'true' };
+const ENV = { AUTH_EMAIL_DELIVERY_ENABLED: 'true', AUTH_EMAIL_VERIFICATION_REQUIRED: 'true' };
 
 // Account states, now split by what the response is ALLOWED to reveal.
 // U_FACTORLESS holds the address with no auth method; U_ENROLLED has a passkey.

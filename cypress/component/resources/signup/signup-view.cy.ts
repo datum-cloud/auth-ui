@@ -150,7 +150,7 @@ describe('resolveSignupView', () => {
       // /signup/method; but intent=passkey needs AUTH_EMAIL_DELIVERY_ENABLED, and the action
       // rejects it with 400. Gating showPasskey on policy alone renders a button whose only
       // possible outcome is a generic error. This is also the CURRENT production flag state
-      // (EMAIL_VERIFICATION and AUTH_EMAIL_DELIVERY_ENABLED both off), not a hypothetical.
+      // (AUTH_EMAIL_VERIFICATION_REQUIRED and AUTH_EMAIL_DELIVERY_ENABLED both off), not a hypothetical.
       'password + no verification + delivery off: user reaches /signup/method, passkey hidden',
       [
         { ...base, allowPassword: true, allowExternalIdp: false } as LoginSettings,

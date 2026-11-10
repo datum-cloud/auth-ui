@@ -115,8 +115,8 @@ const schema = z
     // FAIL-CLOSED: unset => ON. Requiring proof of address ownership is the SAFE state, and the
     // unsafe direction is not a mere nuisance — with verification off, registerWithPassword
     // passes emailVerified:true, so a missing env var silently mints accounts on addresses
-    // nobody proved they own. Only an explicit 'false'/'0' skips verification (resolved below,
-    // together with the deprecated alias — same transform on both: `v !== 'false' && v !== '0'`).
+    // nobody proved they own. Only an explicit 'false'/'0' skips verification (resolved in the
+    // final .transform() below).
     // Deployments that genuinely skip it (no-delivery staging) must opt out in writing — see
     // AUTH_EMAIL_VERIFICATION_REQUIRED in .env.example.
     //
@@ -124,14 +124,8 @@ const schema = z
     // treated unset as off). Any environment relying on unset must now set
     // AUTH_EMAIL_VERIFICATION_REQUIRED=false explicitly.
     // Phase B: deleted entirely after the B4 production flip, along with every
-    // `requireVerification: false` branch it keeps alive — the deprecated EMAIL_VERIFICATION
-    // alias immediately below is removed at the same time.
+    // `requireVerification: false` branch it keeps alive.
     AUTH_EMAIL_VERIFICATION_REQUIRED: z.string().optional(),
-    // Deprecated name for AUTH_EMAIL_VERIFICATION_REQUIRED above — same values, same meaning.
-    // Deployments still set this name; silently dropping it would flip them to verification-ON
-    // and dead-end every signup, so it stays honoured (new name wins when both are set — see the
-    // resolution in the final .transform() below) until removed at the B4 flip.
-    EMAIL_VERIFICATION: z.string().optional(),
     // Base URL of the zitadel-provider authn-webhook that creates verification Email
     // resources. Unset disables delivery: signup still succeeds and the user recovers
     // via resend, which is the same posture as resendIfSquatted.
@@ -336,23 +330,10 @@ const schema = z
     }
   })
   .transform((v) => {
-    // AUTH_EMAIL_VERIFICATION_REQUIRED wins when both names are set — a deployment mid-migration
-    // that sets both should land on the new name, not the old one. The deprecation warning below
-    // fires only on the old-name-only path; it runs once per parse, which at real startup
-    // (schema.parse(process.env) below) means once per process.
-    const parseRequireVerification = (raw: string) => raw !== 'false' && raw !== '0';
-    let requireEmailVerification: boolean;
-    if (v.AUTH_EMAIL_VERIFICATION_REQUIRED !== undefined) {
-      requireEmailVerification = parseRequireVerification(v.AUTH_EMAIL_VERIFICATION_REQUIRED);
-    } else if (v.EMAIL_VERIFICATION !== undefined) {
-      requireEmailVerification = parseRequireVerification(v.EMAIL_VERIFICATION);
-      // Keep this text greppable — ops greps for it when chasing down stale deployment config.
-      console.warn(
-        '[env] EMAIL_VERIFICATION is deprecated; rename it to AUTH_EMAIL_VERIFICATION_REQUIRED (same values, same meaning)'
-      );
-    } else {
-      requireEmailVerification = true;
-    }
+    // Fail-closed: unset => required. Only an explicit 'false'/'0' opts out.
+    const rawRequireVerification = v.AUTH_EMAIL_VERIFICATION_REQUIRED;
+    const requireEmailVerification =
+      rawRequireVerification !== 'false' && rawRequireVerification !== '0';
     return {
       ...v,
       ZITADEL_API_URL: v.ZITADEL_API_URL ?? 'http://localhost:8080',
