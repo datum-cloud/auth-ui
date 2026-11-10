@@ -444,7 +444,7 @@ msgstr "Incorrect credentials. Please try again."
 msgid "Last name"
 msgstr "Last name"
 
-#: app/components/auth-form/last-used-badge.tsx:14
+#: app/components/auth-form/last-used-badge.tsx:11
 msgid "Last used"
 msgstr "Last used"
 

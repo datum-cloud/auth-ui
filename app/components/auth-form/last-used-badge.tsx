@@ -7,10 +7,7 @@ import { Trans } from '@lingui/react/macro';
 export function LastUsedBadge({ active }: { active: boolean }): React.JSX.Element | null {
   if (!active) return null;
   return (
-    <Badge
-      type="primary"
-      theme="solid"
-      className="absolute -top-3.5 -right-5 rounded-lg text-xs text-white dark:text-[#0c1d31]">
+    <Badge type="primary" theme="solid" className="absolute -top-3.5 -right-5 rounded-lg text-xs">
       <Trans>Last used</Trans>
     </Badge>
   );
