@@ -47,7 +47,9 @@ describe('Device deny (sessionless)', () => {
 
     cy.contains('button', /^deny$/i).click();
 
-    cy.contains(/you may return to your device/i).should('be.visible');
+    // The deny terminal screen, not the approve one ("You may return to your device").
+    cy.contains(/device denied/i).should('be.visible');
+    cy.contains(/not granted access/i).should('be.visible');
   });
 });
 
