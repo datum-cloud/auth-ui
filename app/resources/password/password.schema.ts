@@ -59,8 +59,6 @@ export function newPasswordClientSchemaFor(policy?: PasswordComplexity) {
   );
 }
 
-export const newPasswordClientSchema = newPasswordClientSchemaFor();
-
 // change.tsx: password+confirm match; sessionId comes via hidden input. Policy-driven, same as above.
 // Message reconciled from the old 'Passwords do not match' drift to the shared
 // 'Passwords must match' copy via the withPasswordMatch default.
@@ -69,5 +67,3 @@ export function changePasswordClientSchemaFor(policy?: PasswordComplexity) {
     z.object({ password: passwordComplexityField(policy), confirm: z.string().min(1) })
   );
 }
-
-export const changePasswordClientSchema = changePasswordClientSchemaFor();
