@@ -9,6 +9,7 @@ import { ProviderError } from '@/modules/auth/types';
 import { signInWithIdpIntent } from '@/resources/sso/idp-session';
 import type { SsoOutcome } from '@/resources/sso/sso-outcome';
 import { logAuthEvent } from '@/server/observability';
+import type { AuthActionErrorCode } from '@/utils/errors/auth-error-codes';
 import { z } from 'zod';
 
 // ── /sso/ldap action ──────────────────────────────────────────────────────────────
@@ -23,10 +24,11 @@ export const ldapServerSchema = z.object({
 
 /**
  * The error payload the /sso/ldap action surfaces to its component (via useActionData).
- * `INVALID_CREDENTIALS` / `ACCOUNT_NOT_LINKED` / `invalid_input` are recognized; any other
- * ProviderError code rides through as a generic string the component maps to a fallback.
+ * `INVALID_CREDENTIALS` / `ACCOUNT_NOT_LINKED` / `invalid_input` are emitted here; any other
+ * ProviderError code rides through unchanged. Every one is a known AuthActionErrorCode, so
+ * each has its own message in useAuthErrorMessage.
  */
-export type LdapActionData = { error: string };
+export type LdapActionData = { error: AuthActionErrorCode };
 
 /**
  * /sso/ldap action logic. Validates the full form, exchanges credentials for an LDAP intent,
@@ -42,7 +44,11 @@ export async function submitLdapCredentials(
   const parsed = ldapServerSchema.safeParse(Object.fromEntries(form));
   if (!parsed.success) {
     logAuthEvent('ldap_signin', 'failure', { reason: 'invalid_input' });
-    return { kind: 'data', payload: { error: 'invalid_input' as const }, status: 400 };
+    return {
+      kind: 'data',
+      payload: { error: 'invalid_input' } satisfies LdapActionData,
+      status: 400,
+    };
   }
 
   const { idpId, username, requestId, organization } = parsed.data;
@@ -54,10 +60,14 @@ export async function submitLdapCredentials(
     if (error instanceof ProviderError) {
       if (error.code === 'INVALID_CREDENTIALS') {
         logAuthEvent('ldap_signin', 'failure', { reason: error.code, idpId });
-        return { kind: 'data', payload: { error: 'INVALID_CREDENTIALS' as const }, status: 401 };
+        return {
+          kind: 'data',
+          payload: { error: 'INVALID_CREDENTIALS' } satisfies LdapActionData,
+          status: 401,
+        };
       }
       logAuthEvent('ldap_signin', 'failure', { reason: error.code, idpId });
-      return { kind: 'data', payload: { error: error.code as string }, status: 400 };
+      return { kind: 'data', payload: { error: error.code } satisfies LdapActionData, status: 400 };
     }
     throw error;
   }
@@ -72,7 +82,11 @@ export async function submitLdapCredentials(
   // Fail gracefully with a typed error instead of leaking a 500.
   if (!userId) {
     logAuthEvent('ldap_signin', 'failure', { reason: 'account_not_linked', idpId });
-    return { kind: 'data', payload: { error: 'ACCOUNT_NOT_LINKED' as const }, status: 403 };
+    return {
+      kind: 'data',
+      payload: { error: 'ACCOUNT_NOT_LINKED' } satisfies LdapActionData,
+      status: 403,
+    };
   }
 
   const { setCookie, target, reauthClearCookie } = await signInWithIdpIntent(provider, request, {

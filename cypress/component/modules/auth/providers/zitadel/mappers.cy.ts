@@ -23,6 +23,45 @@ const ce = (code: number, message = 'boom', details: unknown[] = []) => ({
   findDetails: () => details,
 });
 
+// Password-policy failures arrive as INVALID_ARGUMENT (3), the same code as a wrong credential.
+// The adapter is the ONE place the message is read; it records the broken rule in
+// detail.passwordRule so resolveAuthError never has to parse text.
+describe('normalizeError — password complexity', () => {
+  it('classifies each policy message (translated text and untranslated key) and records the broken rule', () => {
+    const ROWS: [message: string, rule: string | undefined][] = [
+      ['[invalid_argument] Password must contain symbol (COMMA-ZDLwA)', 'symbol'],
+      ['Password must contain upper case letter', 'uppercase'],
+      ['Password must contain lower case letter', 'lowercase'],
+      ['Password must contain number', 'number'],
+      ['Password minimum length is too short', 'length'],
+      ['Errors.User.PasswordComplexityPolicy.MinLength', 'length'],
+      ['Errors.User.PasswordComplexityPolicy.HasUpper', 'uppercase'],
+      ['Password does not meet complexity requirements', undefined],
+    ];
+    for (const [message, rule] of ROWS) {
+      const err = normalizeError(ce(3, message));
+      expect(err.code, message).to.equal('PASSWORD_COMPLEXITY');
+      expect(err.detail?.passwordRule, message).to.equal(rule);
+    }
+  });
+
+  it('does not treat a non-password failure containing a rule word as a complexity failure', () => {
+    const ROWS: [code: number, message: string, expected: string][] = [
+      [3, 'verification code length is invalid', 'INVALID_CREDENTIALS'],
+      [3, 'phone number is invalid', 'INVALID_CREDENTIALS'],
+      [3, 'Password is invalid', 'INVALID_CREDENTIALS'],
+      // A policy-shaped message on any other gRPC code is not a complexity failure either.
+      [5, 'Password must contain symbol', 'NOT_FOUND'],
+      [9, 'minimum length not reached', 'FAILED_PRECONDITION'],
+    ];
+    for (const [code, message, expected] of ROWS) {
+      const err = normalizeError(ce(code, message));
+      expect(err.code, message).to.equal(expected);
+      expect(err.detail?.passwordRule, message).to.be.undefined;
+    }
+  });
+});
+
 describe('normalizeError (ConnectError → ProviderError)', () => {
   it('maps known gRPC codes to ProviderError, extracts failedAttempts detail, falls back to UNKNOWN, passes a ProviderError through unchanged, and maps code 9 + "already" to ALREADY_DONE (regression guard)', () => {
     expect(normalizeError(ce(5)).code).to.equal('NOT_FOUND');

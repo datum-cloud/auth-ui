@@ -79,3 +79,44 @@ describe('useAuthErrorMessage — reCAPTCHA rejection', () => {
     cy.get('[data-testid="msg"]').should('not.contain.text', 'verif');
   });
 });
+
+// Codes the resources emit that used to fall through to the generic fallback. One row per
+// newly mapped code; the generic text is asserted absent for each.
+const NEWLY_MAPPED: [code: string, expected: string][] = [
+  ['invalid_input', 'Please check your input and try again.'],
+  ['provider_error', "We couldn't complete that request. Please try again."],
+  ['PROVIDER_ERROR', "We couldn't complete that request. Please try again."],
+  [
+    'ACCOUNT_NOT_LINKED',
+    "That directory account isn't linked to an account here, so we can't sign you in with it.",
+  ],
+  ['ENROLL_FAILED', "We couldn't set up that sign-in method. Please try again."],
+  ['SUDO_REQUIRED', "Please confirm it's you before making this change."],
+  ['LAST_METHOD', "You can't remove your only sign-in method. Add another method first."],
+  ['PASSWORD_COMPLEXITY', "That password doesn't meet the password requirements."],
+  ['DISCOVERY_FAILED', "We couldn't sign you in with that passkey. Please try again."],
+  ['ALREADY_SIGNED_IN', "You're already signed in."],
+  ['EXPIRED', 'That link has expired. Start over to get a new one.'],
+  ['RECOVERY_EXPIRED', 'That recovery link has expired. Request a new one.'],
+];
+
+describe('useAuthErrorMessage — resource codes that had no message', () => {
+  it('maps every newly known code to its own message instead of the generic fallback', () => {
+    for (const [code, expected] of NEWLY_MAPPED) {
+      cy.mount(<MessageHarness code={code} />);
+      cy.get('[data-testid="msg"]').should(($el) => {
+        expect($el.text(), code).to.equal(expected);
+        expect($el.text(), code).not.to.equal(GENERIC);
+      });
+    }
+  });
+
+  it('keeps the generic message for UNKNOWN and for a prototype-member name (no inherited lookup)', () => {
+    for (const code of ['UNKNOWN', 'constructor', 'toString', '__proto__']) {
+      cy.mount(<MessageHarness code={code} />);
+      cy.get('[data-testid="msg"]').should(($el) => {
+        expect($el.text(), code).to.equal(GENERIC);
+      });
+    }
+  });
+});

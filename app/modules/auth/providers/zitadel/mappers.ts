@@ -12,6 +12,7 @@ import {
   type IdpUserDraft,
   type LoginSettings,
   type PasswordComplexity,
+  type PasswordRule,
   type ProviderErrorCode,
   type SamlResponse,
   type Session,
@@ -40,10 +41,37 @@ interface ConnectErrorLike {
   findDetails?: (schema?: unknown) => unknown[];
 }
 
+// Zitadel reports a password-policy failure as INVALID_ARGUMENT (code 3), the same code as a
+// wrong credential, so the message is the only discriminator. Two shapes are recognised:
+//   - the untranslated key  `Errors.User.PasswordComplexityPolicy.HasSymbol`
+//   - the translated text   `Password must contain symbol (COMMA-ZDLwA)`
+// The text form must mention the password AND a policy phrase, so an unrelated
+// INVALID_ARGUMENT that merely contains "length" or "number" is not a complexity failure.
+const COMPLEXITY_MESSAGE =
+  /complexity|password[^.]*?(must (contain|have|include)|too short|min(imum)? ?length)/i;
+
+// Order matters only for messages naming several rules; Zitadel reports one rule per error.
+const PASSWORD_RULE_PATTERNS: readonly (readonly [PasswordRule, RegExp])[] = [
+  ['symbol', /symbol/i],
+  ['uppercase', /upper/i],
+  ['lowercase', /lower/i],
+  ['number', /number|digit/i],
+  ['length', /too short|min(imum)? ?length/i],
+];
+
+/**
+ * The broken policy rule named by a complexity message, or undefined when it names none.
+ * Call ONLY on a message already classified as a complexity failure.
+ */
+function passwordRuleFromMessage(message: string): PasswordRule | undefined {
+  return PASSWORD_RULE_PATTERNS.find(([, pattern]) => pattern.test(message))?.[0];
+}
+
 // Message-discriminated mappings run BEFORE the generic GRPC_CODE lookup so that
 // shared codes can be specialised by message content. Ordering matters:
 //   1. failedAttempts detail → INVALID_CREDENTIALS (P1 behaviour, unchanged)
-//   2. code 3 + /complexity/i → PASSWORD_COMPLEXITY (P2)
+//   2. code 3 + a password-policy message → PASSWORD_COMPLEXITY, with the broken rule in
+//      detail.passwordRule so no later layer has to read the message
 //   3. code 6 → ALREADY_EXISTS (P2; AlreadyExists not in P1 GRPC_CODE map)
 //   4. code 9 + /verified|already/i → ALREADY_DONE (P2; FailedPrecondition)
 //   5. fall through to GRPC_CODE table (preserves all P1 behaviour)
@@ -64,8 +92,14 @@ export function normalizeError(error: unknown): ProviderError {
   const numCode = typeof e?.code === 'number' ? e.code : undefined;
   const msg = e?.message ?? '';
   let code: ProviderErrorCode;
-  if (numCode === 3 && /complexity/i.test(msg)) {
-    code = 'PASSWORD_COMPLEXITY';
+  if (numCode === 3 && COMPLEXITY_MESSAGE.test(msg)) {
+    const passwordRule = passwordRuleFromMessage(msg);
+    return new ProviderError(
+      'PASSWORD_COMPLEXITY',
+      msg,
+      false,
+      passwordRule ? { passwordRule } : undefined
+    );
   } else if (numCode === 6) {
     code = 'ALREADY_EXISTS';
   } else if (numCode === 9 && /verified|already/i.test(msg)) {

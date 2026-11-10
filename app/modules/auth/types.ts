@@ -196,13 +196,21 @@ export type ProviderErrorCode =
   | 'ALREADY_EXISTS'
   | 'FAILED_PRECONDITION'
   | 'UNKNOWN';
+/** Which password-policy rule a PASSWORD_COMPLEXITY failure broke, when the provider said. */
+export type PasswordRule = 'symbol' | 'uppercase' | 'lowercase' | 'number' | 'length';
+export interface ProviderErrorDetail {
+  failedAttempts?: number;
+  maxAttempts?: number;
+  /** Set by the adapter on PASSWORD_COMPLEXITY only. Callers never parse `message` for it. */
+  passwordRule?: PasswordRule;
+}
 /** Runtime class — import as a value (`import { ProviderError }`), never `import type`, or `instanceof` checks fail silently. */
 export class ProviderError extends Error {
   constructor(
     public code: ProviderErrorCode,
     message: string,
     public retriable = false,
-    public detail?: { failedAttempts?: number; maxAttempts?: number }
+    public detail?: ProviderErrorDetail
   ) {
     super(message);
     this.name = 'ProviderError'; // subclass name isn't set automatically; keeps logs/Sentry grouping accurate
