@@ -4,15 +4,15 @@ What you need on your machine before cloning `auth-ui`.
 
 ## Required
 
-| Tool | Version | Why |
-| --- | --- | --- |
-| [Node.js](https://nodejs.org) | 26.12.1 (`.nvmrc`; CI and the Docker image use the same version) | Runtime and package manager — every script runs through `npm`. |
-| [Git](https://git-scm.com) | any recent | Cloning and hooks (`lefthook` installs on `npm install`). |
+| Tool                          | Version                                                          | Why                                                            |
+| ----------------------------- | ---------------------------------------------------------------- | -------------------------------------------------------------- |
+| [Node.js](https://nodejs.org) | 26.13.0 (`.nvmrc`; CI and the Docker image use the same version) | Runtime and package manager — every script runs through `npm`. |
+| [Git](https://git-scm.com)    | any recent                                                       | Cloning and hooks (`lefthook` installs on `npm install`).      |
 
-Install Node 26.12.1 with your version manager of choice, e.g.:
+Install Node 26.13.0 with your version manager of choice, e.g.:
 
 ```bash
-nvm install    # reads .nvmrc → 26.12.1
+nvm install    # reads .nvmrc → 26.13.0
 nvm use
 ```
 
@@ -37,7 +37,7 @@ Zitadel instance to run it locally. Pick one:
 ## Checkpoint
 
 ```bash
-node --version     # v26.12.1
+node --version     # v26.13.0
 ```
 
 If it prints the expected version, you are ready to configure the environment.

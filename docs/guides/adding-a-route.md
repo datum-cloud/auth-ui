@@ -68,7 +68,23 @@ Provider errors must not leak: map them to an `AuthErrorCode` so the UI and Sent
 
 ## 4. Add a Cypress component spec
 
-Mirror the path. A route at `app/routes/login/backup-code.tsx` gets its spec at `cypress/component/routes/login/backup-code.cy.tsx`. Pure logic in the resource gets a no-mount spec (`.cy.ts`) under `cypress/component/resources/mfa/`.
+Specs mirror the `app/` **directory**; file names do not map one-to-one. Specs for `app/routes/login/backup-code.tsx` go in `cypress/component/routes/login/`, and specs for the resource go in `cypress/component/resources/mfa/`. Inside that directory a spec file is named for the behaviour it pins, so one route usually has several:
+
+| What you are testing                              | File                                                         | How it runs                                                                   |
+| ------------------------------------------------- | ------------------------------------------------------------ | ----------------------------------------------------------------------------- |
+| What the screen renders for a given loader result | `routes/login/backup-code-render.cy.tsx`                     | Mounts the route component in a memory router with hydrated loader data       |
+| The route's `loader` or `action`                  | `routes/login/backup-code-action.cy.ts` (or `-loader.cy.ts`) | Calls the real export in Node through `callService`                           |
+| Service logic in the resource                     | `resources/mfa/redeem-backup-code.cy.ts`                     | Imports the function directly, or goes through `callService` if it needs Node |
+
+Existing examples: `routes/device/authorize-loader.cy.ts`, `authorize-decision.cy.ts`, `authorize-identity.cy.tsx` and `authorize-recovery.cy.tsx` all cover `app/routes/device/authorize.tsx`; `routes/sso/link-loader.cy.ts` and `link-render.cy.tsx` cover `app/routes/sso/link.tsx`. A handful of older specs sit directly in `cypress/component/routes/` (`reauth.cy.tsx`, `accounts-row.cy.tsx`); leave those where they are and put new ones in the flow directory.
+
+Loaders and actions read signed cookies and check CSRF, which a browser bundle cannot do, so their specs run in Node. To drive a new route handler, import it in `cypress/support/node/harness.ts`, add a `case` that calls it, and add the name to `ServiceFn` in `cypress/support/node/scenario.ts`. The spec then calls `callService({ fn: '<name>', request: { url, form, sessions, csrf } })` and asserts on the serialized response. If the route posts to a rate-limited path or logs an audit event, also register it in `cypress/support/audit-coverage.ts`; the audit and rate-limiter inventory specs read that file and fail when a route is missing from it.
+
+Run one file while you work, since the whole suite takes several minutes:
+
+```bash
+CYPRESS=true npx cypress run --component --spec cypress/component/routes/login/backup-code-action.cy.ts
+```
 
 ```bash
 npm run test:unit:debug    # interactive, while you iterate
@@ -91,7 +107,7 @@ npm run test:e2e
 - [ ] Input validated with a Zod schema through Conform
 - [ ] Provider errors mapped to the app's `AuthErrorCode` vocabulary
 - [ ] Strings wrapped in Lingui macros (`npm run i18n:extract` picks them up; the pre-commit hook does it for you)
-- [ ] Component spec at the mirrored path under `cypress/component/`
+- [ ] Component specs in the mirrored directory under `cypress/component/` (render, plus loader/action through `callService`)
 - [ ] E2E spec in `cypress/e2e/` if the flow is user-visible
 - [ ] `npm run lint && npm run typecheck && npm run lint:boundaries` all clean
 
