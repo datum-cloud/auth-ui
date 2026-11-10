@@ -174,6 +174,8 @@ import {
   action as signupPasswordAction,
 } from '@/routes/signup/password';
 import { loader as signupSuccessLoader } from '@/routes/signup/success';
+import { loader as ssoLinkLoader } from '@/routes/sso/link';
+import { loader as ssoProviderCallbackLoader } from '@/routes/sso/provider/callback';
 import { loader as verifyIndexLoader, action as verifyIndexAction } from '@/routes/verify/index';
 import { providerForRequest } from '@/server/composition';
 import { getCsrfToken, loaderCsrf, assertCsrf, assertCsrfWith } from '@/server/csrf';
@@ -1186,6 +1188,51 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
           } as never);
           outcome = res;
           response = await serializeResponse(res);
+        } finally {
+          providerRegistry.fake = originalFake;
+        }
+        break;
+      }
+      case 'ssoProviderCallbackLoader': {
+        // The REAL /sso/:provider/callback route loader, not processIdpCallback directly: it pins
+        // the route's own provider resolution, the `params.provider` slug threading and the
+        // outcome → Response translation. Same providerRegistry.fake bridge as
+        // reauthProviderCallback, and the same retrieveIdpIntent DI seam as processIdpCallback.
+        const deps: CallbackLoaderDeps = {};
+        if (s.idpIntentError !== undefined) {
+          const code = s.idpIntentError as ConstructorParameters<typeof ProviderError>[0];
+          deps.retrieveIdpIntent = () =>
+            Promise.reject(new ProviderError(code, `scripted retrieveIdpIntent ${String(code)}`));
+        } else if (s.idpIntent !== undefined) {
+          const intent = s.idpIntent as unknown as IdpIntentResult;
+          deps.retrieveIdpIntent = () => Promise.resolve(intent);
+        }
+        const originalFake = providerRegistry.fake;
+        providerRegistry.fake = () => provider;
+        try {
+          const { request: req } = await buildHandlerRequest(sr);
+          const res = await ssoProviderCallbackLoader(
+            { request: req, params: { provider: s.slug ?? 'idp' } } as never,
+            deps
+          );
+          response = await serializeResponse(res);
+        } finally {
+          providerRegistry.fake = originalFake;
+        }
+        break;
+      }
+      case 'ssoLinkLoader': {
+        // The REAL /sso/link route loader: a redirect comes back as a Response, the
+        // sign-in-required prompt as plain loader data (carried as dataBody).
+        const originalFake = providerRegistry.fake;
+        providerRegistry.fake = () => provider;
+        try {
+          const { request: req } = await buildHandlerRequest(sr);
+          const res = await ssoLinkLoader({ request: req, params: {} } as never);
+          response =
+            res instanceof Response
+              ? await serializeResponse(res)
+              : { isResponse: false, dataBody: res as unknown as Record<string, unknown> };
         } finally {
           providerRegistry.fake = originalFake;
         }

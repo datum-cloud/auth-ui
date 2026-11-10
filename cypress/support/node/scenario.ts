@@ -208,6 +208,9 @@ export type ServiceFn =
   // seeded fake provider node-side so recordCalls can capture the org threaded into getActiveIdPs
   // (empty org → the resolved default org, not undefined → the INSTANCE/default IdPs).
   | 'resolveSsoLink'
+  // The REAL /sso/link and /sso/:provider/callback route loaders (provider bridged in).
+  | 'ssoLinkLoader'
+  | 'ssoProviderCallbackLoader'
   | 'resolveSsoManagement'
   | 'activeIdPsProbe'
   // ── mfa / otp / webauthn services (batch 8d) ──
