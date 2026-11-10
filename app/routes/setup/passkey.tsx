@@ -133,8 +133,8 @@ export default function SetupPasskey() {
           <Alert variant="info">
             <AlertDescription>
               <Trans>
-                Finish setting up your passkey to sign in. If you leave this page first, you can set
-                it up later through account recovery.
+                Finish setting up your passkey to sign in. If you leave this page first, you can
+                finish it later from the Recover your account page.
               </Trans>
             </AlertDescription>
           </Alert>

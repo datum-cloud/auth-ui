@@ -60,7 +60,7 @@ function mountPasskey(returnTo?: string, recoveryEnabled = false) {
 
 const SIGNUP_RETURN_TO = '/signup/success?loginName=a%40b.test&requestId=rq1';
 const WARNING = /Please finish setting up your passkey before leaving this page/i;
-const RECOVERABLE = /you can set it up later through account recovery/i;
+const RECOVERABLE = /you can finish it later from the Recover your account page/i;
 
 // With self-serve recovery OFF (AUTH_ACCOUNT_RECOVERY_ENABLED unset), abandoning enrolment here
 // strands the account: the email is already verified (that step enrolled otpEmail), so a retry

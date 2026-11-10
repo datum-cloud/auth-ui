@@ -405,8 +405,8 @@ msgid "Finish creating your account"
 msgstr "Finish creating your account"
 
 #: app/routes/setup/passkey.tsx:135
-msgid "Finish setting up your passkey to sign in. If you leave this page first, you can set it up later through account recovery."
-msgstr "Finish setting up your passkey to sign in. If you leave this page first, you can set it up later through account recovery."
+msgid "Finish setting up your passkey to sign in. If you leave this page first, you can finish it later from the Recover your account page."
+msgstr "Finish setting up your passkey to sign in. If you leave this page first, you can finish it later from the Recover your account page."
 
 #: app/routes/signup/index.tsx:578
 msgid "First name"
