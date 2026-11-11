@@ -148,9 +148,10 @@ describe('/login Passkey button — visibility and identity binding', () => {
     });
     cy.contains('button', /passkey/i).click();
     cy.wait('@discover');
-    // The discover response's resolved identity drives the verify POST.
+    // The discover response's resolved identity drives the verify POST. That POST is sent
+    // after the discover response resolves, so retry until it lands instead of reading once.
+    cy.wrap(capturedPosts).should('have.length', 1);
     cy.then(() => {
-      expect(capturedPosts).to.have.length(1);
       expect(capturedPosts[0].loginName).to.equal('mia@acme.test');
       expect(capturedPosts[0].csrf).to.equal('tok-d');
     });
@@ -164,10 +165,9 @@ describe('/login Passkey button — visibility and identity binding', () => {
       },
     });
     cy.contains('button', /passkey/i).click();
-    cy.then(() => {
-      expect(capturedPosts).to.have.length(1);
-      expect(capturedPosts[0].loginName).to.equal('mia@acme.test');
-    });
+    // The ceremony POST is async after the click; retry until it lands.
+    cy.wrap(capturedPosts).should('have.length', 1);
+    cy.then(() => expect(capturedPosts[0].loginName).to.equal('mia@acme.test'));
   });
 
   it('renders identically hinted vs unhinted — no name, no badge, no extra affordance', () => {
