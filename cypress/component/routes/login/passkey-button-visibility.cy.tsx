@@ -148,8 +148,11 @@ describe('/login Passkey button — visibility and identity binding', () => {
     });
     cy.contains('button', /passkey/i).click();
     cy.wait('@discover');
-    // The discover response's resolved identity drives the verify POST.
-    cy.then(() => {
+    // The discover response's resolved identity drives the verify POST. The verify
+    // dispatch is staged through React state (a passive effect), so RETRY the read of
+    // capturedPosts instead of sampling it once with cy.then — a single sample can run
+    // before the effect fires the POST and flake (see method.cy.tsx's expectCeremonyStarted).
+    cy.wrap(null).should(() => {
       expect(capturedPosts).to.have.length(1);
       expect(capturedPosts[0].loginName).to.equal('mia@acme.test');
       expect(capturedPosts[0].csrf).to.equal('tok-d');
@@ -164,7 +167,9 @@ describe('/login Passkey button — visibility and identity binding', () => {
       },
     });
     cy.contains('button', /passkey/i).click();
-    cy.then(() => {
+    // Retry: the hinted verify dispatch is staged through React state, so sampling once
+    // with cy.then races the effect that fires the POST (see the discovery test above).
+    cy.wrap(null).should(() => {
       expect(capturedPosts).to.have.length(1);
       expect(capturedPosts[0].loginName).to.equal('mia@acme.test');
     });
