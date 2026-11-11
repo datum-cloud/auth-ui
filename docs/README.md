@@ -53,8 +53,8 @@ The login experience for Datum Cloud, served at `/id`. This documentation covers
 
 | Layer         | Choice                                    |
 | ------------- | ----------------------------------------- |
-| Runtime       | Node 26.12.1                              |
-| Framework     | React Router 7 (SSR, framework mode)      |
+| Runtime       | Node 26.13.0                              |
+| Framework     | React Router 8 (SSR, framework mode)      |
 | BFF           | Hono via `react-router-hono-server`       |
 | Identity      | Zitadel v2 APIs (`@zitadel/client`)       |
 | UI            | Tailwind CSS v4 + `@datum-cloud/datum-ui` |

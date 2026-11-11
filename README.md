@@ -32,7 +32,7 @@ Every authentication ceremony — password, passkey, MFA, SSO, device authorizat
 ### Built With
 
 - **[Node.js](https://nodejs.org)** — runtime, with npm as the package manager
-- **[React Router 7](https://reactrouter.com)** — SSR framework mode
+- **[React Router 8](https://reactrouter.com)** — SSR framework mode
 - **[Hono](https://hono.dev)** — backend-for-frontend server
 - **[Zitadel](https://zitadel.com)** — identity platform (v2 APIs)
 - **[Tailwind CSS](https://tailwindcss.com) + [datum-ui](https://github.com/datum-cloud/datum-ui)** — styling and components

@@ -1,5 +1,6 @@
 import { AuthCard } from '@/components/auth-card/auth-card';
 import { AuthFormFields } from '@/components/auth-form/auth-form-fields';
+import { FormError } from '@/components/form-error/form-error';
 import { IdentityBadge } from '@/components/identity-badge/identity-badge';
 import { IdpIcon } from '@/components/idp-icon/idp-icon';
 import { SignOutButton } from '@/components/sign-out-button/sign-out-button';
@@ -20,11 +21,13 @@ import { Dialog } from '@datum-cloud/datum-ui/dialog';
 import { Separator } from '@datum-cloud/datum-ui/separator';
 import { Tooltip } from '@datum-cloud/datum-ui/tooltip';
 import { Trans } from '@lingui/react/macro';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   data,
   redirect,
+  useActionData,
   useLoaderData,
+  useNavigation,
   type ActionFunctionArgs,
   type LoaderFunctionArgs,
 } from 'react-router';
@@ -90,6 +93,20 @@ function UnlinkConfirmDialog({
   csrfToken,
 }: UnlinkConfirmDialogProps) {
   const [open, setOpen] = useState(false);
+  const actionData = useActionData();
+  const navigation = useNavigation();
+  // Scoped to THIS link: useNavigation is global and every connected row renders its own
+  // dialog — matching on the ids keeps one row's unlink from spinning all of them.
+  const unlinking =
+    navigation.state !== 'idle' &&
+    navigation.formData?.get('intent') === 'unlink' &&
+    navigation.formData?.get('idpId') === idpId &&
+    navigation.formData?.get('linkedUserId') === linkedUserId;
+  // Close when an action result lands: a failed unlink renders its inline error on the page,
+  // which must not sit hidden behind the modal overlay (mirrors passkeys RemoveConfirmDialog).
+  useEffect(() => {
+    if (actionData !== undefined) setOpen(false);
+  }, [actionData]);
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <Dialog.Trigger asChild>
@@ -103,7 +120,12 @@ function UnlinkConfirmDialog({
           description={<Trans>This removes it as a sign-in method for your account.</Trans>}
         />
         <Dialog.Footer>
-          <Button type="secondary" theme="outline" htmlType="button" onClick={() => setOpen(false)}>
+          <Button
+            type="secondary"
+            theme="outline"
+            htmlType="button"
+            disabled={unlinking}
+            onClick={() => setOpen(false)}>
             <Trans>Cancel</Trans>
           </Button>
           {/* RRForm auto-adds ?index → POST reaches the sso index action. */}
@@ -112,7 +134,7 @@ function UnlinkConfirmDialog({
             <input type="hidden" name="intent" value="unlink" />
             <input type="hidden" name="idpId" value={idpId} />
             <input type="hidden" name="linkedUserId" value={linkedUserId} />
-            <Button type="primary" theme="solid" htmlType="submit">
+            <Button type="primary" theme="solid" htmlType="submit" loading={unlinking}>
               <Trans>Unlink</Trans>
             </Button>
           </RRForm>
@@ -125,6 +147,9 @@ function UnlinkConfirmDialog({
 export default function SsoPage() {
   const { csrfToken, loginName, linked, linkable, allowUnlink, organization } =
     useLoaderData<typeof loader>();
+  // The action only ever returns data for a failed unlink (502 provider_error); every other
+  // exit redirects or returns null. Without this the failure was silent.
+  const actionData = useActionData() as { error?: string } | null | undefined;
 
   return (
     <AuthCard
@@ -143,6 +168,11 @@ export default function SsoPage() {
         </>
       }>
       <div className="flex w-full flex-col gap-4">
+        {actionData?.error ? (
+          <FormError>
+            <Trans>We couldn't unlink that account. Please try again.</Trans>
+          </FormError>
+        ) : null}
         {/* Linked IdPs */}
         {linked.length > 0 ? (
           <section className="flex flex-col gap-3">

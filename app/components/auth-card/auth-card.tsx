@@ -9,9 +9,9 @@ interface AuthCardProps {
   description?: ReactNode;
   children?: ReactNode;
   /**
-   * Optional org branding (P2). Themes the card via CSS custom properties
-   * (--primary / --background) and swaps the datum logo for the org logo when
-   * present. Absent/null ⇒ datum defaults (unchanged from Phase 1).
+   * Optional org branding, forwarded to BrandLogo only. It does NOT theme the card:
+   * auth pages always render in Datum's own colours and with the Datum mark (BrandLogo
+   * ignores org logos for now), so an org's primaryColor never overrides --primary.
    */
   branding?: BrandingTheme | null;
 
@@ -21,7 +21,7 @@ interface AuthCardProps {
 /**
  * Centered card shell shared by every auth screen.
  *
- * Renders the org/Datum logo, a title, an optional description, and the
+ * Renders the Datum logo, a title, an optional description, and the
  * form content as children.  Max-width is ~sm (384px), centered
  * vertically and horizontally with min-h-screen.
  */

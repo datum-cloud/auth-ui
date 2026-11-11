@@ -70,7 +70,7 @@ See [Testing](../development/testing.md) for what the acceptance suite covers.
               |
               v
 +----------------------------+
-|  React Router 7 (basename  |   /id/login, /id/verify, /id/signup, ...
+|  React Router 8 (basename  |   /id/login, /id/verify, /id/signup, ...
 |  '/id/', SSR framework)    |
 +-------------+--------------+
               |

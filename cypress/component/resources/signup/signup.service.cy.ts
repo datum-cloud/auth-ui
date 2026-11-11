@@ -331,7 +331,7 @@ describe('registerEmailLinkSignup — returnTo carries organization/requestId/ne
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Task 1: registerWithPassword — verification skip (EMAIL_VERIFICATION=false)
+// Task 1: registerWithPassword — verification skip (AUTH_EMAIL_VERIFICATION_REQUIRED=false)
 //
 // When requireVerification=false, provider.register() must be called with
 // emailVerified:true and NO verifyUrlTemplate (Zitadel marks the email

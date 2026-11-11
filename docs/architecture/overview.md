@@ -1,13 +1,13 @@
 # Architecture Overview
 
-Datum Auth UI is the login experience for Datum Cloud, served at `/id`. It is a server-rendered React Router 7 app behind a Hono BFF, talking to Zitadel v2 APIs through a single swappable provider interface.
+Datum Auth UI is the login experience for Datum Cloud, served at `/id`. It is a server-rendered React Router 8 app behind a Hono BFF, talking to Zitadel v2 APIs through a single swappable provider interface.
 
 ## Tech Stack
 
 | Layer         | Choice                                    |
 | ------------- | ----------------------------------------- |
-| Runtime       | Node 26.12.1                              |
-| Framework     | React Router 7 (SSR, framework mode)      |
+| Runtime       | Node 26.13.0                              |
+| Framework     | React Router 8 (SSR, framework mode)      |
 | BFF           | Hono via `react-router-hono-server`       |
 | Identity      | Zitadel v2 APIs (`@zitadel/client`)       |
 | UI            | Tailwind CSS v4 + `@datum-cloud/datum-ui` |
@@ -30,7 +30,7 @@ Datum Auth UI is the login experience for Datum Cloud, served at `/id`. It is a 
                         |
                         v
         +------------------------------+
-        |  React Router 7 (SSR)        |
+        |  React Router 8 (SSR)        |
         |  app/routes/  -> loaders,    |
         |                  actions     |
         +---------------+--------------+

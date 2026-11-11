@@ -1,3 +1,4 @@
+import type { Result } from 'axe-core';
 import 'cypress-axe';
 
 // KNOWN BLIND SPOT: axe classifies equal foreground/background (1:1 contrast) as
@@ -11,11 +12,53 @@ import 'cypress-axe';
 //   • 2.4.11 Focus Appearance (minimum)
 //   • 2.5.7 Dragging Movements
 //   • 3.2.6 Consistent Help
-export function checkA11y() {
+//
+// COLOR CONTRAST is checked (WCAG AA) everywhere except the selectors below. Each entry is
+// a known, real violation that auth-ui cannot fix locally; the rule stays on for everything
+// else, so a new low-contrast element fails the gate. Delete an entry once its cause is fixed.
+const CONTRAST_EXEMPT_SELECTORS = [
+  // All three are datum-ui alpha-theme colour tokens that miss AA (4.5:1) in the LIGHT
+  // theme only. root.css takes those tokens unmodified, so the fix is upstream in datum-ui.
+  // The dark theme passes for each of them and is not exempt.
+  //
+  // Solid primary button: white text on --btn-primary (#a68686) is 3.29:1.
+  'html:not(.dark) .bg-btn-primary',
+  // --primary as a text colour (#9c7979 on white is 3.87:1): datum-ui's link-theme and
+  // outline/borderless primary buttons, e.g. BackLink.
+  'html:not(.dark) .text-primary',
+  // --destructive as a text colour (#d25b5b on the page background is 3.6:1): FormError
+  // and the other inline error messages.
+  'html:not(.dark) .text-destructive',
+];
+
+const CONTRAST_EXEMPT = CONTRAST_EXEMPT_SELECTORS.flatMap((selector) => [
+  selector,
+  `${selector} *`,
+]).join(', ');
+
+/** Narrows ONLY the color-contrast rule; every other rule still sees the exempt elements. */
+export function configureContrastExemptions() {
+  cy.configureAxe({ rules: [{ id: 'color-contrast', selector: `*:not(${CONTRAST_EXEMPT})` }] });
+}
+
+/**
+ * Fails with every violation spelled out (rule, element, axe's reason). cypress-axe alone
+ * reports only a count in the terminal, which is not enough to fix a failure or to scope
+ * an exemption. Works the same in component and e2e runs.
+ */
+export function failWithViolations(violations: Result[]) {
+  const lines = violations.flatMap((violation) =>
+    violation.nodes.map((node) => {
+      const reason = node.any[0]?.message ?? node.failureSummary ?? '';
+      return `${violation.id}: ${node.target.join(' ')}\n    ${node.html}\n    ${reason}`;
+    })
+  );
+  throw new Error(`${lines.length} accessibility violation(s):\n  ${lines.join('\n  ')}`);
+}
+
+/** Runs axe on the page, or on `context` (a selector) when a component spec mounts a fragment. */
+export function checkA11y(context?: string) {
   cy.injectAxe();
-  // `color-contrast` is DISABLED: auth-ui uses datum-ui's original color tokens (see root.css
-  // 755-M5/M3/M4), some of which fall short of WCAG AA. That contrast gap is owned by datum-ui's
-  // alpha theme and must be fixed UPSTREAM — not patched in auth-ui — so we don't fail the gate on
-  // it here. Re-enable (`enabled: true`) once datum-ui's tokens pass AA. All other axe rules stay on.
-  cy.checkA11y(undefined, { rules: { 'color-contrast': { enabled: false } } });
+  configureContrastExemptions();
+  cy.checkA11y(context, undefined, failWithViolations);
 }

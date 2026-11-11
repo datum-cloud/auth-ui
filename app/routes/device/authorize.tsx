@@ -3,6 +3,7 @@ import { AuthFormFields } from '@/components/auth-form/auth-form-fields';
 import { FormError } from '@/components/form-error/form-error';
 import { IdentityBadge } from '@/components/identity-badge/identity-badge';
 import { useAuthActionError } from '@/hooks/use-auth-action-error';
+import { useDescribeScope } from '@/hooks/use-describe-scope';
 import { mostRecent, readSessions } from '@/modules/auth/session/cookie';
 import {
   decisionOutcomeToResponse,
@@ -13,9 +14,8 @@ import {
 import { paths } from '@/routes/paths';
 import { providerForRequest } from '@/server/auth-context.server';
 import { loaderCsrf, assertCsrf } from '@/server/csrf';
-import { Badge } from '@datum-cloud/datum-ui/badge';
 import { Button, LinkButton } from '@datum-cloud/datum-ui/button';
-import { Trans } from '@lingui/react/macro';
+import { Trans, useLingui } from '@lingui/react/macro';
 import {
   data,
   redirect,
@@ -72,6 +72,8 @@ export default function DeviceAuthorize() {
   // <FormError> (role="alert") inside the consent form below — no toast. (The LOADER
   // missing/stale-code recovery is handled separately by the tailored card.)
   const errorMessage = useAuthActionError(actionData);
+  const describeScope = useDescribeScope();
+  const { t } = useLingui();
 
   // The loader returns a spine AppError tagged recovery: 'device' for the
   // missing / stale user_code paths. Render a TAILORED in-component recovery — mirroring
@@ -130,14 +132,16 @@ export default function DeviceAuthorize() {
         </>
       }>
       <div className="flex flex-col gap-4">
+        {/* Plain-language descriptions for the standard OIDC scopes; an unrecognised scope keeps
+            its raw identifier so nothing being granted is hidden. */}
         {scope.length > 0 && (
-          <div className="flex flex-wrap items-center gap-3">
+          <ul
+            aria-label={t`Requested access`}
+            className="text-foreground flex list-disc flex-col gap-1 pl-5 text-sm">
             {scope.map((s) => (
-              <Badge type="quaternary" key={s}>
-                {s}
-              </Badge>
+              <li key={s}>{describeScope(s)}</li>
             ))}
-          </div>
+          </ul>
         )}
         {activeLoginName ? (
           <RRForm method="post" className="flex w-full flex-col gap-4">

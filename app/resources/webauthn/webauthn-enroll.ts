@@ -42,6 +42,7 @@ import { isSudoFresh } from '@/resources/shared/sudo';
 import { paths } from '@/routes/paths';
 import { providerForRequest } from '@/server/auth-context.server';
 import { getCsrfToken, assertCsrf } from '@/server/csrf';
+import { env } from '@/server/infra/env.server';
 import { data, redirect, type ActionFunctionArgs, type LoaderFunctionArgs } from 'react-router';
 import { z } from 'zod';
 
@@ -77,6 +78,8 @@ export interface WebAuthnEnrollLoaderData {
   challengeFailed: boolean;
   /** Validated post-enrollment return target (e.g. /passkeys); null when absent/invalid. */
   returnTo: string | null;
+  /** Self-serve recovery (/recover) is live, so an abandoned signup enrolment can be resumed. */
+  recoveryEnabled: boolean;
 }
 
 export type WebAuthnEnrollActionData =
@@ -244,6 +247,7 @@ export function createWebAuthnEnrollHandlers(cfg: WebAuthnEnrollConfig) {
         publicKey,
         challengeFailed,
         returnTo,
+        recoveryEnabled: env.AUTH_ACCOUNT_RECOVERY_ENABLED,
       },
       { headers }
     );

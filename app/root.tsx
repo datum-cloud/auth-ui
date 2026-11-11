@@ -14,7 +14,6 @@ import { cspNonceContext } from '@/shared/load-context';
 import { authErrorMessage } from '@/utils/errors/auth-error';
 import { ConformAdapter } from '@datum-cloud/datum-ui/form/adapters/conform';
 import { ThemeProvider, ThemeScript } from '@datum-cloud/datum-ui/theme';
-import { Toaster } from '@datum-cloud/datum-ui/toast';
 import { setupI18n } from '@lingui/core';
 import { I18nProvider } from '@lingui/react';
 import { useEffect, useMemo } from 'react';
@@ -127,7 +126,6 @@ export default function App() {
         <ConformAdapter>
           <MaxMindTracker accountId={maxmindAccountId} />
           <Outlet />
-          <Toaster position="top-right" />
         </ConformAdapter>
       </I18nProvider>
     </ThemeProvider>

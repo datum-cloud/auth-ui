@@ -2,8 +2,8 @@
 
 - **Status:** Accepted, with a sunset
 - **Date:** 2026-09-22
-- **Sunset:** delete when staging runs one Zitadel org for humans, as production does. Design for
-  that migration: `docs/superpowers/specs/2026-09-21-staging-single-org-migration-design.md`.
+- **Sunset:** delete when staging runs one Zitadel org for humans, as production does. The design
+  for that migration (staging single-org migration, 2026-09-21) is not checked into this repo.
 
 ## Context
 

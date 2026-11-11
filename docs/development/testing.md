@@ -6,7 +6,7 @@
 
 | Suite                      | Command                   | What it covers                                                                   |
 | -------------------------- | ------------------------- | -------------------------------------------------------------------------------- |
-| Component (the unit layer) | `npm run test:unit`       | `cypress/component/` — mirrors the `app/` tree, real browser                     |
+| Component (the unit layer) | `npm run test:unit`       | `cypress/component/` — mirrors the `app/` directories, real browser              |
 | End-to-end                 | `npm run test:e2e`        | `cypress/e2e/` — full flows against the dev server                               |
 | E2E (fast)                 | `npm run test:e2e:fast`   | built app + `AUTH_PROVIDER=fake`, single spec                                    |
 | Acceptance                 | `npm run test:acceptance` | `acceptance/` — against a real Zitadel (`acceptance/docker-compose.zitadel.yml`) |
@@ -24,7 +24,7 @@ npm run typecheck:cypress   # tsc -p cypress/tsconfig.json --noEmit (~2s)
 npm run test:unit           # CYPRESS=true cypress run --component
 ```
 
-`cypress/component/` mirrors `app/` one-for-one, so the spec for `app/resources/sso/sso-callback.ts` lives under `cypress/component/resources/sso/`. The project holds two kinds of spec:
+`cypress/component/` mirrors the `app/` directory tree, so specs for `app/resources/sso/sso-callback.ts` live under `cypress/component/resources/sso/`. Files do not map one-for-one: a spec is named for the behaviour it pins, and one module often has several (`routes/device/authorize-loader.cy.ts`, `authorize-decision.cy.ts`, `authorize-identity.cy.tsx` all cover `app/routes/device/authorize.tsx`). [Adding a Route](../guides/adding-a-route.md#4-add-a-cypress-component-spec) has the naming table. The project holds two kinds of spec:
 
 - **mount specs** (`.cy.tsx`) — render a component or route through the mount helpers in `cypress/support/`;
 - **no-mount logic specs** (`.cy.ts`) — import a function, assert on its return. No DOM at all. This is where service and mapper logic is covered.

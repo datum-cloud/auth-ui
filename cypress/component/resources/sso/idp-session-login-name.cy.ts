@@ -48,11 +48,11 @@ describe('signInWithIdpIntent — session cookie identity (issue #1485)', () => 
     });
   });
 
-  it('still matches a re-auth intent recorded under the old IdP handle', () => {
-    // reauthRedirect records the intent from the COOKIE entry's loginName, so a session minted
-    // before this fix recorded 'octocat'. Now that sign-in resolves to 'octocat@datum.net', a
-    // naive compare would false-mismatch EVERY legacy IdP re-auth into the account picker for the
-    // cookie's whole 12h life. Same person, two spellings — the ceremony must continue.
+  it('compares a re-auth intent against the Zitadel loginName only', () => {
+    // Sessions minted before the #1485 fix recorded the bare IdP handle ('octocat') as the
+    // re-auth intent, and a transitional `alsoAccept` let that handle match. Those sessions have
+    // long expired, so the guard now compares the canonical loginName alone: an intent recorded
+    // under the handle goes to the account picker like any other mismatch.
     callService({
       fn: 'signInWithIdpIntent',
       seed: { users: [{ id: 'u1', loginName: ZITADEL_LOGIN_NAME }] },
@@ -60,19 +60,18 @@ describe('signInWithIdpIntent — session cookie identity (issue #1485)', () => 
       request: { url: URL, reauthIntent: GITHUB_HANDLE },
       inspect: { cookieSessions: true },
     }).then((v) => {
-      const r = v.outcome as { target?: string; reauthClearCookie?: string };
-      expect(r.target, 'ceremony continues').to.include('/authorize');
-      expect(r.target).to.not.include('reauthMismatch');
-      expect(r.reauthClearCookie ?? '').to.include('reauth-intent=');
-      // The cookie is still rewritten to the canonical name — the tolerance is in the compare,
-      // not a licence to keep persisting the handle.
+      const r = v.outcome as { target?: string };
+      expect(r.target).to.include('/accounts');
+      expect(r.target).to.include('reauthMismatch=1');
+      expect(r.target).to.not.include('/authorize');
+      // The cookie still holds the canonical name, never the handle.
       const entries = v.inspect?.cookieSessions as CookieEntry[] | null;
       expect(entries?.[0].loginName).to.equal(ZITADEL_LOGIN_NAME);
     });
   });
 
   it('still bounces a genuine identity mismatch to the picker', () => {
-    // The widened compare must not blunt the guard: a DIFFERENT account signing in against a
+    // A DIFFERENT account signing in against a
     // pending re-auth intent still has to land on /accounts with both accounts kept.
     callService({
       fn: 'signInWithIdpIntent',

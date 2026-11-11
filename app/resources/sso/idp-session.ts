@@ -163,10 +163,7 @@ export async function signInWithIdpIntent(
   // being re-authenticated: keep both and bounce to the picker so the user chooses. (A rare
   // cross-method false mismatch only adds a picker step — never loses data.) This is the hard
   // guard; the IdP-side login_hint is only best-effort pre-selection.
-  // The intent was recorded from the COOKIE entry's loginName (reauthRedirect). A session minted
-  // before the fix above recorded the IdP handle there, so accept the IdP-vouched name too —
-  // otherwise every legacy IdP re-auth false-mismatches into the picker for the cookie's 12h life.
-  const reauth = await checkReauthIntent(request, loginName, fallbackLoginName);
+  const reauth = await checkReauthIntent(request, loginName);
 
   const entries = await readSessions(request);
   const withNew = addSession(

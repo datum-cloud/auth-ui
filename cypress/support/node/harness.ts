@@ -16,6 +16,10 @@ import type {
   Verdict,
 } from './scenario';
 import { signAssertion, signAttestation } from './sign-assertion';
+import {
+  decodePasskeyRegistrationCode,
+  encodePasskeyRegistrationCode,
+} from '@/modules/auth/passkey-registration-code';
 import { FakeAuthProvider } from '@/modules/auth/providers/fake/fake-provider';
 import { FakeWebAuthn, PREBAKED_CREDENTIAL_ID } from '@/modules/auth/providers/fake/fake-webauthn';
 import {
@@ -67,6 +71,21 @@ import {
   type OtpSessionEntry,
 } from '@/resources/otp';
 import {
+  finishRecoveryCeremony,
+  startRecoveryCeremony,
+} from '@/resources/recovery/recovery-ceremony';
+import {
+  RECOVERY_TICKET_TTL_MS,
+  fillerTicket,
+  recoveryCeremonyCookie,
+  recoveryTicketCookie,
+  openCeremonyTicket,
+  openRequestTicket,
+  sealCeremonyTicket,
+  sealRequestTicket,
+} from '@/resources/recovery/recovery-ticket.server';
+import { requestRecovery } from '@/resources/recovery/recovery.service';
+import {
   resolveSignedIn,
   listAccounts,
   switchAccount,
@@ -85,6 +104,7 @@ import {
   completeEmailLinkSignup,
 } from '@/resources/signup';
 import { allowResend, _resetResendLimiterForTests } from '@/resources/signup/signup-resend-limit';
+import { resendVerification } from '@/resources/signup/verification-resend';
 import {
   processIdpCallback,
   submitLdapCredentials,
@@ -140,6 +160,11 @@ import {
 } from '@/routes/password/reset';
 import { action as reauthAction } from '@/routes/reauth';
 import { loader as reauthProviderCallbackLoader } from '@/routes/reauth/provider/callback';
+import {
+  action as recoverCompleteAction,
+  loader as recoverCompleteLoader,
+} from '@/routes/recover/complete';
+import { action as recoverAction, loader as recoverLoader } from '@/routes/recover/index';
 import { loader as setupAuthenticatorLoader } from '@/routes/setup/authenticator';
 import { loader as signupCompleteLoader } from '@/routes/signup/complete';
 import { loader as signupIndexLoader, action as signupIndexAction } from '@/routes/signup/index';
@@ -149,11 +174,14 @@ import {
   action as signupPasswordAction,
 } from '@/routes/signup/password';
 import { loader as signupSuccessLoader } from '@/routes/signup/success';
+import { loader as ssoLinkLoader } from '@/routes/sso/link';
+import { loader as ssoProviderCallbackLoader } from '@/routes/sso/provider/callback';
 import { loader as verifyIndexLoader, action as verifyIndexAction } from '@/routes/verify/index';
 import { providerForRequest } from '@/server/composition';
 import { getCsrfToken, loaderCsrf, assertCsrf, assertCsrfWith } from '@/server/csrf';
 import { _envSchema, env } from '@/server/infra/env.server';
 import { verifyRecaptcha } from '@/server/infra/recaptcha.server';
+import { sendRecoveryMail } from '@/server/infra/recovery-mail.server';
 import { sendVerificationMail } from '@/server/infra/verification-mail.server';
 import {
   loginPasswordRateLimit,
@@ -244,6 +272,49 @@ async function runRegistrationOp(
     await fake.verifyRegistration('u6', key, credential, 'localhost');
     return {};
   });
+}
+
+/**
+ * The fake verifies a REAL attestation against the challenge it issued, so a recovery finish row
+ * cannot post a made-up credential. This opens a genuine registration for `userId`, signs the
+ * attestation for its challenge, and substitutes the two literals a spec cannot know: 'REGISTERED'
+ * (the passkeyId, in the ceremony ticket and the form) and 'ATTESTED' (the form's credential).
+ */
+async function attestRecoveryPasskey(
+  provider: FakeAuthProvider,
+  userId: string | undefined,
+  spec: RequestSpec
+): Promise<{ spec: RequestSpec; passkeyId?: string }> {
+  if (!userId) return { spec };
+  const options = await provider.registerPasskey(userId, 'harness-opened', 'localhost');
+  const { publicKey } = options.publicKeyCredentialCreationOptions as {
+    publicKey: { challenge: string };
+  };
+  const credential = JSON.stringify(
+    signAttestation({
+      credentialId: 'cmVjb3Zlcnk',
+      publicKeyCose: PASSKEY_U5.publicKeyCose,
+      challenge: publicKey.challenge,
+      origin: FAKE_WEBAUTHN_ORIGIN,
+      rpId: 'localhost',
+    })
+  );
+  const passkeyId = options.passkeyId;
+  const subst = (v: string) => (v === 'REGISTERED' ? passkeyId : v === 'ATTESTED' ? credential : v);
+  return {
+    passkeyId,
+    spec: {
+      ...spec,
+      form: spec.form
+        ? Object.fromEntries(
+            Object.entries(spec.form).map(([k, v]) => [k, typeof v === 'string' ? subst(v) : v])
+          )
+        : spec.form,
+      ceremonyTicket: spec.ceremonyTicket
+        ? { ...spec.ceremonyTicket, passkeyId: subst(spec.ceremonyTicket.passkeyId) }
+        : spec.ceremonyTicket,
+    } as RequestSpec,
+  };
 }
 
 async function runProdOriginOp(
@@ -426,6 +497,18 @@ async function buildCookieHeader(req: RequestSpec): Promise<string | undefined> 
   if (sessionsPart) parts.push(sessionsPart);
   if (req.fingerprintId) parts.push(`fingerprintId=${encodeURIComponent(req.fingerprintId)}`);
   if (req.reauthIntent) parts.push((await serializeReauthIntent(req.reauthIntent)).split(';')[0]);
+  if (req.ceremonyTicket)
+    parts.push(
+      (await recoveryCeremonyCookie.serialize(sealCeremonyTicket(req.ceremonyTicket))).split(';')[0]
+    );
+  if (req.recoveryTicket)
+    parts.push(
+      (
+        await recoveryTicketCookie.serialize(
+          req.recoveryTicket === 'filler' ? fillerTicket() : sealRequestTicket(req.recoveryTicket)
+        )
+      ).split(';')[0]
+    );
   if (req.lastUsedLogin)
     parts.push((await serializeLastUsedLogin(req.lastUsedLogin)).split(';')[0]);
   if (req.passkeyHint) parts.push((await serializePasskeyHint(req.passkeyHint)).split(';')[0]);
@@ -587,6 +670,9 @@ function buildProvider(s: Scenario): FakeAuthProvider {
       ? (getAuthProvider({ AUTH_PROVIDER: 'fake' }) as FakeAuthProvider)
       : new FakeAuthProvider((s.seed ?? {}) as ConstructorParameters<typeof FakeAuthProvider>[0]);
 
+  // Applied through the REAL markEmailVerified, so the fake's ALREADY_DONE guard on
+  // resendEmailCode fires exactly as Zitadel's would for a verified address.
+  for (const id of s.seed?.emailVerified ?? []) void provider.markEmailVerified(id);
   for (const ls of s.liveSessions ?? []) provider.seedLiveSession(ls);
   // The scenario uses an OPEN ProviderErrorCode union (string & {}) so future codes don't break the
   // serializable contract; cast to the fake's strict union at the call boundary.
@@ -915,6 +1001,7 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
   const verificationMailReceived: Array<{
     method?: string;
     contentType?: string;
+    path?: string;
     body?: unknown;
   }> = [];
   if (s.verificationMailListen) {
@@ -928,6 +1015,9 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
         verificationMailReceived.push({
           method: req.method,
           contentType: req.headers['content-type'],
+          // Recovery and verification share this listener on one port; the path is the only
+          // thing that says which webhook the client aimed at.
+          path: req.url,
           body: raw ? JSON.parse(raw) : undefined,
         });
         // Deliberately never respond: the connection stays open and idle, so the ONLY thing that
@@ -936,7 +1026,10 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
         // cannot stand in for this one.
         if (s.verificationMailHang) return;
         res.writeHead(s.verificationMailStatus ?? 200, { 'content-type': 'application/json' });
-        res.end('{}');
+        // The recovery webhook MINTS the code and answers `{ codeId }`; sendRecoveryMail PARSES
+        // that body, so the response is no longer inert. Default '{}' keeps every pre-existing
+        // scenario byte-identical and doubles as the malformed-body row.
+        res.end(JSON.stringify(s.verificationMailResponseBody ?? {}));
       });
     });
     await new Promise<void>((res2, rej2) => {
@@ -1095,6 +1188,51 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
           } as never);
           outcome = res;
           response = await serializeResponse(res);
+        } finally {
+          providerRegistry.fake = originalFake;
+        }
+        break;
+      }
+      case 'ssoProviderCallbackLoader': {
+        // The REAL /sso/:provider/callback route loader, not processIdpCallback directly: it pins
+        // the route's own provider resolution, the `params.provider` slug threading and the
+        // outcome → Response translation. Same providerRegistry.fake bridge as
+        // reauthProviderCallback, and the same retrieveIdpIntent DI seam as processIdpCallback.
+        const deps: CallbackLoaderDeps = {};
+        if (s.idpIntentError !== undefined) {
+          const code = s.idpIntentError as ConstructorParameters<typeof ProviderError>[0];
+          deps.retrieveIdpIntent = () =>
+            Promise.reject(new ProviderError(code, `scripted retrieveIdpIntent ${String(code)}`));
+        } else if (s.idpIntent !== undefined) {
+          const intent = s.idpIntent as unknown as IdpIntentResult;
+          deps.retrieveIdpIntent = () => Promise.resolve(intent);
+        }
+        const originalFake = providerRegistry.fake;
+        providerRegistry.fake = () => provider;
+        try {
+          const { request: req } = await buildHandlerRequest(sr);
+          const res = await ssoProviderCallbackLoader(
+            { request: req, params: { provider: s.slug ?? 'idp' } } as never,
+            deps
+          );
+          response = await serializeResponse(res);
+        } finally {
+          providerRegistry.fake = originalFake;
+        }
+        break;
+      }
+      case 'ssoLinkLoader': {
+        // The REAL /sso/link route loader: a redirect comes back as a Response, the
+        // sign-in-required prompt as plain loader data (carried as dataBody).
+        const originalFake = providerRegistry.fake;
+        providerRegistry.fake = () => provider;
+        try {
+          const { request: req } = await buildHandlerRequest(sr);
+          const res = await ssoLinkLoader({ request: req, params: {} } as never);
+          response =
+            res instanceof Response
+              ? await serializeResponse(res)
+              : { isResponse: false, dataBody: res as unknown as Record<string, unknown> };
         } finally {
           providerRegistry.fake = originalFake;
         }
@@ -2764,33 +2902,18 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
 
       // ── Task 11 migrations ───────────────────────────────────────────────────────
       // env.server._envSchema comprehensive validation: takes parseEnvRaw, runs the REAL Zod
-      // schema (not the Vite browser stub), and returns full { success, data?, issues?, warnings }.
+      // schema (not the Vite browser stub), and returns full { success, data?, issues? }.
       case 'envSchemaFull': {
-        // The AUTH_EMAIL_VERIFICATION_REQUIRED resolution warns via console.warn on the deprecated
-        // EMAIL_VERIFICATION-only path. Intercept it here (scoped to this case, restored in the
-        // finally below) so specs can assert presence/absence without a real startup log to read.
-        const capturedWarnings: string[] = [];
-        const originalWarn = console.warn;
-        console.warn = (...args: unknown[]) => {
-          capturedWarnings.push(args.map((a) => (typeof a === 'string' ? a : String(a))).join(' '));
-        };
-        let result: ReturnType<typeof _envSchema.safeParse>;
-        try {
-          result = _envSchema.safeParse(s.parseEnvRaw ?? {});
-        } finally {
-          console.warn = originalWarn;
-        }
+        const result = _envSchema.safeParse(s.parseEnvRaw ?? {});
         if (result.success) {
           outcome = {
             success: true,
             data: result.data as unknown as Record<string, unknown>,
-            warnings: capturedWarnings,
           };
         } else {
           outcome = {
             success: false,
             issues: result.error.issues.map((i) => ({ path: i.path, message: i.message })),
-            warnings: capturedWarnings,
           };
         }
         break;
@@ -2832,6 +2955,283 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
           s.verificationMailInput ?? { userId: '', code: '', returnTo: '' }
         );
         outcome = { result, received: verificationMailReceived[0] };
+        break;
+      }
+
+      // Drives the REAL sendRecoveryMail over the same shared listener — the recovery URL points
+      // at the same port with the /v1/email/recovery path, so `received.path` distinguishes it.
+      case 'sendRecoveryMail': {
+        const result = await sendRecoveryMail(
+          s.recoveryMailInput ?? { userId: '', returnTo: '', requestedBy: 'self' }
+        );
+        outcome = { result, received: verificationMailReceived[0] };
+        break;
+      }
+
+      // ── recovery tickets (Phase C Lane D Task 4) ────────────────────────────────────────────
+      // Drives the REAL seal/open functions: node:crypto and env.SESSION_SECRET are both
+      // unavailable in the browser bundle. One call runs every requested check so the whole
+      // format — including the fixed-length invariant G7 rests on — is asserted together.
+      case 'recoveryTicketCheck': {
+        const now = 1_700_000_000_000;
+        const EMAIL = 'owner@acme.test';
+        const real = sealRequestTicket({ userId: 'u-1', codeId: 'code-id-1', email: EMAIL }, now);
+        const results: Record<string, unknown> = {};
+        for (const op of s.ticketOps ?? []) {
+          switch (op) {
+            case 'roundTrip':
+              results.roundTrip = openRequestTicket(real, EMAIL, now + 1000);
+              break;
+            case 'fillerLength': {
+              const f1 = fillerTicket(now);
+              const f2 = fillerTicket(now);
+              results.fillerLength = {
+                sameLength: f1.length === real.length && f2.length === real.length,
+                fillersDiffer: f1 !== f2,
+              };
+              break;
+            }
+            case 'wrongEmail':
+              results.wrongEmail = openRequestTicket(real, 'someone-else@acme.test', now + 1000);
+              break;
+            case 'tampered': {
+              // Flip one character of the ciphertext body (past the IV) — the GCM tag must reject.
+              const at = 20;
+              const swap = real[at] === 'A' ? 'B' : 'A';
+              const bad = real.slice(0, at) + swap + real.slice(at + 1);
+              results.tampered = openRequestTicket(bad, EMAIL, now + 1000);
+              break;
+            }
+            case 'expired':
+              results.expired = openRequestTicket(real, EMAIL, now + RECOVERY_TICKET_TTL_MS + 1);
+              break;
+            case 'ceremonyRoundTrip': {
+              const c = sealCeremonyTicket({ userId: 'u-1', passkeyId: 'pk-1' }, now);
+              results.ceremonyRoundTrip = openCeremonyTicket(c, now + 1000);
+              break;
+            }
+            case 'fillerOpensNull':
+              results.fillerOpensNull = openRequestTicket(fillerTicket(now), EMAIL, now + 1000);
+              break;
+            case 'kindConfusion': {
+              const c = sealCeremonyTicket({ userId: 'u-1', passkeyId: 'pk-1' }, now);
+              results.kindConfusion = {
+                requestAsCeremony: openCeremonyTicket(real, now + 1000),
+                ceremonyAsRequest: openRequestTicket(c, EMAIL, now + 1000),
+              };
+              break;
+            }
+            case 'idTooLong': {
+              const long = 'x'.repeat(41);
+              const degraded = sealRequestTicket(
+                { userId: long, codeId: 'code-id-1', email: EMAIL },
+                now
+              );
+              results.idTooLong = {
+                sameLength: degraded.length === real.length,
+                opens: openRequestTicket(degraded, EMAIL, now + 1000),
+              };
+              break;
+            }
+          }
+        }
+        outcome = results;
+        break;
+      }
+
+      // ── shared verification resend (Phase C Lane D Task 5) ──────────────────────────────────
+      // Drives the REAL resendVerification against the REAL sendVerificationMail, so the spec can
+      // assert the destination the mail actually carries rather than a stubbed one.
+      case 'resendVerification': {
+        const u = s.resendUser ?? { id: '', loginName: '' };
+        const link = s.resendLink ?? { origin: 'http://localhost' };
+        const result = await resendVerification(provider, u, link);
+        outcome = {
+          result,
+          second: s.resendTwice ? await resendVerification(provider, u, link) : undefined,
+        };
+        break;
+      }
+
+      // ── recovery request decision (Phase C Lane D Task 6) ───────────────────────────────────
+      // Drives the REAL requestRecovery: real limiter, real mail clients, real sealed tickets.
+      // The ticket is returned verbatim so specs can compare LENGTHS across the G7 matrix.
+      case 'requestRecovery': {
+        const ri = s.recoveryInput ?? { email: '' };
+        const result = await requestRecovery(provider, {
+          ...ri,
+          origin: ri.origin ?? 'http://localhost',
+        });
+        // `opened` is what the ticket actually SEALS. Without it a spec can only compare ticket
+        // lengths, which every filler also satisfies — it could not tell a ticket sealed from the
+        // webhook's codeId apart from one sealed from nothing.
+        outcome = {
+          outcome: result.outcome,
+          ticket: result.ticket,
+          opened: openRequestTicket(result.ticket, ri.email),
+        };
+        break;
+      }
+
+      // Two requests in a row, then asks signup's own limiter whether it would still send.
+      // Proves the budget is SHARED: a recovery request spends signup's resend slot too.
+      case 'requestRecoveryThenAllowResend': {
+        const ri = s.recoveryInput ?? { email: '' };
+        const input = { ...ri, origin: ri.origin ?? 'http://localhost' };
+        const first = await requestRecovery(provider, input);
+        const second = await requestRecovery(provider, input);
+        outcome = {
+          first: first.outcome,
+          second: second.outcome,
+          firstTicket: first.ticket,
+          secondTicket: second.ticket,
+          allowResendAfter: await allowResend(input.email),
+        };
+        break;
+      }
+
+      // ── recovery ceremony (Phase C Lane D Task 7) ───────────────────────────────────────────
+      // The code the fake mints is unknowable to a spec, so 'MINTED' is substituted with the real
+      // envelope here — that is what makes the wrong-code row meaningful rather than tautological.
+      case 'startRecoveryCeremony': {
+        const rs = s.recoveryStart ?? { userId: '', codeId: '', code: '', domain: 'localhost' };
+        let minted: { id: string; code: string } | null = null;
+        if (s.mintPasskeyCode) {
+          minted = decodePasskeyRegistrationCode(
+            (await provider.passkeyRegisterLink(s.mintPasskeyCode)).code
+          );
+        }
+        const result = await startRecoveryCeremony(provider, {
+          userId: rs.userId,
+          codeId: rs.codeId === 'MINTED' && minted ? minted.id : rs.codeId,
+          code: rs.code === 'MINTED' && minted ? minted.code : rs.code,
+          domain: rs.domain,
+          path: s.recoveryPath ?? 'link',
+        });
+        outcome = result.ok
+          ? { ...result, minted: minted?.code }
+          : { ...result, minted: minted?.code };
+        break;
+      }
+
+      // The ceremony ticket arrives as a REAL sealed cookie (see buildCookieHeader), so the
+      // "ticket decides, not the form" rule is exercised end to end rather than against a stub.
+      case 'finishRecoveryCeremony': {
+        const { spec: finishSpec, passkeyId: registeredPasskeyId } = await attestRecoveryPasskey(
+          provider,
+          s.attestRecoveryPasskey,
+          s.request ?? { url: 'http://localhost/id/recover' }
+        );
+        const { request, form } = await buildHandlerRequest(finishSpec);
+        const result = await finishRecoveryCeremony(
+          provider,
+          request,
+          form,
+          s.recoveryPath ?? 'link'
+        );
+        outcome = {
+          ...result,
+          registeredPasskeyId,
+          passkeys: (await provider.listPasskeys('u-1')).map((p) => ({ id: p.id, name: p.name })),
+        };
+        break;
+      }
+
+      // ── /recover routes (Phase C Lane D Task 8) ─────────────────────────────────────────────
+      // PROVIDER BRIDGE, same as signupIndexAction: these routes resolve their own provider via
+      // providerForRequest, independent of the one buildProvider seeded — without the bridge a
+      // scenario's seed never reaches the code under test and every account state would behave
+      // as a fresh address, which is exactly what the G7 matrix must not do.
+      case 'recoverLoader':
+      case 'recoverAction':
+      case 'recoverCodeAction':
+      case 'recoverCompleteLoader':
+      case 'recoverCompleteAction': {
+        const originalFake = providerRegistry.fake;
+        providerRegistry.fake = () => provider;
+        try {
+          // A spec cannot know the code the fake mints, so 'MINTED' in the form or the ticket is
+          // substituted with the real envelope here — that is what makes the wrong-code and
+          // consumed-code rows meaningful rather than tautological.
+          let spec = s.request ?? { url: 'http://localhost/id/recover' };
+          if (s.mintPasskeyCode) {
+            const minted = decodePasskeyRegistrationCode(
+              (await provider.passkeyRegisterLink(s.mintPasskeyCode)).code
+            );
+            if (minted) {
+              if (s.consumeMintedCode) {
+                await provider.registerPasskey(
+                  s.mintPasskeyCode,
+                  encodePasskeyRegistrationCode(minted),
+                  'localhost'
+                );
+              }
+              const subst = (v: unknown) =>
+                typeof v === 'string' && v.trim() === 'MINTED'
+                  ? v.replace('MINTED', minted.code)
+                  : v;
+              spec = {
+                ...spec,
+                form: spec.form
+                  ? Object.fromEntries(
+                      Object.entries(spec.form).map(([k, v]) => [
+                        k,
+                        k === 'codeId' ? minted.id : subst(v),
+                      ])
+                    )
+                  : spec.form,
+                recoveryTicket:
+                  spec.recoveryTicket && spec.recoveryTicket !== 'filler'
+                    ? {
+                        ...spec.recoveryTicket,
+                        codeId:
+                          spec.recoveryTicket.codeId === 'MINTED'
+                            ? minted.id
+                            : spec.recoveryTicket.codeId,
+                      }
+                    : spec.recoveryTicket,
+              } as typeof spec;
+            }
+          }
+          spec = (await attestRecoveryPasskey(provider, s.attestRecoveryPasskey, spec)).spec;
+          const { request } = await buildHandlerRequest(spec);
+          const args = { request, params: {}, context: {} as never } as never;
+          const isComplete = s.fn.startsWith('recoverComplete');
+          const isLoader = s.fn.endsWith('Loader');
+          const handler = isComplete
+            ? isLoader
+              ? recoverCompleteLoader
+              : recoverCompleteAction
+            : isLoader
+              ? recoverLoader
+              : recoverAction;
+          try {
+            let result = await handler(args);
+            // The rate-limited row: the SECOND response is the one under test, and it has to be
+            // indistinguishable from the first.
+            if (s.recoverActionTwice) {
+              const { request: second } = await buildHandlerRequest(spec);
+              result = await handler({
+                request: second,
+                params: {},
+                context: {} as never,
+              } as never);
+            }
+            response = await serializeResponse(result);
+          } catch (thrown) {
+            // The flag-off 404 is `throw data(...)`: a Response, or react-router's data()
+            // envelope. Anything else is a genuine fault and must not be disguised as a response.
+            const isDataEnvelope =
+              typeof thrown === 'object' && thrown !== null && 'init' in thrown;
+            if (thrown instanceof Response || isDataEnvelope) {
+              response = await serializeResponse(thrown);
+            } else {
+              throw thrown;
+            }
+          }
+        } finally {
+          providerRegistry.fake = originalFake;
+        }
         break;
       }
 
