@@ -118,6 +118,8 @@ jobs:
       - uses: actions/setup-node@949feb2413d6458794dcd2491c4babbbce0c15c1 # v7.1.0
         with: { node-version-file: .nvmrc, cache: npm }
       - run: npm ci --ignore-scripts
+      - name: Test the audit gate
+        run: scripts/npm-audit.test.sh
       - name: Dependency audit (blocking)
         # All known transitive vulns are REMEDIATED via package.json `overrides` (each
         # parent's declared range accepts the patched version):
@@ -155,7 +157,13 @@ jobs:
         #   GHSA-qwww-vcr4-c8h2 (react-router RSC CSRF) — fixed by the v8.3.0 upgrade.
         # If a NEW transitive advisory appears with no override-compatible fix, add its
         # GHSA id to the scripts/npm-audit.sh arguments here as a temporary measure and open a remediation follow-up.
-        run: scripts/npm-audit.sh GHSA-3g3m-2fjr-6pw4 GHSA-g3hv-75wg-m249
+        # Ignored until 2026-12-01, or until picomatch ships a release past 4.0.7, whichever comes first:
+        #   GHSA-fc5q-39xc-vjpf (picomatch ReDoS, https://github.com/advisories/GHSA-fc5q-39xc-vjpf), no patched
+        #   release. Holds only while no code passes user-supplied strings to picomatch/micromatch/globby as
+        #   patterns. Upstream fixes: https://github.com/micromatch/picomatch/pull/254,
+        #   https://github.com/micromatch/picomatch/pull/246, https://github.com/micromatch/picomatch/pull/194
+        # Append =YYYY-MM-DD to an id to make its ignore lapse on that date; scripts/npm-audit.test.sh covers this.
+        run: scripts/npm-audit.sh GHSA-3g3m-2fjr-6pw4 GHSA-g3hv-75wg-m249 GHSA-fc5q-39xc-vjpf=2026-12-01
       - name: Generate SBOM (CycloneDX)
         run: npx --yes @cyclonedx/cdxgen@11.10.0 -t js -o sbom.cdx.json --spec-version 1.5
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
