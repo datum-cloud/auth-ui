@@ -142,9 +142,7 @@ jobs:
         # minimatch@9's ^2.0.2; nested 5.0.9 -> 5.0.12 under minimatch@10's ^5.0.5), fixing
         # GHSA-qhr7-859c-m2p7 / GHSA-6j4f-fj2g-mc7p / GHSA-q2hr-2g5m-vwhr.
         #   qs              ^6.16.1   @cypress/request accepts ^6.x (dev-only)   fixes GHSA-6pq8-jhm2-2vcw
-        # Ignored until a parent accepts the patched major (#179): GHSA-3g3m-2fjr-6pw4 (glob, fixed
-        # only in 14.0.2, Sentry declares ^13) and GHSA-g3hv-75wg-m249 (minimatch, fixed only in
-        # 11.0.1, parents declare ^9 / ^10). GitHub withdrew GHSA-vfj7-8cjw-p6xm (braces) on 2026-10-23.
+        # GitHub withdrew GHSA-vfj7-8cjw-p6xm (braces) on 2026-10-23.
         # The former exemptions are all genuinely fixed, not suppressed:
         #   GHSA-mh99-v99m-4gvg / GHSA-rgw5-rvv9-x895 (brace-expansion) — fixed without
         #     an override; each consumer nests its own minimatch on brace-expansion 5.x
@@ -163,7 +161,7 @@ jobs:
         #   patterns. Upstream fixes: https://github.com/micromatch/picomatch/pull/254,
         #   https://github.com/micromatch/picomatch/pull/246, https://github.com/micromatch/picomatch/pull/194
         # Append =YYYY-MM-DD to an id to make its ignore lapse on that date; scripts/npm-audit.test.sh covers this.
-        run: scripts/npm-audit.sh GHSA-3g3m-2fjr-6pw4 GHSA-g3hv-75wg-m249 GHSA-fc5q-39xc-vjpf=2026-12-01
+        run: scripts/npm-audit.sh GHSA-fc5q-39xc-vjpf=2026-12-01
       - name: Generate SBOM (CycloneDX)
         run: npx --yes @cyclonedx/cdxgen@11.10.0 -t js -o sbom.cdx.json --spec-version 1.5
       - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
