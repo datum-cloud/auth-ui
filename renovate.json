@@ -5,12 +5,5 @@
     "helpers:pinGitHubActionDigests",
     "docker:pinDigests"
   ],
-  "npmrc": "replace-registry-host=always",
-  "packageRules": [
-    {
-      "description": "Renovate updates a transitive dependency pinned in overrides by installing the new version directly, which npm rejects as EOVERRIDE unless the override range moves too. Bump the override range together with the version.",
-      "matchDepTypes": ["overrides"],
-      "rangeStrategy": "bump"
-    }
-  ]
+  "npmrc": "replace-registry-host=always"
 }

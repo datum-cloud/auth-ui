@@ -21,16 +21,21 @@ FROM base AS build
 ARG VERSION=dev
 ENV VERSION=${VERSION}
 
-COPY --link package.json package-lock.json ./
-RUN npm ci --include=dev --ignore-scripts --no-audit --no-fund
+# Install dependencies first so this layer stays cached until the lockfile
+# changes. Node 26 ships no corepack, so install the pnpm that package.json's
+# packageManager pins; it stays in this stage only. The split drops a
+# `+sha512.` suffix, which npm can't parse.
+COPY --link package.json pnpm-lock.yaml pnpm-workspace.yaml ./
+RUN npm install -g "$(node -p 'require("./package.json").packageManager.split("+")[0]')" --no-audit --no-fund && \
+    pnpm install --frozen-lockfile --prod=false --ignore-scripts
 
 COPY --link . .
 
 # @lingui/vite-plugin compiles message catalogs during the build — no separate
 # i18n:compile step is needed (committed catalogs are kept fresh by the lefthook
 # i18n hook and verified by the CI i18n-check job).
-RUN npm run build && \
-    npm prune --omit=dev --ignore-scripts --no-audit --no-fund && \
+RUN pnpm build && \
+    pnpm prune --prod --ignore-scripts && \
     touch .env
 
 # ==========================================

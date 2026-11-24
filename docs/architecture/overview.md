@@ -80,7 +80,7 @@ The Hono layer in `app/server.ts` owns everything that must run before routing: 
 
 **Fail-closed security defaults.** Every allowlist defaults to "deny": `FRAME_ANCESTORS` unset means `frame-ancestors 'none'`, an unlisted forward host is rejected before it reaches the Zitadel transport, and a post-logout redirect outside `POST_LOGOUT_ALLOWLIST` is not followed. See [Session & Security](./session-and-security.md).
 
-**Enforced boundaries.** The layering above is not a convention — it is checked. `npm run lint:boundaries` runs dependency-cruiser against `.dependency-cruiser.cjs`, and `npm run lint:cycles` runs madge for import cycles.
+**Enforced boundaries.** The layering above is not a convention — it is checked. `pnpm lint:boundaries` runs dependency-cruiser against `.dependency-cruiser.cjs`, and `pnpm lint:cycles` runs madge for import cycles.
 
 ## Related Documentation
 

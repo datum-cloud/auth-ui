@@ -122,7 +122,7 @@ export default defineConfig({
     modifyObstructiveCode: false,
     // set explicitly so the support file is always loaded (Task 12 adds the axe harness here)
     supportFile: 'cypress/support/e2e.ts',
-    // acceptance/ added so `npx cypress run --spec acceptance/...` resolves the file;
+    // acceptance/ added so `pnpm exec cypress run --spec acceptance/...` resolves the file;
     // describe.skip keeps the suite from running until real Zitadel is wired.
     specPattern: ['cypress/e2e/**/*.cy.{js,jsx,ts,tsx}', 'acceptance/**/*.cy.{js,jsx,ts,tsx}'],
   },

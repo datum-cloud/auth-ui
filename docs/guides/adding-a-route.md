@@ -1,6 +1,6 @@
 # Adding a Route
 
-The one rule that shapes everything below: **a route component never calls the provider.** Routes parse a request and render; `app/resources/<domain>/` does the work; `app/modules/auth/` is the only thing that knows Zitadel exists. `npm run lint:boundaries` enforces this, so a shortcut here fails the build rather than shipping.
+The one rule that shapes everything below: **a route component never calls the provider.** Routes parse a request and render; `app/resources/<domain>/` does the work; `app/modules/auth/` is the only thing that knows Zitadel exists. `pnpm lint:boundaries` enforces this, so a shortcut here fails the build rather than shipping.
 
 ## 1. Write the route module
 
@@ -29,7 +29,7 @@ export default function BackupCode({ actionData }: Route.ComponentProps) {
 }
 ```
 
-The `./+types/<name>` import is generated. If your editor cannot resolve it, run `npm run typecheck` (which runs `react-router typegen` first).
+The `./+types/<name>` import is generated. If your editor cannot resolve it, run `pnpm typecheck` (which runs `react-router typegen` first).
 
 ## 2. Register it in `app/routes.ts`
 
@@ -83,12 +83,12 @@ Loaders and actions read signed cookies and check CSRF, which a browser bundle c
 Run one file while you work, since the whole suite takes several minutes:
 
 ```bash
-CYPRESS=true npx cypress run --component --spec cypress/component/routes/login/backup-code-action.cy.ts
+CYPRESS=true pnpm exec cypress run --component --spec cypress/component/routes/login/backup-code-action.cy.ts
 ```
 
 ```bash
-npm run test:unit:debug    # interactive, while you iterate
-npm run test:unit          # the full component suite
+pnpm test:unit:debug    # interactive, while you iterate
+pnpm test:unit          # the full component suite
 ```
 
 ## 5. Add an e2e spec if it is user-visible
@@ -96,7 +96,7 @@ npm run test:unit          # the full component suite
 If a user can reach the screen in a real flow, it needs a spec in `cypress/e2e/` that drives it against a running server with `AUTH_PROVIDER=fake`.
 
 ```bash
-npm run test:e2e
+pnpm test:e2e
 ```
 
 ## Checklist
@@ -106,10 +106,10 @@ npm run test:e2e
 - [ ] All server logic lives in `app/resources/<domain>/` — the component imports no provider code
 - [ ] Input validated with a Zod schema through Conform
 - [ ] Provider errors mapped to the app's `AuthErrorCode` vocabulary
-- [ ] Strings wrapped in Lingui macros (`npm run i18n:extract` picks them up; the pre-commit hook does it for you)
+- [ ] Strings wrapped in Lingui macros (`pnpm i18n:extract` picks them up; the pre-commit hook does it for you)
 - [ ] Component specs in the mirrored directory under `cypress/component/` (render, plus loader/action through `callService`)
 - [ ] E2E spec in `cypress/e2e/` if the flow is user-visible
-- [ ] `npm run lint && npm run typecheck && npm run lint:boundaries` all clean
+- [ ] `pnpm lint && pnpm typecheck && pnpm lint:boundaries` all clean
 
 ## Related Documentation
 

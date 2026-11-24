@@ -5,14 +5,15 @@ opening a pull request.
 
 ## Prerequisites
 
-- Node 26.12.1 (managed via `.nvmrc`), with npm
+- Node 26.13.0 (managed via `.nvmrc`)
+- pnpm 12.23.0 (pinned in `package.json` `packageManager`): `npm install -g pnpm@12.23.0`
 - A running instance of the dev environment — see [Getting Started](docs/getting-started/)
 
 ## Local development
 
 ```bash
-npm install         # install dependencies and wire up lefthook pre-commit hooks
-npm run dev         # start the local dev server
+pnpm install         # install dependencies and wire up lefthook pre-commit hooks
+pnpm dev         # start the local dev server
 ```
 
 ## Before you push
@@ -20,11 +21,11 @@ npm run dev         # start the local dev server
 Run the full local gate:
 
 ```bash
-npm run lint             # ESLint (auto-fix)
-npm run typecheck        # TypeScript + route type generation
-npm run lint:boundaries  # architecture fitness — dependency-cruiser
-npm run lint:cycles      # circular import check — madge
-npm run size             # bundle budget (requires npm run build first)
+pnpm lint             # ESLint (auto-fix)
+pnpm typecheck        # TypeScript + route type generation
+pnpm lint:boundaries  # architecture fitness — dependency-cruiser
+pnpm lint:cycles      # circular import check — madge
+pnpm size             # bundle budget (requires pnpm build first)
 ```
 
 CI runs the same checks. A PR that fails any of these will not be merged.
@@ -47,7 +48,7 @@ through explicit composition seams defined in `app/server/composition.ts`.
 | `app/resources/` importing from `app/routes/` (except `paths.ts`) | Resources must not couple to route modules |
 | Circular imports anywhere | Cycles make dependency graphs unresolvable |
 
-If `npm run lint:boundaries` rejects your import, the fix is to restructure the
+If `pnpm lint:boundaries` rejects your import, the fix is to restructure the
 code — not to weaken or comment-out the rule. If you believe the rule is
 wrong for your use case, open an issue to discuss it first.
 
@@ -57,8 +58,8 @@ See [Architecture Overview](docs/architecture/overview.md) and
 ## Testing
 
 ```bash
-npm run test:unit          # Cypress component tests
-npm run test:e2e:fast      # E2E suite against the fake auth provider
+pnpm test:unit          # Cypress component tests
+pnpm test:e2e:fast      # E2E suite against the fake auth provider
 ```
 
 See [Testing](docs/development/testing.md) for the full test strategy.
