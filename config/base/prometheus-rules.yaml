@@ -28,7 +28,7 @@ spec:
           for: 10m
           labels:
             severity: critical
-            service: auth-ui
+            service: console
             team: portals
           annotations:
             summary: "auth-ui 5xx error rate > 2% (10m)"
@@ -54,7 +54,7 @@ spec:
           for: 10m
           labels:
             severity: warning
-            service: auth-ui
+            service: console
             team: portals
           annotations:
             summary: "auth-ui p95 request latency > 1s (10m)"
@@ -95,7 +95,7 @@ spec:
           for: 10m
           labels:
             severity: warning
-            service: auth-ui
+            service: console
             team: portals
           annotations:
             summary: "auth-ui sign-in failure:success ratio elevated (possible credential stuffing)"
