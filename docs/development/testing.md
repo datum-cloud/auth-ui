@@ -4,24 +4,24 @@
 
 ## The suites
 
-| Suite                      | Command                   | What it covers                                                                   |
-| -------------------------- | ------------------------- | -------------------------------------------------------------------------------- |
-| Component (the unit layer) | `npm run test:unit`       | `cypress/component/` — mirrors the `app/` directories, real browser              |
-| End-to-end                 | `npm run test:e2e`        | `cypress/e2e/` — full flows against the dev server                               |
-| E2E (fast)                 | `npm run test:e2e:fast`   | built app + `AUTH_PROVIDER=fake`, single spec                                    |
-| Acceptance                 | `npm run test:acceptance` | `acceptance/` — against a real Zitadel (`acceptance/docker-compose.zitadel.yml`) |
+| Suite                      | Command                | What it covers                                                                   |
+| -------------------------- | ---------------------- | -------------------------------------------------------------------------------- |
+| Component (the unit layer) | `pnpm test:unit`       | `cypress/component/` — mirrors the `app/` directories, real browser              |
+| End-to-end                 | `pnpm test:e2e`        | `cypress/e2e/` — full flows against the dev server                               |
+| E2E (fast)                 | `pnpm test:e2e:fast`   | built app + `AUTH_PROVIDER=fake`, single spec                                    |
+| Acceptance                 | `pnpm test:acceptance` | `acceptance/` — against a real Zitadel (`acceptance/docker-compose.zitadel.yml`) |
 
 Two more scripts are worth knowing:
 
 ```bash
-npm run test:unit:debug     # cypress open --component — the interactive runner
-npm run typecheck:cypress   # tsc -p cypress/tsconfig.json --noEmit (~2s)
+pnpm test:unit:debug     # cypress open --component — the interactive runner
+pnpm typecheck:cypress   # tsc -p cypress/tsconfig.json --noEmit (~2s)
 ```
 
 ## Component — the unit layer
 
 ```bash
-npm run test:unit           # CYPRESS=true cypress run --component
+pnpm test:unit           # CYPRESS=true cypress run --component
 ```
 
 `cypress/component/` mirrors the `app/` directory tree, so specs for `app/resources/sso/sso-callback.ts` live under `cypress/component/resources/sso/`. Files do not map one-for-one: a spec is named for the behaviour it pins, and one module often has several (`routes/device/authorize-loader.cy.ts`, `authorize-decision.cy.ts`, `authorize-identity.cy.tsx` all cover `app/routes/device/authorize.tsx`). [Adding a Route](../guides/adding-a-route.md#4-add-a-cypress-component-spec) has the naming table. The project holds two kinds of spec:
@@ -34,7 +34,7 @@ npm run test:unit           # CYPRESS=true cypress run --component
 ## End-to-end
 
 ```bash
-npm run test:e2e            # boots `npm run dev`, waits on /healthz, then runs cypress/e2e
+pnpm test:e2e            # boots `pnpm dev`, waits on /healthz, then runs cypress/e2e
 ```
 
 `start-server-and-test` brings the dev server up on `http://localhost:3000`, waits for the health probe, runs every spec in `cypress/e2e/`, and tears the server down. These are real flows — sign-in, MFA, passkeys, device grant, logout, legacy redirects, plus an accessibility sweep (`a11y-sweep.cy.ts`, via `cypress-axe`).
@@ -42,7 +42,7 @@ npm run test:e2e            # boots `npm run dev`, waits on /healthz, then runs 
 For a quick signal without the full sweep:
 
 ```bash
-npm run test:e2e:fast       # npm run build && AUTH_PROVIDER=fake … --spec cypress/e2e/core-signin.cy.ts
+pnpm test:e2e:fast       # pnpm build && AUTH_PROVIDER=fake … --spec cypress/e2e/core-signin.cy.ts
 ```
 
 That one builds the app, serves it in production mode with the fake provider (the script sets `ALLOW_FAKE_PROVIDER_IN_PRODUCTION=true`, which production mode requires for it), and runs the core sign-in spec only. It needs no Zitadel and no credentials.
@@ -50,7 +50,7 @@ That one builds the app, serves it in production mode with the fake provider (th
 ## Acceptance
 
 ```bash
-npm run test:acceptance     # cypress run --spec acceptance/core-signin.acceptance.cy.ts
+pnpm test:acceptance     # cypress run --spec acceptance/core-signin.acceptance.cy.ts
 ```
 
 Acceptance specs run against a **real Zitadel**, not the fake provider. Bring one up first:
@@ -62,7 +62,7 @@ docker compose -f acceptance/docker-compose.zitadel.yml up -d
 The `test:acceptance` script runs the core sign-in spec only. The directory holds more (`device-grant`, `ldap-signin`, `logout`, `oidc-authorize`, `saml-authorize`, `signup-email`, `signup-passwordless`, `totp-enroll`) — run one directly:
 
 ```bash
-npx cypress run --spec acceptance/totp-enroll.acceptance.cy.ts
+pnpm exec cypress run --spec acceptance/totp-enroll.acceptance.cy.ts
 ```
 
 `acceptance/**` is included in the e2e `specPattern` in `cypress.config.ts`, which is what makes that `--spec` path resolve.

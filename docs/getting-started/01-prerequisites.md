@@ -4,10 +4,11 @@ What you need on your machine before cloning `auth-ui`.
 
 ## Required
 
-| Tool                          | Version                                                          | Why                                                            |
-| ----------------------------- | ---------------------------------------------------------------- | -------------------------------------------------------------- |
-| [Node.js](https://nodejs.org) | 26.13.0 (`.nvmrc`; CI and the Docker image use the same version) | Runtime and package manager — every script runs through `npm`. |
-| [Git](https://git-scm.com)    | any recent                                                       | Cloning and hooks (`lefthook` installs on `npm install`).      |
+| Tool                          | Version                                                          | Why                                                        |
+| ----------------------------- | ---------------------------------------------------------------- | ---------------------------------------------------------- |
+| [Node.js](https://nodejs.org) | 26.13.0 (`.nvmrc`; CI and the Docker image use the same version) | Runtime.                                                   |
+| [pnpm](https://pnpm.io)       | 12.23.0 (`packageManager` in `package.json`)                     | Package manager — every script runs through `pnpm`.        |
+| [Git](https://git-scm.com)    | any recent                                                       | Cloning and hooks (`lefthook` installs on `pnpm install`). |
 
 Install Node 26.13.0 with your version manager of choice, e.g.:
 
@@ -15,6 +16,15 @@ Install Node 26.13.0 with your version manager of choice, e.g.:
 nvm install    # reads .nvmrc → 26.13.0
 nvm use
 ```
+
+Node 26 ships without corepack, so install pnpm with npm:
+
+```bash
+npm install -g pnpm@12.23.0
+```
+
+pnpm runs dependency install scripts only for the packages listed under `allowBuilds` in
+`pnpm-workspace.yaml`, and installs no version published less than a day ago.
 
 ## An identity backend — or not
 

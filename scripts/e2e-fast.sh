@@ -21,12 +21,12 @@ SPECS=(
   cypress/e2e/session-cookie-path.cy.ts
 )
 
-npm run build
+pnpm build
 
 for spec in "${SPECS[@]}"; do
   echo "==> ${spec}"
-  # `npm run start` sets NODE_ENV=production, where the fake provider needs an explicit opt-in.
+  # `pnpm start` sets NODE_ENV=production, where the fake provider needs an explicit opt-in.
   AUTH_PROVIDER=fake ALLOW_FAKE_PROVIDER_IN_PRODUCTION=true PORT="${PORT}" PUBLIC_ORIGIN="${ORIGIN}" \
-    npx --no-install start-server-and-test 'npm run start' "http-get://localhost:${PORT}/healthz" \
-    "npx --no-install cypress run --browser chrome --config baseUrl=${ORIGIN} --spec ${spec}"
+    pnpm exec start-server-and-test 'pnpm start' "http-get://localhost:${PORT}/healthz" \
+    "pnpm exec cypress run --browser chrome --config baseUrl=${ORIGIN} --spec ${spec}"
 done

@@ -31,7 +31,8 @@ Every authentication ceremony — password, passkey, MFA, SSO, device authorizat
 
 ### Built With
 
-- **[Node.js](https://nodejs.org)** — runtime, with npm as the package manager
+- **[Node.js](https://nodejs.org)** — runtime
+- **[pnpm](https://pnpm.io)** — package manager, version pinned in `package.json` `packageManager`
 - **[React Router 8](https://reactrouter.com)** — SSR framework mode
 - **[Hono](https://hono.dev)** — backend-for-frontend server
 - **[Zitadel](https://zitadel.com)** — identity platform (v2 APIs)
@@ -44,12 +45,12 @@ Every authentication ceremony — password, passkey, MFA, SSO, device authorizat
 ## Quick Start
 
 ```bash
-npm install
+pnpm install
 cp .env.example .env    # set SESSION_SECRET, ZITADEL_API_URL, ZITADEL_SERVICE_USER_TOKEN, PUBLIC_ORIGIN
-npm run dev
+pnpm dev
 ```
 
-No Zitadel to hand? Run against the built-in fake provider: `AUTH_PROVIDER=fake npm run dev`
+No Zitadel to hand? Run against the built-in fake provider: `AUTH_PROVIDER=fake pnpm dev`
 
 ---
 
