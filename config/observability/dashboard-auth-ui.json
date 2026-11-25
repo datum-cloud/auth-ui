@@ -180,12 +180,12 @@
       "targets": [
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "sum(rate(auth_events_total{job=\"auth-ui\",event=~\"password_check|ldap_signin|idp\\.signin\",outcome=\"success\"}[5m]))",
+          "expr": "sum(rate(auth_events_total{job=\"auth-ui\",event=~\"password_check|ldap_signin|idp[.]signin\",outcome=\"success\"}[5m]))",
           "legendFormat": "successes"
         },
         {
           "datasource": { "type": "prometheus", "uid": "${datasource}" },
-          "expr": "sum(rate(auth_events_total{job=\"auth-ui\",event=~\"password_check|ldap_signin|idp\\.signin\",outcome=\"failure\"}[5m]))",
+          "expr": "sum(rate(auth_events_total{job=\"auth-ui\",event=~\"password_check|ldap_signin|idp[.]signin\",outcome=\"failure\"}[5m]))",
           "legendFormat": "failures"
         }
       ],
