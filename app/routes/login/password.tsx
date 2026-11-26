@@ -2,6 +2,7 @@ import { AuthCeremony } from '@/components/auth-ceremony/auth-ceremony';
 import { SubmitButton } from '@/components/auth-form/auth-form';
 import { AuthFormFields } from '@/components/auth-form/auth-form-fields';
 import { FormError } from '@/components/form-error/form-error';
+import { useAuthActionError } from '@/hooks/use-auth-action-error';
 import { useLoginContext } from '@/hooks/use-login-context';
 // ADAPTATION (plan-drift fix): readSessions/serializeSessions live in @/modules/auth/session/cookie
 // (which re-exports them from session.ts) — the canonical one-stop import for route-layer session I/O.
@@ -9,6 +10,7 @@ import { readSessions, serializeSessions } from '@/modules/auth/session/cookie';
 import { serializeLastUsedLogin } from '@/modules/auth/session/last-used-login';
 import { serializePasskeyHint } from '@/modules/auth/session/passkey-hint';
 import { checkReauthIntent } from '@/modules/auth/session/reauth-intent';
+import { useRecaptcha } from '@/modules/fraud/recaptcha';
 import { verifyLoginPassword } from '@/resources/login';
 import { attemptsRemaining } from '@/resources/login/login-view';
 import { loginPasswordSchema, loginPasswordClientSchema } from '@/resources/login/login.schema';
@@ -17,14 +19,18 @@ import { redirectToLogin } from '@/routes/login-bounce';
 import { paths } from '@/routes/paths';
 import { providerForRequest } from '@/server/auth-context.server';
 import { loaderCsrf, assertCsrf } from '@/server/csrf';
+import { env } from '@/server/infra/env.server';
+import { recaptchaRejects } from '@/server/infra/recaptcha.server';
 import { Form } from '@datum-cloud/datum-ui/form';
 import { Trans, Plural, useLingui } from '@lingui/react/macro';
+import { useRef, useState } from 'react';
 import {
   data,
   redirect,
   useActionData,
   useLoaderData,
   useNavigation,
+  useSubmit,
   type ActionFunctionArgs,
   type LoaderFunctionArgs,
   type MetaFunction,
@@ -46,7 +52,14 @@ export async function loader({ request }: LoaderFunctionArgs) {
   // auth-ui's headless Session API calls — without this a direct visit renders a working form.
   if (!settings.allowPassword) return redirect(redirectToLogin(requestId, organization));
   const { csrfToken, headers } = await loaderCsrf(request);
-  return data({ csrfToken, hidePasswordReset: settings.hidePasswordReset === true }, { headers });
+  return data(
+    {
+      csrfToken,
+      hidePasswordReset: settings.hidePasswordReset === true,
+      recaptchaSiteKey: env.RECAPTCHA_SITE_KEY ?? '',
+    },
+    { headers }
+  );
 }
 
 export async function action({ request }: ActionFunctionArgs) {
@@ -56,6 +69,13 @@ export async function action({ request }: ActionFunctionArgs) {
   const parsed = loginPasswordSchema.safeParse(Object.fromEntries(form));
   if (!parsed.success) return data({ error: 'INVALID_INPUT' as const }, { status: 400 });
   const { password, loginName, requestId, organization } = parsed.data;
+
+  // Bot gate, before any provider work: a rejected attempt never reaches the password check, so
+  // it cannot count against the account's failed attempts. Its own action name, so a token minted
+  // on a sign-up form is refused here. Google unreachable or keys unset both fail open.
+  if (await recaptchaRejects(String(form.get('recaptchaToken') ?? ''), 'login_password')) {
+    return data({ error: 'RECAPTCHA_FAILED' as const }, { status: 400 });
+  }
 
   // Same policy guard as the loader, repeated because a crafted POST never runs the loader.
   // Not belt-and-braces: Zitadel's Session API password check does NOT consult LoginPolicy,
@@ -116,11 +136,40 @@ export async function action({ request }: ActionFunctionArgs) {
 }
 
 export default function Password() {
-  const { csrfToken, hidePasswordReset } = useLoaderData<typeof loader>();
+  const { csrfToken, hidePasswordReset, recaptchaSiteKey } = useLoaderData<typeof loader>();
   const { loginName, requestId, organization } = useLoginContext();
   const actionData = useActionData<typeof action>();
   const navigation = useNavigation();
   const { t } = useLingui();
+  const recaptchaErrorMessage = useAuthActionError(actionData);
+
+  // Loads the reCAPTCHA script (no-op when unconfigured) and returns the submit-time minter.
+  const mintRecaptchaToken = useRecaptcha(recaptchaSiteKey);
+  const submit = useSubmit();
+  // Form.Root forwards no ref; this always-rendered hidden input locates the form.
+  const formAnchorRef = useRef<HTMLInputElement>(null);
+  const submitInFlight = useRef(false);
+  const [minting, setMinting] = useState(false);
+
+  // Runs on the form's submit event, so Enter in the password field mints a token too.
+  async function handleSubmit() {
+    if (submitInFlight.current) return;
+    submitInFlight.current = true;
+    setMinting(true);
+    try {
+      const formEl = formAnchorRef.current?.form;
+      if (!formEl) return;
+      // Snapshot before the await: the form can be reset during this submit cycle.
+      const formData = new FormData(formEl);
+      const token = await mintRecaptchaToken('login_password');
+      // Unconfigured deployments send no field at all.
+      if (recaptchaSiteKey) formData.set('recaptchaToken', token ?? '');
+      submit(formData, { method: 'post' });
+    } finally {
+      submitInFlight.current = false;
+      setMinting(false);
+    }
+  }
 
   const serverError =
     actionData && 'error' in actionData
@@ -133,7 +182,9 @@ export default function Password() {
           }
         : actionData.error === 'SESSION_EXPIRED'
           ? { kind: 'SESSION_EXPIRED' as const }
-          : { kind: 'INVALID_INPUT' as const }
+          : actionData.error === 'RECAPTCHA_FAILED'
+            ? { kind: 'RECAPTCHA_FAILED' as const }
+            : { kind: 'INVALID_INPUT' as const }
       : undefined;
 
   const attempts =
@@ -157,6 +208,7 @@ export default function Password() {
         method="POST"
         defaultValues={{ password: '' }}
         isSubmitting={navigation.state === 'submitting'}
+        onSubmit={handleSubmit}
         className="flex w-full flex-col gap-4">
         <AuthFormFields
           csrf={csrfToken}
@@ -164,6 +216,10 @@ export default function Password() {
           requestId={requestId}
           organization={organization}
         />
+        {/* No name, so it is never posted; it only locates the form for handleSubmit. */}
+        <input type="hidden" ref={formAnchorRef} />
+        {/* Gated on recaptchaSiteKey: unset config means no field either. */}
+        {recaptchaSiteKey ? <input type="hidden" name="recaptchaToken" defaultValue="" /> : null}
         <Form.Field name="password" label={t`Enter your password`} required>
           <Form.Input type="password" autoComplete="current-password" autoFocus />
         </Form.Field>
@@ -196,13 +252,14 @@ export default function Password() {
             </Link>
           </FormError>
         )}
+        {serverError?.kind === 'RECAPTCHA_FAILED' && <FormError>{recaptchaErrorMessage}</FormError>}
         {serverError?.kind === 'INVALID_INPUT' && (
           <FormError>
             <Trans>Please check your input and try again.</Trans>
           </FormError>
         )}
 
-        <SubmitButton>
+        <SubmitButton loading={minting} disabled={minting}>
           <Trans>Sign in</Trans>
         </SubmitButton>
       </Form.Root>

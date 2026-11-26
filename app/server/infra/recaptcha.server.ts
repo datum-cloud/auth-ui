@@ -173,7 +173,11 @@ export async function recaptchaRejects(token: string, expectedAction: string): P
  * Actions a low score may count against. Recovery is left out on purpose: its answers must stay
  * indistinguishable across branches, so it records its band and never rejects on score.
  */
-const SCORE_ENFORCED_ACTIONS: ReadonlySet<string> = new Set(['signup', 'signup_code']);
+const SCORE_ENFORCED_ACTIONS: ReadonlySet<string> = new Set([
+  'signup',
+  'signup_code',
+  'login_password',
+]);
 
 /**
  * Judges the score alone. Only a valid token with a numeric score below the threshold counts as
