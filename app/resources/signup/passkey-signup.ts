@@ -1,7 +1,9 @@
 import type { AuthProvider } from '@/modules/auth/auth-provider';
 import { resolveOrg } from '@/resources/shared/resolve-org';
+import { matchDisposableDomain } from '@/resources/signup/disposable-email';
 import { registerEmailLinkSignup } from '@/resources/signup/signup.service';
 import { env } from '@/server/infra/env.server';
+import { logAuthEvent } from '@/server/observability';
 
 export interface PasskeySignupInput {
   email: string;
@@ -17,8 +19,11 @@ export interface PasskeySignupInput {
  * `null` means the attempt was refused by policy or configuration; the caller answers 400
  * INVALID_INPUT. The reason is deliberately not surfaced — org policy and deployment
  * configuration are not the submitter's business.
+ *
+ * `refused: 'DISPOSABLE_EMAIL'` is the one refusal that IS surfaced: the address is the
+ * submitter's own choice, and the fix (a permanent address, or Google or GitHub) is theirs.
  */
-export type PasskeySignupResult = { email: string } | null;
+export type PasskeySignupResult = { email: string } | { refused: 'DISPOSABLE_EMAIL' } | null;
 
 /**
  * The one passkey-signup register path, shared by /signup and /signup/method.
@@ -38,6 +43,19 @@ export async function registerPasskeySignup(
   // and the ceremony happens there, after the address is proven. Without delivery there is no way
   // to finish, so refuse rather than create an account nobody can verify.
   if (!env.AUTH_EMAIL_DELIVERY_ENABLED) return null;
+
+  // Disposable inboxes, from the vendored list. Observe mode (the default) records the match and
+  // carries on, so the effect can be measured before SIGNUP_BLOCK_DISPOSABLE_EMAIL refuses it.
+  // The log carries the matched list entry only, never the address.
+  const disposableDomain = matchDisposableDomain(input.email);
+  if (disposableDomain) {
+    const enforce = env.SIGNUP_BLOCK_DISPOSABLE_EMAIL;
+    logAuthEvent('signup_disposable_email', 'failure', {
+      mode: enforce ? 'enforce' : 'observe',
+      domain: disposableDomain,
+    });
+    if (enforce) return { refused: 'DISPOSABLE_EMAIL' };
+  }
 
   // Mints NO session and attaches no fraud metadata: both happen on the verification-link hop
   // (/signup/complete), the only place a session is created.

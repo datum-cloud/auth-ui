@@ -121,6 +121,7 @@ export async function action({ request }: ActionFunctionArgs) {
       origin: trustedAppOrigin(request),
     });
     if (!result) return data({ error: 'INVALID_INPUT' as const }, { status: 400 });
+    if ('refused' in result) return data({ error: result.refused }, { status: 400 });
     return genericCheckYourEmail(result.email);
   } catch (err) {
     return actionError(err);

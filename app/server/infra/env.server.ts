@@ -214,6 +214,12 @@ const schema = z
     // Public by design — this key ships in the page HTML. Its partner below is not.
     RECAPTCHA_SITE_KEY: z.string().optional(),
     RECAPTCHA_SECRET_KEY: z.string().optional(),
+    // Whether a sign-up address on the vendored disposable-domain list is refused. Default off:
+    // the match is recorded (signup_disposable_email, mode observe) and the sign-up proceeds.
+    SIGNUP_BLOCK_DISPOSABLE_EMAIL: z
+      .string()
+      .optional()
+      .transform((v) => v === 'true' || v === '1'),
     // Score threshold for sign-up and password sign-in. Unset means no threshold: every score is
     // recorded and none is judged low. Parsed as a number below; out-of-range values fail boot.
     RECAPTCHA_MIN_SCORE: z.string().optional(),
