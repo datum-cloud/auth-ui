@@ -137,9 +137,15 @@ export async function verifyRecaptcha(
 export async function recaptchaRejects(token: string, expectedAction: string): Promise<boolean> {
   const verdict = await verifyRecaptcha(token, expectedAction);
 
-  // Unconfigured deployments stay dark, audit trail included — otherwise the metric reads
-  // as a healthy gate where there is no gate.
-  if (verdict.reason === 'not-configured') return false;
+  // Unconfigured deployments record no score — otherwise the metric reads as a healthy gate
+  // where there is no gate. A production Zitadel deployment says so instead, on every skipped
+  // check, so missing keys raise an alert rather than going unnoticed. Still fails open.
+  if (verdict.reason === 'not-configured') {
+    if (env.NODE_ENV === 'production' && env.AUTH_PROVIDER !== 'fake') {
+      logAuthEvent('signup_recaptcha_unconfigured', 'failure', { action: expectedAction });
+    }
+    return false;
+  }
 
   const band = scoreBand(verdict.score);
   const decision = scoreDecision(verdict, expectedAction);

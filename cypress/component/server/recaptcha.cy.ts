@@ -251,3 +251,55 @@ describe('scoreBand', () => {
     });
   });
 });
+
+describe('recaptchaRejects — unconfigured keys', () => {
+  // A production Zitadel deployment without keys has no bot gate at all. The check still fails
+  // open, but it says so on every skipped check, so an alert can key on the event.
+  const PRODUCTION_ZITADEL = {
+    NODE_ENV: 'production',
+    AUTH_PROVIDER: 'zitadel',
+    ZITADEL_API_URL: 'http://127.0.0.1:1',
+    ZITADEL_SERVICE_USER_TOKEN: 'test-token',
+    PUBLIC_ORIGIN: 'http://localhost:3000',
+  };
+
+  it('emits signup_recaptcha_unconfigured in production with the zitadel provider', () => {
+    callService({
+      fn: 'recaptchaRejects',
+      env: PRODUCTION_ZITADEL,
+      recaptchaInput: { token: '', expectedAction: 'signup' },
+    }).then((v) => {
+      expect(v.outcome.rejected, 'unconfigured still fails open').to.equal(false);
+      const events = v.audit.filter((a) => a.event === 'signup_recaptcha_unconfigured');
+      expect(events).to.have.length(1);
+      expect(events[0]?.outcome).to.equal('failure');
+      expect(events[0]?.action).to.equal('signup');
+      expect(v.audit.find((a) => a.event === 'signup_recaptcha_scored')).to.equal(undefined);
+    });
+  });
+
+  it('stays silent outside production', () => {
+    callService({
+      fn: 'recaptchaRejects',
+      recaptchaInput: { token: '', expectedAction: 'signup' },
+    }).then((v) => {
+      expect(v.outcome.rejected).to.equal(false);
+      expect(v.audit).to.deep.equal([]);
+    });
+  });
+
+  it('stays silent in a production-mode fake-provider run', () => {
+    callService({
+      fn: 'recaptchaRejects',
+      env: {
+        NODE_ENV: 'production',
+        AUTH_PROVIDER: 'fake',
+        ALLOW_FAKE_PROVIDER_IN_PRODUCTION: 'true',
+      },
+      recaptchaInput: { token: '', expectedAction: 'signup' },
+    }).then((v) => {
+      expect(v.outcome.rejected).to.equal(false);
+      expect(v.audit.find((a) => a.event === 'signup_recaptcha_unconfigured')).to.equal(undefined);
+    });
+  });
+});

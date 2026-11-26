@@ -250,6 +250,8 @@ describe('signup reCAPTCHA gate', () => {
       const scored = v.audit?.find((a) => a.event === 'signup_recaptcha_scored') as
         ScoredEvent | undefined;
       expect(scored, 'unconfigured emits no audit event at all').to.be.undefined;
+      const unconfigured = v.audit?.find((a) => a.event === 'signup_recaptcha_unconfigured');
+      expect(unconfigured, 'no unconfigured signal outside production').to.be.undefined;
     });
   });
 

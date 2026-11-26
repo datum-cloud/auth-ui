@@ -321,6 +321,8 @@ export type ServiceFn =
   | 'verifyRecaptcha'
   // Maps each of `recaptchaScores` through the real scoreBand.
   | 'recaptchaScoreBand'
+  // Drives the real recaptchaRejects gate with `recaptchaInput`; outcome.rejected is its answer.
+  | 'recaptchaRejects'
   // ── routes/login handlers (batch 13b) ────────────────────────────────────────
   // Login route loaders/actions are node-bound: they read a signed `sessions` cookie off a real
   // Request (Cookie header blocked by Fetch spec in the browser), and some need the signed

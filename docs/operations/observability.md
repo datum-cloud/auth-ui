@@ -94,6 +94,7 @@ Alert rules in `config/base/prometheus-rules.yaml`, group `auth-ui.slos`:
 | `AuthUIHighErrorRate` | 5xx ratio over 2% for 10m (critical) |
 | `AuthUIHighLatencyP95` | p95 request latency breach |
 | `AuthUISignInFailureSpike` | Sign-in failure spike from `auth_events_total` |
+| `AuthUIRecaptchaUnconfigured` | `signup_recaptcha_unconfigured` seen in the last 15m: production is running without reCAPTCHA keys |
 
 ## Dashboard
 
