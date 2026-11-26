@@ -319,6 +319,8 @@ export type ServiceFn =
   | 'recoverCompleteAction'
   // Drives the real verifyRecaptcha node-side; env.server is stubbed out of the browser bundle.
   | 'verifyRecaptcha'
+  // Maps each of `recaptchaScores` through the real scoreBand.
+  | 'recaptchaScoreBand'
   // ── routes/login handlers (batch 13b) ────────────────────────────────────────
   // Login route loaders/actions are node-bound: they read a signed `sessions` cookie off a real
   // Request (Cookie header blocked by Fetch spec in the browser), and some need the signed
@@ -917,6 +919,8 @@ export interface Scenario {
 
   /** Input for the real verifyRecaptcha(token, expectedAction). */
   recaptchaInput?: { token: string; expectedAction: string };
+  /** Scores fed to the real scoreBand (fn: 'recaptchaScoreBand'); outcome.bands is in order. */
+  recaptchaScores?: Array<number | null>;
   /** Stubs `globalThis.fetch` for this scenario's siteverify call. `{ reject: true }` simulates
    *  Google unreachable; `{ body }` simulates a response. Omitted for the not-configured case.
    *  The harness records the request as `outcome.request`, never the secret's value. */

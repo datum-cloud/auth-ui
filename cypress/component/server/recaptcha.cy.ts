@@ -226,3 +226,28 @@ describe('verifyRecaptcha — Google error codes', () => {
     });
   });
 });
+
+describe('scoreBand', () => {
+  // The bands are the only score breakdown the metric carries, so their edges are pinned
+  // exactly: each boundary value belongs to the band above it.
+  it('maps scores onto bounded bands, with null as none', () => {
+    callService({
+      fn: 'recaptchaScoreBand',
+      recaptchaScores: [null, 0, 0.1, 0.29, 0.3, 0.49, 0.5, 0.69, 0.7, 0.9, 1],
+    }).then((v) => {
+      expect(v.outcome.bands).to.deep.equal([
+        'none',
+        'lt03',
+        'lt03',
+        'lt03',
+        '03to05',
+        '03to05',
+        '05to07',
+        '05to07',
+        'gte07',
+        'gte07',
+        'gte07',
+      ]);
+    });
+  });
+});

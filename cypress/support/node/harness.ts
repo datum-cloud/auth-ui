@@ -180,7 +180,7 @@ import { loader as verifyIndexLoader, action as verifyIndexAction } from '@/rout
 import { providerForRequest } from '@/server/composition';
 import { getCsrfToken, loaderCsrf, assertCsrf, assertCsrfWith } from '@/server/csrf';
 import { _envSchema, env } from '@/server/infra/env.server';
-import { verifyRecaptcha } from '@/server/infra/recaptcha.server';
+import { scoreBand, verifyRecaptcha } from '@/server/infra/recaptcha.server';
 import { sendRecoveryMail } from '@/server/infra/recovery-mail.server';
 import { sendVerificationMail } from '@/server/infra/verification-mail.server';
 import {
@@ -3240,6 +3240,11 @@ export async function runScenario(s: Scenario): Promise<Verdict> {
         const input = s.recaptchaInput ?? { token: '', expectedAction: 'signup' };
         const result = await verifyRecaptcha(input.token, input.expectedAction);
         outcome = { ...result, request: recaptchaCapturedRequest };
+        break;
+      }
+
+      case 'recaptchaScoreBand': {
+        outcome = { bands: (s.recaptchaScores ?? []).map((score) => scoreBand(score)) };
         break;
       }
 

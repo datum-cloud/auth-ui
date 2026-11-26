@@ -214,6 +214,15 @@ const schema = z
     // Public by design — this key ships in the page HTML. Its partner below is not.
     RECAPTCHA_SITE_KEY: z.string().optional(),
     RECAPTCHA_SECRET_KEY: z.string().optional(),
+    // Score threshold for sign-up and password sign-in. Unset means no threshold: every score is
+    // recorded and none is judged low. Parsed as a number below; out-of-range values fail boot.
+    RECAPTCHA_MIN_SCORE: z.string().optional(),
+    // Whether a score below RECAPTCHA_MIN_SCORE is rejected. Default off: the low score is
+    // recorded as would_reject and the request proceeds, so a threshold can be chosen from data.
+    RECAPTCHA_ENFORCE_SCORE: z
+      .string()
+      .optional()
+      .transform((v) => v === 'true' || v === '1'),
   })
   .superRefine((v, ctx) => {
     if (
@@ -316,6 +325,16 @@ const schema = z
           'verification would fail on every request',
       });
     }
+    if (v.RECAPTCHA_MIN_SCORE !== undefined) {
+      const minScore = Number(v.RECAPTCHA_MIN_SCORE);
+      if (v.RECAPTCHA_MIN_SCORE.trim() === '' || !(minScore >= 0 && minScore <= 1)) {
+        ctx.addIssue({
+          code: 'custom',
+          path: ['RECAPTCHA_MIN_SCORE'],
+          message: 'RECAPTCHA_MIN_SCORE must be a number from 0 to 1, or unset for no threshold',
+        });
+      }
+    }
     // recaptcha.server.ts's hostname check silently no-ops without PUBLIC_ORIGIN, and it is the
     // only control against token farming with our public site key on another domain.
     if (v.RECAPTCHA_SECRET_KEY && !v.PUBLIC_ORIGIN) {
@@ -348,6 +367,9 @@ const schema = z
             .filter(Boolean)
         : [],
       AUTH_EMAIL_VERIFICATION_REQUIRED: requireEmailVerification,
+      // Validated to 0..1 by the superRefine above; undefined means no threshold.
+      RECAPTCHA_MIN_SCORE:
+        v.RECAPTCHA_MIN_SCORE === undefined ? undefined : Number(v.RECAPTCHA_MIN_SCORE),
       // TEMPORARY (ADR 007): parsed allow-list (lower-cased, empty = off) and alias tag.
       IDP_AUTO_CREATE_EMAIL_DOMAINS: (v.IDP_AUTO_CREATE_EMAIL_DOMAINS ?? '')
         .split(/[,\s]+/)

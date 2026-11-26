@@ -15,6 +15,27 @@ const authEvents = new Counter({
   registers: [registry],
 });
 
+// reCAPTCHA scores by band. Labels are bounded: `action` is one of the few fixed action names the
+// gate is called with, `band` is ScoreBand, `decision` is pass / would_reject / reject.
+const recaptchaScores = new Counter({
+  name: 'auth_recaptcha_score_total',
+  help: 'reCAPTCHA verifications by action, score band and gate decision',
+  labelNames: ['action', 'band', 'decision'],
+  registers: [registry],
+});
+
+export type RecaptchaScoreDecision = 'pass' | 'would_reject' | 'reject';
+/** Defined here rather than in recaptcha.server.ts so the metric types need no import back. */
+export type ScoreBand = 'none' | 'lt03' | '03to05' | '05to07' | 'gte07';
+
+export function recordRecaptchaScore(
+  action: string,
+  band: ScoreBand,
+  decision: RecaptchaScoreDecision
+): void {
+  recaptchaScores.inc({ action, band, decision });
+}
+
 // HTTP request duration histogram — labels: method, route, status_code.
 // "route" uses the Hono matched path pattern (e.g. /id/login/password), not
 // the raw URL, so high-cardinality identifiers (user IDs in query params, etc.)

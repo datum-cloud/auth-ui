@@ -1,5 +1,12 @@
 import { env } from '@/server/infra/env.server';
-import { logAuthEvent } from '@/server/observability';
+import {
+  logAuthEvent,
+  recordRecaptchaScore,
+  type RecaptchaScoreDecision,
+  type ScoreBand,
+} from '@/server/observability';
+
+export type { ScoreBand };
 
 const SITEVERIFY_URL = 'https://www.google.com/recaptcha/api/siteverify';
 const REQUEST_TIMEOUT_MS = 2000;
@@ -132,20 +139,58 @@ export async function recaptchaRejects(token: string, expectedAction: string): P
 
   // Unconfigured deployments stay dark, audit trail included — otherwise the metric reads
   // as a healthy gate where there is no gate.
-  if (verdict.reason !== 'not-configured') {
-    logAuthEvent(
-      'signup_recaptcha_scored',
-      verdict.outcome === 'unavailable' ? 'failure' : 'success',
-      {
-        verdict: verdict.outcome,
-        reason: verdict.reason,
-        score: verdict.score,
-        action: expectedAction,
-        ...(verdict.errorCodes ? { errorCodes: verdict.errorCodes } : {}),
-      }
-    );
-  }
+  if (verdict.reason === 'not-configured') return false;
+
+  const band = scoreBand(verdict.score);
+  const decision = scoreDecision(verdict, expectedAction);
+
+  logAuthEvent(
+    'signup_recaptcha_scored',
+    verdict.outcome === 'unavailable' ? 'failure' : 'success',
+    {
+      verdict: verdict.outcome,
+      reason: verdict.reason,
+      score: verdict.score,
+      band,
+      decision,
+      action: expectedAction,
+      ...(verdict.errorCodes ? { errorCodes: verdict.errorCodes } : {}),
+    }
+  );
+  recordRecaptchaScore(expectedAction, band, decision);
 
   // 'unavailable' is Google failing us, not the caller — fail open.
-  return verdict.outcome === 'invalid';
+  return verdict.outcome === 'invalid' || decision === 'reject';
+}
+
+/**
+ * Actions a low score may count against. Recovery is left out on purpose: its answers must stay
+ * indistinguishable across branches, so it records its band and never rejects on score.
+ */
+const SCORE_ENFORCED_ACTIONS: ReadonlySet<string> = new Set(['signup', 'signup_code']);
+
+/**
+ * Judges the score alone. Only a valid token with a numeric score below the threshold counts as
+ * low; a missing score is never low. Without RECAPTCHA_ENFORCE_SCORE a low score is only
+ * recorded as would_reject.
+ */
+function scoreDecision(verdict: RecaptchaVerdict, action: string): RecaptchaScoreDecision {
+  const min = env.RECAPTCHA_MIN_SCORE;
+  const isLow =
+    verdict.outcome === 'valid' &&
+    verdict.score !== null &&
+    min !== undefined &&
+    verdict.score < min &&
+    SCORE_ENFORCED_ACTIONS.has(action);
+  if (!isLow) return 'pass';
+  return env.RECAPTCHA_ENFORCE_SCORE ? 'reject' : 'would_reject';
+}
+
+/** Buckets a score for the metric. Each edge belongs to the band above it. */
+export function scoreBand(score: number | null): ScoreBand {
+  if (score === null) return 'none';
+  if (score < 0.3) return 'lt03';
+  if (score < 0.5) return '03to05';
+  if (score < 0.7) return '05to07';
+  return 'gte07';
 }

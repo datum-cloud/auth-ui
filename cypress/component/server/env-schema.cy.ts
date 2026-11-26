@@ -395,6 +395,46 @@ describe('env schema — RECAPTCHA_SITE_KEY / RECAPTCHA_SECRET_KEY (reCAPTCHA v3
   });
 });
 
+describe('env schema — RECAPTCHA_MIN_SCORE / RECAPTCHA_ENFORCE_SCORE', () => {
+  it('leaves both off when unset', () => {
+    callService({ fn: 'envSchemaFull', parseEnvRaw: { ...BASE } }).then((v) => {
+      expect(v.outcome.success).to.equal(true);
+      const data = v.outcome.data as Record<string, unknown>;
+      expect(data.RECAPTCHA_MIN_SCORE).to.equal(undefined);
+      expect(data.RECAPTCHA_ENFORCE_SCORE).to.equal(false);
+    });
+  });
+
+  it('parses a threshold and the enforcement flag', () => {
+    callService({
+      fn: 'envSchemaFull',
+      parseEnvRaw: { ...BASE, RECAPTCHA_MIN_SCORE: '0.5', RECAPTCHA_ENFORCE_SCORE: 'true' },
+    }).then((v) => {
+      expect(v.outcome.success).to.equal(true);
+      const data = v.outcome.data as Record<string, unknown>;
+      expect(data.RECAPTCHA_MIN_SCORE).to.equal(0.5);
+      expect(data.RECAPTCHA_ENFORCE_SCORE).to.equal(true);
+    });
+  });
+
+  for (const bad of ['1.5', '-0.1', 'abc', '']) {
+    it(`REFUSES RECAPTCHA_MIN_SCORE=${JSON.stringify(bad)}`, () => {
+      callService({
+        fn: 'envSchemaFull',
+        parseEnvRaw: { ...BASE, RECAPTCHA_MIN_SCORE: bad },
+      }).then((v) => {
+        expect(v.outcome.success).to.equal(false);
+        expect(
+          (v.outcome.issues as Array<{ path: unknown[] }>).some(
+            (i) => i.path[0] === 'RECAPTCHA_MIN_SCORE'
+          ),
+          JSON.stringify(v.outcome.issues)
+        ).to.equal(true);
+      });
+    });
+  }
+});
+
 // ── ZITADEL_CUSTOM_REQUEST_HEADERS ───────────────────────────────────────────
 // The transport used to drop a malformed entry on every request with no signal. The schema now
 // fails boot on one, and accepts a value containing ':' (only the first ':' is the separator).

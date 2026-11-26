@@ -38,12 +38,17 @@ server log line for that traceId  ->  full provider/proto detail, never sent any
 ## Metrics
 
 `app/server/observability.ts` owns a private `prom-client` `Registry` (plus default Node process
-metrics). Two application metrics:
+metrics). Three application metrics:
 
 | Metric | Type | Labels |
 | --- | --- | --- |
 | `http_request_duration_seconds` | Histogram | `method`, `route`, `status_code` |
 | `auth_events_total` | Counter | `event`, `outcome` |
+| `auth_recaptcha_score_total` | Counter | `action`, `band`, `decision` |
+
+`auth_recaptcha_score_total` counts every reCAPTCHA verification. `band` buckets the score
+(`none`, `lt03`, `03to05`, `05to07`, `gte07`) and `decision` is `pass`, `would_reject` or
+`reject`; see `RECAPTCHA_MIN_SCORE` in [configuration](configuration.md).
 
 `route` is the **matched Hono path pattern** (e.g. `/id/login/password`), never the raw URL — that
 is what keeps label cardinality bounded when identifiers appear in query params. The `httpMetrics`
