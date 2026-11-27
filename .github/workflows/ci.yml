@@ -265,7 +265,7 @@ jobs:
       contents: read
       packages: write
       attestations: write
-    uses: datum-cloud/actions/.github/workflows/publish-docker.yaml@3c539313fc5f8df14c302ea95ed90349fc83ead9 # v1.29.0
+    uses: datum-cloud/actions/.github/workflows/publish-docker.yaml@51f5aaf27abc090bdfd70c0a96d37aeb90273c9f # v1.31.0
     with:
       image-name: auth-ui
     # No secrets are passed on purpose. The build does not upload source maps,
@@ -280,7 +280,7 @@ jobs:
       id-token: write
       contents: read
       packages: write
-    uses: datum-cloud/actions/.github/workflows/publish-kustomize-bundle.yaml@3c539313fc5f8df14c302ea95ed90349fc83ead9 # v1.29.0
+    uses: datum-cloud/actions/.github/workflows/publish-kustomize-bundle.yaml@51f5aaf27abc090bdfd70c0a96d37aeb90273c9f # v1.31.0
     with:
       bundle-name: ghcr.io/datum-cloud/auth-ui-kustomize
       bundle-path: config
