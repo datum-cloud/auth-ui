@@ -2,7 +2,7 @@
 # Brings up Zitadel + Postgres; a follow-up task seeds a service user + an OIDC app.
 services:
   db:
-    image: postgres:16-alpine@sha256:0cefaabd882e42bcb2a2f3dc56d3ce4770560ba62fd7f197f1a2e008fd5731ab
+    image: postgres:16-alpine@sha256:f2f98726820d0342055351c6e9d36e705f5bfffb3dd53ff556325114b08afb6d
     environment: { POSTGRES_USER: zitadel, POSTGRES_PASSWORD: zitadel, POSTGRES_DB: zitadel }
   zitadel:
     image: ghcr.io/zitadel/zitadel:latest@sha256:9ea0e9ecfdc43115da871242e40a0320f2ece864c7cd8b5d41a863a7f4902499
