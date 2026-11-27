@@ -42,16 +42,22 @@ spec:
         runAsGroup: 1001
         seccompProfile:
           type: RuntimeDefault
-      # Spread pods across nodes to survive single-node failure.
-      # cloud-portal doesn't model topologySpreadConstraints yet, so we add a
-      # single hostname-level constraint (best-effort DoNotSchedule equivalent
-      # for 2 replicas).
+      # Require separate nodes so one node failure cannot take the sign-in page
+      # down, and prefer separate zones. matchLabelKeys keeps a rolling update from
+      # counting the previous ReplicaSet's pods.
       topologySpreadConstraints:
         - maxSkew: 1
           topologyKey: kubernetes.io/hostname
+          whenUnsatisfiable: DoNotSchedule
+          labelSelector:
+            matchLabels: { app.kubernetes.io/name: auth-ui }
+          matchLabelKeys: [pod-template-hash]
+        - maxSkew: 1
+          topologyKey: topology.kubernetes.io/zone
           whenUnsatisfiable: ScheduleAnyway
           labelSelector:
             matchLabels: { app.kubernetes.io/name: auth-ui }
+          matchLabelKeys: [pod-template-hash]
       containers:
         - name: auth-ui
           # Immutable, pinned tag (git SHA / semver) set by the publish job — never `:latest`,

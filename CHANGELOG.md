@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Changed
+- The two pods now run on different nodes and prefer different zones. Previously both
+  could share one node, so a single node failure took the sign-in page down.
 - Email signup now asks for first and last name alongside the email address, and
   the account is created with that name. Previously the name was copied from the
   email address (e.g. "jane.doe jane.doe") until the user completed their profile
