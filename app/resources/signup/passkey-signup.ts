@@ -44,9 +44,10 @@ export async function registerPasskeySignup(
   // to finish, so refuse rather than create an account nobody can verify.
   if (!env.AUTH_EMAIL_DELIVERY_ENABLED) return null;
 
-  // Disposable inboxes, from the vendored list. Observe mode (the default) records the match and
-  // carries on, so the effect can be measured before SIGNUP_BLOCK_DISPOSABLE_EMAIL refuses it.
-  // The log carries the matched list entry only, never the address.
+  // Disposable inboxes, from the disposable-email-domains-js list. Observe mode (the default)
+  // records the match and carries on, so the effect can be measured before
+  // SIGNUP_BLOCK_DISPOSABLE_EMAIL refuses it. The log carries the matched list entry only, never
+  // the address.
   const disposableDomain = matchDisposableDomain(input.email);
   if (disposableDomain) {
     const enforce = env.SIGNUP_BLOCK_DISPOSABLE_EMAIL;

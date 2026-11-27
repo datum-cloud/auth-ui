@@ -1,14 +1,10 @@
-// Vendored, not fetched at runtime: the list changes only through
-// scripts/update-disposable-domains.sh, so every change is a reviewed diff.
-import listText from '@/resources/signup/data/disposable-email-domains.txt?raw';
+// The list ships in the pinned disposable-email-domains-js package, so a change to it arrives as a
+// reviewed dependency update. The package's own isDisposableEmail answers only true or false; the
+// walk below also returns the matched entry, which is what the sign-up audit event logs.
+import { disposableEmailBlocklistSet } from 'disposable-email-domains-js';
 
-/** Built once per process. Blank lines and `#` comments are not domains. */
-const DISPOSABLE_DOMAINS: ReadonlySet<string> = new Set(
-  listText
-    .split('\n')
-    .map((line) => line.trim().toLowerCase())
-    .filter((line) => line !== '' && !line.startsWith('#'))
-);
+/** Built once per process; the package returns a fresh copy on every call. */
+const DISPOSABLE_DOMAINS: ReadonlySet<string> = disposableEmailBlocklistSet();
 
 /**
  * The listed domain the address falls under, or null. Checks the domain and each parent suffix

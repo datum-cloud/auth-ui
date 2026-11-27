@@ -1,6 +1,6 @@
 // cypress/component/resources/signup/disposable-email.cy.ts
 //
-// Pure module, so it runs browser-side against the real vendored list.
+// Pure module, so it runs browser-side against the real list from disposable-email-domains-js.
 import { isDisposableEmail } from '@/resources/signup/disposable-email';
 
 describe('isDisposableEmail', () => {
