@@ -57,5 +57,5 @@ overrides:
   # it did under npm.
   'madge>typescript': 'catalog:'
   'dependency-tree>typescript': 5.9.3
-  minimatch: 11.0.4
-  glob: 14.0.3
+  minimatch: 11.0.9
+  glob: 14.0.6
