@@ -68,6 +68,7 @@ export function stubServerModulesForCypress(root: string): Plugin {
     // Task 8a: observability.ts imports node:crypto, prom-client, hono — all server-only.
     [resolve(root, './app/server/observability.ts')]: `
       export function logAuthEvent(_event, _outcome, _meta) {}
+      export function recordRecaptchaScore(_action, _band, _decision) {}
       export function hashActor(_id) { return ''; }
       export const registry = {};
       export function logHono() { return (_c, next) => next(); }

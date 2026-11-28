@@ -106,3 +106,24 @@ spec:
               Events covered: password_check, ldap_signin, idp.signin.
               Investigate for credential-stuffing or brute-force activity.
               Check rate-limit logs: kubectl -n auth-ui logs -l app.kubernetes.io/name=auth-ui | grep rate_limit
+
+        # --- reCAPTCHA Unconfigured ---
+        # recaptchaRejects emits signup_recaptcha_unconfigured on every check it skips in a
+        # production Zitadel deployment with no reCAPTCHA keys. The check fails open, so without
+        # this alert the sign-up bot gate could be off with nothing to show for it.
+        - alert: AuthUIRecaptchaUnconfigured
+          expr: |
+            sum(increase(auth_events_total{
+              job="auth-ui",
+              event="signup_recaptcha_unconfigured"
+            }[15m])) > 0
+          labels:
+            severity: warning
+            service: console
+            team: portals
+          annotations:
+            summary: "auth-ui is running without reCAPTCHA keys"
+            description: |
+              Every reCAPTCHA check is being skipped because RECAPTCHA_SITE_KEY and
+              RECAPTCHA_SECRET_KEY are not both set.
+              Set both keys (and PUBLIC_ORIGIN) on the deployment.

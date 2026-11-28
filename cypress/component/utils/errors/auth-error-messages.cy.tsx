@@ -98,6 +98,7 @@ const NEWLY_MAPPED: [code: string, expected: string][] = [
   ['ALREADY_SIGNED_IN', "You're already signed in."],
   ['EXPIRED', 'That link has expired. Start over to get a new one.'],
   ['RECOVERY_EXPIRED', 'That recovery link has expired. Request a new one.'],
+  ['DISPOSABLE_EMAIL', 'Use a permanent email address, or continue with Google or GitHub.'],
 ];
 
 describe('useAuthErrorMessage — resource codes that had no message', () => {

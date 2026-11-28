@@ -34,6 +34,7 @@ export function useAuthErrorMessage() {
     // would tell a bot which wall it hit for no human benefit. Deliberately avoids
     // "verify" — that word means email verification everywhere else in this flow.
     RECAPTCHA_FAILED: t`That didn't go through. Please try again.`,
+    DISPOSABLE_EMAIL: t`Use a permanent email address, or continue with Google or GitHub.`,
     USER_NOT_FOUND: t`We could not find an account for that identifier.`,
     PHONE_LOGIN_DISABLED: t`Phone sign-in isn't available — use your email or username.`,
     EMAIL_LOGIN_DISABLED: t`Email sign-in isn't available — use your username.`,

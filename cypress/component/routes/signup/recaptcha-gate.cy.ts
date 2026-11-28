@@ -22,7 +22,17 @@ const ok = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
-type ScoredEvent = { action?: string; verdict?: string; reason?: string; score?: number | null };
+type ScoredEvent = {
+  action?: string;
+  verdict?: string;
+  reason?: string;
+  score?: number | null;
+  band?: string;
+  decision?: string;
+};
+
+const scoredEvent = (v: { audit?: Array<Record<string, unknown>> }) =>
+  v.audit?.find((a) => a.event === 'signup_recaptcha_scored') as ScoredEvent | undefined;
 
 // The identifier form requires a name; without it the action would 400 on schema, not on the gate.
 const NAMED = { firstName: 'Ada', lastName: 'Lovelace' };
@@ -240,6 +250,149 @@ describe('signup reCAPTCHA gate', () => {
       const scored = v.audit?.find((a) => a.event === 'signup_recaptcha_scored') as
         ScoredEvent | undefined;
       expect(scored, 'unconfigured emits no audit event at all').to.be.undefined;
+      const unconfigured = v.audit?.find((a) => a.event === 'signup_recaptcha_unconfigured');
+      expect(unconfigured, 'no unconfigured signal outside production').to.be.undefined;
+    });
+  });
+
+  it('records a low score as would_reject in observe mode', () => {
+    callService({
+      fn: 'signupIndexAction',
+      env: { ...RECAPTCHA_ENV, RECAPTCHA_MIN_SCORE: '0.5' },
+      recaptchaFetch: { body: ok({ score: 0.2 }) },
+      recordCalls: ['register'],
+      request: {
+        url: URL,
+        form: { email: 'observe@acme.test', recaptchaToken: 'tok', ...NAMED },
+        csrf: true,
+      },
+    }).then((v) => {
+      expect(v.calls?.register ?? [], 'observe mode still registers').to.have.length(1);
+      const body = v.response?.dataBody as Record<string, unknown> | undefined;
+      expect(body?.sent).to.equal(true);
+      const scored = scoredEvent(v);
+      expect(scored?.band).to.equal('lt03');
+      expect(scored?.decision).to.equal('would_reject');
+    });
+  });
+
+  it('rejects a low score when enforcement is on', () => {
+    callService({
+      fn: 'signupIndexAction',
+      env: { ...RECAPTCHA_ENV, RECAPTCHA_MIN_SCORE: '0.5', RECAPTCHA_ENFORCE_SCORE: 'true' },
+      recaptchaFetch: { body: ok({ score: 0.2 }) },
+      recordCalls: ['register'],
+      request: {
+        url: URL,
+        form: { email: 'enforced@acme.test', recaptchaToken: 'tok', ...NAMED },
+        csrf: true,
+      },
+    }).then((v) => {
+      expect(v.response?.dataStatus).to.equal(400);
+      expect(v.response?.dataBody).to.have.property('error', 'RECAPTCHA_FAILED');
+      expect(v.calls?.register ?? [], 'no register call on a rejected score').to.have.length(0);
+      const scored = scoredEvent(v);
+      expect(scored?.band).to.equal('lt03');
+      expect(scored?.decision).to.equal('reject');
+    });
+  });
+
+  it('passes a score at the threshold', () => {
+    callService({
+      fn: 'signupIndexAction',
+      env: { ...RECAPTCHA_ENV, RECAPTCHA_MIN_SCORE: '0.5', RECAPTCHA_ENFORCE_SCORE: 'true' },
+      recaptchaFetch: { body: ok({ score: 0.5 }) },
+      recordCalls: ['register'],
+      request: {
+        url: URL,
+        form: { email: 'edge@acme.test', recaptchaToken: 'tok', ...NAMED },
+        csrf: true,
+      },
+    }).then((v) => {
+      expect(v.calls?.register ?? []).to.have.length(1);
+      const scored = scoredEvent(v);
+      expect(scored?.band).to.equal('05to07');
+      expect(scored?.decision).to.equal('pass');
+    });
+  });
+
+  it('never rejects a missing score for score', () => {
+    callService({
+      fn: 'signupIndexAction',
+      env: { ...RECAPTCHA_ENV, RECAPTCHA_MIN_SCORE: '0.5', RECAPTCHA_ENFORCE_SCORE: 'true' },
+      // Google can answer success with no score at all. That is not a low score.
+      recaptchaFetch: { body: ok({ score: undefined }) },
+      recordCalls: ['register'],
+      request: {
+        url: URL,
+        form: { email: 'noscore@acme.test', recaptchaToken: 'tok', ...NAMED },
+        csrf: true,
+      },
+    }).then((v) => {
+      expect(v.calls?.register ?? []).to.have.length(1);
+      const scored = scoredEvent(v);
+      expect(scored?.band).to.equal('none');
+      expect(scored?.decision).to.equal('pass');
+    });
+  });
+
+  it('records no decision change when no threshold is set', () => {
+    callService({
+      fn: 'signupIndexAction',
+      env: { ...RECAPTCHA_ENV, RECAPTCHA_ENFORCE_SCORE: 'true' },
+      recaptchaFetch: { body: ok({ score: 0.1 }) },
+      recordCalls: ['register'],
+      request: {
+        url: URL,
+        form: { email: 'nothreshold@acme.test', recaptchaToken: 'tok', ...NAMED },
+        csrf: true,
+      },
+    }).then((v) => {
+      expect(v.calls?.register ?? []).to.have.length(1);
+      const scored = scoredEvent(v);
+      expect(scored?.band).to.equal('lt03');
+      expect(scored?.decision).to.equal('pass');
+    });
+  });
+
+  it('recovery never rejects on score', () => {
+    const recoverEnv = {
+      ...RECAPTCHA_ENV,
+      AUTH_ACCOUNT_RECOVERY_ENABLED: 'true',
+      PUBLIC_ORIGIN: 'http://localhost',
+      RECAPTCHA_MIN_SCORE: '0.5',
+      RECAPTCHA_ENFORCE_SCORE: 'true',
+    };
+    const recover = (score: number) =>
+      callService({
+        fn: 'recoverAction',
+        env: recoverEnv,
+        seed: { users: [] },
+        recaptchaFetch: { body: ok({ score, action: 'recovery' }) },
+        request: {
+          url: 'http://localhost/id/recover',
+          csrf: true,
+          form: {
+            intent: 'request',
+            email: 'owner@acme.test',
+            organization: 'org-1',
+            recaptchaToken: 'tok',
+          },
+        },
+      });
+
+    recover(0.9).then((high) => {
+      recover(0.1).then((low) => {
+        // Recovery answers the same terminal whatever the score: a distinct answer would tell a
+        // caller which branch ran.
+        expect(low.response?.dataStatus ?? 200).to.equal(high.response?.dataStatus ?? 200);
+        expect(low.response?.dataBody).to.deep.equal(high.response?.dataBody);
+        expect(low.response?.dataBody).to.deep.equal({ sent: true, email: 'owner@acme.test' });
+        const scored = scoredEvent(low);
+        expect(scored?.action).to.equal('recovery');
+        expect(scored?.band).to.equal('lt03');
+        expect(scored?.decision).to.equal('pass');
+      });
     });
   });
 });
